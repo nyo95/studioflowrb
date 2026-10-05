@@ -13,6 +13,7 @@ import {
   type BqServiceContext,
 } from "./context";
 import { requireRupiah } from "../lib/currency";
+import { BQ_PRICE_MODES, type BqPriceMode } from "../lib/quotation";
 
 export function createProjectTreeService(ctx: BqServiceContext) {
   const {
@@ -230,10 +231,14 @@ async function updateItem(input: {
   hargaSnapshot?: string | null;
   koefisien?: string;
   markupL1Pct?: string;
+  priceMode?: BqPriceMode;
   sortOrder?: number;
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  if (input.priceMode !== undefined && !BQ_PRICE_MODES.includes(input.priceMode)) {
+    throw new AppError("VALIDATION", "bq.item.price-mode-invalid", "Unknown price mode");
+  }
   if (input.koefisien !== undefined) requirePositiveCoefficient(input.koefisien);
   await requireEditableProjectForItem(input.id);
 
@@ -246,6 +251,7 @@ async function updateItem(input: {
     && decimalFieldUnchanged(input.hargaSnapshot, existing.harga_snapshot)
     && decimalFieldUnchanged(input.koefisien, existing.koefisien)
     && decimalFieldUnchanged(input.markupL1Pct, existing.markup_l1_pct)
+    && fieldUnchanged(input.priceMode, existing.price_mode)
     && fieldUnchanged(input.sortOrder, existing.sort_order)
     && fieldUnchanged(input.notes, existing.notes)
   ) return existing;
@@ -259,6 +265,7 @@ async function updateItem(input: {
       ...(input.hargaSnapshot !== undefined && { harga_snapshot: input.hargaSnapshot }),
       ...(input.koefisien !== undefined && { koefisien: input.koefisien }),
       ...(input.markupL1Pct !== undefined && { markup_l1_pct: input.markupL1Pct }),
+      ...(input.priceMode !== undefined && { price_mode: input.priceMode }),
       ...(input.sortOrder !== undefined && { sort_order: input.sortOrder }),
       ...(input.notes !== undefined && { notes: input.notes }),
     },

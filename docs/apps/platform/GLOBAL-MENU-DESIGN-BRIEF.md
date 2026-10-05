@@ -1,6 +1,8 @@
 # Global Menu Design Brief
 
-Status: design input, not a final design decision.
+Status: executed. Option B app switcher (R8.110/R8.121, owner 2026-09-23); the
+header/sidebar boundary and the narrow treatment were finished in R8.329
+(owner asked the Lead to do it, 2026-10-05). See "Outcome" at the end.
 Created: 2026-09-16.
 
 This brief records owner feedback about the global app menu and settings entry
@@ -166,3 +168,24 @@ This document does not decide:
 - whether the top bar, rail, or launcher is the winning pattern.
 
 Those should be handled in the dedicated design pass.
+
+## Outcome (R8.329, 2026-10-05)
+
+The Lead's answers to "Decision Inputs Needed", as built:
+
+- **Desktop placement.** Option B: one app chip right of the mark in the top
+  bar (current app icon and name; the menu lists every app with its icon).
+- **Header/sidebar boundary.** Navigation is one column from the top edge down:
+  the mark sits in a cell exactly as wide as the rail (48px collapsed, 212px
+  expanded), in the rail's recessed colour and with no rule under it. The top
+  bar and its bottom rule span only the workspace. Bar content never moves when
+  the rail is collapsed or expanded. A surface without a rail keeps a plain bar.
+- **Mobile (below 840px).** The rail becomes a horizontal strip under the bar
+  and the mark cell joins the bar. Below 560px the app chip shows only the app
+  icon (the name stays as its accessible name and tooltip), so the search field
+  keeps a usable width; the personal controls stay pinned right.
+- **Settings.** One Settings entry in the account menu (`Account / Settings /
+  Sign out`) opening the single settings canvas; Settings is not an app in the
+  switcher. Outside every app the chip reads "Apps".
+- **App count.** The menu pattern holds well past the current three apps; no
+  persistent per-app links are planned.

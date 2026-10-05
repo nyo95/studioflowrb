@@ -64,6 +64,8 @@ export function requireCommand(ctx: CommandContext, permission: string): string 
 
 export type ProjectAccess = {
   override: boolean;
+  /** A completed project is read-only for everyone until it is reopened (owner, 2026-10-04). */
+  completed: boolean;
   isDesigner: boolean;
   isDrafter: boolean;
   canEditProject: boolean;
@@ -73,28 +75,38 @@ export type ProjectAccess = {
 
 /** The single StudioFlow PIC-assignment policy (WO-SF-ACCESS-01). */
 export async function getProjectAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<ProjectAccess> {
-  const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } } } });
+  const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } } } });
   if (!project) throw notFound("project");
   const override = hasPermission(input.grants, P.projectOverride);
   const isDesigner = project.pic_designer_id === input.actorId;
   const isDrafter = project.pic_drafter_id === input.actorId;
+  const completed = project.status === "COMPLETED";
+  const open = !completed;
   return {
     override,
+    completed,
     isDesigner,
     isDrafter,
-    canEditProject: override || isDesigner,
-    canEditDocuments: override || isDesigner || isDrafter,
+    canEditProject: open && (override || isDesigner),
+    canEditDocuments: open && (override || isDesigner || isDrafter),
     phases: project.phases.map((phase) => ({
       phaseId: phase.id,
-      canTransition: override || isDesigner || (isDrafter && phase.seat_snapshot === "drafter"),
-      canEditContent: override || isDesigner || (isDrafter && phase.seat_snapshot === "drafter"),
+      canTransition: open && (override || isDesigner || (isDrafter && phase.seat_snapshot === "drafter")),
+      canEditContent: open && (override || isDesigner || (isDrafter && phase.seat_snapshot === "drafter")),
     })),
   };
 }
 
-export async function requireProjectAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string; kind: "project" | "document" | "transition" | "content"; phaseId?: string | null }): Promise<ProjectAccess> {
+/** Who may mark a project completed or reopen it: either PIC, or an override holder. */
+export function canChangeCompletion(access: ProjectAccess): boolean {
+  return access.override || access.isDesigner || access.isDrafter;
+}
+
+/** `allowCompleted` (project-level checks only) lets a PIC archive, restore or reopen a completed project. */
+export async function requireProjectAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string; kind: "project" | "document" | "transition" | "content"; phaseId?: string | null; allowCompleted?: boolean }): Promise<ProjectAccess> {
   const access = await getProjectAccess(tx, input);
-  const permitted = input.kind === "project" ? access.canEditProject
+  if (access.completed && !(input.allowCompleted && input.kind === "project")) throw projectCompletedError();
+  const permitted = input.kind === "project" ? access.override || access.isDesigner
     : input.kind === "document" ? access.canEditDocuments
       : input.kind === "transition" ? access.phases.some((phase) => phase.phaseId === input.phaseId && phase.canTransition)
         : access.phases.some((phase) => phase.phaseId === input.phaseId && phase.canEditContent);
@@ -112,6 +124,16 @@ export function invalid(code: string, message: string): AppError {
 
 export function conflict(code: string, message: string): AppError {
   return new AppError("CONFLICT", code, message);
+}
+
+export function projectCompletedError(): AppError {
+  return conflict("PROJECT_COMPLETED", "This project is completed. Reopen it before making changes.");
+}
+
+/** Archived and completed projects take no changes; reopening is the only way back (owner, 2026-10-04). */
+export function assertProjectWritable(project: { archived_at: Date | null; status: string }, options: { allowCompleted?: boolean } = {}): void {
+  if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+  if (!options.allowCompleted && project.status === "COMPLETED") throw projectCompletedError();
 }
 
 export function mapWriteError(error: unknown): never {
@@ -149,11 +171,12 @@ export function optionalText(value: string | null | undefined, max = 2000): stri
   return text;
 }
 
-/** Archived projects are read-only everywhere (contract §4.4). */
-export async function loadWritableProject(tx: TxClient, projectId: string) {
+/** Archived (contract §4.4) and completed projects are read-only everywhere. Only the completion
+ * commands themselves pass `allowCompleted`, so a completed project can be reopened. */
+export async function loadWritableProject(tx: TxClient, projectId: string, options: { allowCompleted?: boolean } = {}) {
   const project = await tx.sfProject.findUnique({ where: { id: projectId } });
   if (!project) throw notFound("project");
-  if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+  assertProjectWritable(project, options);
   return project;
 }
 

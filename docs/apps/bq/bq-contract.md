@@ -379,6 +379,9 @@ tidak ada FK lintas schema atau pembacaan tabel internal aplikasi lain.
 | `external_ref` | string? | Referensi ke project system lain (opsional) |
 | `created_by` | string | FK ke User |
 | `notes` | text? | Keterangan umum |
+| `quotation_number` | string? | Nomor quotation (R8.328) |
+| `quotation_date` | date? | Tanggal quotation; kosong = tanggal cetak |
+| `quotation_terms` | text? | T&C milik project; kosong = T&C standar studio |
 | `created_at` | timestamp | |
 | `updated_at` | timestamp | |
 
@@ -392,6 +395,10 @@ ARCHIVED ──▶ deletion request (terpisah)
 ```
 
 Project hanya boleh dikunci bila memiliki sedikitnya satu Work Item. Baris dengan harga Rp0 harus diisi, kecuali pemanggil secara eksplisit mengonfirmasi bahwa project boleh dikunci dengan baris harga nol; baris yang terdampak dihitung dan tidak diubah.
+
+**Quotation (R8.328).** Dokumen cetak `/bq/print/[id]/quotation` (Print / Save PDF lewat browser, seperti Product Schedule): kop studio (nama dan logo dari Platform settings), nomor/tanggal/klien, Section → Subsection → Work Item dengan No., uraian, qty, unit, rate, total; subtotal per Section, grand total, catatan TBC/By Owner, T&C bernomor (satu baris = satu butir), dan kolom tanda tangan. Klien hanya melihat rate dan total (§6.4) — tanpa markup, koefisien, atau breakdown. Nomor, tanggal, dan T&C menjelaskan surat, bukan isi harga, sehingga tetap bisa diubah saat project `LOCKED` (`updateQuotation`, `bq.project.manage`); project `ARCHIVED` menolaknya.
+
+**Price mode (R8.328; owner 2026-09-23).** Setiap Work Item punya `price_mode`: `PRICED` (default), `TBC`, atau `BY_OWNER`. TBC dan By Owner adalah baris penanda: tidak ada rate/total yang ditampilkan atau dihitung (walau harga tersimpan), baris itu tidak masuk subtotal/grand total, tidak membuat grand total "belum lengkap", dan tidak dihitung sebagai baris Rp0 saat lock.
 
 **Service-layer enforcement:** setiap mutation terhadap content BQ wajib melewati guard `requireEditableProject` yang reject bila status `LOCKED` atau `ARCHIVED`. Tidak cukup hanya disable tombol di UI.
 
@@ -569,8 +576,6 @@ yang eksplisit direkam.
 | Item | Keterangan |
 |---|---|
 | Waste tracking | Konsep: `waste = 1 − koefisien`. Tidak ada UI/DB untuk ini dulu. |
-| Quotation PDF dengan T&C | Butuh project stable dulu. |
-| Price mode (TBC, By Owner) | Lapis dokumen. |
 | Rate Library | Menyusul setelah banyak L1 jadi. |
 | Revisi antar versi BQ | Snapshot di §7 sudah siap sejak awal. |
 | Integrasi formal ke StudioFlow project | Via `external_ref` nanti. |

@@ -8,11 +8,9 @@ import { fullBlockers, todoBlockers } from "../domain/blockers";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { isCdMall, iterationChoices, iterationKinds } from "../domain/iteration-kinds";
 import {
-  availablePhaseCommands,
   canActivatePhase,
   isLegacySupervisionDefinition,
   isPhaseModifiable,
-  nextRevision,
   revisionLabel,
   waitingDays,
   type PhaseSeat,
@@ -21,6 +19,8 @@ import {
 } from "../domain/phase";
 import {
   P,
+  assertProjectWritable,
+  canChangeCompletion,
   conflict,
   getProjectAccess,
   hasPermission,
@@ -33,6 +33,7 @@ import {
   requireProjectAccess,
   requirePermission,
   requireRead,
+  optionalText,
   requiredText,
   writeAudit,
   type CommandContext,
@@ -42,7 +43,7 @@ import {
   type TxClient,
 } from "../shared";
 import { readBlockerCounts, readBlockerCountsBatch, readBlockerItems } from "./blocker-query";
-import { assertProjectCompletionReady } from "../projects/completion";
+import { assertProjectCompletionReady, readProjectCompletionReadiness } from "../projects/completion";
 
 type PhaseRow = Awaited<ReturnType<TxClient["sfPhase"]["findUniqueOrThrow"]>>;
 type ProjectRow = Awaited<ReturnType<TxClient["sfProject"]["findUniqueOrThrow"]>>;
@@ -50,6 +51,9 @@ type ProjectRow = Awaited<ReturnType<TxClient["sfProject"]["findUniqueOrThrow"]>
 /** Iteration states that count as "the phase's open iteration". */
 /** Undo stays possible for this long after a change (WO-SF-ITER-01 decision 7). */
 export const UNDO_WINDOW_MS = 300_000;
+
+/** Notes per iteration: what the client said, kept as one text (owner, 2026-10-05). */
+export const ITERATION_NOTE_MAX = 4000;
 
 const OPEN_ITERATION_STATES: Array<"NOT_SENT" | "SENT" | "ANSWERED"> = ["NOT_SENT", "SENT", "ANSWERED"];
 
@@ -71,7 +75,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   async function loadPhase(tx: TxClient, projectId: string, phaseId: string, access?: CommandContext): Promise<{ phase: PhaseRow; project: ProjectRow }> {
     const phase = await tx.sfPhase.findUnique({ where: { id: phaseId }, include: { project: true } });
     if (!phase || phase.project_id !== projectId) throw notFound("phase");
-    if (phase.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+    assertProjectWritable(phase.project);
     if (access?.actor.userId) await requireProjectAccess(tx, { grants: access.grants, actorId: access.actor.userId, projectId, phaseId, kind: "transition" });
     const { project, ...rest } = phase;
     return { phase: rest, project };
@@ -85,23 +89,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     return tx.sfRevision.findFirst({ where: { phase_id: phaseId }, orderBy: { major: "desc" } });
   }
 
-  async function closeRevision(tx: TxClient, revisionId: string) {
-    await tx.sfRevision.update({ where: { id: revisionId }, data: { status: "DONE", done_at: nowOf(ports) } });
-  }
-
   async function setPhase(tx: TxClient, phase: PhaseRow, data: { status: PhaseStatus; is_locked?: boolean }) {
     await tx.sfPhase.update({ where: { id: phase.id }, data: { ...data, status_changed_at: nowOf(ports) } });
-  }
-
-  async function nextPhaseExists(tx: TxClient, phase: PhaseRow): Promise<boolean> {
-    return (await tx.sfPhase.count({ where: { project_id: phase.project_id, order_index: phase.order_index + 1 } })) > 0;
-  }
-
-  async function assertFullyUnblocked(tx: TxClient, phaseId: string) {
-    const blockers = fullBlockers(await readBlockerCounts(tx, phaseId));
-    if (blockers.total > 0) {
-      throw new AppError("CONFLICT", "PHASE_APPROVAL_BLOCKED", `Cannot proceed: ${blockers.reasons.join(", ")}.`, { details: { reasons: blockers.reasons } });
-    }
   }
 
   async function audit(tx: TxClient, actor: AuditActor, action: string, phase: PhaseRow, from: PhaseStatus, to: PhaseStatus, metadata: Record<string, unknown> = {}) {
@@ -118,25 +107,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   type PhaseCommandInput = CommandContext & { projectId: string; phaseId: string };
 
   const commands = {
-    async activatePhase(input: PhaseCommandInput) {
-      requireCommand(input, P.phaseWork);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.status !== "PENDING") throw invalidState("Only a phase that has not started can be started.");
-        if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active to start a phase.");
-        const previous = await tx.sfPhase.findFirst({ where: { project_id: project.id, order_index: phase.order_index - 1 } });
-        if (!canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null)) {
-          throw conflict("PHASE_SEQUENTIAL", `${resolvePhaseName(phase)} starts after ${resolvePhaseName(previous!)} is approved.`);
-        }
-        const latest = await latestRevision(tx, phase.id);
-        const number = nextRevision(latest);
-        await setPhase(tx, phase, { status: "ACTIVE", is_locked: false });
-        const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number, name: `${phase.name_snapshot} ${number.major}`, status: "NOT_SENT" } });
-        await audit(tx, input.actor, "activated", phase, "PENDING", "ACTIVE", { revisionId: revision.id, revision: revisionLabel(number, phase.prefix_snapshot) });
-        return { phaseId: phase.id };
-      });
-    },
-
     async bypassPhase(input: PhaseCommandInput & { reason: string }) {
       requireCommand(input, P.phaseReview);
       const reason = requiredText(input.reason, "BYPASS_REASON_REQUIRED", "A reason", 500);
@@ -149,140 +119,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const latest = await latestRevision(tx, phase.id);
         if (!latest) await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, major: 1, name: `${phase.name_snapshot} 1`, status: "DONE", done_at: nowOf(ports) } });
         await audit(tx, input.actor, "bypassed", phase, "PENDING", target, { reason });
-        return { phaseId: phase.id };
-      });
-    },
-
-    /** Sends the open iteration to the client (iteration NOT_SENT -> SENT). */
-    async submitForClientReview(input: PhaseCommandInput) {
-      requireCommand(input, P.phaseReview);
-      return runTransaction(async (tx) => {
-        const { phase } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.is_locked) throw lockedError();
-        if (phase.status !== "ACTIVE") throw invalidState("This phase cannot be sent to the client now.");
-        const current = await activeRevision(tx, phase.id);
-        if (!current || current.status !== "NOT_SENT") throw invalidState("There is no iteration ready to send.");
-        await tx.sfRevision.update({ where: { id: current.id }, data: { status: "SENT", sent_at: nowOf(ports) } });
-        await setPhase(tx, phase, { status: "ACTIVE" });
-        await audit(tx, input.actor, "submitted-client", phase, "ACTIVE", "ACTIVE", { revisionId: current.id, revision: current.name });
-        return { phaseId: phase.id };
-      });
-    },
-
-    /** The client asked for changes: the sent iteration becomes REVISED and the next one opens. Open FEEDBACK activities become checklist todos (V2-D1). */
-    async rejectPhase(input: PhaseCommandInput & { type: "CLIENT" }) {
-      requireCommand(input, P.phaseReview);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.is_locked) throw lockedError();
-        const current = await activeRevision(tx, phase.id);
-        if (phase.status !== "ACTIVE" || !current || current.status !== "SENT") throw invalidState("Only a phase with the client can record client changes.");
-        const at = nowOf(ports);
-        await tx.sfRevision.update({ where: { id: current.id }, data: { status: "REVISED", answered_at: at } });
-        const number = nextRevision(current);
-        const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number, name: `${phase.name_snapshot} ${number.major}`, status: "NOT_SENT" } });
-        const feedback = await tx.sfActivity.findMany({ where: { revision_id: current.id, mode: "FEEDBACK", status: "OPEN" }, orderBy: { created_at: "asc" } });
-        const fallbackAssignee = phaseSnapshot(phase).seatSnapshot === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
-        const converted: string[] = [];
-        for (const item of feedback) {
-          // V2-D1: Feedback converts to SfChecklistItem (Todo SSOT) instead of a new SfActivity(TODO).
-          const id = randomUUID();
-          await tx.sfChecklistItem.create({
-            data: {
-              id,
-              project_id: project.id,
-              phase_id: phase.id,
-              label: item.content,
-              is_checked: false,
-              assigned_to_id: item.assigned_to_id ?? fallbackAssignee,
-              due_at: item.due_at,
-              created_by_id: item.created_by_id,
-            },
-          });
-          converted.push(id);
-        }
-        // Mark the original feedback activities as completed so they no longer count as open work.
-        if (feedback.length > 0) {
-          await tx.sfActivity.updateMany({ where: { id: { in: feedback.map((item) => item.id) } }, data: { status: "COMPLETED", completed_at: at } });
-        }
-        await setPhase(tx, phase, { status: "ACTIVE" });
-        await audit(tx, input.actor, "rejected-client", phase, "ACTIVE", "ACTIVE", {
-          previousRevision: current.name,
-          revision: revision.name,
-          revisionId: revision.id,
-          feedbackConverted: converted.length,
-        });
-        return { phaseId: phase.id, revision: revision.name, converted: converted.length };
-      });
-    },
-
-    /** The client approved the sent iteration: it is DONE and the phase is DONE. */
-    async approveClient(input: PhaseCommandInput) {
-      requireCommand(input, P.phaseReview);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.is_locked) throw lockedError();
-        const current = await activeRevision(tx, phase.id);
-        if (phase.status !== "ACTIVE" || !current || current.status !== "SENT") throw invalidState("Only a phase with the client can be approved.");
-        const at = nowOf(ports);
-        await tx.sfRevision.update({ where: { id: current.id }, data: { status: "DONE", answered_at: at, done_at: at } });
-        await setPhase(tx, phase, { status: "DONE", is_locked: true });
-        await audit(tx, input.actor, "approved-client", phase, "ACTIVE", "DONE", { revision: current.name });
-        const projectCompleted = false;
-        return { phaseId: phase.id, projectCompleted };
-      });
-    },
-
-    /** A finished phase gets one more iteration and returns to ACTIVE. */
-    async reopenPhase(input: PhaseCommandInput & { reason: string }) {
-      requireCommand(input, P.phaseReview);
-      const reason = requiredText(input.reason, "REOPEN_REASON_REQUIRED", "A reason", 500);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (phase.status !== "DONE") throw invalidState("Only a finished phase can be reopened.");
-        const number = nextRevision(await latestRevision(tx, phase.id));
-        const revision = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, ...number, name: `${phase.name_snapshot} ${number.major}`, status: "NOT_SENT" } });
-        await setPhase(tx, phase, { status: "ACTIVE", is_locked: false });
-        await audit(tx, input.actor, "reopened", phase, "DONE", "ACTIVE", { reason, revision: revision.name, revisionId: revision.id });
-        return { phaseId: phase.id, revision: revision.name };
-      });
-    },
-
-    async completeSupervision(input: PhaseCommandInput) {
-      requireCommand(input, P.phaseReview);
-      return runTransaction(async (tx) => {
-        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
-        if (!isLegacySupervisionDefinition(phase.definition_id) || phase.status !== "ACTIVE" || phase.is_locked) throw invalidState("Only Supervision in progress can be finished.");
-        await setPhase(tx, phase, { status: "DONE", is_locked: true });
-        const current = await activeRevision(tx, phase.id);
-        const converted: string[] = [];
-        if (current) {
-          // This completion has no gate (legacy parity: Supervision finishes on its own terms). Open FEEDBACK is converted
-          // to checklist todos the same way a client rejection does, so it is never orphaned on a closed iteration.
-          const feedback = await tx.sfActivity.findMany({ where: { revision_id: current.id, mode: "FEEDBACK", status: "OPEN" }, orderBy: { created_at: "asc" } });
-          const fallbackAssignee = phaseSnapshot(phase).seatSnapshot === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
-          for (const item of feedback) {
-            const id = randomUUID();
-            await tx.sfChecklistItem.create({
-              data: {
-                id,
-                project_id: project.id,
-                phase_id: phase.id,
-                label: item.content,
-                is_checked: false,
-                assigned_to_id: item.assigned_to_id ?? fallbackAssignee,
-                due_at: item.due_at,
-                created_by_id: item.created_by_id,
-              },
-            });
-            converted.push(id);
-          }
-          if (feedback.length > 0) {
-            await tx.sfActivity.updateMany({ where: { id: { in: feedback.map((item) => item.id) } }, data: { status: "COMPLETED", completed_at: nowOf(ports) } });
-          }
-          await closeRevision(tx, current.id);
-        }
-        await audit(tx, input.actor, "supervision-completed", phase, "ACTIVE", "DONE", { feedbackConverted: converted.length });
         return { phaseId: phase.id };
       });
     },
@@ -301,14 +137,14 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const revisions = await tx.sfRevision.findMany({
           where: { phase_id: phase.id },
           orderBy: { major: "asc" },
-          select: { id: true, major: true, name: true, status: true, created_at: true, activities: { select: { content: true, mode: true, status: true } } },
+          select: { id: true, major: true, name: true, status: true, created_at: true, note: true, visit_date: true, activities: { select: { content: true, mode: true, status: true } } },
         });
         // Snapshot deliverable provenance before revision destruction
         const deliverables = await tx.sfDeliverable.findMany({ where: { phase_id: phase.id }, select: { id: true, name: true, revision_id: true, storage_key: true, created_at: true } });
         const deliverableSnapshot = deliverables.map((d) => ({
           id: d.id, name: d.name, revisionId: d.revision_id, storageKey: d.storage_key, createdAt: d.created_at.toISOString(),
         }));
-        const history = revisions.map((rev) => ({ version: rev.name, status: rev.status, createdAt: rev.created_at.toISOString(), activities: rev.activities }));
+        const history = revisions.map((rev) => ({ version: rev.name, status: rev.status, createdAt: rev.created_at.toISOString(), note: rev.note, visitDate: rev.visit_date?.toISOString() ?? null, activities: rev.activities }));
         if (input.mode === "HARD_RESET_ACTIVE" && revisions.length > 0) {
           const latest = revisions[revisions.length - 1]!;
           if (input.major! <= latest.major) throw invalid("OVERRIDE_VERSION_BACKWARD", `Iteration ${input.major} must be higher than the latest iteration ${latest.major}.`);
@@ -372,7 +208,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   async function writableIteration(tx: TxClient, input: PhaseCommandInput) {
     requireCommand(input, P.phaseWork);
     const loaded = await loadPhase(tx, input.projectId, input.phaseId, input);
-    if (loaded.project.status === "COMPLETED") throw conflict("PROJECT_COMPLETED", "Reopen the project before changing a phase.");
     if (loaded.project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing an iteration.");
     return loaded;
   }
@@ -399,14 +234,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   function iterationUndo(row: { id: string; phase_id: string; major: number; name: string; status: string; sent_at: Date | null; answered_at: Date | null; done_at: Date | null; visit_date: Date | null; note: string | null }) {
     return { id: row.id, phaseId: row.phase_id, major: row.major, name: row.name, status: row.status, sentAt: row.sent_at?.toISOString() ?? null, answeredAt: row.answered_at?.toISOString() ?? null, doneAt: row.done_at?.toISOString() ?? null, visitDate: row.visit_date?.toISOString() ?? null, note: row.note };
   }
-  async function carryForwardFeedback(tx: TxClient, phase: PhaseRow, project: ProjectRow, revisionId: string) {
-    const feedback = await tx.sfActivity.findMany({ where: { revision_id: revisionId, mode: "FEEDBACK", status: "OPEN" } });
-    const assignee = phase.seat_snapshot === "drafter" ? project.pic_drafter_id : project.pic_designer_id;
-    const itemIds: string[] = [];
-    for (const item of feedback) { const created = await tx.sfChecklistItem.create({ data: { id: randomUUID(), project_id: project.id, phase_id: phase.id, label: item.content, assigned_to_id: item.assigned_to_id ?? assignee, due_at: item.due_at, created_by_id: item.created_by_id } }); itemIds.push(created.id); }
-    if (feedback.length) await tx.sfActivity.updateMany({ where: { id: { in: feedback.map((item) => item.id) } }, data: { status: "COMPLETED", completed_at: nowOf(ports) } });
-    return { itemIds, feedbackIds: feedback.map((item) => item.id) };
-  }
   async function defaultFirstKind(tx: TxClient, phase: PhaseRow) {
     const definition = await tx.sfPhaseDefinition.findUnique({ where: { id: phase.definition_id }, select: { default_iteration_kinds: true } });
     return iterationKinds(definition?.default_iteration_kinds)[0];
@@ -424,13 +251,18 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   }
   async function closePhase(tx: TxClient, input: PhaseCommandInput, phase: PhaseRow, project: ProjectRow, iteration: { id: string; status: string; phase_id: string; major: number; name: string; sent_at: Date | null; answered_at: Date | null; done_at: Date | null; visit_date: Date | null; note: string | null }) {
     const at = nowOf(ports);
-    const feedback = await carryForwardFeedback(tx, phase, project, iteration.id);
     await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "DONE", answered_at: at, done_at: at } });
     await setPhase(tx, phase, { status: "DONE", is_locked: true });
     const auto = await autoAdvance(tx, input, phase);
-    await recordEvent(tx, input, phase, iteration.id, iteration.status, "DONE", { beforeIteration: iterationUndo(iteration), phaseBefore: "ACTIVE", autoAdvance: auto, feedback });
+    await recordEvent(tx, input, phase, iteration.id, iteration.status, "DONE", { beforeIteration: iterationUndo(iteration), phaseBefore: "ACTIVE", autoAdvance: auto });
     await audit(tx, input.actor, "iteration-done", phase, "ACTIVE", "DONE", { iterationId: iteration.id, autoAdvance: auto });
     return { phaseId: phase.id, autoAdvance: auto };
+  }
+
+  async function writeIterationNote(tx: TxClient, input: PhaseCommandInput, phase: PhaseRow, iteration: Parameters<typeof iterationUndo>[0], note: string | null) {
+    await tx.sfRevision.update({ where: { id: iteration.id }, data: { note } });
+    await recordEvent(tx, input, phase, iteration.id, iteration.status, iteration.status, { beforeIteration: iterationUndo(iteration) });
+    await audit(tx, input.actor, "iteration-note-set", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id });
   }
 
   const iterationCommands = {
@@ -459,16 +291,37 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         return { iterationId: iteration.id };
       });
     },
-    async recordClientAnswer(input: PhaseCommandInput & { iterationId: string }) {
+    /** The client answered: the iteration is ANSWERED and, when given, what they said becomes its notes. */
+    async recordClientAnswer(input: PhaseCommandInput & { iterationId: string; note?: string | null }) {
+      const note = input.note === undefined ? undefined : optionalText(input.note, ITERATION_NOTE_MAX);
       return runTransaction(async (tx) => {
         const { phase } = await writableIteration(tx, input);
         const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } });
         if (!iteration) throw notFound("iteration");
-        if (iteration.status === "ANSWERED") return { iterationId: iteration.id };
+        if (iteration.status === "ANSWERED") {
+          // A retry, or notes added after "decide later": keep the answer, store the notes.
+          if (note !== undefined && note !== iteration.note) await writeIterationNote(tx, input, phase, iteration, note);
+          return { iterationId: iteration.id };
+        }
         if (iteration.status !== "SENT") throw invalidState("Only an iteration sent to the client can receive an answer.");
-        await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "ANSWERED", answered_at: nowOf(ports) } });
+        await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "ANSWERED", answered_at: nowOf(ports), ...(note !== undefined ? { note } : {}) } });
         await recordEvent(tx, input, phase, iteration.id, "SENT", "ANSWERED", { beforeIteration: iterationUndo(iteration) });
-        await audit(tx, input.actor, "client-answer-recorded", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id });
+        await audit(tx, input.actor, "client-answer-recorded", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id, notes: note !== undefined && note !== null });
+        return { iterationId: iteration.id };
+      });
+    },
+    /**
+     * An iteration's notes: what the client said about it (owner, 2026-10-05; they replace per-point feedback).
+     * Editable on any iteration of the phase while the project is open, so a late remark can still be recorded.
+     */
+    async setIterationNote(input: PhaseCommandInput & { iterationId: string; note: string | null }) {
+      const note = optionalText(input.note, ITERATION_NOTE_MAX);
+      return runTransaction(async (tx) => {
+        const { phase } = await writableIteration(tx, input);
+        const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } });
+        if (!iteration) throw notFound("iteration");
+        if (iteration.note === note) return { iterationId: iteration.id };
+        await writeIterationNote(tx, input, phase, iteration, note);
         return { iterationId: iteration.id };
       });
     },
@@ -481,9 +334,10 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const kinds = iterationKinds(definition.default_iteration_kinds);
         const isMall = isCdMall(kinds, iteration.name);
         if (input.outcome === "REVISION") {
-          const feedback = await carryForwardFeedback(tx, phase, project, iteration.id); const at = nowOf(ports); await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "REVISED", done_at: at } });
+          // What the client said stays in this iteration's notes; the next iteration shows them as its brief.
+          const at = nowOf(ports); await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "REVISED", done_at: at } });
           const next = await createIteration(tx, phase);
-          await recordEvent(tx, input, phase, iteration.id, "ANSWERED", "REVISED", { beforeIteration: iterationUndo(iteration), createdIteration: iterationUndo(next), feedback });
+          await recordEvent(tx, input, phase, iteration.id, "ANSWERED", "REVISED", { beforeIteration: iterationUndo(iteration), createdIteration: iterationUndo(next) });
           await audit(tx, input.actor, "iteration-revised", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id, nextIterationId: next.id });
           return { iterationId: iteration.id, nextIterationId: next.id };
         }
@@ -526,7 +380,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         if (latest?.id !== event.id) throw conflict("UNDO_NOT_LATEST", "Only the latest project change can be undone.");
         if (event.actor_id !== input.actor.userId) throw conflict("UNDO_ACTOR_MISMATCH", "Only the person who made this change can undo it.");
         if (event.undone_at || nowOf(ports).getTime() - event.occurred_at.getTime() > UNDO_WINDOW_MS) throw conflict("UNDO_EXPIRED", "This change can no longer be undone.");
-        const p = (event.auto_created ?? {}) as { beforeIteration?: ReturnType<typeof iterationUndo>; createdIteration?: ReturnType<typeof iterationUndo>; deletedIteration?: { iteration: ReturnType<typeof iterationUndo> }; autoAdvance?: { phaseId: string; iterationId: string } | null; phaseBefore?: string; phaseNoteBefore?: string | null; requirementId?: string; dismissedAtBefore?: string | null; feedback?: { itemIds: string[]; feedbackIds: string[] } };
+        const p = (event.auto_created ?? {}) as { beforeIteration?: ReturnType<typeof iterationUndo>; createdIteration?: ReturnType<typeof iterationUndo>; deletedIteration?: { iteration: ReturnType<typeof iterationUndo> }; autoAdvance?: { phaseId: string; iterationId: string } | null; phaseBefore?: string; phaseNoteBefore?: string | null; requirementId?: string; dismissedAtBefore?: string | null };
         for (const created of [p.createdIteration, p.autoAdvance ? { id: p.autoAdvance.iterationId } : undefined]) {
           if (!created) continue;
           const attached = await tx.sfRevision.findUnique({ where: { id: created.id }, select: { _count: { select: { activities: true, deliverables: true } } } });
@@ -536,7 +390,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         if (p.createdIteration) await tx.sfRevision.delete({ where: { id: p.createdIteration.id } });
         if (p.deletedIteration) { const row = p.deletedIteration.iteration; await tx.sfRevision.create({ data: { id: row.id, phase_id: row.phaseId, major: row.major, name: row.name, status: row.status as "NOT_SENT", sent_at: row.sentAt ? new Date(row.sentAt) : null, answered_at: row.answeredAt ? new Date(row.answeredAt) : null, done_at: row.doneAt ? new Date(row.doneAt) : null, visit_date: row.visitDate ? new Date(row.visitDate) : null, note: row.note } }); }
         if (p.beforeIteration) { const row = p.beforeIteration; await tx.sfRevision.update({ where: { id: row.id }, data: { name: row.name, status: row.status as "NOT_SENT" | "SENT" | "ANSWERED" | "REVISED" | "DONE", sent_at: row.sentAt ? new Date(row.sentAt) : null, answered_at: row.answeredAt ? new Date(row.answeredAt) : null, done_at: row.doneAt ? new Date(row.doneAt) : null, visit_date: row.visitDate ? new Date(row.visitDate) : null, note: row.note } }); }
-        if (p.feedback) { if (p.feedback.itemIds.length) await tx.sfChecklistItem.deleteMany({ where: { id: { in: p.feedback.itemIds } } }); if (p.feedback.feedbackIds.length) await tx.sfActivity.updateMany({ where: { id: { in: p.feedback.feedbackIds } }, data: { status: "OPEN", completed_at: null } }); }
         if (p.requirementId) await tx.sfChecklistItem.update({ where: { id: p.requirementId }, data: { dismissed_at: p.dismissedAtBefore ? new Date(p.dismissedAtBefore) : null } });
         if (p.phaseNoteBefore !== undefined) await tx.sfPhase.update({ where: { id: event.phase_id }, data: { note: p.phaseNoteBefore } });
         if (p.phaseBefore) await tx.sfPhase.update({ where: { id: event.phase_id }, data: { status: p.phaseBefore as PhaseStatus, is_locked: false } });
@@ -547,142 +400,40 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     },
     async markProjectCompleted(input: CommandContext & { projectId: string; overrideReason?: string | null }) {
       requireCommand(input, P.projectRead);
-      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can complete this project."); if (project.status === "COMPLETED") return { projectId: project.id }; const completion = await assertProjectCompletionReady(tx, input); await tx.sfProject.update({ where: { id: project.id }, data: { status: "COMPLETED" } }); await writeAudit(ports, tx, { action: "studioflow.project.completed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: "COMPLETED" } }, metadata: completion.overrideReason ? { completionOverrideReason: completion.overrideReason } : undefined }); return { projectId: project.id }; });
+      return runTransaction(async (tx) => {
+        const project = await loadWritableProject(tx, input.projectId, { allowCompleted: true });
+        const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id });
+        if (!canChangeCompletion(access)) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can complete this project.");
+        if (project.status === "COMPLETED") return { projectId: project.id };
+        const completion = await assertProjectCompletionReady(tx, input);
+        await tx.sfProject.update({ where: { id: project.id }, data: { status: "COMPLETED" } });
+        await writeAudit(ports, tx, { action: "studioflow.project.completed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: "COMPLETED" } }, metadata: completion.overrideReason ? { completionOverrideReason: completion.overrideReason } : undefined });
+        return { projectId: project.id };
+      });
     },
     async reopenProject(input: CommandContext & { projectId: string }) {
       requireCommand(input, P.projectRead);
-      return runTransaction(async (tx) => { const project = await loadWritableProject(tx, input.projectId); const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id }); if (!access.override && !access.isDesigner && !access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can reopen this project."); if (project.status !== "COMPLETED") return { projectId: project.id }; await tx.sfProject.update({ where: { id: project.id }, data: { status: "ACTIVE" } }); await writeAudit(ports, tx, { action: "studioflow.project.reopened", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: "COMPLETED", to: "ACTIVE" } } }); return { projectId: project.id }; });
-    },
-  };
-
-  // ── Activities ──────────────────────────────────────────────────────────
-
-  async function loadActivity(tx: TxClient, projectId: string, activityId: string, access?: CommandContext) {
-    const activity = await tx.sfActivity.findUnique({ where: { id: activityId }, include: { project: true, phase: true, revision: true } });
-    if (!activity || activity.project_id !== projectId) throw notFound("item");
-    if (activity.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
-    if (activity.phase && !isPhaseModifiable({ status: activity.phase.status as PhaseStatus, isLocked: activity.phase.is_locked })) throw lockedError();
-    if (access?.actor.userId) await requireProjectAccess(tx, { grants: access.grants, actorId: access.actor.userId, projectId, phaseId: activity.phase_id, kind: "content" });
-    return activity;
-  }
-
-  async function assertAssignee(assigneeId: string | null | undefined) {
-    if (!assigneeId) return;
-    const holders = await ports.people.listHolders(P.phaseWork);
-    if (!holders.some((person) => person.id === assigneeId)) throw invalid("ASSIGNEE_NOT_ELIGIBLE", "The selected person cannot be assigned work.");
-  }
-
-  function parseDue(value: string | null | undefined): Date | null | undefined {
-    if (value === undefined) return undefined;
-    if (value === null || value === "") return null;
-    try { return dateOnlyToDate(value); } catch { throw invalid("DUE_DATE_INVALID", "Due date must be a valid date."); }
-  }
-
-  const activities = {
-    /**
-     * V2-D1: SfActivity is FEEDBACK-only. TODO items use SfChecklistItem instead.
-     * phaseId is required for FEEDBACK (feedback must belong to a phase+revision).
-     */
-    async addActivity(input: CommandContext & { projectId: string; phaseId: string; content: string; mode: "FEEDBACK"; dueDate?: string | null; assignedToId?: string | null }) {
-      const userId = requireCommand(input, P.phaseWork);
-      if (input.mode !== "FEEDBACK") throw invalid("ACTIVITY_TODO_DEPRECATED", "Use a checklist item for to-dos. SfActivity is feedback-only.");
-      if (!input.phaseId) throw invalid("FEEDBACK_PHASE_REQUIRED", "Client feedback must belong to a phase.");
-      const content = requiredText(input.content, "ACTIVITY_CONTENT_REQUIRED", "Text", 2000);
-      const due = parseDue(input.dueDate) ?? null;
-      await assertAssignee(input.assignedToId);
       return runTransaction(async (tx) => {
-        let phaseId: string | null = null;
-        let revisionId: string | null = null;
-        if (input.phaseId) {
-          const { phase } = await loadPhase(tx, input.projectId, input.phaseId, input);
-          if (!isPhaseModifiable({ status: phase.status as PhaseStatus, isLocked: phase.is_locked })) throw lockedError();
-          const revision = await activeRevision(tx, phase.id);
-          if (!revision) throw invalidState("Start this phase before recording feedback.");
-          phaseId = phase.id;
-          revisionId = revision.id;
-        } else {
-          // This branch is unreachable after the guard above but kept for type safety.
-          throw invalid("FEEDBACK_PHASE_REQUIRED", "Client feedback must belong to a phase.");
-        }
-        const id = randomUUID();
-        await tx.sfActivity.create({ data: { id, project_id: input.projectId, phase_id: phaseId, revision_id: revisionId, content, mode: input.mode, due_at: due, assigned_to_id: input.assignedToId ?? null, created_by_id: userId } });
-        await writeAudit(ports, tx, { action: "studioflow.activity.created", entityType: "activity", entityId: id, actor: input.actor, metadata: { projectId: input.projectId, phaseId, revisionId, mode: input.mode } });
-        return { activityId: id };
+        const project = await loadWritableProject(tx, input.projectId, { allowCompleted: true });
+        const access = await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: project.id });
+        if (!canChangeCompletion(access)) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only a project PIC can reopen this project.");
+        if (project.status !== "COMPLETED") return { projectId: project.id };
+        await tx.sfProject.update({ where: { id: project.id }, data: { status: "ACTIVE" } });
+        await writeAudit(ports, tx, { action: "studioflow.project.reopened", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: "COMPLETED", to: "ACTIVE" } } });
+        return { projectId: project.id };
       });
     },
-
-    async updateActivity(input: CommandContext & { projectId: string; activityId: string; content?: string; dueDate?: string | null; assignedToId?: string | null }) {
-      requireCommand(input, P.phaseWork);
-      const due = parseDue(input.dueDate);
-      return runTransaction(async (tx) => {
-        const activity = await loadActivity(tx, input.projectId, input.activityId, input);
-        // Only a changed assignee is validated, so items kept on a former member stay editable.
-        if (input.assignedToId !== undefined && (input.assignedToId ?? null) !== activity.assigned_to_id) await assertAssignee(input.assignedToId);
-        const data: { content?: string; due_at?: Date | null; assigned_to_id?: string | null } = {};
-        const changes: Record<string, { from: unknown; to: unknown }> = {};
-        if (input.content !== undefined) {
-          const content = requiredText(input.content, "ACTIVITY_CONTENT_REQUIRED", "Text", 2000);
-          if (content !== activity.content) { data.content = content; changes.content = { from: activity.content, to: content }; }
-        }
-        if (due !== undefined && dateToDateOnly(due) !== dateToDateOnly(activity.due_at)) { data.due_at = due; changes.dueDate = { from: dateToDateOnly(activity.due_at), to: dateToDateOnly(due) }; }
-        if (input.assignedToId !== undefined && (input.assignedToId ?? null) !== activity.assigned_to_id) { data.assigned_to_id = input.assignedToId ?? null; changes.assignedToId = { from: activity.assigned_to_id, to: input.assignedToId ?? null }; }
-        if (Object.keys(changes).length === 0) return { activityId: activity.id };
-        await tx.sfActivity.update({ where: { id: activity.id }, data });
-        await writeAudit(ports, tx, { action: "studioflow.activity.updated", entityType: "activity", entityId: activity.id, actor: input.actor, changes, metadata: { projectId: activity.project_id, phaseId: activity.phase_id } });
-        return { activityId: activity.id };
-      });
+    /** What completing the project would meet right now: unfinished phases block it; open requirements are
+     * reminders that are only reported (owner, 2026-10-04/05). */
+    async getProjectCompletionReadiness(input: ReadContext & { actor: CommandContext["actor"]; projectId: string }) {
+      requireRead(input.grants);
+      const readiness = await readProjectCompletionReadiness(db, input.projectId);
+      const access = input.actor.userId ? await getProjectAccess(db, { grants: input.grants, actorId: input.actor.userId, projectId: input.projectId }) : null;
+      return { ...readiness, canChange: access ? canChangeCompletion(access) : false, canOverride: hasPermission(input.grants, P.projectManage) };
     },
-
-    async setActivityDone(input: CommandContext & { projectId: string; activityId: string; done: boolean }) {
-      requireCommand(input, P.phaseWork);
-      return runTransaction(async (tx) => {
-        const activity = await loadActivity(tx, input.projectId, input.activityId, input);
-        const next = input.done ? "COMPLETED" : "OPEN";
-        if (activity.status === next) return { activityId: activity.id };
-        await tx.sfActivity.update({ where: { id: activity.id }, data: { status: next, completed_at: input.done ? nowOf(ports) : null } });
-        await writeAudit(ports, tx, { action: input.done ? "studioflow.activity.completed" : "studioflow.activity.reopened", entityType: "activity", entityId: activity.id, actor: input.actor, changes: { status: { from: activity.status, to: next } }, metadata: { projectId: activity.project_id, phaseId: activity.phase_id } });
-        return { activityId: activity.id };
-      });
-    },
-
-    async deleteActivity(input: CommandContext & { projectId: string; activityId: string }) {
-      requireCommand(input, P.phaseWork);
-      return runTransaction(async (tx) => {
-        const activity = await loadActivity(tx, input.projectId, input.activityId, input);
-        await tx.sfActivity.delete({ where: { id: activity.id } });
-        await writeAudit(ports, tx, { action: "studioflow.activity.deleted", entityType: "activity", entityId: activity.id, actor: input.actor, metadata: { projectId: activity.project_id, phaseId: activity.phase_id, content: activity.content, mode: activity.mode } });
-        return { activityId: activity.id };
-      });
-    },
-
   };
 
   // ── Reads ───────────────────────────────────────────────────────────────
-
-  function activityView(row: { id: string; content: string; mode: string; status: string; assigned_to_id: string | null; due_at: Date | null; deferred_from_version: string | null; revision_id: string | null; phase_id: string | null; created_at: Date }) {
-    return {
-      id: row.id,
-      content: row.content,
-      // V2-D1: SfActivity is FEEDBACK-only
-      mode: "FEEDBACK" as const,
-      done: row.status === "COMPLETED",
-      assigneeId: row.assigned_to_id,
-      dueDate: dateToDateOnly(row.due_at),
-      deferredFrom: row.deferred_from_version,
-      revisionId: row.revision_id,
-      phaseId: row.phase_id,
-      createdAt: row.created_at,
-    };
-  }
-
-  async function readRevisionActivities(revisionId: string) {
-    const rows = await db.sfActivity.findMany({
-      where: { revision_id: revisionId },
-      orderBy: { created_at: "asc" },
-      select: { id: true, content: true, mode: true, status: true, assigned_to_id: true, due_at: true, deferred_from_version: true, revision_id: true, phase_id: true, created_at: true },
-    });
-    return rows.map(activityView);
-  }
 
   function phaseSnapshot(phase: { name_snapshot: string; prefix_snapshot: string; seat_snapshot: string }): PhaseSnapshot {
     return { nameSnapshot: phase.name_snapshot, prefixSnapshot: phase.prefix_snapshot, seatSnapshot: phase.seat_snapshot as PhaseSeat };
@@ -711,12 +462,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const status = phase.status as PhaseStatus;
         const previous = phases.find((p) => p.order_index === phase.order_index - 1) ?? null;
         const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
-        const archived = project?.archived_at != null;
-        const commands = archived ? [] : availablePhaseCommands({ status, isLocked: phase.is_locked, legacySupervision: isLegacySupervisionDefinition(phase.definition_id), iterationState: phase.revisions[0]?.status ?? null }).filter((command) => {
-          if (command === "activate") return canStart && project?.status === "ACTIVE";
-          if (command === "bypass") return project?.status === "ACTIVE";
-          return true;
-        });
         const snap = phaseSnapshot(phase);
         results.push({
           id: phase.id,
@@ -737,7 +482,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           openRootChecklist: counts.openRootChecklistItems,
           blockers: fullBlockers(counts),
           todoBlockers: todoBlockers(counts),
-          commands,
           startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${phaseSnapshot(previous).nameSnapshot} is approved.` : null,
         });
       }
@@ -782,7 +526,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
             orderBy: { major: "desc" },
             select: {
               id: true, major: true, name: true, status: true, created_at: true, sent_at: true, answered_at: true, done_at: true, visit_date: true, note: true,
-              _count: { select: { activities: true } },
             },
           },
         },
@@ -793,13 +536,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const previous = await db.sfPhase.findFirst({ where: { project_id: phase.project_id, order_index: phase.order_index - 1 }, select: { name_snapshot: true, prefix_snapshot: true, seat_snapshot: true, status: true, order_index: true } });
       const canStart = canActivatePhase({ orderIndex: phase.order_index, allowParallel: phase.allow_parallel }, previous ? { status: previous.status as PhaseStatus } : null);
       const active = phase.revisions.find((rev) => OPEN_ITERATION_STATES.includes(rev.status as "NOT_SENT" | "SENT" | "ANSWERED")) ?? null;
-      const activeActivities = active ? await readRevisionActivities(active.id) : [];
       const archived = phase.project.archived_at !== null;
-      const commands = archived ? [] : availablePhaseCommands({ status, isLocked: phase.is_locked, legacySupervision: isLegacySupervisionDefinition(phase.definition_id), iterationState: active?.status ?? null }).filter((command) => {
-        if (command === "activate") return canStart && phase.project.status === "ACTIVE";
-        if (command === "bypass") return phase.project.status === "ACTIVE";
-        return true;
-      });
       const snap = phaseSnapshot(phase);
       const isSupervision = isLegacySupervisionDefinition(phase.definition_id);
       const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
@@ -809,7 +546,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         db.sfChecklistItem.count({ where: { phase_id: phase.id, parent_id: null, is_checked: false, is_blocking: false } }),
         db.sfDeliverable.findMany({ where: { phase_id: phase.id }, select: { revision_id: true } }),
         referenceRevisionId(db, phase.id),
-        readBlockerItems(db, phase.id, active?.id ?? null, counts),
+        readBlockerItems(db, phase.id, counts),
       ]);
       return {
         id: phase.id,
@@ -825,7 +562,6 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         waitingDays: status !== "ACTIVE" ? null : waitingDays(active?.status === "SENT" ? active.sent_at : phase.status_changed_at, nowOf(ports)),
         modifiable: !archived && isPhaseModifiable({ status, isLocked: phase.is_locked }),
         startBlockedReason: status === "PENDING" && !canStart && previous ? `Starts after ${resolvePhaseName(previous)} is approved.` : phase.project.status !== "ACTIVE" && status === "PENDING" ? "The project is not active." : null,
-        commands,
         blockers: fullBlockers(counts, blockerItems),
         todoBlockers: todoBlockers(counts),
         warnings: { optionalOpen, deliverableStatus: computeDeliverableStatus(deliverables, refRevisionId) },
@@ -837,12 +573,20 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           id: active.id, name: active.name, state: active.status, sentAt: active.sent_at, visitDate: dateToDateOnly(active.visit_date),
           waitingDays: active.status === "SENT" ? waitingDays(active.sent_at, nowOf(ports)) : null,
           choices: iterationChoices({ state: active.status, phaseStatus: status, iterationName: active.name, kinds: iterationKinds(phase.definition.default_iteration_kinds), supervision: isSupervision }),
+          /** The outcomes offered once the client has answered (Revision / Done, or Continue to CD Final on CD Mall). */
+          answerChoices: iterationChoices({ state: "ANSWERED", phaseStatus: status, iterationName: active.name, kinds: iterationKinds(phase.definition.default_iteration_kinds), supervision: isSupervision }),
+          note: active.note,
         } : null,
+        /** The iteration before the open one: its notes are the brief for the open iteration. */
+        previousIteration: (() => {
+          const before = active ? phase.revisions.find((rev) => rev.major < active.major) : null;
+          return before ? { id: before.id, name: before.name, state: before.status, note: before.note } : null;
+        })(),
         iterations: phase.revisions.map((rev) => ({
           id: rev.id, name: rev.name, state: rev.status, createdAt: rev.created_at, sentAt: rev.sent_at, answeredAt: rev.answered_at, doneAt: rev.done_at,
-          visitDate: dateToDateOnly(rev.visit_date), note: rev.note, activityCount: rev._count.activities,
+          visitDate: dateToDateOnly(rev.visit_date), note: rev.note,
         })),
-        activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), name: active.name, state: active.status, sentAt: active.sent_at, createdAt: active.created_at, activities: activeActivities } : null,
+        activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), name: active.name, state: active.status, sentAt: active.sent_at, createdAt: active.created_at, note: active.note } : null,
         history: phase.revisions.filter((rev) => !OPEN_ITERATION_STATES.includes(rev.status as "NOT_SENT" | "SENT" | "ANSWERED")).map((rev) => ({
           id: rev.id,
           label: revisionLabel(rev, snap.prefixSnapshot),
@@ -850,16 +594,9 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           state: rev.status,
           createdAt: rev.created_at,
           closedAt: rev.done_at ?? rev.answered_at,
-          activityCount: rev._count.activities,
+          note: rev.note,
         })),
       };
-    },
-
-    async getRevisionActivities(input: ReadContext & { revisionId: string }) {
-      requireRead(input.grants);
-      const revision = await db.sfRevision.findUnique({ where: { id: input.revisionId }, select: { id: true } });
-      if (!revision) throw notFound("revision");
-      return readRevisionActivities(revision.id);
     },
 
     /** The project's latest phase event when this person may still undo it (same actor, within five minutes, not yet undone). */
@@ -1308,5 +1045,5 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     },
   };
 
-  return { ...commands, ...iterationCommands, ...activities, ...reads, ...phaseTemplates, ...deliverables };
+  return { ...commands, ...iterationCommands, ...reads, ...phaseTemplates, ...deliverables };
 }

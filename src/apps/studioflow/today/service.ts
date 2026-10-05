@@ -1,20 +1,8 @@
 import type { Prisma } from "@/generated/prisma/client";
 
-import { fullBlockers, type PhaseBlockers } from "../domain/blockers";
 import { dateToDateOnly } from "../domain/dates";
 import { groupFeed, nestFeed, type FeedGroup, type FeedTask } from "../domain/feed";
-import {
-  availablePhaseCommands,
-  isLegacySupervisionDefinition,
-  phaseAccentDotClass,
-  phaseStatusDisplay,
-  waitingDays,
-  type PhaseCommand,
-  type PhaseSeat,
-  type PhaseStatus,
-} from "../domain/phase";
-import { P, hasPermission, nowOf, requireCommand, requireRead, type CommandContext, type Db, type ReadContext, type StudioFlowPorts } from "../shared";
-import { readBlockerCountsBatch } from "../phases/blocker-query";
+import { P, hasPermission, nowOf, requireCommand, type CommandContext, type Db, type StudioFlowPorts } from "../shared";
 import { ITEM_ORDER, ITEM_SELECT, toItemView } from "../tasks/service";
 
 /** Checked checklist rows older than this drop out of Today (legacy retention). */
@@ -27,21 +15,6 @@ export type TodayAddTarget = {
   projectId: string;
   projectName: string;
   targets: Array<{ phaseId: string | null; label: string; disabledReason: string | null }>;
-};
-
-export type PhaseAttentionRow = {
-  phaseId: string;
-  projectId: string;
-  projectName: string;
-  label: string;
-  definitionId: string | null;
-  accentDotClass: string;
-  status: PhaseStatus;
-  statusDisplay: ReturnType<typeof phaseStatusDisplay>;
-  waitingDays: number | null;
-  seat: PhaseSeat;
-  commands: PhaseCommand[];
-  blockers: PhaseBlockers;
 };
 
 export function createTodayService(db: Db, ports: StudioFlowPorts) {
@@ -67,35 +40,26 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
           phases: {
             orderBy: { order_index: "asc" },
             include: {
-              revisions: { where: { status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } }, take: 1, include: { activities: { orderBy: { created_at: "asc" } } } },
+              revisions: { where: { status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } }, take: 1, select: { id: true } },
               checklist_items: { where: notStale, select: ITEM_SELECT, orderBy: ITEM_ORDER },
             },
           },
-          activities: { where: { phase_id: null }, orderBy: { created_at: "asc" } },
           checklist_items: { where: { phase_id: null, ...notStale }, select: ITEM_SELECT, orderBy: ITEM_ORDER },
         },
       });
 
       const rows: FeedTask[] = [];
-      const activityRow = (projectId: string, phaseId: string | null, phaseDefinitionId: string | null, label: string | null, a: { id: string; content: string; status: string; mode: string; due_at: Date | null; assigned_to_id: string | null; deferred_from_version: string | null }): FeedTask => ({
-        key: `activity:${a.id}`, id: a.id, source: "activity", label: a.content, isChecked: a.status === "COMPLETED",
-        projectId, phaseId, phaseDefinitionId, phaseLabel: a.deferred_from_version && label ? `${label} · deferred` : label,
-        priority: 4, dueDate: dateToDateOnly(a.due_at), assigneeId: a.assigned_to_id, labels: [],
-        // V2-D1: SfActivity is FEEDBACK-only
-        mode: "FEEDBACK", templateId: null, parentId: null, children: [],
-      });
       const itemRow = (projectId: string, phaseDefinitionId: string | null, label: string | null, row: Parameters<typeof toItemView>[0]): FeedTask => {
         const view = toItemView(row);
         return {
           key: `checklist:${view.id}`, id: view.id, source: "checklist", label: view.label, isChecked: view.isChecked,
           projectId, phaseId: view.phaseId, phaseDefinitionId, phaseLabel: label, priority: view.priority, dueDate: view.dueDate,
-          assigneeId: view.assigneeId, labels: view.labels, mode: null, templateId: view.templateId, parentId: view.parentId, children: [],
+          assigneeId: view.assigneeId, labels: view.labels, templateId: view.templateId, parentId: view.parentId, children: [],
         };
       };
 
       const addTargets: TodayAddTarget[] = [];
       for (const project of projects) {
-        for (const a of project.activities) rows.push(activityRow(project.id, null, null, null, a));
         for (const item of project.checklist_items) rows.push(itemRow(project.id, null, null, item));
         const targets: TodayAddTarget["targets"] = [{ phaseId: null, label: "General", disabledReason: null }];
         for (const phase of project.phases) {
@@ -103,12 +67,8 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
           const active = (ACTIVE_PHASE_STATUSES as readonly string[]).includes(phase.status);
           const revision = phase.revisions[0];
           targets.push({ phaseId: phase.id, label, disabledReason: phase.is_locked ? "Approved" : !revision ? "Not started" : null });
-          // A completed phase no longer exposes revision activity, but converted
-          // supervision feedback remains a live checklist task until it is checked
-          // or dismissed. Keeping it here prevents a closed phase from hiding work.
-          if (active) {
-            for (const a of revision?.activities ?? []) rows.push(activityRow(project.id, phase.id, phase.definition_id, label, a));
-          }
+          // Client remarks are iteration notes, not tasks (owner, 2026-10-05). A finished phase keeps its
+          // unticked requirements here until they are ticked or dismissed.
           if (active || phase.status === "DONE") {
             for (const item of phase.checklist_items) rows.push(itemRow(project.id, phase.definition_id, label, item));
           }
@@ -134,62 +94,6 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
         overdue: items.filter((item) => !item.isChecked && item.dueDate !== null && item.dueDate < now).length,
         items,
       };
-    },
-
-    /**
-     * §7.3 Cross-project phase attention: every in-flight phase the user can read,
-     * with its project, display status, waiting days, seat, available commands and blocker count.
-     */
-    async listPhaseAttention(input: ReadContext): Promise<PhaseAttentionRow[]> {
-      requireRead(input.grants);
-      const now = nowOf(ports);
-
-      const phases = await db.sfPhase.findMany({
-        where: {
-          status: { in: [...ACTIVE_PHASE_STATUSES] },
-          project: { archived_at: null, status: { not: "COMPLETED" } },
-        },
-        orderBy: [{ project: { priority: "asc" } }, { project: { name: "asc" } }, { order_index: "asc" }],
-        select: {
-          id: true,
-          definition_id: true,
-          name_snapshot: true,
-          seat_snapshot: true,
-          status: true,
-          is_locked: true,
-          status_changed_at: true,
-          revisions: { where: { status: { in: ["NOT_SENT", "SENT", "ANSWERED"] } }, take: 1, select: { status: true, sent_at: true } },
-          project: { select: { id: true, name: true } },
-        },
-      });
-
-      const countsByPhase = await readBlockerCountsBatch(db, phases.map((phase) => phase.id));
-      const rows: PhaseAttentionRow[] = phases.map((phase) => {
-          const status = phase.status as PhaseStatus;
-          const counts = countsByPhase.get(phase.id)!;
-          const commands = availablePhaseCommands({
-            status,
-            isLocked: phase.is_locked,
-            legacySupervision: isLegacySupervisionDefinition(phase.definition_id),
-            iterationState: phase.revisions[0]?.status ?? null,
-          });
-          return {
-            phaseId: phase.id,
-            projectId: phase.project.id,
-            projectName: phase.project.name,
-            label: phase.name_snapshot,
-            definitionId: phase.definition_id,
-            accentDotClass: phaseAccentDotClass(phase.definition_id),
-            status,
-            statusDisplay: phaseStatusDisplay(status),
-            waitingDays: waitingDays(phase.revisions[0]?.status === "SENT" ? phase.revisions[0].sent_at : phase.status_changed_at, now),
-            seat: phase.seat_snapshot as PhaseSeat,
-            commands,
-            blockers: fullBlockers(counts),
-          };
-        });
-
-      return rows;
     },
   };
 }

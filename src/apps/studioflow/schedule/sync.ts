@@ -1,5 +1,6 @@
 import {
   fallbackPrefix,
+  normalizeSchedulePrefix,
   nextGapless,
   normalizeExtraFields,
   orderCardFields,
@@ -84,6 +85,41 @@ export async function resolvePrefix(tx: TxClient, section: ScheduleSection, cate
   return row?.prefix ?? fallbackPrefix(category);
 }
 
+/**
+ * Prefixes to try for a category whose usual prefix already belongs to another category in the project:
+ * the usual one, then its first letter with each later letter of the name, then the usual one numbered.
+ * "Wall panel" next to "Wallpaper" (both WA) becomes WL, never a shared WA sequence.
+ */
+export function prefixCandidates(base: string, categoryKey: string): string[] {
+  const letters = categoryKey.replace(/[^A-Z0-9]/g, "");
+  const pairs = letters ? [...letters.slice(1)].map((letter) => normalizeSchedulePrefix(`${letters[0]}${letter}`)) : [];
+  const numbered = Array.from({ length: 98 }, (_, index) => normalizeSchedulePrefix(`${base}${index + 2}`));
+  return [...new Set([normalizeSchedulePrefix(base), ...pairs, ...numbered].filter(Boolean))];
+}
+
+/**
+ * The spelling and code prefix a category uses inside one project section. A category already in the
+ * project keeps its spelling and historical prefix (e.g. PA for Paint) so codes never mix. A new one
+ * takes the dictionary/fallback prefix unless another category of the project already numbers under it;
+ * two categories never share one code sequence, because numbering, reorder and move are per prefix.
+ */
+export async function categoryPrefix(tx: TxClient, input: { projectId: string; section: ScheduleSection; category: string; categoryKey: string; excludeEntryId?: string }): Promise<{ label: string; prefix: string }> {
+  const others = input.excludeEntryId ? { id: { not: input.excludeEntryId } } : {};
+  const existing = await tx.sfScheduleEntry.findFirst({
+    where: { project_id: input.projectId, section: input.section, category_key: input.categoryKey, ...others },
+    select: { category: true, prefix: true },
+  });
+  if (existing) return { label: existing.category, prefix: existing.prefix };
+  const base = await resolvePrefix(tx, input.section, input.category, input.categoryKey);
+  const taken = new Set((await tx.sfScheduleEntry.findMany({
+    where: { project_id: input.projectId, section: input.section, category_key: { not: input.categoryKey }, ...others },
+    distinct: ["prefix"],
+    select: { prefix: true },
+  })).map((row) => row.prefix));
+  const prefix = prefixCandidates(base, input.categoryKey).find((candidate) => !taken.has(candidate)) ?? base;
+  return { label: input.category, prefix };
+}
+
 export async function createEntryWithOptionalOption(tx: TxClient, input: {
   projectId: string;
   section: ScheduleSection;
@@ -96,24 +132,7 @@ export async function createEntryWithOptionalOption(tx: TxClient, input: {
   templateItemId?: string | null;
   snapshot?: SnapshotInput | null;
 }) {
-  // One spelling and one code prefix per category inside a project (the first wins).
-  // Persisted rows keep their historical prefix (e.g. PA for Paint) so a new
-  // row never starts a mixed PT/PA code sequence for an existing project group.
-  const existingCategory = await tx.sfScheduleEntry.findFirst({
-    where: {
-      project_id: input.projectId,
-      section: input.section,
-      category_key: input.categoryKey,
-    },
-    select: {
-      category: true,
-      prefix: true,
-    },
-  });
-  const categoryLabel = existingCategory?.category ?? input.category;
-  const prefix =
-    existingCategory?.prefix ??
-    (await resolvePrefix(tx, input.section, input.category, input.categoryKey));
+  const { label: categoryLabel, prefix } = await categoryPrefix(tx, { projectId: input.projectId, section: input.section, category: input.category, categoryKey: input.categoryKey });
   const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: input.projectId, section: input.section, prefix }, orderBy: { increment: "asc" }, select: { increment: true } });
   const increment = nextGapless(siblings);
   const entry = await tx.sfScheduleEntry.create({

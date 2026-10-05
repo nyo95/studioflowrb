@@ -1,11 +1,9 @@
 /**
- * The single blocker projection (contract §6.4), ported from legacy
- * `assertNoPendingTasks` and the submit-for-internal-review guard.
- * V2-D1: SfActivity is FEEDBACK-only; todos live in SfChecklistItem.
+ * The open-checklist projection of a phase (contract §6.4), shown as information. Since WO-SF-ITER-01 no
+ * phase step is gated by it, and since 2026-10-05 client remarks are iteration notes, not open work items,
+ * so only checklist items are counted.
  */
 export type PhaseBlockerCounts = {
-  /** Open FEEDBACK activities in the active revision. */
-  openRevisionActivities: number;
   /** Unchecked, blocking ROOT checklist items (subtasks never block; `is_blocking = false` only warns). */
   openRootChecklistItems: number;
 };
@@ -16,7 +14,6 @@ export type PhaseBlockers = {
   total: number;
   reasons: string[];
   /** Populated only in full phase detail (getPhaseDetail); empty on list views. */
-  activityItems: BlockerItem[];
   checklistItems: BlockerItem[];
 };
 
@@ -24,24 +21,17 @@ function plural(count: number, noun: string): string {
   return `${count} ${noun}${count === 1 ? "" : "s"}`;
 }
 
-/** Blockers for approveInternal, submitClient, approveClient. */
-export function fullBlockers(
-  counts: PhaseBlockerCounts,
-  items?: { activityItems: { id: string; content: string }[]; checklistItems: { id: string; label: string }[] },
-): PhaseBlockers {
-  const reasons: string[] = [];
-  if (counts.openRevisionActivities > 0) reasons.push(`${plural(counts.openRevisionActivities, "open feedback item")} in this revision`);
-  if (counts.openRootChecklistItems > 0) reasons.push(`${plural(counts.openRootChecklistItems, "checklist item")} not ticked`);
+export function fullBlockers(counts: PhaseBlockerCounts, items?: { checklistItems: { id: string; label: string }[] }): PhaseBlockers {
+  const total = counts.openRootChecklistItems;
   return {
-    total: counts.openRevisionActivities + counts.openRootChecklistItems,
-    reasons,
-    activityItems: items?.activityItems.map((a) => ({ id: a.id, text: a.content })) ?? [],
+    total,
+    reasons: total > 0 ? [`${plural(total, "checklist item")} not ticked`] : [],
     checklistItems: items?.checklistItems.map((c) => ({ id: c.id, text: c.label })) ?? [],
   };
 }
 
-/** Blockers for submitInternal: open todos (unchecked root checklist items) only (V2-D1). */
+/** Open to-dos (unchecked root checklist items). */
 export function todoBlockers(counts: PhaseBlockerCounts): PhaseBlockers {
   const total = counts.openRootChecklistItems;
-  return { total, reasons: total > 0 ? [`${plural(total, "open to-do")}`] : [], activityItems: [], checklistItems: [] };
+  return { total, reasons: total > 0 ? [`${plural(total, "open to-do")}`] : [], checklistItems: [] };
 }

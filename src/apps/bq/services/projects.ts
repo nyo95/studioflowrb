@@ -4,6 +4,7 @@ import { AppError } from "@platform/core/errors";
 import type { BqProjectStatus } from "@/generated/prisma/client";
 
 import { BQ_PERMISSIONS, fieldUnchanged, type BqServiceContext } from "./context";
+import { QUOTATION_TERMS_MAX } from "../lib/quotation";
 
 export function createProjectLifecycleService(ctx: BqServiceContext) {
   const { db, runTransaction, auditWriter, requireEditableProject } = ctx;
@@ -160,6 +161,54 @@ async function updateProject(input: {
   return project;
 }
 
+/**
+ * Quotation number, date, and terms describe the letter sent to the client, not the priced content, so they
+ * stay editable while the project is LOCKED (a quotation is normally issued from a locked BQ). An archived
+ * project is closed and refuses them like every other change.
+ */
+async function updateQuotation(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  id: string;
+  number: string | null;
+  date: string | null;
+  terms: string | null;
+}) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  const existing = await db.bqProject.findUnique({ where: { id: input.id } });
+  if (!existing) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
+  if (existing.status === "ARCHIVED") {
+    throw new AppError("CONFLICT", "bq.project.archived", "Restore the project before changing its quotation.");
+  }
+  if (input.date !== null && !/^\d{4}-\d{2}-\d{2}$/.test(input.date)) {
+    throw new AppError("VALIDATION", "bq.quotation.date-invalid", "Quotation date must be a date (YYYY-MM-DD).");
+  }
+  if (input.terms !== null && input.terms.length > QUOTATION_TERMS_MAX) {
+    throw new AppError("VALIDATION", "bq.quotation.terms-too-long", `Terms can be at most ${QUOTATION_TERMS_MAX} characters.`);
+  }
+  const date = input.date === null ? null : new Date(`${input.date}T00:00:00.000Z`);
+  if (date !== null && Number.isNaN(date.getTime())) {
+    throw new AppError("VALIDATION", "bq.quotation.date-invalid", "Quotation date must be a date (YYYY-MM-DD).");
+  }
+  if (
+    input.number === existing.quotation_number
+    && input.terms === existing.quotation_terms
+    && (date?.getTime() ?? null) === (existing.quotation_date?.getTime() ?? null)
+  ) return existing;
+  const project = await db.bqProject.update({
+    where: { id: input.id },
+    data: { quotation_number: input.number, quotation_date: date, quotation_terms: input.terms },
+  });
+  await auditWriter({
+    appId: "bq",
+    action: "bq.project.quotation-updated",
+    entityType: "BqProject",
+    entityId: project.id,
+    actor: input.actor,
+  });
+  return project;
+}
+
 async function lockProject(input: {
   grants: PermissionGrants;
   actor: { kind: string; userId?: string; label: string };
@@ -193,7 +242,8 @@ async function lockProject(input: {
   if (items.length === 0) {
     throw new AppError("CONFLICT", "bq.project.lock-empty", "Add at least one item before locking the project.");
   }
-  const zeroPriceRows = items.reduce((count, item) => {
+  // TBC and By Owner rows are marker lines with no price by design, so they never count as Rp0 rows.
+  const zeroPriceRows = items.filter((item) => item.price_mode === "PRICED").reduce((count, item) => {
     const standaloneZero = item.sub_objects.length === 0
       && item.line_items.length === 0
       && (item.harga_snapshot === null || item.harga_snapshot.toString() === "0");
@@ -428,6 +478,7 @@ async function rejectProjectDeletion(input: {
   return {
     createProject,
     updateProject,
+    updateQuotation,
     lockProject,
     unlockProject,
     archiveProject,

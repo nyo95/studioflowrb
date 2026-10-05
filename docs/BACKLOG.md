@@ -97,21 +97,13 @@ Rules carried over unchanged from the prior trackers:
   future file consumers (Master Data media, sample photos) remain, each through its own approved work order. Phase 5 (cloud profile) is parked.
 - [ ] [PLANNED] **Notifications (platform) — inbox built in R8.185, retention in R8.232.** Read notifications are removed 90 days after they were read (unread never); in-app inbox only, polling every 60 s while the tab is visible.
   Email, push, preferences, and digests stay deferred. Private user-to-user messaging below is separate and still blocked.
-- [ ] [PLANNED] Redesign the top-header/sidebar boundary. Design input already
-  captured in `apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md` (owner feedback,
-  2026-09-16). Preserve the approved semantic colors. **Partially executed
-  2026-09-23 (R8.110):** logo shrunk, account menu slimmed to
-  `Account / Settings / Sign out` (brief line 138-140), and the "one settings
-  sidebar" direction (brief line 133) is now fully built (closes KB-031, see
-  StudioFlow section). **App switcher — Option B built 2026-09-23 (R8.121):**
-  turned out to already be ~90% built since R8.107 (a single Popover-based
-  control showing the current app name, opening a menu to switch apps — not
-  per-app text links as the brief's "Observed UI" section describes, which
-  predates that commit); the only real gap was placement (`ml-auto` pushed it
-  to the far right instead of next to the brand/logo) — fixed in
-  `authenticated-shell/navigation.tsx`/`index.tsx`. Mobile/narrow-viewport
-  treatment beyond generic truncation, and per-app icons, remain undecided —
-  not blocking, no icon field exists in the apps registry yet.
+- [x] [PLANNED] Redesign the top-header/sidebar boundary
+  (`apps/platform/GLOBAL-MENU-DESIGN-BRIEF.md`). Done: account menu and one
+  settings canvas (R8.110), Option B app switcher next to the mark (R8.121),
+  per-app icons (already in the apps registry), and in R8.329 the boundary
+  itself (the mark's cell is part of the rail column, the bar's rule spans only
+  the workspace) plus the phone treatment (icon-only app chip, full-width
+  search). The brief's "Outcome" section records the answers.
 
 ## UI Engine and Shared Utilities
 
@@ -204,10 +196,15 @@ and "direct hard-delete resolves a pre-existing pending request…".
   valid swap does not collide mid-update. Both rebuild databases had zero
   pre-existing duplicate groups before the migration, and concurrency plus
   reorder regression tests cover the failure mode.
-- [ ] [PLANNED] Add Quotation PDF output and Terms & Conditions.
-- [ ] [PLANNED] Add price modes TBC and By Owner. Owner-confirmed, 2026-09-23:
+- [x] [PLANNED] Add Quotation PDF output and Terms & Conditions. Done in R8.328:
+  print view `/bq/print/[id]/quotation` (browser Print / Save PDF), quotation
+  number/date/terms per project, studio standard terms by default.
+- [x] [PLANNED] Add price modes TBC and By Owner. Owner-confirmed, 2026-09-23:
   both modes mean the price is left blank/not counted toward the total — a
-  marker line, not a computed value.
+  marker line, not a computed value. Done in R8.328.
+- [ ] [UNVERIFIED][P3] R8.328 standard quotation terms are a Lead draft
+  (validity 30 days, 50/40/10 payment, VAT excluded). The owner should read
+  them once and correct the wording; a project can already use its own terms.
 - [ ] [PLANNED] Add Rate Library after sufficient project-line evidence exists.
 - [ ] [PLANNED] Add revision/version comparison between BQ snapshots.
 - [ ] [PLANNED] Define formal StudioFlow linking through a stable external
@@ -316,8 +313,7 @@ duration report derived from actual status-change history (these are
 duplicated `/studioflow/timeline`'s per-project view with no added
 information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
 
-- [ ] [UNVERIFIED] **Project-card home: three checks left after the 2026-10-02 browser pass (R8.295).** Expand the "My tasks" strip and use a task in it; the All projects scope as a manager with several designers; the project overview page's pipeline strip at phone width. The StudioFlow top navigation overlaps its icons and labels at phone width (an older shell issue, not from R8.292): fix it with the Lead's next UI pass.
-- [ ] [CLEANUP][P2] Retire the transitional StudioFlow phase commands (`activatePhase`, `submitForClientReview`, `rejectPhase`, `approveClient`, `reopenPhase`, `completeSupervision`) and the old `PhaseCommand` / `availablePhaseCommands` / `listPhaseAttention` code. No screen calls them any more; only about 60 integration-test call sites do. Move those tests to the iteration commands, then delete the old ones (they skip the event log and the CD rules).
+- [ ] [UNVERIFIED] **Project-card home: two checks left after the 2026-10-02 browser pass (R8.295).** ("Expand My tasks and use a task" was walked in R8.326: a drafter ticked a close-out requirement there.) The All projects scope as a manager with several designers; the project overview page's pipeline strip at phone width. The StudioFlow top navigation overlaps its icons and labels at phone width (an older shell issue, not from R8.292): fix it with the Lead's next UI pass.
 - [ ] [CLEANUP][P3] The undo bar on cards is app-local (a composed notice, not a floating toast). If a second app needs transient "saved · Undo" feedback, admit one generic toast to the UI Engine with a showcase and consumer matrix instead of copying it.
 - **[DONE R8.285-R8.295, browser-accepted 2026-10-02] Iteration-based phase tracking + project-card home (owner
   design discussion, 2026-10-01 — direction agreed, NOT built, no Work Order
@@ -377,32 +373,9 @@ recorded here. Terminology note settled the same session: this rebuild has no
 Data/BQ, peers) → feature module inside an app (MOM, Schedule, Presentation,
 etc., all StudioFlow modules, no sub-tier between them).
 
-- [ ] [PLANNED] **UNBLOCKED 2026-09-29 (see Decision gates); the read port is built in R8.183.** **Sample request → Master Data "incoming requests" queue.**
-  Owner confirmed the shape: StudioFlow only requests; a Master Data staff
-  member processes it manually (contacts vendor, gets a price, creates the
-  SKU/price themselves) — same division of labor as legacy's
-  `sample-request-actions.ts` (`subapps/master-data/`), which never let
-  StudioFlow write into Master Data's schema even though it shared one DB.
-  Confirmed against the locked boundary: `studioflow.md` §4 "StudioFlow
-  reads only Brands through the Master Data public read port, read-only";
-  Master Data's own `pricing-contract.md` §12 "read-only public contract".
-  StudioFlow side: add a public read port (symmetric to Master Data's
-  existing one) exposing pending `SfScheduleSampleRequest` rows — no schema
-  change beyond that. Master Data side (the actual new work — see mirrored
-  entry under **Master Data** below) is what's blocked.
-  **Questions the owner must answer before a `PLAN.md` can be written:**
-  1. New Master Data permission for the "Incoming Sample Requests" screen, or
-     reuse an existing one?
-  2. Does Master Data marking a request "priced" auto-flip StudioFlow's
-     `SfScheduleSampleRequest.status` to `RECEIVED`, or do the two stay
-     independent (Master Data's "we priced it" and StudioFlow's "the
-     physical sample is in the designer's hands" are different moments)?
-  3. `docs/BACKLOG.md`'s own standing rule: *"do not modify Master Data app
-     code without an explicit new owner request, even to clean up or
-     improve something found in passing."* This item **is** that explicit
-     request once the owner answers 1–2, but do not start on Master Data
-     code from this bullet alone — get the direct go-ahead in the same turn
-     work begins.
+- [x] [PLANNED] **Sample request → Master Data "incoming requests" queue.** Built: StudioFlow read
+  contract and Master Data intake in R8.183, the Master Data Sample requests screen and the
+  notification bell in R8.185, cancel in R8.197. Closed in the 2026-10-05 tidy-up (R8.328).
 
 - [ ] [BLOCKED][P3] **AI conversational file filing (owner review,
   2026-09-27) — explicitly deprioritized: "AI ini bagian paling ga priority,
@@ -493,6 +466,40 @@ one. Paper size/orientation are user-selectable (`DocumentSheet.printFormat`
 gap the owner named in legacy's fixed-layout export. No true per-page running
 header/page counter: browsers don't support it without a PDF-render pipeline,
 which the owner declined to add; see `STUDIOFLOW-REWORK-CONTRACT.md` §11.11.
+
+### External audit follow-ups (2026-10-04, after R8.318–R8.326)
+
+The owner's external audit of R8.285–R8.317 was verified against the code; its
+findings were fixed in R8.318–R8.325 (see `CHANGELOG.md`). What remains:
+
+- [ ] [UNVERIFIED] **R8.318–R8.324 browser pass on real data.** Walked on a disposable
+  dev database (completion dialog blocked/ready/override field, completed project
+  read-only and reopen, Today requirement tick by a phase-work-only drafter, new
+  category display and WA/WL prefixes, Fixture list reset, New price modes, Library
+  batching, `/ui-engine` rail at 839/840/841 px). Still to walk with real data: the
+  manager override with a reason end to end, "Complete anyway" audit entry in History,
+  saving a multi-supplier grid with real suppliers, typing "By Request" in each price
+  table, Library images from real Brand websites, and the StudioFlow rail at 840 px.
+- [ ] [UNVERIFIED] **Client notes replace feedback (R8.327): run the data migration on real data.**
+  Verified on a disposable copy seeded with old-model rows (feedback on iterations, detached, phase without
+  iterations, converted checklist copies with and without subtasks). On the office/home databases: read the
+  migration's precheck NOTICE, then spot-check a few projects' iteration notes and Requirements lists.
+- [ ] [CLEANUP][P3] `sf_activity` is history only since R8.327 (no command writes it; every row is closed).
+  Drop the table, its relations and the `activity.*` History labels once nobody needs the old rows, after the
+  notes migration has run everywhere.
+- [ ] [CLEANUP][P3] SKU price workbook's transaction-scoped service still takes `any`
+  inputs (`sku-price-workbook.service.ts` `createScopedService`), and the header-keyed
+  `ParsedRow` is assembled through a cast. Type it like `PriceWorkbookScopedService` (R8.325).
+- [ ] [CLEANUP][P3] Unused imports flagged by `tsc --noUnusedLocals` in StudioFlow screens
+  (project overview page, presentation page, schedule board, studio settings view, Today
+  view) and in presentation/phases services (unused `project` destructures). No behavior;
+  remove in a UI pass.
+- [ ] [CLEANUP][P3] `docs/apps/studioflow/STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md` still
+  describes `approveClient` / `rejectClient` / `rejectPhase`; those commands were removed in
+  R8.321. Mark the sections superseded the way `STUDIOFLOW-REWORK-CONTRACT.md` §5.2 now is.
+- [ ] [PLANNED][P3] A browser geometry test for the UI Engine shell (rail states × 839/840/841
+  × long content) inside `npm test` needs a browser test dependency, which needs an owner
+  decision; R8.322 pins the query and records the manual geometry pass instead.
 
 ### Open defects
 

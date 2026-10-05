@@ -5,6 +5,7 @@ import { Popover } from "radix-ui";
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { getComboboxNavigationIndex, type ComboboxNavigationKey } from "../internal/combobox-navigation";
+import { withCreatedOption } from "../internal/creatable-options";
 import { cx } from "../internal/cx";
 import { Button, Input, Text } from "../primitives";
 
@@ -75,11 +76,15 @@ export function CreatableSearch({
   const [createError, setCreateError] = useState<ReactNode>(null);
   const [previousValue, setPreviousValue] = useState(value);
   const [wasOpen, setWasOpen] = useState(false);
+  const [created, setCreated] = useState<CreatableSearchOption | null>(null);
   const listboxId = useId();
   const statusId = useId();
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const flatOptions = useMemo(() => (groups ? groups.flatMap((group) => group.options) : options), [groups, options]);
+  const flatOptions = useMemo(
+    () => withCreatedOption<CreatableSearchOption>(groups ? groups.flatMap((group) => group.options) : options, created),
+    [groups, options, created],
+  );
   const activeQuery = query ?? internalQuery;
   const selected = flatOptions.find((option) => option.id === value);
 
@@ -124,7 +129,9 @@ export function CreatableSearch({
     setCreateError(null);
     try {
       const createdValue = await onCreate?.(text);
-      onValueChange(typeof createdValue === "string" ? createdValue : text);
+      const nextValue = typeof createdValue === "string" ? createdValue : text;
+      setCreated({ id: nextValue, label: text });
+      onValueChange(nextValue);
       setOpen(false);
       updateQuery("");
     } catch (error) {

@@ -77,21 +77,24 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation domainNavigation={domainNavigation} />}
       utility={domainUtilityNavigation}
-      /* Prototype `.a-top` order: mark, app chip, search, spacer, avatar. The
-         search grows to its own 300px cap and the spacer takes the remainder,
-         so the field keeps its width instead of being pushed about by the
-         account menu's name length. */
+      /* Prototype `.a-top` order: mark, app chip, search, then the personal
+         controls pinned right. The search grows to its own 300px cap and the
+         personal group's auto margin takes the remainder, so the field keeps
+         its width instead of being pushed about by the account menu. On a
+         phone the cap lifts and the field takes the whole gap (a spacer here
+         used to split it, leaving one visible letter). */
       topbar={<div className="flex w-full items-center gap-2.5">
         <HeaderApplicationNavigation apps={apps} />
         {contextSlot}
-        <span className="flex-1" aria-hidden="true" />
-        <QuickMessenger />
-        <NotificationBell />
-        <AccountMenu
-          name={principal.displayName}
-          logoutAction={logoutAction}
-          showSettings={showSettings}
-        />
+        <div className="ml-auto flex shrink-0 items-center gap-2.5">
+          <QuickMessenger />
+          <NotificationBell />
+          <AccountMenu
+            name={principal.displayName}
+            logoutAction={logoutAction}
+            showSettings={showSettings}
+          />
+        </div>
       </div>}
     >
       {children}

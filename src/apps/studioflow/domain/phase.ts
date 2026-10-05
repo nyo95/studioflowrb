@@ -103,45 +103,12 @@ export function isValidPhaseTransition(from: PhaseStatus, to: PhaseStatus): bool
   return TRANSITIONS[from].includes(to);
 }
 
-// ── Commands available in a state (drives buttons; the service re-checks) ─
+// ── Iteration state ─────────────────────────────────────────────────────
+// The next steps a screen may offer come from `iterationChoices` (iteration-kinds.ts), the same rule
+// the iteration commands enforce. The pre-iteration phase-command set (activate/submit/approve/reject/
+// reopen/completeSupervision) was removed with its service commands (external audit, 2026-10-04).
 
-export type PhaseCommand =
-  | "activate"
-  | "bypass"
-  | "submitClient"
-  | "approveClient"
-  | "rejectClient"
-  | "reopen"
-  | "completeSupervision";
-
-/**
- * WO-SF-ITER-01 Phase 1: internal review is gone, so only the client-facing steps remain.
- * Phase 2 replaces this set with the iteration commands.
- */
 export type IterationState = "NOT_SENT" | "SENT" | "ANSWERED" | "REVISED" | "DONE";
-
-export function availablePhaseCommands(phase: PhaseState & { legacySupervision?: boolean; iterationState?: IterationState | null }): PhaseCommand[] {
-  const commands: PhaseCommand[] = [];
-  const { status, isLocked, legacySupervision = false, iterationState = null } = phase;
-  if (status === "PENDING") commands.push("activate", "bypass");
-  if (status === "ACTIVE" && !isLocked) {
-    if (legacySupervision) commands.push("completeSupervision");
-    else if (iterationState === "SENT") commands.push("approveClient", "rejectClient");
-    else commands.push("submitClient");
-  }
-  if (status === "DONE") commands.push("reopen");
-  return commands;
-}
-
-export const PHASE_COMMAND_LABELS: Record<PhaseCommand, string> = {
-  activate: "Start phase",
-  bypass: "Skip phase",
-  submitClient: "Send to client",
-  approveClient: "Client approved",
-  rejectClient: "Client asked for changes",
-  reopen: "Reopen phase",
-  completeSupervision: "Finish supervision",
-};
 
 // ── Revisions ────────────────────────────────────────────────────────────
 

@@ -1,8 +1,10 @@
 import { BQ_PERMISSIONS } from "../service";
 import { calculateItem, calculateProject, type ItemInput } from "../lib/calculation-engine";
+import { isMarkerPriceMode, type BqPriceMode } from "../lib/quotation";
 import { toDecimalString } from "@platform/utilities/decimal";
 
 export * from "./nav";
+export { BQ_DEFAULT_QUOTATION_TERMS, BQ_PRICE_MODE_LABEL, BQ_PRICE_MODES, QUOTATION_TERMS_MAX, isMarkerPriceMode, type BqPriceMode } from "../lib/quotation";
 
 export { BQ_PERMISSIONS };
 
@@ -101,6 +103,13 @@ export type BqProjectDetail = {
   status: "ACTIVE" | "LOCKED" | "ARCHIVED";
   externalRef: string | null;
   notes: string | null;
+  quotation: {
+    number: string | null;
+    /** YYYY-MM-DD */
+    date: string | null;
+    /** The project's own terms; null prints the studio's standard terms. */
+    terms: string | null;
+  };
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -131,6 +140,8 @@ export type BqItemDetail = {
   hargaSnapshot: string | null;
   koefisien: string;
   markupL1Pct: string;
+  /** TBC and BY_OWNER rows carry no rate or total and are left out of the grand total. */
+  priceMode: BqPriceMode;
   sortOrder: number;
   notes: string | null;
   subObjects: BqSubObjectDetail[];
@@ -139,7 +150,8 @@ export type BqItemDetail = {
    * Server-computed amounts. bq-contract §2 forbids calculating in the client,
    * and §13.1 needs rate and total on a collapsed L1, so they travel with the
    * row. `null` means this L1 cannot be priced yet — a standalone item with no
-   * price entered — which is stated rather than shown as a confident zero.
+   * price entered — which is stated rather than shown as a confident zero —
+   * or a TBC/By Owner marker line, which is never priced.
    */
   biayaPokok: string | null;
   rate: string | null;
@@ -472,6 +484,11 @@ export function createBqPublicRead(db: PrismaClient) {
         status: project.status,
         externalRef: project.external_ref,
         notes: project.notes,
+        quotation: {
+          number: project.quotation_number,
+          date: project.quotation_date ? project.quotation_date.toISOString().slice(0, 10) : null,
+          terms: project.quotation_terms,
+        },
         createdBy: project.created_by,
         createdAt: project.created_at.toISOString(),
         updatedAt: project.updated_at.toISOString(),
@@ -497,16 +514,22 @@ function flattenItems(sections: BqSectionDetail[]): BqItemDetail[] {
  * be priced; the rest of the document still can. Each item is therefore attempted
  * on its own, and the grand total is stated only when every item produced one —
  * a missing total is truthful, a total silently missing a line is not.
+ *
+ * TBC and By Owner rows are marker lines by decision (owner, 2026-09-23): they
+ * carry no amounts at all, are left out of the grand total, and do not make it
+ * incomplete.
  */
 function applyCalculations(sections: BqSectionDetail[]): string | null {
   let complete = true;
+  const priced: BqItemDetail[] = [];
 
   for (const item of flattenItems(sections)) {
     let result;
     try {
+      if (isMarkerPriceMode(item.priceMode)) throw new Error("marker line");
       result = calculateItem(toCalculationItem(item));
     } catch {
-      complete = false;
+      if (!isMarkerPriceMode(item.priceMode)) complete = false;
       item.biayaPokok = null;
       item.rate = null;
       item.total = null;
@@ -519,6 +542,7 @@ function applyCalculations(sections: BqSectionDetail[]): string | null {
       continue;
     }
 
+    priced.push(item);
     item.biayaPokok = result.biayaPokok ?? null;
     item.rate = result.rate;
     item.total = result.total;
@@ -537,7 +561,22 @@ function applyCalculations(sections: BqSectionDetail[]): string | null {
 
   if (!complete) return null;
   try {
-    return calculateProject(flattenItems(sections).map(toCalculationItem)).grandTotal;
+    return calculateProject(priced.map(toCalculationItem)).grandTotal;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A Section's own total for the quotation, from the same engine as the grand total. Marker lines are left out;
+ * null when a priced row in the Section cannot be priced yet. Pass a Section returned by `getProjectDetail`.
+ */
+export function bqSectionTotal(section: BqSectionDetail): string | null {
+  const items = [...section.items, ...section.subsections.flatMap((subsection) => subsection.items)]
+    .filter((item) => !isMarkerPriceMode(item.priceMode));
+  if (items.some((item) => item.total === null)) return null;
+  try {
+    return calculateProject(items.map(toCalculationItem)).grandTotal;
   } catch {
     return null;
   }
@@ -574,6 +613,7 @@ function mapItemDetail(item: {
   harga_snapshot: unknown;
   koefisien: unknown;
   markup_l1_pct: unknown;
+  price_mode: BqPriceMode;
   sort_order: number;
   notes: string | null;
   sub_objects: Array<{
@@ -627,6 +667,7 @@ function mapItemDetail(item: {
     hargaSnapshot: item.harga_snapshot ? (item.harga_snapshot as { toString: () => string }).toString() : null,
     koefisien: (item.koefisien as { toString: () => string }).toString(),
     markupL1Pct: (item.markup_l1_pct as { toString: () => string }).toString(),
+    priceMode: item.price_mode,
     sortOrder: item.sort_order,
     notes: item.notes,
     subObjects: item.sub_objects.map((so) => ({

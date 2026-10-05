@@ -349,7 +349,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         include: {
           client: { select: { id: true, name: true } },
           phases: { orderBy: { order_index: "asc" }, select: { id: true, definition_id: true, status: true, is_locked: true, status_changed_at: true, name_snapshot: true, planned_start_date: true, planned_end_date: true } },
-          _count: { select: { activities: { where: { status: "OPEN" } }, checklist_items: { where: { is_checked: false, parent_id: null } } } },
+          _count: { select: { checklist_items: { where: { is_checked: false, parent_id: null } } } },
         },
       });
       const people = await namesFor(rows.flatMap((row) => [row.pic_designer_id, row.pic_drafter_id]));
@@ -371,7 +371,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         designer: people.get(row.pic_designer_id) ?? { id: row.pic_designer_id, displayName: "Unknown", active: false },
         drafter: people.get(row.pic_drafter_id) ?? { id: row.pic_drafter_id, displayName: "Unknown", active: false },
         phases: row.phases.map((phase) => ({ id: phase.id, definitionId: phase.definition_id, status: phase.status as PhaseStatus, isLocked: phase.is_locked, statusChangedAt: phase.status_changed_at, label: phase.name_snapshot, plannedStartDate: dateToDateOnly(phase.planned_start_date), plannedEndDate: dateToDateOnly(phase.planned_end_date) })),
-        openItems: row._count.activities + row._count.checklist_items,
+        openItems: row._count.checklist_items,
       }));
     },
 
@@ -536,8 +536,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     async setProjectStatus(input: CommandContext & { projectId: string; status: ProjectStatus; overrideReason?: string | null }) {
       const userId = requireCommand(input, P.projectManage);
       return runTransaction(async (tx) => {
-        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
-        const project = await loadWritableProject(tx, input.projectId);
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project", allowCompleted: true });
+        const project = await loadWritableProject(tx, input.projectId, { allowCompleted: true });
         if (project.status === input.status) return { projectId: project.id };
         const completion = input.status === "COMPLETED"
           ? await assertProjectCompletionReady(tx, input)
@@ -552,7 +552,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const userId = requireCommand(input, P.projectManage);
       const reason = requiredText(input.reason, "ARCHIVE_REASON_REQUIRED", "A reason", 500);
       return runTransaction(async (tx) => {
-        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project", allowCompleted: true });
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
         if (project.archived_at) throw conflict("PROJECT_ALREADY_ARCHIVED", "This project is already archived.");
@@ -567,7 +567,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     async restoreProject(input: CommandContext & { projectId: string; reason?: string | null }) {
       const userId = requireCommand(input, P.projectManage);
       return runTransaction(async (tx) => {
-        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project", allowCompleted: true });
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
         if (!project.archived_at) throw conflict("PROJECT_NOT_ARCHIVED", "This project is not archived.");
@@ -606,8 +606,9 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           client: { select: { id: true, name: true } },
           phases: { orderBy: { order_index: "asc" }, include: {
             definition: { select: { default_iteration_kinds: true } },
-            revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true } },
-            checklist_items: { where: { is_checked: false, dismissed_at: null }, select: { id: true } },
+            revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true, note: true } },
+            // Requirements waiting: unticked, undismissed root items (subtasks are part of their requirement).
+            checklist_items: { where: { is_checked: false, dismissed_at: null, parent_id: null }, select: { id: true } },
           } },
         },
       });
@@ -623,7 +624,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           const choices = !current ? (phase.status === "DONE" ? ["add_iteration"] : []) : iterationChoices({ state: current.status, phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision });
           return {
             id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,
-            current_iteration: current ? { id: current.id, name: current.name, state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices } : null,
+            current_iteration: current ? { id: current.id, name: current.name, state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices, answer_choices: iterationChoices({ state: "ANSWERED", phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision }), note: current.note } : null,
             iteration_count: phase.revisions.length, has_note: Boolean(phase.note?.trim()),
             is_supervision: isSupervision,
             seat: phase.seat_snapshot as "designer" | "drafter",

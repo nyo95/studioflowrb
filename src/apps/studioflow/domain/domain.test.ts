@@ -3,12 +3,14 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { fullBlockers, todoBlockers } from "./blockers";
+import { iterationChoices } from "./iteration-kinds";
 import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot } from "./mom";
 import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
 import { compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
   applyChecklistFilter,
   buildTree,
+  canTickChecklistItem,
   cascadeTargets,
   countChecklistFilters,
   fromChecklistFilterQuery,
@@ -19,7 +21,6 @@ import { countOpen, groupFeed, nestFeed, sortFeed, type FeedTask } from "./feed"
 import {
   LEGACY_PHASE_DEFINITION_IDS,
   PHASE_STATUSES,
-  availablePhaseCommands,
   canActivatePhase,
   isLegacySupervisionDefinition,
   isPhaseModifiable,
@@ -73,12 +74,14 @@ describe("phase policy (legacy parity)", () => {
     assert.equal(isPhaseModifiable({ status: "ACTIVE", isLocked: true }), false);
   });
 
-  it("offers the right commands per state", () => {
-    assert.deepEqual(availablePhaseCommands({ status: "PENDING", isLocked: false }), ["activate", "bypass"]);
-    assert.deepEqual(availablePhaseCommands({ status: "ACTIVE", isLocked: false, iterationState: "NOT_SENT" }), ["submitClient"]);
-    assert.deepEqual(availablePhaseCommands({ status: "ACTIVE", isLocked: false, legacySupervision: true }), ["completeSupervision"]);
-    assert.deepEqual(availablePhaseCommands({ status: "ACTIVE", isLocked: false, iterationState: "SENT" }), ["approveClient", "rejectClient"]);
-    assert.deepEqual(availablePhaseCommands({ status: "DONE", isLocked: true }), ["reopen"]);
+  it("offers the next steps of the client-sent iteration lifecycle (the one source for every screen)", () => {
+    const base = { phaseStatus: "ACTIVE", iterationName: "Moodboard 1", kinds: [], supervision: false };
+    assert.deepEqual(iterationChoices({ ...base, state: "NOT_SENT" }), ["send"]);
+    assert.deepEqual(iterationChoices({ ...base, state: "SENT" }), ["record_answer"], "an outcome needs the client answer first");
+    assert.deepEqual(iterationChoices({ ...base, state: "ANSWERED" }), ["revision", "done"]);
+    assert.deepEqual(iterationChoices({ ...base, state: "ANSWERED", iterationName: "CD Mall", kinds: ["CD Mall", "CD Final"] }), ["revision", "continue_cd_final"]);
+    assert.deepEqual(iterationChoices({ ...base, state: "NOT_SENT", supervision: true }), ["next_visit", "done"]);
+    assert.deepEqual(iterationChoices({ ...base, state: "DONE", phaseStatus: "DONE" }), ["add_iteration"]);
   });
 
   it("numbers iterations from 1", () => {
@@ -97,19 +100,29 @@ describe("phase policy (legacy parity)", () => {
 });
 
 describe("blockers", () => {
-  const counts = { openRevisionActivities: 2, openRootChecklistItems: 3 };
-  it("counts root checklist and revision activities for approval", () => {
+  const counts = { openRootChecklistItems: 3 };
+  it("counts open root checklist items, as information only", () => {
     const result = fullBlockers(counts);
-    assert.equal(result.total, 5);
-    assert.equal(result.reasons.length, 2);
+    assert.equal(result.total, 3);
+    assert.deepEqual(result.reasons, ["3 checklist items not ticked"]);
+    assert.equal(fullBlockers({ openRootChecklistItems: 0 }).total, 0);
   });
-  it("counts only checklist items for internal submission", () => {
+  it("reports the same count as open to-dos", () => {
     assert.equal(todoBlockers(counts).total, 3);
-    assert.equal(todoBlockers({ ...counts, openRootChecklistItems: 0 }).total, 0);
+    assert.equal(todoBlockers({ openRootChecklistItems: 0 }).total, 0);
   });
 });
 
 describe("checklist rules", () => {
+  it("lets phase work tick a phase requirement, but needs task-manage for to-dos and subtasks", () => {
+    const worker = { canManageTasks: false, canWork: true };
+    assert.equal(canTickChecklistItem({ parentId: null, phaseId: "p" }, worker), true);
+    assert.equal(canTickChecklistItem({ parentId: null, phaseId: null }, worker), false);
+    assert.equal(canTickChecklistItem({ parentId: "root", phaseId: "p" }, worker), false);
+    assert.equal(canTickChecklistItem({ parentId: "root", phaseId: null }, { canManageTasks: true, canWork: false }), true);
+    assert.equal(canTickChecklistItem({ parentId: null, phaseId: "p" }, { canManageTasks: false, canWork: false }), false);
+  });
+
   const tasks = [
     { id: "a", isChecked: false, dueDate: "2026-09-10", priority: 1, assigneeId: "u1" },
     { id: "b", isChecked: true, dueDate: "2026-09-10", priority: 1, assigneeId: null },
@@ -145,10 +158,10 @@ describe("checklist rules", () => {
 describe("today feed", () => {
   const base = { projectId: "p1", phaseId: null, phaseDefinitionId: null, phaseLabel: null, assigneeId: null, labels: [], templateId: null, children: [] };
   const rows: FeedTask[] = [
-    { ...base, key: "checklist:c", id: "c", source: "checklist", label: "child", isChecked: false, priority: 4, dueDate: null, mode: null, parentId: "r" },
-    { ...base, key: "checklist:r", id: "r", source: "checklist", label: "root", isChecked: false, priority: 2, dueDate: null, mode: null, parentId: null },
-    { ...base, key: "activity:a", id: "a", source: "activity", label: "todo", isChecked: false, priority: 4, dueDate: "2026-09-01", mode: "FEEDBACK", parentId: null },
-    { ...base, key: "activity:d", id: "d", source: "activity", label: "done", isChecked: true, priority: 4, dueDate: "2026-08-01", mode: "FEEDBACK", parentId: null },
+    { ...base, key: "checklist:c", id: "c", source: "checklist", label: "child", isChecked: false, priority: 4, dueDate: null, parentId: "r" },
+    { ...base, key: "checklist:r", id: "r", source: "checklist", label: "root", isChecked: false, priority: 2, dueDate: null, parentId: null },
+    { ...base, key: "checklist:a", id: "a", source: "checklist", label: "todo", isChecked: false, priority: 4, dueDate: "2026-09-01", parentId: null },
+    { ...base, key: "checklist:d", id: "d", source: "checklist", label: "done", isChecked: true, priority: 4, dueDate: "2026-08-01", parentId: null },
   ];
   it("nests, sorts, and keeps empty projects", () => {
     const nested = nestFeed(rows);

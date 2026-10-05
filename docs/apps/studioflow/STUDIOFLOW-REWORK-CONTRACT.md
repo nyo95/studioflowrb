@@ -180,10 +180,23 @@ default entries (§11.5, when SF-R4 exists) → audit `project.bootstrapped`.
 
 ### 4.4 Lifecycle
 
-`executeCompleteProject` (legacy) sets `COMPLETED`; approving the last phase or
-completing Supervision also completes the project. `ON_HOLD` blocks phase
-activation (legacy "Project must be ACTIVE"). Archive requires a reason; an
-archived project is read-only everywhere and hidden from Today by default.
+`executeCompleteProject` (legacy) sets `COMPLETED`. Since WO-SF-ITER-01 no
+phase change completes the project: completion is always a person's explicit
+choice. `ON_HOLD` blocks phase activation (legacy "Project must be ACTIVE").
+Archive requires a reason; an archived project is read-only everywhere and
+hidden from Today by default.
+
+**Completion (owner, 2026-10-04; feedback clause removed 2026-10-05).** Every
+phase must be done (client notes carry no open state, so the client's OK on
+each phase is the whole test); a project manager may complete a blocked project only
+with a written reason, kept in the audit history. Requirements and to-dos are
+reminders: they never block completion, are only listed in the confirmation,
+and stay on the project as they are. **A completed project is read-only
+everywhere** (phases, iterations, checklist, feedback, files, MOM, Product
+Schedule, presentation, project details) until a PIC or override holder
+reopens it; archiving and restoring stay available. The rule is enforced in
+the services (`assertProjectWritable`, `requireProjectAccess`), and the access
+model reports `completed` so screens hide edit controls from one source.
 
 ## 5. Phases and revisions
 
@@ -194,6 +207,18 @@ DESIGN_3D, CD are created with `allow_parallel = true`. Phase set is app code,
 not an administered template.
 
 ### 5.2 State machine (port `PhasePolicy` + `phaseService`)
+
+> **Superseded by WO-SF-ITER-01 (R8.285–R8.292); legacy commands removed in
+> R8.321.** Phases are `PENDING → ACTIVE → DONE`; the work is a chain of
+> client-sent iterations `NOT_SENT → SENT → ANSWERED → REVISED | DONE` (CD
+> Mall continues to CD Final; Supervision runs on site visits that close with
+> "Next visit" or "Done"). The commands are `addIteration`, `sendIteration`,
+> `recordClientAnswer`, `chooseIterationOutcome`, `createSupervisionVisit`,
+> `chooseSupervisionVisit`, plus `bypassPhase` and `overrideRevision`; each
+> writes an undoable phase event. Screens take their next steps from
+> `iterationChoices`, the same rule the commands enforce. There is no internal
+> review, nothing gates a step on checklist items, and finishing a phase never
+> completes the project (§4.4). The table below is kept as legacy evidence only.
 
 Stored states: `PENDING`, `IN_PROGRESS`, `ON_REVIEW_INTERNAL`,
 `APPROVED_INTERNAL`, `ON_REVIEW_CLIENT`, `READY_FOR_NEXT`, `COMPLETED`, plus
@@ -256,6 +281,33 @@ do not exist on the rebuilt model. Project/phase to-dos live exclusively in
 defer command) was fully purged in R8.98. Adding a `mode: "TODO"` activity is
 rejected with `ACTIVITY_TODO_DEPRECATED`.
 
+**Superseded again: client notes per iteration (owner, 2026-10-05, R8.327).**
+Per-point feedback is retired. What the client said about an iteration is
+that iteration's **client notes** (`SfRevision.note`, one text; Supervision
+visits already used it). Flow: send → "Client answered" (write the notes) →
+OK (phase done) or Revision (the next iteration shows the previous notes as
+its brief) → … until OK. Notes are never copied, ticked, assigned or carried:
+a Revision answers them. They are editable on any iteration while the project
+is open (`setIterationNote`, undoable like every iteration event) and are kept
+in the admin reset snapshot. The R8.9x conversion of carried-forward feedback
+into root checklist items is removed: it had made client remarks
+indistinguishable from requirements (legacy at `c4b0c466` kept them apart —
+feedback became revision TODO activities, never checklist rows). The add/
+edit/tick/delete feedback commands, their actions and screens, the Today
+feedback rows, and the feedback count in the open-items projection are gone.
+Migration `20261005090000_sf_iteration_notes_replace_feedback` appended every
+feedback point to its iteration's notes, removed the checklist copies made
+from it, turned project-level loose feedback into general to-dos, and closed
+the `sf_activity` rows, which stay as history.
+
+Three kinds of text now exist per phase, kept apart:
+- **Client notes** (per iteration): what the client said.
+- **Pinned note** (`SfPhase.note`, one per phase): what holds for the whole
+  phase, whatever the iteration.
+- **Requirements** (root checklist items of the phase, normally from
+  templates): the standard checklist; reminders that never block a step or
+  completing the project.
+
 ### 6.2 Checklist item (project/phase tasks)
 
 Legacy `ProjectChecklist`: `project_id`, `phase_id?` (null = general),
@@ -273,6 +325,9 @@ Sync is idempotent on `(template_id, phase_id)` and appends after existing
 rows. Deleting a template detaches generated rows (they become plain tasks).
 
 ### 6.4 Blocker projection
+
+> Since WO-SF-ITER-01 nothing is gated by this projection, and since R8.327 it
+> counts only unchecked root checklist items (no feedback). Legacy text below.
 
 Two pure projections over the same counts (`domain/blockers.ts`), used by the
 phase commands and shown in the UI before the button is pressed:
@@ -510,6 +565,18 @@ Legacy renumbering via negative temporary values is replaced by one
 transactional renumber that uses a deferrable unique constraint or a
 two-phase update inside the service (Executor chooses; behavior must match:
 codes stay gapless per `(project, section, prefix)` after add/delete/reorder).
+
+**One prefix per category (2026-10-04).** Because numbering, reorder and
+move are per prefix, two categories must never share one inside a project
+section. A category already in the project keeps its spelling and historical
+prefix; a new one takes the dictionary/fallback prefix unless another category
+of the project numbers under it, in which case it takes the next free letter
+pair from its name (`Wall panel` beside `Wallpaper` → `WL`, not `WA-02`), then
+a numbered variant. The prefix dictionary refuses a prefix already used by
+another category of the same section (`SCHEDULE_PREFIX_IN_USE`). Projects
+created before this rule may still hold two categories under one prefix:
+reorder and up/down then move rows only within their own category, and the
+other category keeps its code slots.
 
 ### 11.3 Option (the spec)
 

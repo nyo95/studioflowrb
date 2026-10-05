@@ -10,6 +10,7 @@ import {
   CHECKLIST_PRIORITY_NONE,
   CHECKLIST_SORT_STEP,
   buildTree,
+  canTickChecklistItem,
   cascadeTargets,
   steppedSortOrders,
   type ChecklistFilterQuery,
@@ -18,6 +19,7 @@ import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { isPhaseModifiable, type PhaseStatus } from "../domain/phase";
 import {
   P,
+  assertProjectWritable,
   conflict,
   hasPermission,
   invalid,
@@ -127,7 +129,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
   async function loadItem(tx: TxClient, projectId: string, itemId: string, access?: CommandContext, options: { allowLocked?: boolean } = {}) {
     const item = await tx.sfChecklistItem.findUnique({ where: { id: itemId }, include: { project: true, phase: true } });
     if (!item || item.project_id !== projectId) throw notFound("checklist item");
-    if (item.project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+    assertProjectWritable(item.project);
     if (!options.allowLocked && item.phase && !isPhaseModifiable({ status: item.phase.status as PhaseStatus, isLocked: item.phase.is_locked })) {
       throw conflict("PHASE_LOCKED", "This phase is approved and locked. Reopen it first.");
     }
@@ -180,9 +182,9 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       const due = parseDue(input.dueDate) ?? null;
       await assertAssignee(input.assignedToId);
       return runTransaction(async (tx) => {
-        const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true } });
+        const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true, status: true } });
         if (!project) throw notFound("project");
-        if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+        assertProjectWritable(project);
         await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, phaseId: input.phaseId, kind: input.phaseId ? "content" : "document" });
         if (input.phaseId) {
           const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { project_id: true, status: true, is_locked: true } });
@@ -293,10 +295,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       }
       return runTransaction(async (tx) => {
         const item = await loadItem(tx, input.projectId, input.itemId, input, { allowLocked: true });
-        // A root item of a phase is a requirement (a reminder that gates nothing): ticking it only needs
-        // phase-work access. Everything else still needs task-manage access.
-        const isMergedRequirement = item.parent_id === null && item.phase_id !== null;
-        if (!hasPermission(input.grants, P.taskManage) && !(isMergedRequirement && hasPermission(input.grants, P.phaseWork))) {
+        if (!canTickChecklistItem({ parentId: item.parent_id, phaseId: item.phase_id }, { canManageTasks: hasPermission(input.grants, P.taskManage), canWork: hasPermission(input.grants, P.phaseWork) })) {
           requirePermission(input.grants, P.taskManage);
         }
         const children = item.parent_id === null ? await tx.sfChecklistItem.findMany({ where: { parent_id: item.id }, select: { id: true } }) : [];
@@ -484,7 +483,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
       return runTransaction(async (tx) => {
         const project = await tx.sfProject.findUnique({ where: { id: input.projectId } });
         if (!project) throw notFound("project");
-        if (project.archived_at) throw conflict("PROJECT_ARCHIVED", "This project is archived. Restore it before making changes.");
+        assertProjectWritable(project);
         await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "document" });
         const created = await seedChecklistFromTemplates(tx, project.id, userId);
         if (created > 0) await writeAudit(ports, tx, { action: "studioflow.checklist.synced", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, created } });

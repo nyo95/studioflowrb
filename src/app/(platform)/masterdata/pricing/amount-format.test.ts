@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { blurDisplay, entryDisplay, isTextAmount, parseAmountEntry, parseIndonesianAmount, parsePastedAmount, storedAmountText } from "./amount-format";
+import { blurDisplay, entryDisplay, isTextAmount, parseIndonesianAmount, parsePastedAmount, readTypedAmount, storedAmountText } from "./amount-format";
 
 describe("pasted amounts", () => {
   it("reads Indonesian and spreadsheet number styles", () => {
@@ -35,8 +35,8 @@ describe("text prices in quotation marks", () => {
   });
 
   it("lets a typed quote through and keeps typing the text, but still groups numbers", () => {
-    assert.equal(parseAmountEntry('"call sa'), '"call sa');
-    assert.equal(parseAmountEntry("1.250,50"), "1250.50");
+    assert.deepEqual(readTypedAmount('"call sa'), { value: '"call sa', display: '"call sa' });
+    assert.deepEqual(readTypedAmount("1.250,50"), { value: "1250.50", display: "1.250,5" });
     assert.equal(entryDisplay('"call sa', '"call sa'), '"call sa');
     assert.equal(entryDisplay("1250", "1250"), "1.250");
     assert.equal(entryDisplay("12", "12,"), "12,");
@@ -55,5 +55,20 @@ describe("text prices in quotation marks", () => {
     assert.equal(parsePastedAmount('"call sales"'), '"call sales"');
     assert.equal(parsePastedAmount('"120"'), '"120"');
     assert.equal(parsePastedAmount("120"), "120");
+  });
+});
+
+describe("typed and pasted amounts agree", () => {
+  it("reads every value a paste accepts the same way when it is typed", () => {
+    for (const cell of ["135000", "135.000", "Rp 1.250.000", "12,5", "By Request", "tbc", "Nego", "0", "N/A", '"call sales"']) {
+      assert.equal(readTypedAmount(cell)?.value, parsePastedAmount(cell), cell);
+    }
+  });
+
+  it("keeps letters visible while typing so a keyword can be finished", () => {
+    assert.deepEqual(readTypedAmount("By"), { value: "", display: "By" });
+    assert.deepEqual(readTypedAmount("By Request"), { value: "0", display: "By Request" });
+    assert.equal(blurDisplay(readTypedAmount("By Request")!.value), "0");
+    assert.deepEqual(readTypedAmount("15000"), { value: "15000", display: "15.000" });
   });
 });

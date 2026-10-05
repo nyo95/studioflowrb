@@ -132,7 +132,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop
 - Steps: 1. Open the project overview. 2. Expand each closed revision. 3. Close and reopen one revision. 4. Simulate a failed action request and reopen to retry.
 - Acceptance: overview renders; closed-revision counts are correct; items load only when opened and retain content, order and done styling; empty history says No items; loading/error lines appear appropriately and retry works.
-- Status: PENDING
+- Status: OBSOLETE (R8.327, 2026-10-05). Per-point feedback and the per-revision history panel were removed; client notes per iteration replace them and were walked in R8.327.
 
 ### [R8.173] Phase page retains active items and lazy closed history
 - Surface: `/studioflow/projects/[projectId]/phases/[phaseId]`
@@ -140,7 +140,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop
 - Steps: 1. Open the phase page. 2. Inspect active items. 3. Expand a closed revision. 4. Verify a user without project-read cannot load revision activities.
 - Acceptance: phase renders; active items remain visible; closed history shows the same list when opened; unauthorized reads fail.
-- Status: PENDING
+- Status: OBSOLETE (R8.327, 2026-10-05). Per-point feedback and the per-revision history panel were removed; client notes per iteration replace them and were walked in R8.327.
 
 ### [R8.173] Header quick-search preserves results
 - Surface: StudioFlow header quick-search
@@ -245,11 +245,11 @@ this backlog's former SF-A entries.)_
 - Acceptance: one failed row never leaves partial prices; each saved row has its own history entry; the unit follows the SKU; linking works only with the right permission.
 - Status: PENDING
 
-### [R8.277] Compare-suppliers grid
-- Surface: Master Data → Pricing → New price → Compare suppliers
+### [R8.277] Compare-suppliers grid (R8.323: "New price" → Labor or Material + labor → "Several suppliers")
+- Surface: Master Data → Pricing → New price → Labor / Material + labor → Several suppliers
 - Fixture: three labor-capable suppliers; one already holds a price named "Screeding base"; an Excel block of five items (one section heading line, one "-" cell, one "By Request" cell)
 - Viewport: desktop and a narrow tablet width
-- Steps: 1. Choose type, category and two suppliers; the grid opens with two amount columns. 2. Type two rows by hand; Enter in the last cell adds a row. 3. Paste the Excel block; items fill, the heading is skipped, the note says how many. 4. Set one cell to the existing "Screeding base" name and press Create: that row shows the supplier-named problem and nothing is saved. 5. Fix it and save; each supplier gains the category.
+- Steps: 1. Choose type, category and two suppliers; the grid opens with two amount columns. 2. Type two rows by hand (typing "By Request" must give the same result as pasting it); Enter in the last cell adds a row. 3. Paste the Excel block; items fill, the heading is skipped, the note says how many. 4. Set one cell to the existing "Screeding base" name and press Create: that row shows the supplier-named problem and nothing is saved. 5. Fix it and save; each supplier gains the category.
 - Acceptance: blank cells create nothing; pasted amounts with dots, commas and Rp read correctly; a failure never leaves partial prices.
 - Status: PENDING
 

@@ -453,7 +453,11 @@ export function ScheduleBoard({
     return [...map.entries()].map(([category, rows]) => ({ category, rows }));
   }, [entries, section]);
 
-  const categories = useMemo(() => [...new Set(entries.filter((e) => e.section === section).map((e) => e.category))], [entries, section]);
+  const categoriesBySection = useMemo(() => ({
+    MATERIAL: [...new Set(entries.filter((e) => e.section === "MATERIAL").map((e) => e.category))],
+    FIXTURE: [...new Set(entries.filter((e) => e.section === "FIXTURE").map((e) => e.category))],
+  }), [entries]);
+  const categories = categoriesBySection[section];
   const open = entries.find((entry) => entry.id === openId) ?? null;
 
   const removeEntry = async (entry: ScheduleEntryView) => {
@@ -686,7 +690,7 @@ export function ScheduleBoard({
       ) : null}
 
       {dialog === "add" ? (
-        <AddItemDialog projectId={projectId} section={section} categories={categories} brands={brands} command={command} onClose={() => setDialog(null)} />
+        <AddItemDialog projectId={projectId} section={section} categoriesBySection={categoriesBySection} brands={brands} command={command} onClose={() => setDialog(null)} />
       ) : null}
       {dialog === "import" ? <ImportDialog projectId={projectId} section={section} command={command} onClose={() => setDialog(null)} /> : null}
       {dialog && typeof dialog === "object" ? (
@@ -798,9 +802,17 @@ function Footer({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap justify-end gap-2">{children}</div>;
 }
 
-function AddItemDialog({ projectId, section, categories, brands, command, onClose }: { projectId: string; section: Section; categories: string[]; brands: readonly Brand[]; command: Command; onClose: () => void }) {
+function AddItemDialog({ projectId, section, categoriesBySection, brands, command, onClose }: { projectId: string; section: Section; categoriesBySection: Record<Section, string[]>; brands: readonly Brand[]; command: Command; onClose: () => void }) {
   const [targetSection, setTargetSection] = useState<Section>(section);
+  // Categories belong to a section: Material and Fixture number separately, so switching the section
+  // switches the list and never carries a Material category into a Fixture row.
+  const categories = categoriesBySection[targetSection];
   const [category, setCategory] = useState(categories[0] ?? "");
+  const switchSection = (next: Section) => {
+    if (next === targetSection) return;
+    setTargetSection(next);
+    setCategory(categoriesBySection[next][0] ?? "");
+  };
   const [withProduct, setWithProduct] = useState(true);
   const [product, setProduct] = useState<ProductDraft>(EMPTY_PRODUCT);
   const [qty, setQty] = useState({ qty: "", unit: "", location: "" });
@@ -827,19 +839,20 @@ function AddItemDialog({ projectId, section, categories, brands, command, onClos
       open
       onOpenChange={(value) => { if (!value) onClose(); }}
       title="Add item"
-      description="It gets a code from the category, like PT-03."
+      description="It gets a code from the category, like PT-03. A new category gets its own code letters."
       size="lg"
       dismissible={!pending}
       footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button><Button variant="primary" pending={pending} disabled={!canSave} onClick={save}>Add item</Button></Footer>}
     >
       <div className="grid gap-4">
         <div className="flex flex-wrap gap-1.5" role="group" aria-label="Section">
-          <FilterChip selected={targetSection === "MATERIAL"} onClick={() => setTargetSection("MATERIAL")}>Material</FilterChip>
-          <FilterChip selected={targetSection === "FIXTURE"} onClick={() => setTargetSection("FIXTURE")}>Fixture</FilterChip>
+          <FilterChip selected={targetSection === "MATERIAL"} onClick={() => switchSection("MATERIAL")}>Material</FilterChip>
+          <FilterChip selected={targetSection === "FIXTURE"} onClick={() => switchSection("FIXTURE")}>Fixture</FilterChip>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Category" required>
             <CreatableSearch
+              key={targetSection}
               label="Category"
               options={categories.map((name) => ({ id: name, label: name }))}
               value={category}

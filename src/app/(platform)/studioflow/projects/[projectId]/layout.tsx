@@ -11,7 +11,8 @@ import { studioFlow } from "@/apps/studioflow/runtime";
 import { Breadcrumb, ContextNavHeading, Notice, PageShell } from "@/platform/ui_engine";
 
 import { ArchivedFilesNote } from "../../_components/archived-files-note";
-import { pageSession } from "../../_components/session";
+import { pageProjectAccess, pageSession } from "../../_components/session";
+import { ReopenProjectButton } from "../../_components/reopen-project-button";
 import { PROJECT_STATUS_LABEL } from "../../_components/phase-status";
 import { ProjectNavLinks } from "./project-nav-links";
 
@@ -149,6 +150,8 @@ async function ProjectContextBar({
     });
   // Only an archived project needs the retention window; skip the read everywhere else.
   const settings = project.archivedAt ? await studioFlow.projects.getStudioSettings({ grants }) : null;
+  const completed = project.archivedAt === null && project.status === "COMPLETED";
+  const access = completed ? await pageProjectAccess(projectId) : null;
   const asOf = new Date().toISOString();
 
   return (
@@ -175,6 +178,16 @@ async function ProjectContextBar({
                 <ArchivedFilesNote archivedAt={project.archivedAt} assetsPurgedAt={project.assetsPurgedAt} retentionDays={settings.archiveRetentionDays} asOf={asOf} />
               </span>
             ) : null}
+          </Notice>
+        </div>
+      ) : null}
+      {completed ? (
+        <div className="px-[22px] pt-3">
+          <Notice tone="success" title="Completed">
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <span>This project is read-only. Reopen it to make changes.</span>
+              {access && (access.override || access.isDesigner || access.isDrafter) ? <ReopenProjectButton projectId={projectId} /> : null}
+            </span>
           </Notice>
         </div>
       ) : null}

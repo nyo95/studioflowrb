@@ -311,7 +311,8 @@ State is controlled (`collapsed` + `onCollapsedChange`) or uncontrolled
 (`defaultCollapsed`). UI Engine owns the affordance, the widths, the transition,
 and `aria-expanded`; it does not persist the choice — persistence is app state.
 
-At `840px` and below, the effective presentation is always expanded and labeled.
+Below `840px` (the shell's `max-[840px]:` utilities and `NARROW_NAVIGATION_QUERY`, both
+`width < 840px`), the effective presentation is always expanded and labeled.
 The desktop preference is retained rather than overwritten, the collapse control
 is not shown, and the stored state resumes only when the viewport widens.
 
