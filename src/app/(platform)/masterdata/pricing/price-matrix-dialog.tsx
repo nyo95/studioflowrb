@@ -3,10 +3,10 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useState, type ClipboardEvent, type FormEvent, type ReactNode } from "react";
 
-import { Button, ConfirmDialog, CreatableMultiSelect, CreatableSearch, Dialog, Field, FormActions, IconButton, InlineError, Input, Select, Text } from "@/platform/ui_engine";
+import { Button, ConfirmDialog, CreatableMultiSelect, CreatableSearch, Dialog, Field, FormActions, IconButton, InlineError, Input, PrefixedInput, Select, Text } from "@/platform/ui_engine";
 import { formatDecimal } from "@platform/utilities/decimal";
 
-import { blurDisplay, parsePastedAmount, readTypedAmount } from "./amount-format";
+import { blurDisplay, parsePastedAmount, readTypedAmount, shouldShowAmountPrefix } from "./amount-format";
 import { saveWorkPriceMatrixAction } from "./actions";
 import type { PriceEntry } from "./price-entry-modes";
 
@@ -148,12 +148,13 @@ export function PriceMatrixDialog({ kind, modes, onSwitch, vendors, categories, 
                       <option value="">Unit</option>
                       {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}
                     </Select>
-                    {chosen.map((vendor, column) => (
-                      <Input key={vendor.id} aria-label={`${vendor.name}, row ${index + 1}`} density="compact" inputMode="text" placeholder="–" className="tabular-nums" value={row.cells[vendor.id]?.display ?? ""}
+                    {chosen.map((vendor, column) => {
+                      const cell = row.cells[vendor.id] ?? { value: "", display: "" };
+                      return <PrefixedInput key={vendor.id} prefix="Rp." prefixVisible={shouldShowAmountPrefix(cell.value, cell.display)} aria-label={`${vendor.name}, row ${index + 1}`} density="compact" inputMode="text" placeholder="–" className="tabular-nums" value={cell.display}
                         onChange={(event) => { const read = readTypedAmount(event.target.value); if (read === null) return; patchCell(row.key, vendor.id, { value: read.value, display: read.display }); }}
-                        onBlur={() => { const cell = row.cells[vendor.id]; if (cell) patchCell(row.key, vendor.id, { value: cell.value, display: blurDisplay(cell.value) }); }}
-                        onKeyDown={(event) => { if (event.key === "Enter" && index === rows.length - 1 && column === chosen.length - 1) { event.preventDefault(); addRow(); } }} />
-                    ))}
+                        onBlur={() => { const current = row.cells[vendor.id]; if (current) patchCell(row.key, vendor.id, { value: current.value, display: blurDisplay(current.value) }); }}
+                        onKeyDown={(event) => { if (event.key === "Enter" && index === rows.length - 1 && column === chosen.length - 1) { event.preventDefault(); addRow(); } }} />;
+                    })}
                     <Input aria-label={`Notes, row ${index + 1}`} density="compact" maxLength={1000} placeholder="Specification, brand reference…" value={row.notes} onChange={(event) => patchRow(row.key, { notes: event.target.value })} />
                     <IconButton label={`Remove row ${index + 1}`} icon={<Trash2 size={14} />} size="sm" onClick={() => removeRow(row.key)} />
                     {problems[row.key] ? <div role="alert" className="col-span-full px-1 text-xs text-danger">{problems[row.key]!.map((message) => <div key={message}>Row {index + 1} — {message}</div>)}</div> : null}

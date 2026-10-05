@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { blurDisplay, entryDisplay, isTextAmount, parseIndonesianAmount, parsePastedAmount, readTypedAmount, storedAmountText } from "./amount-format";
+import { blurDisplay, entryDisplay, isTextAmount, parseIndonesianAmount, parsePastedAmount, readTypedAmount, shouldShowAmountPrefix, storedAmountText } from "./amount-format";
 
 describe("pasted amounts", () => {
   it("reads Indonesian and spreadsheet number styles", () => {
@@ -70,5 +70,17 @@ describe("typed and pasted amounts agree", () => {
     assert.deepEqual(readTypedAmount("By Request"), { value: "0", display: "By Request" });
     assert.equal(blurDisplay(readTypedAmount("By Request")!.value), "0");
     assert.deepEqual(readTypedAmount("15000"), { value: "15000", display: "15.000" });
+  });
+});
+
+describe("amount currency prefix", () => {
+  it("shows for an empty or numeric price and hides for on-request or text prices", () => {
+    assert.equal(shouldShowAmountPrefix("", ""), true);
+    assert.equal(shouldShowAmountPrefix("15000", "15.000"), true);
+    assert.equal(shouldShowAmountPrefix("15000", "Rp 15.000"), false);
+    assert.equal(shouldShowAmountPrefix("0", "0"), false);
+    assert.equal(shouldShowAmountPrefix("0.00", "0"), false);
+    assert.equal(shouldShowAmountPrefix("0", "By Request"), false);
+    assert.equal(shouldShowAmountPrefix('"call sales"', '"call sales"'), false);
   });
 });

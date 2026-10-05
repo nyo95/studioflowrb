@@ -37,6 +37,14 @@ export function storedAmountText(amount: string, label: string | null | undefine
   return label ? `"${label}"` : amount;
 }
 
+/** Show a currency prefix only while the field represents an actual numeric price. */
+export function shouldShowAmountPrefix(value: string, display: string): boolean {
+  if (display !== "" && /[^\d.,\s-]/.test(display)) return false;
+  if (value === "") return display === "";
+  if (!/^\d+(?:\.\d+)?$/.test(value)) return false;
+  return !/^0+(?:\.0+)?$/.test(value);
+}
+
 /** Reads an amount typed the Indonesian way ("1.250.000" or "12,5"). Returns a plain decimal string, "" when empty, null when unreadable. */
 export function parseIndonesianAmount(value: string): string | null {
   const compact = value.replace(/\s/g, "").replace(/[^\d,.-]/g, "");

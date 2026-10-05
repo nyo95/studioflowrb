@@ -158,6 +158,11 @@ Form controls take `density="regular" | "compact"`, matching `DataTable`'s
 `density`. `size` stays the native attribute it always was on `input` and
 `select`, so multi-selects that set a row count keep working.
 
+`PrefixedInput` is the canonical short, presentation-only prefix for values such
+as currency amounts. The prefix is never part of the submitted value. The app
+supplies the prefix and decides when it remains meaningful to show it; the UI
+Engine owns its alignment, spacing, and accessibility treatment.
+
 ## 3.3 Dialog sizing convention (R6.1)
 
 | Size | When to use |
@@ -830,7 +835,7 @@ The UI contract is broader than the code required today. Public code is added by
 ### UI-F0 — required for login, access, and General Settings
 
 - `Heading`, `Text`, `Button`, `IconButton`;
-- `Input`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`;
+- `Input`, `PrefixedInput`, `Textarea`, `Select`, `Checkbox`, `RadioGroup`, `Switch`;
 - `Divider`, `Badge`, `Spinner`, `Skeleton`, `Surface`;
 - semantic tokens and typography/print base styles.
 

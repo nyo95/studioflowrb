@@ -20,6 +20,7 @@ describe("UI Engine foundation", () => {
       "Button",
       "IconButton",
       "Input",
+      "PrefixedInput",
       "Textarea",
       "Select",
       "Checkbox",
@@ -695,6 +696,30 @@ describe("UI Engine foundation", () => {
     assert.match(zone, /aria-describedby="field-1-error"/);
     assert.match(zone, /aria-invalid="true"/);
     assert.match(zone, /aria-required="true"/);
+  });
+
+  it("keeps an input prefix presentational and out of the submitted value", () => {
+    const amount = renderToStaticMarkup(
+      createElement(ui.PrefixedInput, {
+        prefix: "Rp.",
+        value: "15000",
+        readOnly: true,
+        "aria-label": "Amount",
+      }),
+    );
+    assert.match(amount, /aria-hidden="true"[^>]*>Rp\.<\/span>/);
+    assert.match(amount, /<input[^>]*value="15000"/);
+    assert.doesNotMatch(amount, /value="Rp\./);
+
+    const textPrice = renderToStaticMarkup(
+      createElement(ui.PrefixedInput, {
+        prefix: "Rp.",
+        prefixVisible: false,
+        value: '"call sales"',
+        readOnly: true,
+      }),
+    );
+    assert.doesNotMatch(textPrice, />Rp\.<\/span>/);
   });
 
   it("CopyButton renders with its idle accessible label", () => {

@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.335 | 2026-10-06 | fix(masterdata): show Rupiah prefixes on numeric price inputs
+
+- Owner-directed minimal UI takeover: every Master Data Pricing amount-entry path now shows `Rp.` as a presentation-only prefix for an empty or numeric Rupiah value. The saved/submitted value remains the same plain decimal, so calculations, imports, and server validation do not change.
+- Price-on-request values (`0`, `By Request`, `TBC`) and quoted text prices hide the prefix instead of presenting non-numeric wording as money. The single editor keeps a non-IDR currency code when editing historical non-IDR data.
+- Added the domain-neutral `PrefixedInput` primitive to UI Engine and used it for the one-supplier bulk rows, material rows, several-suppliers matrix, and single-price editor. `UI_ENGINE.md` records the shared boundary; focused tests cover raw-value preservation and the prefix visibility rule.
+- Lead curation remains requested for final spacing, responsive fit, and interaction review in the Pricing dialog. No schema, migration, dependency, persistence behavior, or price calculation changed.
+
+**Checks.** Focused amount-format and UI Engine suites passed (59/59); full `npm test` passed (834/834, none failed, skipped, or cancelled); typecheck, boundary check, legacy-runtime check, and production build passed. Full lint passed with zero errors and the two pre-existing `<img>` optimization warnings. Browser spacing/responsive curation is intentionally left to the Lead as requested.
+
 ## R8.334 | 2026-10-06 | fix(studioflow,ui-engine): "Change photo" opens the file picker directly
 
 - Owner (2026-10-06): pressing "Change photo" / "Add photo" on a schedule item showed a second step with a "Choose image" button. It now goes straight to the file picker. The code comment already promised this but nothing implemented it.
@@ -181,8 +190,8 @@ Logic, backend and flow review of the StudioFlow phase, task and Today code afte
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.334**
-- Next local revision: **R8.335**
+- Current revision after this entry is committed: **R8.335**
+- Next local revision: **R8.336**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

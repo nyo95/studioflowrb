@@ -73,6 +73,45 @@ export const Input = forwardRef<
   },
 );
 
+/**
+ * A text input with a short, presentation-only prefix. The prefix is never part
+ * of the input value; consumers decide when it is meaningful to show it.
+ */
+export const PrefixedInput = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement> & InvalidProp & {
+    density?: ControlDensity;
+    textCase?: TextCase;
+    prefix: ReactNode;
+    prefixVisible?: boolean;
+  }
+>(function PrefixedInput(
+  { className, density = "regular", prefix, prefixVisible = true, ...props },
+  ref,
+) {
+  return (
+    <span className="relative block w-full">
+      {prefixVisible ? (
+        <span
+          aria-hidden="true"
+          className={cx(
+            "pointer-events-none absolute inset-y-0 z-10 flex items-center font-ui-mono font-semibold text-ink-secondary",
+            density === "compact" ? "left-2 text-xs" : "left-2.5 text-sm",
+          )}
+        >
+          {prefix}
+        </span>
+      ) : null}
+      <Input
+        ref={ref}
+        density={density}
+        className={cx(prefixVisible && (density === "compact" ? "pl-8" : "pl-9"), className)}
+        {...props}
+      />
+    </span>
+  );
+});
+
 export const Textarea = forwardRef<
   HTMLTextAreaElement,
   TextareaHTMLAttributes<HTMLTextAreaElement> & InvalidProp & { density?: ControlDensity }
