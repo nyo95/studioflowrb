@@ -355,6 +355,7 @@ information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
       the card. A project completes **only** when someone presses "Mark as
       completed"; nothing on the card suggests or does it automatically, even
       when every phase is finished.
+    - [BUG][P2] Staff assigned to tasks but not PIC Designer/Drafter do not see the project in My Today: `getToday` scope `mine` selects projects only by PIC Designer/Drafter. Owner decision needed before changing this visibility rule.
   - Gap vs. current code (checked 2026-10-01): today a phase has 7 statuses
     incl. internal review and v1.0/v1.1 revisions (minor = internal reject);
     Today is a per-person task feed with an "In flight" phase strip;

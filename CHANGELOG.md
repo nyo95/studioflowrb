@@ -2,6 +2,14 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.330 | 2026-10-05 | test(studioflow): record that My Today shows only PIC projects
+
+- After pulling R8.318–R8.329 the local completion-override UI was dropped as superseded by `ProjectCompletionDialog`; two independent items are kept.
+- BACKLOG: `[BUG][P2]` — staff assigned only tasks (not PIC Designer/Drafter) do not see the project in My Today (`getToday` scope `mine`). Owner decision needed before changing the rule.
+- Test: "does not include a task-assigned non-PIC project in My Today" pins the current behavior so a later rule change is deliberate.
+
+**Checks.** Docs and one test only; no source change. `npm test` was not run for this revision (no disposable test database prepared in this session) — not a pass.
+
 ## R8.329 | 2026-10-05 | feat(platform): one navigation column from the top edge and a usable phone header
 
 - Owner's "#4" (2026-10-05): the open BACKLOG item "redesign the top-header/sidebar boundary" (`GLOBAL-MENU-DESIGN-BRIEF.md`). Already built earlier: one Settings entry and settings canvas (R8.110), the Option B app switcher beside the mark (R8.121), per-app icons. Left open were the boundary itself and the phone treatment; the Lead decided and built both.
@@ -132,8 +140,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.329**
-- Next local revision: **R8.330**
+- Current revision after this entry is committed: **R8.330**
+- Next local revision: **R8.331**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

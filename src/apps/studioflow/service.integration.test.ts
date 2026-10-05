@@ -224,6 +224,14 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ACTIVE" });
     await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: item.itemId, checked: true });
   });
+
+  it("does not include a task-assigned non-PIC project in My Today", async () => {
+    const assigned = await seedUser("Task assignee", [P.access, P.projectRead]);
+    const { projectId } = await newProject("PIC-only Today");
+    await testDb.prisma.sfChecklistItem.create({ data: { id: randomUUID(), project_id: projectId, label: "Assigned task", assigned_to_id: assigned.id } });
+    const today = await sf.today.getToday({ grants: [P.access, P.projectRead], actor: assigned.actor, scope: "mine" });
+    assert.equal(today.groups.some((group) => group.project.id === projectId), false);
+  });
 });
 
 describe("WO-SF-ITER-01 phase 3 card reads", () => {
