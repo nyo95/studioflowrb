@@ -1,11 +1,13 @@
 "use client";
 
-import { Archive, ArchiveRestore, ChevronDown, ChevronRight, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronDown, ChevronRight, FileText, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import {
   Badge,
   Button,
+  buttonClasses,
   ConfirmDialog,
   DataTable,
   EmptyState,
@@ -34,6 +36,7 @@ import type {
   BqSectionDetail,
   BqSubObjectDetail,
 } from "@/apps/bq/public";
+import { BQ_PRICE_MODE_LABEL, BQ_PRICE_MODES, isMarkerPriceMode } from "@/apps/bq/lib/quotation";
 import type { UnitRead } from "@/apps/masterdata/public";
 
 import { resolveCalcExpression } from "@/apps/bq/lib/calc-expression";
@@ -59,9 +62,11 @@ import {
   updateSubsectionAction,
   revertLineItemPriceAction,
   unlockProjectAction,
+  updateQuotationAction,
 } from "./actions";
 import { AssemblyPickerDialog } from "./assembly-picker-dialog";
 import { ImportDialog, type SourcePickOption } from "./source-picker-dialog";
+import { QuotationDialog } from "./quotation-dialog";
 
 const KATEGORI_LABEL: Record<string, string> = {
   MATERIAL: "Material",
@@ -98,6 +103,8 @@ function countPriceCompleteness(sections: BqProjectDetail["sections"]) {
   };
 
   const countItem = (item: BqItemDetail) => {
+    // TBC and By Owner rows are unpriced on purpose, so they are not "missing" a price.
+    if (isMarkerPriceMode(item.priceMode)) return;
     const hasChildren = item.subObjects.length > 0 || item.lineItems.length > 0;
     if (!hasChildren) {
       total += 1;
@@ -169,6 +176,7 @@ export function ProjectEditor({
   /** Set when the server refused to lock because rows still have a price of Rp0: the count to confirm. */
   const [zeroPriceRows, setZeroPriceRows] = useState<number | null>(null);
   const [lifecycleConfirm, setLifecycleConfirm] = useState<"archive" | "restore" | "delete" | null>(null);
+  const [quotationOpen, setQuotationOpen] = useState(false);
 
   const locked = project.status === "LOCKED" || project.status === "ARCHIVED";
   const editable = canManage && !locked;
@@ -229,6 +237,13 @@ export function ProjectEditor({
           {canManage && project.status === "ACTIVE" ? " · dapat diedit" : null}
         </Text>
         <div className="flex flex-wrap items-center gap-2">
+          {canManage && project.status !== "ARCHIVED" ? (
+            <Button variant="ghost" onClick={() => setQuotationOpen(true)} disabled={pending}>Quotation details</Button>
+          ) : null}
+          <Link href={`/bq/print/${project.id}/quotation`} prefetch={false} className={buttonClasses("secondary", "md")}>
+            <FileText aria-hidden="true" className="size-4" />
+            Quotation
+          </Link>
           {canManage && project.status === "ACTIVE" ? <>
             <Button variant="secondary" leadingIcon={<Lock aria-hidden="true" />} onClick={() => setLockOpen(true)} disabled={pending}>Lock project</Button>
             <Button variant="ghost" leadingIcon={<Archive aria-hidden="true" />} onClick={() => setLifecycleConfirm("archive")} disabled={pending}>Archive</Button>
@@ -382,6 +397,15 @@ export function ProjectEditor({
           </span>
         </div>
       </div>
+
+      {quotationOpen ? (
+        <QuotationDialog
+          quotation={project.quotation}
+          pending={pending}
+          onClose={() => setQuotationOpen(false)}
+          onSave={(fields) => run(updateQuotationAction, fields).then(() => setQuotationOpen(false))}
+        />
+      ) : null}
 
       {importTarget ? (
         <ImportDialog
@@ -618,7 +642,11 @@ function ItemRows({
           )}
         </TableCell>
         <TableCell align="end">
-          {hasChildren ? (
+          {isMarkerPriceMode(item.priceMode) ? (
+            <Tooltip content="Not priced and not counted in the grand total. Change it in the row's details.">
+              <span className="inline-block"><Badge tone="neutral">{BQ_PRICE_MODE_LABEL[item.priceMode]}</Badge></span>
+            </Tooltip>
+          ) : hasChildren ? (
             money(item.rate)
           ) : (
             <InlineEdit
@@ -633,7 +661,9 @@ function ItemRows({
             />
           )}
         </TableCell>
-        <TableCell align="end" className="font-semibold">{money(item.total)}</TableCell>
+        <TableCell align="end" className="font-semibold">
+          {isMarkerPriceMode(item.priceMode) ? <Text tone="tertiary" size="sm">{BQ_PRICE_MODE_LABEL[item.priceMode]}</Text> : money(item.total)}
+        </TableCell>
         {editable ? (
           <TableCell align="end">
             <RemoveButton
@@ -676,11 +706,30 @@ function ItemRows({
             />
           ))}
 
-          {editable ? (
+          {editable || isMarkerPriceMode(item.priceMode) ? (
             <TableRow>
               <TableCell />
               <TableCell colSpan={columns - 1}>
                 <div className="flex flex-wrap items-center gap-1.5 pl-4">
+                  {editable ? (
+                    <label className="mr-2 flex items-center gap-2 text-sm text-ink-secondary">
+                      Price
+                      <Select
+                        aria-label={`Price mode for ${item.name}`}
+                        value={item.priceMode}
+                        disabled={pending}
+                        onChange={(event) => void commit(updateItemAction, item.id, "priceMode")(event.target.value).catch(() => undefined)}
+                      >
+                        {BQ_PRICE_MODES.map((mode) => <option key={mode} value={mode}>{mode === "PRICED" ? "Priced" : `${BQ_PRICE_MODE_LABEL[mode]} — not counted`}</option>)}
+                      </Select>
+                    </label>
+                  ) : null}
+                  {isMarkerPriceMode(item.priceMode) ? (
+                    <Text tone="tertiary" size="sm" className="mr-2">
+                      Marked {BQ_PRICE_MODE_LABEL[item.priceMode]}: the quotation shows no price for this row and the grand total leaves it out.
+                    </Text>
+                  ) : null}
+                  {editable ? <>
                   <AddRow
                     label="+ Component Group"
                     placeholder="Nama Component Group"
@@ -706,6 +755,7 @@ function ItemRows({
                       Assembly
                     </Button>
                   ) : null}
+                  </> : null}
                 </div>
               </TableCell>
             </TableRow>

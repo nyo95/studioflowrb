@@ -204,10 +204,15 @@ and "direct hard-delete resolves a pre-existing pending request…".
   valid swap does not collide mid-update. Both rebuild databases had zero
   pre-existing duplicate groups before the migration, and concurrency plus
   reorder regression tests cover the failure mode.
-- [ ] [PLANNED] Add Quotation PDF output and Terms & Conditions.
-- [ ] [PLANNED] Add price modes TBC and By Owner. Owner-confirmed, 2026-09-23:
+- [x] [PLANNED] Add Quotation PDF output and Terms & Conditions. Done in R8.328:
+  print view `/bq/print/[id]/quotation` (browser Print / Save PDF), quotation
+  number/date/terms per project, studio standard terms by default.
+- [x] [PLANNED] Add price modes TBC and By Owner. Owner-confirmed, 2026-09-23:
   both modes mean the price is left blank/not counted toward the total — a
-  marker line, not a computed value.
+  marker line, not a computed value. Done in R8.328.
+- [ ] [UNVERIFIED][P3] R8.328 standard quotation terms are a Lead draft
+  (validity 30 days, 50/40/10 payment, VAT excluded). The owner should read
+  them once and correct the wording; a project can already use its own terms.
 - [ ] [PLANNED] Add Rate Library after sufficient project-line evidence exists.
 - [ ] [PLANNED] Add revision/version comparison between BQ snapshots.
 - [ ] [PLANNED] Define formal StudioFlow linking through a stable external
@@ -376,32 +381,9 @@ recorded here. Terminology note settled the same session: this rebuild has no
 Data/BQ, peers) → feature module inside an app (MOM, Schedule, Presentation,
 etc., all StudioFlow modules, no sub-tier between them).
 
-- [ ] [PLANNED] **UNBLOCKED 2026-09-29 (see Decision gates); the read port is built in R8.183.** **Sample request → Master Data "incoming requests" queue.**
-  Owner confirmed the shape: StudioFlow only requests; a Master Data staff
-  member processes it manually (contacts vendor, gets a price, creates the
-  SKU/price themselves) — same division of labor as legacy's
-  `sample-request-actions.ts` (`subapps/master-data/`), which never let
-  StudioFlow write into Master Data's schema even though it shared one DB.
-  Confirmed against the locked boundary: `studioflow.md` §4 "StudioFlow
-  reads only Brands through the Master Data public read port, read-only";
-  Master Data's own `pricing-contract.md` §12 "read-only public contract".
-  StudioFlow side: add a public read port (symmetric to Master Data's
-  existing one) exposing pending `SfScheduleSampleRequest` rows — no schema
-  change beyond that. Master Data side (the actual new work — see mirrored
-  entry under **Master Data** below) is what's blocked.
-  **Questions the owner must answer before a `PLAN.md` can be written:**
-  1. New Master Data permission for the "Incoming Sample Requests" screen, or
-     reuse an existing one?
-  2. Does Master Data marking a request "priced" auto-flip StudioFlow's
-     `SfScheduleSampleRequest.status` to `RECEIVED`, or do the two stay
-     independent (Master Data's "we priced it" and StudioFlow's "the
-     physical sample is in the designer's hands" are different moments)?
-  3. `docs/BACKLOG.md`'s own standing rule: *"do not modify Master Data app
-     code without an explicit new owner request, even to clean up or
-     improve something found in passing."* This item **is** that explicit
-     request once the owner answers 1–2, but do not start on Master Data
-     code from this bullet alone — get the direct go-ahead in the same turn
-     work begins.
+- [x] [PLANNED] **Sample request → Master Data "incoming requests" queue.** Built: StudioFlow read
+  contract and Master Data intake in R8.183, the Master Data Sample requests screen and the
+  notification bell in R8.185, cancel in R8.197. Closed in the 2026-10-05 tidy-up (R8.328).
 
 - [ ] [BLOCKED][P3] **AI conversational file filing (owner review,
   2026-09-27) — explicitly deprioritized: "AI ini bagian paling ga priority,

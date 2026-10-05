@@ -7,6 +7,7 @@ import { AppError } from "@platform/core/errors";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 import { createBqService, BQ_PERMISSIONS } from "./service";
+import { bqSectionTotal, createBqPublicRead } from "./public";
 
 const ACTOR = { kind: "USER" as const, userId: "bq-test-user", label: "BQ Test" };
 const ACTOR_B = { kind: "USER" as const, userId: "bq-test-approver", label: "BQ Approver" };
@@ -551,6 +552,63 @@ describe("BQ R6.1 invariants", () => {
       (await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: item.id } })).markup_l1_pct.toString(),
       "0",
       "the last child gone means markup can no longer be seen/edited in the UI, so it must not keep multiplying",
+    );
+  });
+
+  it("leaves TBC and By Owner Work Items out of totals and out of the Rp0 lock check", async () => {
+    const { project, section, item } = await projectTree();
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, qty: "2", hargaSnapshot: "100" });
+    const tbc = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Stone top", qty: "1", unit: "LS" });
+    const byOwner = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Loose furniture", qty: "1", unit: "LS" });
+    const read = createBqPublicRead(testDb.prisma);
+
+    assert.equal((await read.getProjectDetail(project.id))?.grandTotal, null, "an unpriced PRICED row keeps the total incomplete");
+
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: tbc.id, priceMode: "TBC" });
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: byOwner.id, priceMode: "BY_OWNER", hargaSnapshot: "999" });
+    const detail = await read.getProjectDetail(project.id);
+    assert.equal(detail?.grandTotal, "200");
+    assert.equal(bqSectionTotal(detail!.sections[0]!), "200");
+    const marked = detail!.sections[0]!.items.find((row) => row.id === byOwner.id)!;
+    assert.equal(marked.priceMode, "BY_OWNER");
+    assert.equal(marked.rate, null, "a marker line never carries an amount, even with a price stored");
+    assert.equal(marked.total, null);
+
+    await assert.rejects(
+      () => service.updateItem({ grants: GRANTS, actor: ACTOR, id: tbc.id, priceMode: "FREE" as never }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.item.price-mode-invalid",
+    );
+    await service.lockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+    assert.equal((await testDb.prisma.bqProject.findUniqueOrThrow({ where: { id: project.id } })).status, "LOCKED");
+  });
+
+  it("keeps quotation details editable on a locked project but not on an archived one", async () => {
+    const { project, item } = await projectTree();
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "100" });
+    await service.lockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+
+    await service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: "Q-014", date: "2026-10-05", terms: "Valid 14 days." });
+    const read = createBqPublicRead(testDb.prisma);
+    assert.deepEqual((await read.getProjectDetail(project.id))?.quotation, { number: "Q-014", date: "2026-10-05", terms: "Valid 14 days." });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "bq.project.quotation-updated" } }), 1);
+
+    await service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: "Q-014", date: "2026-10-05", terms: "Valid 14 days." });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "bq.project.quotation-updated" } }), 1, "an unchanged save writes nothing");
+
+    await assert.rejects(
+      () => service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: null, date: "05/10/2026", terms: null }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.quotation.date-invalid",
+    );
+    await assert.rejects(
+      () => service.updateQuotation({ grants: [BQ_PERMISSIONS.projectRead], actor: ACTOR, id: project.id, number: null, date: null, terms: null }),
+      (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN",
+    );
+
+    await service.unlockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+    await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+    await assert.rejects(
+      () => service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: null, date: null, terms: null }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.project.archived",
     );
   });
 });

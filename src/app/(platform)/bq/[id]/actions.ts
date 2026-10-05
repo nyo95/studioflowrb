@@ -9,7 +9,7 @@ import { validationError } from "@platform/core/validation";
 import { AppError } from "@platform/core/errors";
 import { isDecimalString } from "@platform/utilities/decimal";
 import { bqPublicRead, bqService, masterDataRead } from "@/apps/bq/runtime";
-import type { BqProjectDetail } from "@/apps/bq/public";
+import { BQ_PRICE_MODES, QUOTATION_TERMS_MAX, type BqProjectDetail } from "@/apps/bq/public";
 import {
   snapshotCustom,
   snapshotFromLibrary,
@@ -162,7 +162,7 @@ export async function addItemAction(
   });
 }
 
-const ITEM_FIELDS = ["name", "qty", "unit", "hargaSnapshot", "koefisien", "markupL1Pct", "notes"] as const;
+const ITEM_FIELDS = ["name", "qty", "unit", "hargaSnapshot", "koefisien", "markupL1Pct", "priceMode", "notes"] as const;
 const ItemFieldSchema = z.object({
   projectId: Id,
   id: Id,
@@ -179,6 +179,12 @@ export async function updateItemAction(
     const { projectId, id, field, value } = parse(ItemFieldSchema, formData);
 
     const patch: Record<string, string | null> = {};
+    if (field === "priceMode") {
+      const mode = z.enum(BQ_PRICE_MODES).safeParse(value);
+      if (!mode.success) throw validationError(mode.error);
+      await bqService.updateItem({ grants, actor, id, priceMode: mode.data });
+      return reload(projectId);
+    }
     if (field === "name") {
       if (!value.trim()) throw new AppError("VALIDATION", "bq.item.name-required", "Work Item name is required");
       patch.name = value.trim();
@@ -482,6 +488,35 @@ export async function lockProjectAction(
     const { projectId } = parse(z.object({ projectId: Id }), formData);
     await bqService.lockProject({ grants, actor, id: projectId, acknowledgeZeroPrices: formData.get("acknowledgeZeroPrices") === "true" });
     return reload(projectId);
+  });
+}
+
+const QuotationSchema = z.object({
+  projectId: Id,
+  number: z.string().trim().max(80),
+  date: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date")]),
+  terms: z.string().max(QUOTATION_TERMS_MAX),
+  useStandardTerms: z.enum(["true", "false"]),
+});
+
+/** Quotation details stay editable on a LOCKED project; the service refuses an archived one. */
+export async function updateQuotationAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const value = parse(QuotationSchema, formData);
+    await bqService.updateQuotation({
+      grants,
+      actor,
+      id: value.projectId,
+      number: value.number || null,
+      date: value.date || null,
+      terms: value.useStandardTerms === "true" || !value.terms.trim() ? null : value.terms.trim(),
+    });
+    revalidatePath(`/bq/print/${value.projectId}/quotation`);
+    return reload(value.projectId);
   });
 }
 

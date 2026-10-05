@@ -37,6 +37,17 @@ enum BqKategori {
   @@schema("bq")
 }
 
+/// How a Work Item's price reads on the document (owner, 2026-09-23). TBC and
+/// BY_OWNER are marker lines: no rate or total is shown and nothing is counted
+/// toward the grand total.
+enum BqPriceMode {
+  PRICED
+  TBC
+  BY_OWNER
+
+  @@schema("bq")
+}
+
 enum BqLineItemSourceType {
   MASTERDATA
   BQ_LIBRARY
@@ -241,6 +252,12 @@ model BqProject {
   status       BqProjectStatus @default(ACTIVE)
   external_ref String?
   notes        String?
+  /// Quotation document details. They describe the letter, not the priced
+  /// content, so they stay editable while the project is LOCKED.
+  quotation_number String?
+  quotation_date   DateTime? @db.Date
+  /// Null prints the studio's standard terms.
+  quotation_terms  String?
   created_by   String
   created_at   DateTime    @default(now())
   updated_at   DateTime    @updatedAt
@@ -319,6 +336,7 @@ model BqItem {
   harga_snapshot Decimal?      @db.Decimal(18, 4)  // dipakai hanya saat L1 tanpa child
   koefisien      Decimal       @default(1) @db.Decimal(18, 6)  // dipakai hanya saat L1 tanpa child
   markup_l1_pct  Decimal       @default(0) @db.Decimal(6, 4)
+  price_mode     BqPriceMode   @default(PRICED)
   sort_order     Int           @default(0)
   notes          String?
   created_at     DateTime      @default(now())

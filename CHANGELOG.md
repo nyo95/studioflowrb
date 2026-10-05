@@ -2,6 +2,19 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.328 | 2026-10-05 | feat(bq): TBC and By Owner price modes and the quotation document
+
+- Two BQ items the owner queued as "#2" (2026-10-05): **price modes TBC / By Owner** and **Quotation PDF with Terms & Conditions** (bq-contract §16 deferred list; owner decision 2026-09-23: both modes are marker lines whose price is blank and not counted). No legacy evidence exists for either; designed by the Lead.
+- **Schema (migration `20261005120000_bq_price_mode_quotation`, additive).** `enum BqPriceMode { PRICED TBC BY_OWNER }`; `bq_item.price_mode` (default `PRICED`, so every existing row keeps its price); `bq_project.quotation_number`, `quotation_date` (date), `quotation_terms` (null = studio standard terms).
+- **Calculation.** `applyCalculations` leaves TBC/By Owner rows with no amounts at all (even when a price is stored), out of the grand total, and they do not make it "incomplete". New `bqSectionTotal` gives a Section's total from the same engine for the quotation. `lockProject` no longer counts marker rows as Rp0 rows. `updateItem` accepts `priceMode` (validated; unchanged saves still write nothing).
+- **Quotation details.** New `updateQuotation` (`bq.project.manage`, audited `bq.project.quotation-updated`, no-op when unchanged): number, date (YYYY-MM-DD), terms (≤ 8000). Allowed on a LOCKED project — they describe the letter, not the priced content — and refused on an ARCHIVED one. Standard terms live in `src/apps/bq/lib/quotation.ts` (`BQ_DEFAULT_QUOTATION_TERMS`, a Lead draft, flagged in BACKLOG for the owner to word).
+- **UI (Lead).** Project editor: a marker row shows a "TBC"/"By Owner" badge in Rate and the label in Total; the price mode is chosen in the expanded row ("Price: Priced / TBC — not counted / By Owner — not counted") with a one-line explanation; the "X of Y priced" counter skips marker rows. Toolbar: "Quotation details" dialog (number, date, Standard terms / Own terms, own terms start from the standard text) and a "Quotation" button to the print view. Print view `/bq/print/[id]/quotation` (document layout, Paper/Orientation picker, Print / Save PDF): studio name and logo from Platform settings, No./Date/Client, sections lettered A, B… with items A.1…, subsection headings, rate and total only (no markup, coefficient or breakdown — §6.4), subtotal per section, grand total, a TBC/By Owner footnote, numbered T&C, and signature blocks.
+- Contract §10 records the fields, the quotation document and the price-mode rule; §16 drops both deferred rows. BACKLOG: both [PLANNED] items closed; standard-terms wording added as [UNVERIFIED][P3] for the owner. Tidy-up: the sample-request queue entry is closed (built in R8.183/R8.185/R8.197) and the two R8.173 revision-history browser checks are marked obsolete (that UI was removed in R8.327).
+
+**Browser evidence** (Chromium, `next dev`, disposable rebuild-only dev database, project seeded with SQL): the editor showed TBC and By Owner badges; switching "Wall paint" to By Owner moved the grand total from Rp25.440.000 to Rp23.100.000 and back when set to Priced; Quotation details saved Q-2026-014 / 2026-10-05; the print view showed A.1–A.3 and B.1–B.2 with TBC/By Owner in place of amounts, Subtotal A Rp23.100.000, Subtotal B Rp2.340.000, Grand total Rp25.440.000, the footnote, six numbered terms, and signature blocks; a Chromium PDF render succeeded; no page errors.
+
+**Checks.** `npm run typecheck`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime` passed; `npm test` **832/832** (none failed, skipped or cancelled; two new BQ integration tests) on the disposable rebuild-only test database with the new migration applied (84 migrations). `npm run build` is run once at the end of the branch (R8.329).
+
 ## R8.327 | 2026-10-05 | feat(studioflow): client notes per iteration replace per-point feedback
 
 - Owner decision (2026-10-05): per-point client feedback is replaced by **client notes per iteration**; the flow is D1 → client answered → notes → OK (phase done), or Revision → D2 (with D1's notes as its brief) → … until OK. The phase's own note becomes the **pinned note**; **requirements** stay a separate standard checklist. Legacy at `c4b0c466` confirms requirements were always apart: feedback became revision TODO activities there, never checklist rows. The rebuild's V2-D1 conversion of carried-forward feedback into root checklist items had made client remarks indistinguishable from requirements (shown under Requirements, counted as "requirements waiting", dismissible, and — after R8.318 — never blocking completion).
@@ -108,8 +121,8 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.327**
-- Next local revision: **R8.328**
+- Current revision after this entry is committed: **R8.328**
+- Next local revision: **R8.329**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
