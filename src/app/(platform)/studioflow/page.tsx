@@ -4,12 +4,13 @@ import { hasPermission } from "@platform/core/rbac";
 import { userPreferences } from "@platform/runtime";
 import { currentDateOnly } from "@platform/utilities/date";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
+import { countOpen } from "@/apps/studioflow/domain/feed";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { Badge, EmptyState, filterChipClasses, PageHeader, PageShell } from "@/platform/ui_engine";
+import { EmptyState, filterChipClasses, PageHeader, PageShell } from "@/platform/ui_engine";
 
 import { pageSession } from "./_components/session";
 import { ProjectCard } from "./_components/project-card";
-import { TodayView } from "./today-view";
+import { AllTasksDialog, TodayView } from "./today-view";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +38,14 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   // Must match the timezone the checklist and every DueLabel badge use (the person's own, else the studio's).
   const { timezone } = await userPreferences.resolveDisplay({ userId });
   const dateToday = currentDateOnly({ timeZone: timezone });
-  const openTasks = today.groups.flatMap((group) => group.tasks).filter((task) => !task.isChecked);
+  const openTasks = today.groups
+    .flatMap((group) => group.tasks.flatMap((task) => [task, ...task.children]))
+    .filter((task) => !task.isChecked);
+  const openTaskCount = today.groups.reduce((sum, group) => sum + countOpen(group.tasks), 0);
   const overdue = openTasks.filter((task) => task.dueDate && task.dueDate < dateToday).length;
   const dueToday = openTasks.filter((task) => task.dueDate === dateToday).length;
+  const canWork = hasPermission(grants, P.phaseWork);
+  const canManageTasks = hasPermission(grants, P.taskManage);
 
   const running = cards.filter((card) => card.status !== "COMPLETED");
   const completed = cards.filter((card) => card.status === "COMPLETED");
@@ -59,6 +65,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         description={scope === "mine" ? `${firstName}, these are your projects` : "Every running project in the studio"}
         actions={(
           <div className="flex flex-wrap gap-1.5">
+            <AllTasksDialog
+              groups={today.groups}
+              addTargets={today.addTargets}
+              people={people}
+              currentUserId={userId}
+              labels={labels}
+              savedFilters={filters}
+              canWork={canWork}
+              canManageTasks={canManageTasks}
+              openCount={openTaskCount}
+              overdue={overdue}
+              dueToday={dueToday}
+            />
             <div className="flex gap-1.5" role="group" aria-label="Show">
               <Link href={link({ scope, status: "running" })} prefetch={false} className={filterChipClasses(statusView === "running")} aria-current={statusView === "running" ? "page" : undefined}>Running ({running.length})</Link>
               <Link href={link({ scope, status: "completed" })} prefetch={false} className={filterChipClasses(statusView === "completed")} aria-current={statusView === "completed" ? "page" : undefined}>Completed ({completed.length})</Link>
@@ -74,39 +93,38 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         divider
       />
 
-      <details className="group mb-4 rounded-surface border border-line bg-surface-raised" aria-label="My tasks">
-        <summary className="flex cursor-pointer list-none flex-wrap items-center gap-2 px-4 py-2.5 text-sm font-medium text-ink [&::-webkit-details-marker]:hidden">
-          <span>My tasks</span>
-          {openTasks.length === 0 ? <span className="font-normal text-ink-tertiary">Nothing open</span> : <Badge>{openTasks.length} open</Badge>}
-          {overdue > 0 ? <Badge tone="danger">{overdue} overdue</Badge> : null}
-          {dueToday > 0 ? <Badge tone="warning">{dueToday} due today</Badge> : null}
-          <span className="ml-auto text-xs font-normal text-ink-tertiary group-open:hidden">Show</span>
-          <span className="ml-auto hidden text-xs font-normal text-ink-tertiary group-open:inline">Hide</span>
-        </summary>
-        <div className="border-t border-line p-4">
-          <TodayView
-            groups={today.groups}
-            addTargets={today.addTargets}
-            people={people}
-            currentUserId={userId}
-            labels={labels}
-            savedFilters={filters}
-            canWork={hasPermission(grants, P.phaseWork)}
-            canManageTasks={hasPermission(grants, P.taskManage)}
-          />
-        </div>
-      </details>
-
       {shown.length === 0 ? (
         <EmptyState
           title={statusView === "running" ? (scope === "mine" ? "No running projects of yours" : "No running projects") : "No completed projects"}
           description={statusView === "running" ? "Create a project from the Projects list, or switch to All projects." : "A project appears here after someone marks it as completed."}
         />
       ) : (
-        <div className="grid gap-3">
-          {shown.map((card) => (
-            <ProjectCard key={card.id} card={card} viewer={{ userId, canOverride: hasPermission(grants, P.projectOverride) }} />
-          ))}
+        <div className="grid gap-0">
+          {shown.map((card) => {
+            const group = today.groups.find((item) => item.project.id === card.id);
+            return (
+              <ProjectCard
+                key={card.id}
+                card={card}
+                viewer={{ userId, canOverride: hasPermission(grants, P.projectOverride) }}
+                taskCount={group ? countOpen(group.tasks) : undefined}
+                defaultExpanded={shown.length <= 3}
+                tasks={group ? (
+                  <TodayView
+                    embedded
+                    groups={[group]}
+                    addTargets={today.addTargets.filter((target) => target.projectId === card.id)}
+                    people={people}
+                    currentUserId={userId}
+                    labels={labels}
+                    savedFilters={[]}
+                    canWork={canWork}
+                    canManageTasks={canManageTasks}
+                  />
+                ) : undefined}
+              />
+            );
+          })}
         </div>
       )}
     </PageShell>

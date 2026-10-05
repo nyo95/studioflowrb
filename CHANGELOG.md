@@ -2,6 +2,19 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.336 | 2026-10-06 | feat(studioflow): fold personal tasks into scalable project rows
+
+- Owner-directed UI takeover, shaped with the `frontend-skill`: Home is now a quiet project ledger instead of a task panel followed by nested project and phase cards. Each project owns its viewer's open tasks, shows at most the first three until “Show all”, and keeps the existing per-task controls and inline Add to-do path.
+- “My tasks” in the header opens the complete existing task surface in a large dialog, so filters, saved views, Quick add, project grouping, permissions, and checklist behavior remain available. Task counts now include child tasks consistently.
+- Project density scales with the portfolio: every project can collapse to one summary row with client, open-task count, and completed-phase progress; up to three projects start open, while a larger list starts compact. Expanded phases use a flat status ledger rather than another layer of bordered cards. Requirement reminders, notes, project actions, phase actions, completion rules, and links are unchanged.
+- No schema, migration, dependency, persistence rule, permission, task rule, or phase workflow changed. Lead curation is still requested for the final visual judgment and any preferred wording/spacing adjustment after reviewing this owner-directed takeover.
+
+**Browser evidence.** StudioFlow Home rendered the three-task project preview and flat five-phase ledger; “My tasks · 17” opened the full filtered task view; the project collapsed to a single summary row and expanded again; at 390×844 the document width stayed exactly 390px with no horizontal overflow. No page error remained after a fresh reload.
+
+**Checks.** Full `npm test` passed (834/834, none failed, skipped, or cancelled); typecheck, boundary check, legacy-runtime check, and production build passed. Full lint passed with zero errors and the two pre-existing `<img>` optimization warnings. `next-env.d.ts` was restored after the production build.
+
+## R8.330 | 2026-10-05 | fix(masterdata): show Rupiah prefixes on numeric price inputs
+
 ## R8.335 | 2026-10-06 | fix(masterdata): show Rupiah prefixes on numeric price inputs
 
 - Owner-directed minimal UI takeover: every Master Data Pricing amount-entry path now shows `Rp.` as a presentation-only prefix for an empty or numeric Rupiah value. The saved/submitted value remains the same plain decimal, so calculations, imports, and server validation do not change.

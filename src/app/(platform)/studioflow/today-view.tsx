@@ -53,6 +53,7 @@ type Props = {
   savedFilters: Array<{ id: string; name: string; query: ChecklistFilterQuery }>;
   canWork: boolean;
   canManageTasks: boolean;
+  embedded?: boolean;
 };
 
 function filterTree(tasks: FeedTask[], keep: (task: FeedTask) => boolean): FeedTask[] {
@@ -87,7 +88,7 @@ function writeCollapsed(next: string[]): void {
   collapsedListeners.forEach((listener) => listener());
 }
 
-export function TodayView({ groups, addTargets, people, currentUserId, labels, savedFilters, canWork, canManageTasks }: Props) {
+export function TodayView({ groups, addTargets, people, currentUserId, labels, savedFilters, canWork, canManageTasks, embedded = false }: Props) {
   const { timezone } = useDisplaySettings();
   const today = currentDateOnly({ timeZone: timezone });
   const [filter, setFilter] = useState<ChecklistFilter>("all");
@@ -95,6 +96,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
   const [labelFilter, setLabelFilter] = useState<string>("");
   const [quickAdd, setQuickAdd] = useState(false);
   const [saveName, setSaveName] = useState("");
+  const [embeddedExpanded, setEmbeddedExpanded] = useState(false);
   // Collapsed project cards are a per-viewer convenience: remembered in this browser only.
   const collapsedRaw = useSyncExternalStore(subscribeCollapsed, readCollapsed, () => "[]");
   const collapsed = useMemo(() => parseCollapsed(collapsedRaw), [collapsedRaw]);
@@ -158,6 +160,44 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
   };
 
   const currentQuery = toChecklistFilterQuery(filter, showCompleted);
+
+  if (embedded) {
+    const group = visibleGroups[0];
+    const tasks = group?.tasks ?? [];
+    const visibleTasks = embeddedExpanded ? tasks : tasks.slice(0, 3);
+    const openCount = group ? countOpen(group.tasks) : 0;
+    const targets = group
+      ? addTargets.find((target) => target.projectId === group.project.id)?.targets ?? null
+      : null;
+
+    return (
+      <div className="grid gap-2.5">
+        <div className="flex min-h-8 items-center gap-2">
+          <span className="text-sm font-medium text-ink">My tasks</span>
+          <CountBadge>{openCount} open</CountBadge>
+          {tasks.length > 3 ? (
+            <button
+              type="button"
+              className="ml-auto text-xs font-medium text-ink-muted underline-offset-4 hover:text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+              onClick={() => setEmbeddedExpanded((current) => !current)}
+            >
+              {embeddedExpanded ? "Show less" : `Show all ${tasks.length}`}
+            </button>
+          ) : null}
+        </div>
+
+        {error ? <InlineError>{error}</InlineError> : null}
+
+        {visibleTasks.length > 0 ? (
+          <ul className="m-0 grid list-none gap-px p-0">{visibleTasks.map((task) => renderTask(task))}</ul>
+        ) : (
+          <Text size="sm" tone="tertiary">Nothing open for you in this project.</Text>
+        )}
+
+        {canManageTasks && group ? <InlineAddRow projectId={group.project.id} targets={targets} /> : null}
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4">
@@ -257,6 +297,37 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
 
       {quickAdd ? <QuickAddDialog targets={addTargets} people={people} onClose={() => setQuickAdd(false)} /> : null}
     </div>
+  );
+}
+
+export function AllTasksDialog({
+  openCount,
+  overdue,
+  dueToday,
+  ...todayProps
+}: Omit<Props, "embedded"> & {
+  openCount: number;
+  overdue: number;
+  dueToday: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const summary = [
+    `${openCount} open`,
+    overdue > 0 ? `${overdue} overdue` : null,
+    dueToday > 0 ? `${dueToday} due today` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <>
+      <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(true)}>
+        My tasks · {openCount}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen} title="My tasks" description={summary} size="xl">
+        <TodayView {...todayProps} />
+      </Dialog>
+    </>
   );
 }
 
