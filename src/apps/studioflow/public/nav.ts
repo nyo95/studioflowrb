@@ -7,6 +7,7 @@ export const STUDIOFLOW_ROUTES = {
   timeline: "/studioflow/timeline",
   project: (projectId: string) => `/studioflow/projects/${projectId}`,
   projectPhase: (projectId: string, phaseId: string) => `/studioflow/projects/${projectId}/phases/${phaseId}`,
+  projectRequirements: (projectId: string) => `/studioflow/projects/${projectId}/requirements`,
   projectHistory: (projectId: string) => `/studioflow/projects/${projectId}/history`,
   projectSchedule: (projectId: string) => `/studioflow/projects/${projectId}/schedule`,
   projectSchedulePrint: (projectId: string) => `/studioflow/print/projects/${projectId}/schedule`,

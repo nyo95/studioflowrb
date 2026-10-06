@@ -313,7 +313,7 @@ duration report derived from actual status-change history (these are
 duplicated `/studioflow/timeline`'s per-project view with no added
 information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
 
-- [ ] [UNVERIFIED] **Project-card home: two checks left after the 2026-10-02 browser pass (R8.295).** ("Expand My tasks and use a task" was walked in R8.326: a drafter ticked a close-out requirement there.) The All projects scope as a manager with several designers; the project overview page's pipeline strip at phone width. The StudioFlow top navigation overlaps its icons and labels at phone width (an older shell issue, not from R8.292): fix it with the Lead's next UI pass.
+- [ ] [UNVERIFIED] **Project-card home: two checks left after the 2026-10-02 browser pass (R8.295).** (The My tasks strip no longer exists since R8.342.) The All projects scope as a manager with several designers; the project overview page's pipeline strip at phone width. The StudioFlow top navigation overlaps its icons and labels at phone width (an older shell issue, not from R8.292): fix it with the Lead's next UI pass.
 - [ ] [PLANNED][P3] **Deferred until a second app needs it:** The undo bar on cards is app-local (a composed notice, not a floating toast). If a second app needs transient "saved · Undo" feedback, admit one generic toast to the UI Engine with a showcase and consumer matrix instead of copying it.
 - **[DONE R8.285-R8.295, browser-accepted 2026-10-02] Iteration-based phase tracking + project-card home (owner
   design discussion, 2026-10-01 — direction agreed, NOT built, no Work Order
@@ -349,7 +349,8 @@ information; `/studioflow/timeline` remains. See `CHANGELOG.md` R8.138.
     Both open questions were **decided by the owner on 2026-10-01**:
     - [DECIDED] The per-person task feed that Today carried ("my tasks today",
       overdue) moves to a compact **"My tasks" strip above the project cards,
-      collapsed by default**, so the daily "what is on my plate" view is kept;
+      collapsed by default**, so the daily "what is on my plate" view is kept
+      (**superseded 2026-10-06**: the owner removed to-dos and My Tasks, R8.342);
       the cards stay the main view.
     - [DECIDED] **No** "all phases done — mark project completed?" prompt on
       the card. A project completes **only** when someone presses "Mark as

@@ -1146,3 +1146,26 @@ export async function globalSearchAction(query: string): Promise<ActionResult<Gl
     return studioFlow.projects.quickSearch({ ...ctx, search: q });
   });
 }
+
+// ── Requirements (one general checklist per project) ────────────────────────
+
+const RequirementOp = z.discriminatedUnion("op", [
+  z.strictObject({ op: z.literal("check"), projectId: Id, itemId: Id, checked: z.boolean() }),
+  z.strictObject({ op: z.literal("rename"), projectId: Id, itemId: Id, label: z.string().min(1).max(200) }),
+  z.strictObject({ op: z.literal("subtask"), projectId: Id, itemId: Id, label: z.string().min(1).max(200) }),
+]);
+export async function requirementAction(input: z.infer<typeof RequirementOp>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(RequirementOp, input);
+    const tasks = studioFlow.tasks;
+    let result: unknown;
+    switch (data.op) {
+      case "check": result = await tasks.setItemChecked({ ...ctx, projectId: data.projectId, itemId: data.itemId, checked: data.checked }); break;
+      case "rename": result = await tasks.updateItem({ ...ctx, projectId: data.projectId, itemId: data.itemId, label: data.label }); break;
+      case "subtask": result = await tasks.createSubtask({ ...ctx, projectId: data.projectId, parentId: data.itemId, label: data.label }); break;
+    }
+    refresh(data.projectId);
+    return result;
+  });
+}

@@ -603,8 +603,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         orderBy: [{ updated_at: "desc" }, { name: "asc" }],
         include: {
           client: { select: { id: true, name: true } },
-          // General rows copied from requirement templates stay requirements;
-          // detached/ad-hoc project rows are personal to-dos instead.
+          // General requirements: unticked, undismissed root rows with no phase.
           checklist_items: { where: { phase_id: null, template_id: { not: null }, is_checked: false, dismissed_at: null, parent_id: null }, select: { id: true } },
           phases: { orderBy: { order_index: "asc" }, include: {
             definition: { select: { default_iteration_kinds: true } },

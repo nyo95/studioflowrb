@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.343 | 2026-10-06 | feat(studioflow): Requirements page; contract rewritten to notes-only
+
+- Lead review of R8.342 (WO-SF-NOTES-ONLY-01): PASS. Re-ran typecheck, lint and the full suite (826 pass, 0 fail); no to-do code is left (the Drawing List keeps its own assignee); the migration deletes only ad-hoc roots and a test proves requirements and their subtasks survive and that no ad-hoc creation command exists.
+- New page `/studioflow/projects/[projectId]/requirements` (link "Requirements" in the project rail): the general list first, then one list per phase. Tick and untick (children follow), Dismiss on an open phase requirement, Rename and Add subtask for people with task access. A completed or archived project is read-only. Server rules are unchanged; one thin action (`requirementAction`) wires the three existing commands.
+- Home already shows project cards with My projects / All projects and Running / Completed; nothing else was needed there.
+- `STUDIOFLOW-REWORK-CONTRACT.md`: §6.2 now describes requirements only (no priority, due date, assignee, labels, saved filters), §7 describes the card Home, the permission table, the legacy-disposition rows and the route table follow. A stale comment in the project-card query was corrected.
+
+**Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two existing image warnings). Browser check of the new page: see the report (needs a signed-in session).
+
 ## R8.342 | 2026-10-06 | refactor(studioflow): remove My Tasks and ad-hoc to-dos
 
 - Removed personal to-do/My Tasks backend, persistence, server actions, home and phase task UI, and tests that depended on them. Template-backed requirements, their subtasks, and the remaining requirement/template commands stay intact; the Lead will build their replacement surface in R8.343.
@@ -254,8 +263,8 @@ Logic, backend and flow review of the StudioFlow phase, task and Today code afte
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.341**
-- Next local revision: **R8.342**
+- Current revision after this entry is committed: **R8.343**
+- Next local revision: **R8.344**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

@@ -79,10 +79,10 @@ except where §9 below overrides them.
 | Revision `major.minor` (`Revision`) | KEEP | §5.4 |
 | Activity TODO/FEEDBACK per revision, deferral, due date (`Activity`, `activity-manager.tsx`) | PARTIAL | FEEDBACK-only, §6.1; TODO mode and deferral superseded by V2-D1 (todos live in `SfChecklistItem`, §6.2; deferral mesh purged R8.98) |
 | Approval blocker `assertNoPendingTasks` (root checklist only) | KEEP | §6.4 |
-| Checklist tree (depth 1), priority 1–4, due, assignee, labels, cascade toggle, reorder, filter views (`ProjectChecklist`, `checklist-*`, `saved-checklist-filters.tsx`) | KEEP | §6.2 |
+| Checklist tree (depth 1), cascade toggle (`ProjectChecklist`, `checklist-*`) | KEEP | §6.2; priority, due, assignee, labels and filter views PURGED 2026-10-06 |
 | Checklist templates global/per-phase + sync (`ChecklistTemplate`, `template-manager.tsx`, `executeSyncProjectChecklists`) | KEEP | §6.3 and StudioFlow settings |
 | Task comments on checklist (`Comment.task_id`) | DEFER | wave 2 with collaboration |
-| Today feed grouped by project, quick add, inline add (`today-view.tsx`, `task-feed.ts`) | KEEP | `/studioflow` (Today); §7 |
+| Today feed grouped by project, quick add, inline add (`today-view.tsx`, `task-feed.ts`) | PURGE | owner decision 2026-10-06: no to-dos; Home is project cards, §7 |
 | Upcoming date buckets (`upcoming-view.tsx`) | DEFER | D-SF-01 stands |
 | Project activity log / global activity (`activity-log-table.tsx`) | MERGE | project History tab reads platform audit |
 | Undo button (`undo-executor.ts`) | PURGE | audit is read-only history |
@@ -122,7 +122,7 @@ grant mechanics. Registered set (replaces the old eleven):
 | `studioflow.phase.work` | Activate a phase, submit for internal review, add/edit/defer/complete activities |
 | `studioflow.phase.review` | Approve/reject internal, submit to client, approve/reject client, reopen, complete Supervision, bypass a pending phase |
 | `studioflow.phase.override` | Admin revision override (hard reset) |
-| `studioflow.task.manage` | Create/edit/complete/reorder/delete checklist items, labels, saved filters |
+| `studioflow.task.manage` | Rename requirements, add and reorder subtasks |
 | `studioflow.settings.manage` | Naming toggle, checklist templates, schedule templates/prefixes |
 | `studioflow.mom.manage` | Create/edit/delete MOM documents and content |
 | `studioflow.schedule.manage` | Create/edit/delete schedule entries and options, mark final |
@@ -308,15 +308,26 @@ Three kinds of text now exist per phase, kept apart:
   templates): the standard checklist; reminders that never block a step or
   completing the project.
 
-### 6.2 Checklist item (project/phase tasks)
+### 6.2 Requirement (checklist item)
 
-Legacy `ProjectChecklist`: `project_id`, `phase_id?` (null = general),
-`label`, `is_checked`, `checked_at`, `parent_id?` (depth max 1), `sort_order`
-(step spacing), `priority` 1–4 (4 = none), `due_at?` date-only,
-`assigned_to_id?`, `template_id?` (SetNull), labels (many-to-many with a
-global label list: name + color token). Toggle cascades both ways to
-children; children never roll up. Saved filter views per user
-(`name`, `query_json` validated by Zod).
+Owner decision 2026-10-06 (WO-SF-NOTES-ONLY-01): StudioFlow has **no personal
+to-do, My Tasks, Quick add, assignee, priority, due date, task label or saved
+filter**. The checklist holds requirements only; phase notes (§6.1) replace
+the to-do list.
+
+`SfChecklistItem`: `project_id`, `phase_id?` (null = general), `label`,
+`is_checked`, `checked_at`, `parent_id?` (depth max 1, a subtask breaks a
+requirement down), `sort_order` (step spacing), `is_blocking` (kept; every
+requirement is a reminder and gates nothing), `template_id?` (SetNull),
+`dismissed_at?`. Root rows are created only from templates (§6.3); there is no
+command that creates a loose root row. Ticking cascades to children; children
+never roll up. A requirement stays visible after its phase is done until it is
+ticked or dismissed.
+
+Screen: `/studioflow/projects/[projectId]/requirements` shows the whole
+checklist of one project, the general list first and then one list per phase.
+Anyone who works on the project may tick or dismiss; renaming and subtasks need
+`studioflow.task.manage`. A completed or archived project is read-only.
 
 ### 6.3 Checklist templates
 
@@ -339,24 +350,20 @@ phase commands and shown in the UI before the button is pressed:
   subset of the same list" design, since `SfActivity` no longer carries a
   TODO mode to subset from).
 
-## 7. Today (StudioFlow home)
+## 7. Home (StudioFlow home)
 
-`/studioflow` is Home/Today (D-SF-01 kept), presented as the project ledger
-introduced in R8.331:
+`/studioflow` is Home (D-SF-01 kept): one card per project, introduced in
+R8.331 and reduced to cards only in R8.343.
 
-- Scope = active projects where I am PIC designer or drafter; a toggle
-  "All projects" is available to holders of `studioflow.project.manage`
-  (rebuild addition).
-- Grouped by project, a project with an empty queue still shows.
-- **My Tasks contains ad-hoc project-level to-dos and their subtasks only**
-  (owner, 2026-10-05). A template-backed row remains a requirement even when
-  its scope is General; it and its subtasks are represented on Home only by
-  the separate "requirements waiting" count. Phase requirements likewise stay
-  in their phase. Neither kind is duplicated or counted as a personal to-do.
-- Filter tabs, due, priority, assignee, labels, saved filters, inline add,
-  and Quick add remain. Inline/Quick add here always creates a project-level
-  to-do; requirements are added and managed from their requirement scope.
-- Legacy KB-023 (general todos on the home page) is satisfied by this page.
+- **My projects** = running projects where I am PIC designer or drafter.
+  **All projects** (every running project) is available to holders of
+  `studioflow.project.manage`. A Running / Completed switch sits beside it.
+- A card shows the phase strip, the current iteration and its actions, the
+  waiting-requirements count and the phase notes (§6.1).
+- There is no My Tasks list, task feed, Quick add, saved filter or inline add
+  (see §6.2). Requirements are worked on the project's Requirements page.
+- Legacy KB-023 (general todos on the home page) is superseded by the owner
+  decision of 2026-10-06 and is not built.
 
 ## 7a. Library (owner, 2026-09-23 — shipped ahead of wave 2)
 
@@ -383,8 +390,9 @@ Routes (canonical, D-SF-07 redirects from `/projects/...` stay allowed):
 |---|---|
 | `/studioflow/projects` | project directory (legacy filters: status, priority, PIC, client; search) |
 | `/studioflow/timeline` | portfolio Gantt: one bar per project, filterable by client/PIC/status/date range (§ below) |
-| `/studioflow/projects/[projectId]` | overview: identity header, phase strip, general checklist, open work |
-| `/studioflow/projects/[projectId]/phases/[phaseId]` | phase page: state + actions, active revision, activities, phase checklist, revision history |
+| `/studioflow/projects/[projectId]` | overview: identity header, phase strip, open work |
+| `/studioflow/projects/[projectId]/requirements` | requirements: the general list and each phase's list (§6.2) |
+| `/studioflow/projects/[projectId]/phases/[phaseId]` | phase page: state + actions, active revision, activities, revision history |
 | `/studioflow/projects/[projectId]/mom` and `/mom/[momId]` (+ print) | MOM |
 | `/studioflow/projects/[projectId]/schedule` | Product Schedule |
 | `/studioflow/projects/[projectId]/history` | audit timeline for the project |

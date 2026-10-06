@@ -82,6 +82,13 @@ export default async function ProjectLayout({
               marker: null,
               detail: null,
             },
+            {
+              href: STUDIOFLOW_ROUTES.projectRequirements(projectId),
+              label: "Requirements",
+              exact: false,
+              marker: null,
+              detail: null,
+            },
           ]}
         />
         <Suspense fallback={null}>
