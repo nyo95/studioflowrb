@@ -2,6 +2,14 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.353 | 2026-10-06 | docs(plan): skip a started phase and a phase menu on Home — Work Order WO-SF-PHASE-MENU-01
+
+- Owner finding: when the client supplies the moodboard, the Moodboard phase cannot be skipped (it is active from project creation and skip accepted only a phase that had not started; the phase menu offered only rename/delete round). Wording mixed "iteration" and "round".
+- Owner decisions (2026-10-06): skip is allowed any time while a phase is not done, sent rounds stay as history, an empty never-sent round is removed, and the skip is undoable and shown as Skipped; each phase on the Home card gets a ⋯ menu (Client notes, + New round, Skip phase, Open phase); every screen says "round".
+- `PLAN.md` replaced with WO-SF-PHASE-MENU-01 (Executor R8.354, Lead review R8.355).
+
+**Checks.** Documentation only; none run.
+
 ## R8.352 | 2026-10-06 | fix(studioflow): Lead review of the Product Schedule re-layout and first polish
 
 - Lead review of R8.351 (WO-SF-SCHED-RELAYOUT-01): PASS with polish. Read the diff: toolbar with Set up menu, progress and the three decision filters, `GroupHeader` categories with quick add, cards without nested controls or sample links, one right-side drawer for add/edit with inline photo, sample request and reuse, explicit Save/Discard and the discard prompt on close, previous/next and section switch. No server, schema or permission change.
