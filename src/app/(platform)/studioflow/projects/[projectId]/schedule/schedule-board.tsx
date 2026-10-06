@@ -2,6 +2,7 @@
 
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crown, Eye, EyeOff, History, ImageIcon, Plus, Printer, Search } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
@@ -387,6 +388,7 @@ export function ScheduleBoard({
   canManageTemplates: boolean;
   templatesHref: string;
 }) {
+  const router = useRouter();
   const command = useCommand();
   const { run, isPending, error } = command;
   const confirm = useConfirm();
@@ -518,7 +520,7 @@ export function ScheduleBoard({
               { label: "Apply studio templates", onSelect: () => { void run("templates", () => applyScheduleTemplatesAction({ projectId })); } },
               { label: "Import CSV", onSelect: () => setDialog("import") },
             ] : []),
-            ...(canManageTemplates ? [{ label: "Schedule templates", onSelect: () => { window.location.href = templatesHref; } }] : []),
+            ...(canManageTemplates ? [{ label: "Schedule templates", onSelect: () => router.push(templatesHref) }] : []),
           ]} /> : null}
           {canEdit ? (
           <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setDialog("add")}>
@@ -864,14 +866,6 @@ function AddItemDrawer({ projectId, section, categoriesBySection, brands, comman
   );
 }
 
-/**
- * One row of the unified checklist: a checkbox and, only once it is checked,
- * the input(s) that fill the field in — so ticking a field is never blocked
- * by it being empty (that was the point of ticking it), and there is one
- * place per field instead of a visibility toggle here and a value form
- * elsewhere (owner decision 2026-09-23, closer to legacy's per-card inline
- * editing than a separate popover ever was).
- */
 // ── Entry drawer content ───────────────────────────────────────────────────────
 
 /** A slim, borderless field that reads as text until it is hovered or focused: how the card is edited in place. */
@@ -1087,211 +1081,162 @@ function EntryPanelContent({
   };
   const busyKey = selected ? `${entry.id}-opt-${selected.id}` : "";
 
+  const optionActions = canEdit && selected ? (
+    <div className="flex flex-wrap items-center gap-2 rounded-control bg-surface-muted px-3 py-2">
+      <Text size="sm" tone="secondary" className="mr-auto">
+        {`Option ${selected.label}`}
+        {selected.sampleRequest?.status === "REQUESTED" ? ` · sample asked${selected.sampleRequest.requestedFrom ? ` from ${selected.sampleRequest.requestedFrom}` : ", supplier to be found"}` : selected.sampleRequest?.status === "RECEIVED" ? " · sample received" : ""}
+      </Text>
+      {selected.isFinal ? (
+        <Badge tone="success"><Crown aria-hidden="true" className="h-3 w-3" />Final</Badge>
+      ) : (
+        <Button size="sm" variant="primary" pending={isPending(busyKey)} onClick={() => void run(busyKey, () => markScheduleFinalAction({ projectId, optionId: selected.id }))}>Set as final</Button>
+      )}
+      {selected.sampleRequest?.status === "REQUESTED" ? (
+        <Button size="sm" variant="secondary" pending={isPending(busyKey)} onClick={() => void run(busyKey, () => receiveScheduleSampleAction({ projectId, requestId: selected.sampleRequest!.id }))}>Sample received</Button>
+      ) : (
+        <Button size="sm" variant="secondary" onClick={() => { setSampleFor(selected); setPhotoFor(null); setReuse(false); }}>{selected.sampleRequest ? "Request sample again" : "Request sample"}</Button>
+      )}
+      <RowActionMenu
+        label={`Option ${selected.label} actions`}
+        pending={isPending(busyKey)}
+        items={[
+          { label: selected.imageUrl ? "Change photo" : "Add photo", onSelect: () => setPhotoFor(selected.id) },
+          ...(selected.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(selected) }] : []),
+          ...(selected.sampleRequest?.status === "REQUESTED" ? [{ label: "Cancel sample request", danger: true, separatorBefore: true, onSelect: () => void cancelSample(selected) }] : []),
+          { label: "Delete option", danger: true, separatorBefore: true, onSelect: () => void removeOption(selected) },
+        ]}
+      />
+    </div>
+  ) : null;
+
   return (
     <div className="grid gap-4">
-      <div className="grid items-start gap-5">
-        <div className="grid gap-2">
-          <div className="flex flex-wrap items-stretch gap-2" role="group" aria-label="Spec options">
-            {entry.options.map((option) => (
-              <button key={option.id} type="button" aria-pressed={selectedId !== "new" && option.id === selected?.id} onClick={() => { setSelectedId(option.id); setReuse(false); setPhotoFor(null); setSampleFor(null); }} className={`flex min-w-28 max-w-44 items-center gap-2 rounded-control border px-2 py-1.5 text-left ${selectedId !== "new" && option.id === selected?.id ? "border-line-focus bg-surface-muted" : "border-line hover:border-line-strong"}`}>
-                <Thumb url={option.imageUrl} alt="" className="h-9 w-7" />
-                <span className="grid min-w-0"><span className="text-xs font-semibold">Option {option.label}{option.isFinal ? " · Final" : option.status === "NOT_USED" ? " · Not used" : ""}</span><span className="truncate text-xs text-ink-tertiary">{option.productName}</span></span>
+      {/* Options, then what can be done with the selected one: the decisions sit above the form, not below it. */}
+      <div className="grid gap-2">
+        <div className="flex flex-wrap items-stretch gap-2" role="group" aria-label="Spec options">
+          {entry.options.map((option) => (
+            <button key={option.id} type="button" aria-pressed={selectedId !== "new" && option.id === selected?.id} onClick={() => { setSelectedId(option.id); setReuse(false); setPhotoFor(null); setSampleFor(null); }} className={`flex min-w-28 max-w-44 items-center gap-2 rounded-control border px-2 py-1.5 text-left ${selectedId !== "new" && option.id === selected?.id ? "border-line-focus bg-surface-muted" : "border-line hover:border-line-strong"}`}>
+              <Thumb url={option.imageUrl} alt="" className="h-9 w-7" />
+              <span className="grid min-w-0"><span className="text-xs font-semibold">Option {option.label}{option.isFinal ? " · Final" : option.status === "NOT_USED" ? " · Not used" : ""}</span><span className="truncate text-xs text-ink-tertiary">{option.productName}</span></span>
+            </button>
+          ))}
+          {canEdit ? <Button size="sm" variant="secondary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => { setSelectedId("new"); setDrafts((current) => ({ ...current, new: current.new ?? EMPTY_PRODUCT })); setReuse(false); setPhotoFor(null); setSampleFor(null); }}>Option {nextOptionLabel(entry.options.map((option) => option.label))}</Button> : null}
+          {canEdit ? <Button size="sm" variant="ghost" leadingIcon={<History className="h-3.5 w-3.5" />} onClick={() => { setReuse(true); setPhotoFor(null); setSampleFor(null); }}>From past project</Button> : null}
+        </div>
+        {reuse ? <InlineReuse projectId={projectId} entry={entry} command={command} onClose={() => setReuse(false)} /> : null}
+        {selectedId !== "new" ? optionActions : null}
+        {sampleFor ? <InlineSampleRequest projectId={projectId} option={sampleFor} command={command} onClose={() => setSampleFor(null)} /> : null}
+        {entry.options.length === 0 && selectedId !== "new" ? <Text size="sm" tone="tertiary">No product yet. Fill in the Type and fields below and Save, or copy one from a past project.</Text> : null}
+      </div>
+
+      {photoFor && entry.options.some((option) => option.id === photoFor) ? (
+        <InlinePhotoEditor projectId={projectId} entryCode={entry.code} option={entry.options.find((option) => option.id === photoFor)!} command={command} onClose={() => setPhotoFor(null)} />
+      ) : (
+        <div className="grid items-start gap-4 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
+          {/* Photo of the selected option (4:5, as on the board). */}
+          <div className="relative">
+            {selectedId === "new" && canEdit ? (
+              <div className="grid gap-1"><ImageWorkspace label="New option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={setPreparedNewPhoto} disabled={savePending} />{preparedNewPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedNewPhoto.name}</Text> : null}</div>
+            ) : selected && canEdit ? (
+              <button type="button" onClick={() => setPhotoFor(selected.id)} aria-label={selected.imageUrl ? `Change photo of option ${selected.label}` : `Add photo to option ${selected.label}`} className="relative block w-full rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+                <Thumb url={selected.imageUrl} alt={selected.productName} className="aspect-[4/5] !h-auto w-full !rounded-control" />
+                <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-surface/90 px-2 py-0.5 text-[11px] font-medium text-ink-secondary">{selected.imageUrl ? "Change photo" : "Add photo"}</span>
               </button>
-            ))}
-            {canEdit ? <Button size="sm" variant="secondary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => { setSelectedId("new"); setDrafts((current) => ({ ...current, new: current.new ?? EMPTY_PRODUCT })); setReuse(false); setPhotoFor(null); setSampleFor(null); }}>Option {nextOptionLabel(entry.options.map((option) => option.label))}</Button> : null}
-            {canEdit ? <Button size="sm" variant="ghost" leadingIcon={<History className="h-3.5 w-3.5" />} onClick={() => { setReuse(true); setPhotoFor(null); setSampleFor(null); }}>From past project</Button> : null}
+            ) : (
+              <Thumb url={selected?.imageUrl ?? null} alt={selected?.productName ?? "No photo"} className="aspect-[4/5] !h-auto w-full !rounded-control" />
+            )}
           </div>
-          {reuse ? <InlineReuse projectId={projectId} entry={entry} command={command} onClose={() => setReuse(false)} /> : null}
-        </div>
 
-        {/* Selected option form */}
-        <div className="grid gap-3">
-          <div className="grid gap-3">
-            <div className="grid gap-2.5 p-5">
-              <div className="flex items-center justify-between">
-                <span className="rounded-[6px] bg-surface-raised px-2 py-0.5 font-ui-mono text-xs font-medium text-ink-secondary">{entry.code}</span>
-                <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-ink-tertiary">{entry.category}</span>
-              </div>
-
-              <input
-                aria-label="Type"
-                value={draft.productName}
-                onChange={(event) => updateDraft({ productName: event.target.value })}
-                disabled={disabled}
-                maxLength={200}
-                placeholder="Type, e.g. Nude Pro - ATS 1132 M"
-                className="h-11 w-full rounded-[6px] border border-transparent bg-transparent px-0 text-xl font-medium leading-tight tracking-tight text-ink placeholder:text-sm placeholder:font-normal placeholder:text-ink-tertiary hover:border-line-subtle focus:border-line-focus focus:bg-surface focus:px-1.5 focus:outline-none"
-              />
-
-              <div className="relative">
-                {selectedId === "new" && canEdit ? (
-                  <div className="grid gap-1"><ImageWorkspace label="New option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={setPreparedNewPhoto} disabled={savePending} />{preparedNewPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedNewPhoto.name}</Text> : null}</div>
-                ) : selected && canEdit ? (
-                  <button type="button" onClick={() => setPhotoFor(selected.id)} aria-label={selected.imageUrl ? `Change photo of option ${selected.label}` : `Add photo to option ${selected.label}`} className="block w-full rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
-                    <Thumb url={selected.imageUrl} alt={selected.productName} className="h-36 w-full !rounded-control" />
-                  </button>
-                ) : (
-                  <Thumb url={selected?.imageUrl ?? null} alt={selected?.productName ?? "No photo"} className="h-36 w-full !rounded-control" />
-                )}
-                {selected?.sampleRequest ? (
-                  <span className="absolute right-2 top-2"><Badge tone={selected.sampleRequest.status === "RECEIVED" ? "success" : "warning"}>{selected.sampleRequest.status === "RECEIVED" ? "Sample received" : "Sample requested"}</Badge></span>
-                ) : null}
-                {selected && canEdit ? <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-surface/90 px-2 py-0.5 text-[11px] font-medium text-ink-secondary">{selected.imageUrl ? "Change photo" : "Add photo"}</span> : null}
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5">
-                {true ? (
-                  <CardPlate label="Brand" action={visibilityAction("brand", "Brand")}>
-                    <CreatableSearch
-                      label="Brand"
-                      options={brandSearchOptions}
-                      value={draft.brandId || draft.brandName}
-                      onValueChange={handleBrandChange}
-                      onCreate={(text) => text}
-                      createLabel={(text) => `Use "${text}" (not in Master Data)`}
-                      placeholder="Tap to add"
-                      searchPlaceholder="Search brands…"
-                      emptyLabel="No brands found"
-                      allowClear
-                      disabled={disabled}
-                      className="w-full min-w-0 !h-7 !min-h-7 !border-transparent !bg-transparent !px-0 !text-sm !font-medium"
-                    />
-                  </CardPlate>
-                ) : null}
-                {(["color", "pattern", "finishing"] as const).map((key) => (
-                  <CardPlate key={key} label={CARD_FIELD_LABEL[key]} action={visibilityAction(key, CARD_FIELD_LABEL[key])}>
-                    <input aria-label={CARD_FIELD_LABEL[key]} value={draft[key]} onChange={(event) => updateDraft({ [key]: event.target.value })} disabled={disabled} maxLength={160} placeholder="Tap to add" className={PLATE_INPUT} />
-                  </CardPlate>
-                ))}
-                {true ? (
-                  <CardPlate label="Size" action={visibilityAction("dimension", "Size")}>
-                    <input aria-label="Size" value={draft.dimension} onChange={(event) => updateDraft({ dimension: event.target.value })} disabled={disabled} maxLength={160} placeholder="e.g. 60 × 60 cm" className={PLATE_INPUT} />
-                  </CardPlate>
-                ) : null}
-                {true ? (
-                  <CardPlate label="Location" action={visibilityAction("location", "Location")}>
-                    <input aria-label="Location" value={fields.location} onChange={(event) => setFields({ ...fields, location: event.target.value })} disabled={disabled} maxLength={160} placeholder="Tap to add" className={PLATE_INPUT} />
-                  </CardPlate>
-                ) : null}
-                {/* Qty only for Fixture — a Material line is specified, not counted (owner decision 2026-09-23). */}
-                {entry.section === "FIXTURE" ? (
-                  <CardPlate label="Qty" action={visibilityAction("qty", "Qty")}>
-                    <div className="grid grid-cols-[1fr_4rem] gap-1.5">
-                      <input aria-label="Qty" inputMode="decimal" value={fields.qty} onChange={(event) => setFields({ ...fields, qty: event.target.value })} disabled={disabled} maxLength={20} placeholder="0" className={PLATE_INPUT} />
-                      <input aria-label="Unit" placeholder="Unit" value={fields.unit} onChange={(event) => setFields({ ...fields, unit: event.target.value })} disabled={disabled} maxLength={40} className={PLATE_INPUT} />
-                    </div>
-                  </CardPlate>
-                ) : null}
-                {extraChoices.map((extra) => (
-                  <CardPlate key={extra.key} label={extra.label} action={visibilityAction(extra.key, extra.label)}>
-                    <input aria-label={extra.label} value={extraValue(extra.label)} onChange={(event) => setExtraValue(extra.label, event.target.value)} disabled={disabled} maxLength={400} placeholder="Tap to add" className={PLATE_INPUT} />
-                  </CardPlate>
-                ))}
-              </div>
-
-              <ExtraFieldsEditor value={draft.extra} onChange={(extra) => updateDraft({ extra })} />
-
-              {true ? (
-                <div className="grid gap-1 pt-1">
-                  <div className="flex items-center justify-between"><Text size="sm" weight="semibold">Notes</Text>{visibilityAction("notes", "Notes")}</div>
-                  <SimpleTextEditor value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} disabled={disabled} maxLength={2000} rows={2} />
-                </div>
-              ) : null}
-
-              <div className="grid gap-2 border-t border-line-subtle pt-3">
-                <Text size="sm" tone="tertiary">The eye controls what appears on the card. Hidden fields stay editable.</Text>
-                {canEdit && cardFieldsDraft !== null ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" disabled={savePending} onClick={() => setCardFieldsDraft(null)}>Use default</Button> : null}
-              </div>
-
-              <div className="mt-1 flex items-center justify-between">
-                <span className="flex items-center gap-2 text-xs text-ink-tertiary">
-                  <span className="grid h-7 w-7 place-items-center rounded-full bg-surface-raised text-sm font-medium text-ink-secondary">{selected?.label ?? "A"}</span>
-                  {selected ? `Option ${selected.label} of ${entry.options.length}` : "No option yet"}
-                </span>
-                {selected?.isFinal ? (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-[0.08em]" style={{ color: "var(--ui-warning-fg)" }}>
-                    <Crown aria-hidden="true" className="h-4 w-4" /> Final
-                  </span>
-                ) : selected ? <Badge>{selected.status === "NOT_USED" ? "Not used" : "Not final"}</Badge> : null}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Option actions */}
-        <div className="grid gap-3 border-t border-line-subtle pt-3">
-          {photoFor && entry.options.some((option) => option.id === photoFor) ? (
-            <InlinePhotoEditor projectId={projectId} entryCode={entry.code} option={entry.options.find((option) => option.id === photoFor)!} command={command} onClose={() => setPhotoFor(null)} />
-          ) : (
-            <>
-              {canEdit ? (
-                <div className="grid gap-2">
-                  {selected ? (
-                    selected.isFinal ? (
-                      <div className="inline-flex min-h-10 items-center justify-center gap-2 rounded-control border border-warning-border bg-warning-surface text-sm font-medium" style={{ color: "var(--ui-warning-fg)" }}>
-                        <Crown aria-hidden="true" className="h-4 w-4" /> This is the final
-                      </div>
-                    ) : (
-                      <Button variant="primary" pending={isPending(busyKey)} onClick={() => void run(busyKey, () => markScheduleFinalAction({ projectId, optionId: selected.id }))}>Set as final</Button>
-                    )
-                  ) : null}
-                  <div className="grid grid-cols-[1fr_auto] gap-2">
-                    {selected ? (
-                      selected.sampleRequest?.status !== "REQUESTED" ? (
-                        <Button variant="secondary" onClick={() => setSampleFor(selected)}>{selected.sampleRequest ? "Request sample again" : "Request sample"}</Button>
-                      ) : (
-                        <Button variant="secondary" pending={isPending(busyKey)} onClick={() => void run(busyKey, () => receiveScheduleSampleAction({ projectId, requestId: selected.sampleRequest!.id }))}>Mark sample received</Button>
-                      )
-                    ) : <span />}
-                    {selected ? (
-                      <RowActionMenu
-                        label={`Option ${selected.label} actions`}
-                        pending={isPending(busyKey)}
-                        items={[
-                          { label: selected.imageUrl ? "Change photo" : "Add photo", onSelect: () => setPhotoFor(selected.id) },
-                          ...(selected.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(selected) }] : []),
-                          ...(selected.sampleRequest?.status === "REQUESTED" ? [{ label: "Cancel sample request", danger: true, separatorBefore: true, onSelect: () => void cancelSample(selected) }] : []),
-                          { label: "Delete option", danger: true, separatorBefore: true, onSelect: () => void removeOption(selected) },
-                        ]}
-                      />
-                    ) : null}
+          <div className="grid min-w-0 gap-2.5">
+            <input
+              aria-label="Type"
+              value={draft.productName}
+              onChange={(event) => updateDraft({ productName: event.target.value })}
+              disabled={disabled}
+              maxLength={200}
+              placeholder="Type, e.g. Nude Pro - ATS 1132 M"
+              className="h-10 w-full rounded-[6px] border border-transparent bg-transparent px-0 text-lg font-semibold leading-tight tracking-tight text-ink placeholder:text-sm placeholder:font-normal placeholder:text-ink-tertiary hover:border-line-subtle focus:border-line-focus focus:bg-surface focus:px-1.5 focus:outline-none"
+            />
+            <div className="grid grid-cols-2 gap-1.5">
+              <CardPlate label="Brand" action={visibilityAction("brand", "Brand")}>
+                <CreatableSearch
+                  label="Brand"
+                  options={brandSearchOptions}
+                  value={draft.brandId || draft.brandName}
+                  onValueChange={handleBrandChange}
+                  onCreate={(text) => text}
+                  createLabel={(text) => `Use "${text}" (not in Master Data)`}
+                  placeholder="Tap to add"
+                  searchPlaceholder="Search brands…"
+                  emptyLabel="No brands found"
+                  allowClear
+                  disabled={disabled}
+                  className="w-full min-w-0 !h-7 !min-h-7 !border-transparent !bg-transparent !px-0 !text-sm !font-medium"
+                />
+              </CardPlate>
+              {(["color", "pattern", "finishing"] as const).map((key) => (
+                <CardPlate key={key} label={CARD_FIELD_LABEL[key]} action={visibilityAction(key, CARD_FIELD_LABEL[key])}>
+                  <input aria-label={CARD_FIELD_LABEL[key]} value={draft[key]} onChange={(event) => updateDraft({ [key]: event.target.value })} disabled={disabled} maxLength={160} placeholder="Tap to add" className={PLATE_INPUT} />
+                </CardPlate>
+              ))}
+              <CardPlate label="Size" action={visibilityAction("dimension", "Size")}>
+                <input aria-label="Size" value={draft.dimension} onChange={(event) => updateDraft({ dimension: event.target.value })} disabled={disabled} maxLength={160} placeholder="e.g. 60 × 60 cm" className={PLATE_INPUT} />
+              </CardPlate>
+              <CardPlate label="Location" action={visibilityAction("location", "Location")}>
+                <input aria-label="Location" value={fields.location} onChange={(event) => setFields({ ...fields, location: event.target.value })} disabled={disabled} maxLength={160} placeholder="Tap to add" className={PLATE_INPUT} />
+              </CardPlate>
+              {/* Qty only for Fixture — a Material line is specified, not counted (owner decision 2026-09-23). */}
+              {entry.section === "FIXTURE" ? (
+                <CardPlate label="Qty" action={visibilityAction("qty", "Qty")}>
+                  <div className="grid grid-cols-[1fr_4rem] gap-1.5">
+                    <input aria-label="Qty" inputMode="decimal" value={fields.qty} onChange={(event) => setFields({ ...fields, qty: event.target.value })} disabled={disabled} maxLength={20} placeholder="0" className={PLATE_INPUT} />
+                    <input aria-label="Unit" placeholder="Unit" value={fields.unit} onChange={(event) => setFields({ ...fields, unit: event.target.value })} disabled={disabled} maxLength={40} className={PLATE_INPUT} />
                   </div>
-                  {selected?.sampleRequest ? <Text tone="tertiary" size="sm">{selected.sampleRequest.requestedFrom ? `Sample from ${selected.sampleRequest.requestedFrom}` : "Supplier to be found"}</Text> : null}
-                </div>
+                </CardPlate>
               ) : null}
-            </>
-          )}
+              {extraChoices.map((extra) => (
+                <CardPlate key={extra.key} label={extra.label} action={visibilityAction(extra.key, extra.label)}>
+                  <input aria-label={extra.label} value={extraValue(extra.label)} onChange={(event) => setExtraValue(extra.label, event.target.value)} disabled={disabled} maxLength={400} placeholder="Tap to add" className={PLATE_INPUT} />
+                </CardPlate>
+              ))}
+            </div>
+            <ExtraFieldsEditor value={draft.extra} onChange={(extra) => updateDraft({ extra })} />
+          </div>
         </div>
+      )}
+
+      <div className="grid gap-1">
+        <div className="flex items-center justify-between"><Text size="sm" weight="semibold">Notes</Text>{visibilityAction("notes", "Notes")}</div>
+        <SimpleTextEditor value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} disabled={disabled} maxLength={2000} rows={2} />
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Eye aria-hidden="true" className="h-3.5 w-3.5 text-ink-tertiary" />
+        <Text size="sm" tone="tertiary">The eye shows a field on the board card and in print. Hidden fields stay editable.</Text>
+        {canEdit && cardFieldsDraft !== null ? <Button type="button" size="sm" variant="ghost" disabled={savePending} onClick={() => setCardFieldsDraft(null)}>Use default</Button> : null}
       </div>
 
       {optionNeedsType ? <InlineError>Enter a Type before saving product details.</InlineError> : null}
       {saveError ? <InlineError>{saveError}</InlineError> : null}
+      {command.error && !reuse && !photoFor && !sampleFor ? <InlineError>{command.error}</InlineError> : null}
       {canEdit ? (
-        <FormActions className="sticky bottom-0 z-10 -mx-4 -mb-4 bg-surface-raised px-4 pb-4">
+        <FormActions className="sticky bottom-0 z-10 -mx-4 -mb-4 border-t border-line-subtle bg-surface px-4 py-3">
           <Button type="button" variant="ghost" disabled={!isDirty || savePending} onClick={discardDraft}>Discard</Button>
           <Button type="button" variant="primary" pending={savePending} disabled={!isDirty || optionNeedsType} onClick={() => void saveAll().catch((error) => setSaveError(error instanceof Error ? error.message : "Could not save."))}>
             Save
           </Button>
         </FormActions>
       ) : null}
-      {command.error && !reuse && !photoFor && !sampleFor ? <InlineError>{command.error}</InlineError> : null}
-
-      {sampleFor ? (
-        <InlineSampleRequest projectId={projectId} option={sampleFor} command={command} onClose={() => setSampleFor(null)} />
-      ) : null}
     </div>
   );
 }
 
-// ── Entry drawer (mobile wrapper) ─────────────────────────────────────────────
+// ── Entry drawer ───────────────────────────────────────────────────────────────
 
 /**
- * The full item editor — Item details, What shows on the card, and Spec
- * options — as its own dialog rather than a slim sidebar squeezed beside the
- * board. Same dialog on desktop and mobile, matching every other schedule
- * dialog in this file (owner decision 2026-09-23: the old 22rem inline panel
- * left no room for the card-field checkboxes and the option-edit form
- * without heavy scrolling).
+ * The one item editor (WO-SF-SCHED-RELAYOUT-01): a right-side drawer so the board stays in view, with
+ * previous/next across the current section and filter, and the item menu (move, save as template, delete).
  */
 function EntryDrawer({
   projectId,

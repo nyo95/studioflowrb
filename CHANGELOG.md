@@ -2,6 +2,14 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.352 | 2026-10-06 | fix(studioflow): Lead review of the Product Schedule re-layout and first polish
+
+- Lead review of R8.351 (WO-SF-SCHED-RELAYOUT-01): PASS with polish. Read the diff: toolbar with Set up menu, progress and the three decision filters, `GroupHeader` categories with quick add, cards without nested controls or sample links, one right-side drawer for add/edit with inline photo, sample request and reuse, explicit Save/Discard and the discard prompt on close, previous/next and section switch. No server, schema or permission change.
+- Polish in the item drawer: the option row is followed directly by the selected option's actions (Set as final or a Final badge, Request sample / Sample received, option menu) and the inline sample form, so decisions are no longer below the notes; the photo sits beside Type and the fields at the board's 4:5 instead of a full-width strip; the duplicate code/category header and the "Option A of N / Final" footer inside the form are gone (the drawer title and option row already say it); the eye legend and Use default sit together; leftover `{true ? … : null}` wrappers and two stale comments removed; "Schedule templates" navigates with the router instead of a full page load.
+- Browser (owner's session, read-only): board, filters, progress, quick-add tile and the drawer render at 1366 px; no command was clicked, so no data changed. The full click-through stays on `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` (R8.351).
+
+**Checks.** `tsc --noEmit`; `npm run lint` (0 errors, 2 existing `<img>` warnings); `check:boundaries`; `check:legacy-runtime`; `npm test` **829/829**.
+
 ## R8.351 | 2026-10-06 | feat(studioflow): consolidate Product Schedule workspace
 
 - Reworked the Schedule toolbar around section/view chips, Print/PDF, a compact Set up menu and one primary Add item action. Added per-section final progress plus decision, sample and empty-product filters shared by Board and List.
