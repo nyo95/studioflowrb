@@ -80,7 +80,7 @@ export function StudioFlowHeaderSearch() {
           lines up with the whole row, while Trigger stays just the icon —
           it's the only element that opens/closes on click. */}
       <Popover.Anchor asChild>
-        <div className="flex h-[27px] min-w-0 max-w-[300px] flex-1 items-center gap-[7px] rounded-action border border-line-subtle bg-rail-soft px-[9px] transition-colors focus-within:border-line-focus max-[560px]:max-w-none">
+        <div className="flex h-[30px] min-w-0 max-w-[420px] flex-1 items-center gap-[7px] rounded-action border border-line bg-rail-soft px-[10px] transition-colors focus-within:border-line-focus max-[560px]:max-w-none">
           <Search size={14} aria-hidden="true" className="shrink-0 text-ink-tertiary" />
           <input
             ref={inputRef}
@@ -88,9 +88,9 @@ export function StudioFlowHeaderSearch() {
             value={query}
             onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
-            placeholder="Search projects, items, MOM"
+            placeholder="Search projects or clients"
             aria-label="Search projects or clients"
-            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[12.5px] text-ink outline-none placeholder:text-ink-tertiary [&::-webkit-search-cancel-button]:appearance-none"
+            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-ink outline-none placeholder:text-ink-tertiary [&::-webkit-search-cancel-button]:appearance-none"
           />
           {shortcutHint ? (
             <kbd className="shrink-0 rounded-[4px] border border-line px-1 font-ui-mono text-[10px] leading-[14px] text-ink-tertiary max-[560px]:hidden">

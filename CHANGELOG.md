@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.344 | 2026-10-06 | fix(studioflow): honest, easier-to-find header search
+
+- The header search said "Search projects, items, MOM" but only finds projects and clients; the placeholder now says "Search projects or clients".
+- The field is easier to see: 30px tall (was 27), up to 420px wide (was 300), 13px text (was 12.5) and a stronger border. Behaviour (Ctrl K, results panel, phone width) is unchanged.
+- Browser-checked the new Requirements page (R8.343) with the signed-in owner: it lists the general and phase requirements; ticking one saved and showed in History as "ticked a checklist item"; it was unticked again afterwards so no data changed.
+- Not changed, noted from the header review: notification dots on the chat and bell icons, the heavy dark avatar, and the visual split between the header and the breadcrumb strip.
+
+**Checks.** `npm run check`; `npm run lint`; `npm test`.
+
 ## R8.343 | 2026-10-06 | feat(studioflow): Requirements page; contract rewritten to notes-only
 
 - Lead review of R8.342 (WO-SF-NOTES-ONLY-01): PASS. Re-ran typecheck, lint and the full suite (826 pass, 0 fail); no to-do code is left (the Drawing List keeps its own assignee); the migration deletes only ad-hoc roots and a test proves requirements and their subtasks survive and that no ad-hoc creation command exists.
@@ -9,7 +18,7 @@ This file is the authoritative revision ledger. Revision/commit rules are in `AG
 - Home already shows project cards with My projects / All projects and Running / Completed; nothing else was needed there.
 - `STUDIOFLOW-REWORK-CONTRACT.md`: §6.2 now describes requirements only (no priority, due date, assignee, labels, saved filters), §7 describes the card Home, the permission table, the legacy-disposition rows and the route table follow. A stale comment in the project-card query was corrected.
 
-**Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two existing image warnings). Browser check of the new page: see the report (needs a signed-in session).
+**Checks.** `npm test`; `npm run check`; `npm run lint` (0 errors; two existing image warnings). Browser check of the new page: done in R8.344.
 
 ## R8.342 | 2026-10-06 | refactor(studioflow): remove My Tasks and ad-hoc to-dos
 
@@ -263,8 +272,8 @@ Logic, backend and flow review of the StudioFlow phase, task and Today code afte
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.343**
-- Next local revision: **R8.344**
+- Current revision after this entry is committed: **R8.344**
+- Next local revision: **R8.345**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
