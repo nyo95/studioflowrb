@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.370 | 2026-10-06 | fix(studioflow): a round holding work can no longer be deleted — WO-SF-SAFE-01
+
+- Owner (2026-10-06): Lead executes as Planner + Executor. `deleteNeverSentIteration` now refuses (`ITERATION_HAS_ATTACHED_WORK`, conflict) a never-sent round that has any activity or deliverable attached. Before, the delete cascade-removed its activities and detached its files (`onDelete: SetNull`), and undo recreated only the round row. The undo snapshot now holds only the round.
+- `bypassPhase` counts activities as well as files and note before treating the open round as empty; a round with activities is kept as closed (`DONE`) history instead of being deleted.
+- Tests: rejected delete with a file and with an activity leaves both attached; undo restores an empty deleted round exactly; skip keeps a round holding an activity or a file.
+
+**Checks.** `npm run typecheck`, eslint on changed files, `service.integration.test.ts` 126/126 (disposable cloud-container Postgres).
+
 ## R8.369 | 2026-10-06 | docs(plan): StudioFlow production-safety closure — WO-SF-SAFE-01/02/03 (Lead)
 
 - Verified three reported findings against c6f1cb7: round deletion can cascade-delete activities and detach deliverables (confirmed, P0, plus `bypassPhase` ignoring activities); `setProjectStatus` can reopen/complete outside the explicit lifecycle (confirmed, P1); bare `storage.remove` paths bypass the cleanup failure ledger (confirmed, P1). Lifecycle timers are acceptable for the always-on PC runtime.

@@ -281,6 +281,59 @@ describe("WO-SF-PHASE-MENU-01 skip lifecycle", () => {
     await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: phase.id }), "PHASE_INVALID_STATE");
   });
 
+  it("refuses to delete a never-sent round that holds files or activities, and leaves them intact", async () => {
+    const { projectId } = await newProject("Round with attached work");
+    const phase = await phaseOf(projectId, "moodboard");
+    const open = await openIteration(phase.id);
+    const file = await testDb.prisma.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: open.id, name: "Moodboard v1", storage_key: "studioflow/deliverables/attached.pdf" } });
+    await rejectsWith(sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id }), "ITERATION_HAS_ATTACHED_WORK");
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: open.id } })).status, "NOT_SENT");
+    const kept = await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { id: file.id } });
+    assert.equal(kept.revision_id, open.id);
+    assert.equal(kept.storage_key, "studioflow/deliverables/attached.pdf");
+
+    await testDb.prisma.sfDeliverable.delete({ where: { id: file.id } });
+    const activity = await testDb.prisma.sfActivity.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: open.id, content: "Client asked for warmer tones" } });
+    await rejectsWith(sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id }), "ITERATION_HAS_ATTACHED_WORK");
+    assert.equal((await testDb.prisma.sfActivity.findUniqueOrThrow({ where: { id: activity.id } })).revision_id, open.id);
+
+    await testDb.prisma.sfActivity.delete({ where: { id: activity.id } });
+    await sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id });
+    assert.equal(await testDb.prisma.sfRevision.count({ where: { id: open.id } }), 0);
+  });
+
+  it("undoes the deletion of an empty never-sent round back to the identical round", async () => {
+    const { projectId } = await newProject("Undo empty round delete");
+    const phase = await phaseOf(projectId, "moodboard");
+    const open = await openIteration(phase.id);
+    await sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id });
+    await sf.phases.undoPhaseEvent({ ...as(designer), projectId, eventId: (await latestPhaseEvent(projectId)).id });
+    const restored = await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: open.id } });
+    assert.deepEqual(
+      { phase: restored.phase_id, major: restored.major, name: restored.name, status: restored.status, note: restored.note },
+      { phase: open.phase_id, major: open.major, name: open.name, status: "NOT_SENT", note: open.note },
+    );
+    await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: phase.id }), "PHASE_INVALID_STATE");
+  });
+
+  it("keeps a never-sent round with an activity as closed history when its phase is skipped", async () => {
+    const { projectId } = await newProject("Skip round with activity");
+    const phase = await phaseOf(projectId, "moodboard");
+    const open = await openIteration(phase.id);
+    const activity = await testDb.prisma.sfActivity.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: open.id, content: "Keep me" } });
+    await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: phase.id, reason: "Client supplied the concept" });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: open.id } })).status, "DONE");
+    assert.equal((await testDb.prisma.sfActivity.findUniqueOrThrow({ where: { id: activity.id } })).revision_id, open.id);
+
+    const filed = await newProject("Skip round with file");
+    const filedPhase = await phaseOf(filed.projectId, "moodboard");
+    const filedRound = await openIteration(filedPhase.id);
+    const file = await testDb.prisma.sfDeliverable.create({ data: { project_id: filed.projectId, phase_id: filedPhase.id, revision_id: filedRound.id, name: "Concept", storage_key: "studioflow/deliverables/concept.pdf" } });
+    await sf.phases.bypassPhase({ ...as(designer), projectId: filed.projectId, phaseId: filedPhase.id, reason: "Client supplied the concept" });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: filedRound.id } })).status, "DONE");
+    assert.equal((await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { id: file.id } })).revision_id, filedRound.id);
+  });
+
   it("refuses to skip a phase that is already done", async () => {
     const { projectId } = await newProject("Skip done refusal");
     const phase = await phaseOf(projectId, "moodboard");

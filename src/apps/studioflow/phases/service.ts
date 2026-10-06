@@ -121,8 +121,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         let deletedIteration: { iteration: ReturnType<typeof iterationUndo> } | undefined;
         let createdIteration: ReturnType<typeof iterationUndo> | undefined;
         if (current) {
-          const files = await tx.sfDeliverable.count({ where: { revision_id: current.id } });
-          const emptyNeverSent = current.status === "NOT_SENT" && !current.note?.trim() && files === 0;
+          const [files, activities] = await Promise.all([
+            tx.sfDeliverable.count({ where: { revision_id: current.id } }),
+            tx.sfActivity.count({ where: { revision_id: current.id } }),
+          ]);
+          // Only a round with nothing attached may be deleted; anything else is kept as closed history.
+          const emptyNeverSent = current.status === "NOT_SENT" && !current.note?.trim() && files === 0 && activities === 0;
           if (emptyNeverSent) {
             deletedIteration = { iteration: iterationUndo(current) };
             await tx.sfRevision.delete({ where: { id: current.id } });
@@ -383,7 +387,10 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!iteration) throw iterationNotFound(); if (iteration.name === name) return { iterationId: iteration.id }; await tx.sfRevision.update({ where: { id: iteration.id }, data: { name } }); await recordEvent(tx, input, phase, iteration.id, iteration.name, name, { beforeIteration: iterationUndo(iteration) }); await audit(tx, input.actor, "iteration-renamed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async deleteNeverSentIteration(input: PhaseCommandInput & { iterationId: string }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id }, include: { activities: true, deliverables: true } }); if (!iteration) throw iterationNotFound(); if (iteration.status !== "NOT_SENT") throw invalidState("Only a round that was never sent can be deleted."); const snapshot = { iteration: iterationUndo(iteration), activities: iteration.activities.map((a) => ({ id: a.id, revisionId: a.revision_id })), deliverables: iteration.deliverables.map((d) => ({ id: d.id, revisionId: d.revision_id })) }; await tx.sfRevision.delete({ where: { id: iteration.id } }); await recordEvent(tx, input, phase, null, "NOT_SENT", "DELETED", { deletedIteration: snapshot }); await audit(tx, input.actor, "iteration-deleted", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id }, include: { _count: { select: { activities: true, deliverables: true } } } }); if (!iteration) throw iterationNotFound(); if (iteration.status !== "NOT_SENT") throw invalidState("Only a round that was never sent can be deleted.");
+      // Deleting the round would cascade-delete its activities and detach its files (SetNull), and undo only recreates
+      // the round row — so a round with persisted work is never deleted.
+      if (iteration._count.activities + iteration._count.deliverables > 0) throw conflict("ITERATION_HAS_ATTACHED_WORK", "This round has files or notes attached. Remove them first, then delete the round."); const snapshot = { iteration: iterationUndo(iteration) }; await tx.sfRevision.delete({ where: { id: iteration.id } }); await recordEvent(tx, input, phase, null, "NOT_SENT", "DELETED", { deletedIteration: snapshot }); await audit(tx, input.actor, "iteration-deleted", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async setPhaseNote(input: PhaseCommandInput & { note: string | null }) {
       return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const note = input.note === null ? null : requiredText(input.note, "PHASE_NOTE_REQUIRED", "Note", 2000); if (phase.note === note) return { phaseId: phase.id }; await tx.sfPhase.update({ where: { id: phase.id }, data: { note } }); await recordEvent(tx, input, phase, null, phase.note, note ?? "", { phaseNoteBefore: phase.note }); await audit(tx, input.actor, "note-set", phase, phase.status as PhaseStatus, phase.status as PhaseStatus); return { phaseId: phase.id }; });
