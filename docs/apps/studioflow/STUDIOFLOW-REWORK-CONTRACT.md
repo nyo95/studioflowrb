@@ -1,52 +1,40 @@
-# StudioFlow Rework Contract — Legacy Behavior on the Centralized Foundation
+# StudioFlow Contract — Legacy Behavior on the Centralized Foundation
 
-Status: **ACTIVE — owner-ratified 2026-09-15 (R8.70). Supersedes every other
-StudioFlow contract in this folder.**
-Owner: repository owner
-Lane that produced it: Planner, kantor
+Status: **ACTIVE — the single StudioFlow authority.** Owner-ratified 2026-09-15
+(R8.70); rewritten to the implemented state on 2026-10-06 (R8.349). Every
+statement below describes the code as it is; history lives in `CHANGELOG.md`
+and the pre-rewrite text is kept at
+`docs/archive/studioflow-rb/STUDIOFLOW-REWORK-CONTRACT-2026-10-06.md`.
+Owner: repository owner.
 
 Legacy evidence: `D:\Misc\ProjectsHUB\studioflow`, branch `main`, commit
-`c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` (same pin as D-SF). Only committed
-files are evidence. The legacy working tree (`foldering/`, dumps, `.env`) and
-the legacy database remain forbidden.
-
-Rebuild evidence: branch `studioflow/contracts`, revision R8.69.
+`c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` (see `D-SF-RECOVERY-DISCOVERY.md`).
+Only committed files are evidence. The legacy working tree and the legacy
+database remain forbidden.
 
 ## 0. Why this contract exists
 
-The rebuild StudioFlow (R7.xx–R8.69) redesigned the product around Iterations,
-client Responses, IterationPoints, first-class Requirements with evidence,
-phase templates, and a single project lead. The owner reviewed the result on
-2026-09-15 and ruled that it **deviates from how the studio actually works**.
+On 2026-09-15 the owner ruled that the first rebuild StudioFlow deviated from
+how the studio works, archived it (git tag only, code deleted) and asked for
+legacy business logic rebuilt on the Foundation (Core, Utilities, UI Engine)
+with a better UI. Since then the owner has simplified the workflow further:
 
-Owner instructions, 2026-09-15:
-
-1. The current rebuild StudioFlow is partial and diverges from legacy.
-2. Master Data and BQ are accepted and stay untouched.
-3. StudioFlow documentation/contracts may be rewritten.
-4. The existing rebuild StudioFlow app is archived: **git tag only, code
-   deleted** from the working branch.
-5. The goal is to rework legacy behavior *into* the rebuild: legacy business
-   logic, rebuilt on the centralized Foundation (Core, Utilities, UI Engine),
-   with an improved UI/UX.
-
-Decisions taken in the same session:
-
-| ID | Decision |
+| ID | Decision (current) |
 |---|---|
-| RW-01 | Phase workflow is the **legacy phase state machine** with revisions `vMAJOR.MINOR` and FEEDBACK→TODO conversion. The screen shows **simplified labels** (§5.3). |
-| RW-02 | Project keeps **PIC Designer** and **PIC Drafter** as assignment fields. Authorization = platform RBAC grants AND assignment: edit rights follow the assigned PIC (owner, 2026-09-30, reversing the earlier grants-only rule; see §3 and `PLAN.md` WO-SF-ACCESS-01). The CD phase is the drafter's phase. No role enum. |
-| RW-03 | Archive = local git tag on the last pre-rework commit, then delete the rebuild StudioFlow code, routes, tests, and `sf_*` schema from the working branch. |
-| RW-04 | First rework wave: Project + Client + Phase + Revision; Task/Checklist + Today; MOM; Product Schedule. CD List, Deliverables/files, SketchUp, collaboration, Upcoming are wave 2+. Library shipped 2026-09-23 (§7a) once the owner confirmed scope, ahead of the rest of wave 2. |
+| RW-01 | A phase is a chain of **client-sent rounds** (iterations): `NOT_SENT → SENT → ANSWERED → REVISED / DONE`. No internal review and no `vMAJOR.MINOR` (WO-SF-ITER-01, R8.285–R8.295; legacy commands removed R8.321). |
+| RW-02 | A project has a **PIC Designer** and a **PIC Drafter**. Authorization = platform RBAC grant AND assignment (§3). The Construction Drawing phase is the drafter's seat. No role enum. |
+| RW-03 | What the client said is the round's **client notes**; per-point feedback is retired (R8.327). |
+| RW-04 | No personal to-dos, My Tasks or Quick add; the checklist holds **requirements** only (WO-SF-NOTES-ONLY-01, R8.342). |
+| RW-05 | A project completes **only** by an explicit "Mark as completed" (KB-060). |
+| RW-06 | Project names are free text; there is no project code (R8.213). |
 
 ## 1. Authority and how legacy is used
 
 This contract amends the legacy-isolation rule in `AGENTS.md` for StudioFlow
 only:
 
-- Legacy **behavior** at the pinned commit is the functional specification.
-  Where this contract is silent, legacy behavior wins over any older rebuild
-  StudioFlow document.
+- Legacy **behavior** at the pinned commit is the functional specification
+  where this contract is silent.
 - An Executor **may read** pinned legacy files and port algorithms, validation
   rules, ordering rules, copy, and interaction flows.
 - An Executor **may not** import legacy modules, copy the legacy schema or
@@ -56,430 +44,325 @@ only:
 - Every ported behavior lands on rebuild services, Prisma models, platform
   audit, and UI Engine components.
 
-Superseded (kept only as history, moved under `docs/archive/studioflow-rb/`
-in R8.71): `studioflow.md`, `studioflow-project-contract.md`,
-`studioflow-schedule-contract.md`, `studioflow-mom-contract.md`,
-`studioflow-ux-spec.md`, `studioflow-work-orders.md`,
-`studioflow-implementation-plan.md`, `STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`.
-`D-SF-RECOVERY-DISCOVERY.md` stays as evidence; its D-SF-01…07 remain valid
-except where §9 below overrides them.
+Older StudioFlow documents are history only, under `docs/archive/studioflow-rb/`
+(including the Phase Engine V2 contract, its baseline audit and the
+Presentation plan, archived 2026-10-06).
 
 ## 2. Legacy → rebuild disposition matrix
 
 | Legacy capability (pinned paths) | Disposition | Rebuild destination |
 |---|---|---|
 | Project list, create dialog, edit, priority, complete (`projects/page.tsx`, `project-list-client.tsx`, `create-project-dialog.tsx`, `project-service.ts`) | KEEP | `/studioflow/projects`; §4 |
-| Auto project naming `[Year]-[Number] [Name]`, toggle in settings (`core/domain-shared/project-naming.ts`, `SystemConfig.is_auto_naming_enabled`) | PURGE (R8.213) | names are free text; §4.2 |
-| Hard project delete + deletion impact (`executeDeleteProject`) | FIX | archive/restore with reason + audit (no hard delete) |
-| Client by name, address, logo (`Client`, `client-management-table.tsx`, `client-branding.tsx`) | KEEP | `/studioflow/clients`; logo via platform `ObjectStorage` |
-| PIC designer/drafter + role eligibility (`assertPicAssignable`, `DESIGNER_ROLES`) | FIX | plain user references; eligibility = holds the relevant grant (§3) |
-| Five fixed phases, sequential activation, `allow_parallel`, lock (`phase-policy.ts`, bootstrap) | KEEP | §5 |
-| Phase actions: activate, bypass, submit internal, approve internal, reject internal/client, submit client, approve client, reopen, complete supervision (`phase-service.ts`) | KEEP | §5.2 |
-| Admin revision override hard reset (`executeOverrideRevision`, `admin-revision-override.tsx`) | KEEP | `studioflow.phase.override`; history snapshot into audit |
-| Revision `major.minor` (`Revision`) | KEEP | §5.4 |
-| Activity TODO/FEEDBACK per revision, deferral, due date (`Activity`, `activity-manager.tsx`) | PARTIAL | FEEDBACK-only, §6.1; TODO mode and deferral superseded by V2-D1 (todos live in `SfChecklistItem`, §6.2; deferral mesh purged R8.98) |
-| Approval blocker `assertNoPendingTasks` (root checklist only) | KEEP | §6.4 |
-| Checklist tree (depth 1), cascade toggle (`ProjectChecklist`, `checklist-*`) | KEEP | §6.2; priority, due, assignee, labels and filter views PURGED 2026-10-06 |
-| Checklist templates global/per-phase + sync (`ChecklistTemplate`, `template-manager.tsx`, `executeSyncProjectChecklists`) | KEEP | §6.3 and StudioFlow settings |
-| Task comments on checklist (`Comment.task_id`) | DEFER | wave 2 with collaboration |
-| Today feed grouped by project, quick add, inline add (`today-view.tsx`, `task-feed.ts`) | PURGE | owner decision 2026-10-06: no to-dos; Home is project cards, §7 |
+| Auto project naming `[Year]-[Number] [Name]` (`core/domain-shared/project-naming.ts`) | PURGE (R8.213) | free-text names; §4.2 |
+| Hard project delete (`executeDeleteProject`) | FIX | archive/restore with reason + audit, file retention window (§4.4) |
+| Client by name, address, logo (`Client`, `client-management-table.tsx`) | KEEP | `/studioflow/clients`; logo via platform `ObjectStorage` |
+| PIC designer/drafter + role eligibility (`assertPicAssignable`) | FIX | plain user references; eligibility = holds the PIC position grant (§3) |
+| Five phases, sequential activation, `allow_parallel` (`phase-policy.ts`) | KEEP | phase templates and definitions (§5.1) |
+| Phase state machine with internal review and `vMAJOR.MINOR` revisions (`phase-service.ts`) | PURGE | client-sent rounds (§5.2) |
+| Admin revision override hard reset (`executeOverrideRevision`) | KEEP | `studioflow.phase.override`; history snapshot into audit (§5.3) |
+| Activity TODO/FEEDBACK per revision (`Activity`) | PURGE | client notes per round (§6.1); `sf_activity` kept as closed history |
+| Approval blocker `assertNoPendingTasks` | PURGE | requirements never block (§6.2) |
+| Checklist tree (depth 1), cascade toggle (`ProjectChecklist`) | KEEP | requirements (§6.2) |
+| Checklist templates global/per-phase + sync (`ChecklistTemplate`) | KEEP | §6.3 and StudioFlow settings |
+| Today feed, quick add, inline add (`today-view.tsx`, `task-feed.ts`) | PURGE | Home is project cards (§7) |
+| Task comments on checklist (`Comment.task_id`) | DEFER | with collaboration |
 | Upcoming date buckets (`upcoming-view.tsx`) | DEFER | D-SF-01 stands |
-| Project activity log / global activity (`activity-log-table.tsx`) | MERGE | project History tab reads platform audit |
-| Undo button (`undo-executor.ts`) | PURGE | audit is read-only history |
-| Project identity strip (`project-identity-strip.tsx`) | KEEP | project header; §8 |
-| Project nav rail with phase status + open counts (`nav-inner.tsx`, `project-layout-shell.tsx`) | KEEP | project workspace nav via UI Engine; §8 |
-| Phase reading / CD list (`phase-reading.tsx`, `cd-list-table.tsx`, `CDList`) | DEFER | wave 2 (CD List) |
-| Deliverables and uploads (`deliverables-table.tsx`, `upload/*` routes, `File`) | DEFER | wave 2 via `ObjectStorage`; unsafe upload routes PURGE |
-| MOM documents/items/points/images/print (`extensions/mom/*`) | KEEP | §10; legacy content model and editing flow, no ISSUED/SUPERSEDED lifecycle |
-| Product schedule entries/options/templates/prefix/codes (`extensions/schedule/*`, `CatalogBoard.tsx`) | KEEP | §11 |
-| Product requests + vendor follow-up (`ProjectProductRequest`) | DEFER | vendor fields write into Master Data — needs a MD public port decision |
-| Reuse pool "from a past project" (`searchReusableSpecs`) | KEEP | §11.4 (project-owned rows searched across projects, read-only) |
-| SketchUp sync, render boards (`extensions/sketchup/*`) | DEFER | D-SF-06 stands |
-| Project chat / live providers | DEFER | D-SF-05 stands |
-| Studio settings: app title, UI settings, logo (`studio-settings-panel.tsx`) | ALREADY_REPLACED | Platform General Settings/Appearance |
+| Project activity log (`activity-log-table.tsx`) | MERGE | project History page reads platform audit |
+| Undo button (`undo-executor.ts`) | FIX | one undo per phase event, same person, five minutes (§5.2) |
+| Project identity strip (`project-identity-strip.tsx`) | KEEP | shared project header (§8) |
+| Project nav rail with phase status (`nav-inner.tsx`) | PURGE (R8.347) | phase strip + project header nav (§8) |
+| CD list (`cd-list-table.tsx`, `CDList`) | KEEP | Drawing list on the drafter phase (§5.5) |
+| Deliverables and uploads (`deliverables-table.tsx`, `upload/*`) | FIX | streamed private files with a version lifecycle (§5.4) |
+| Render boards (`RenderBoard`, `RenderAnnotation`) | KEEP | Presentation boards (§8a) |
+| MOM documents/items/images/print (`extensions/mom/*`) | KEEP | §10 |
+| Product schedule (`extensions/schedule/*`, `CatalogBoard.tsx`) | KEEP | §11 |
+| Product requests + vendor follow-up (`ProjectProductRequest`) | FIX | physical sample requests read by Master Data (§11.12) |
+| Reuse pool "from a past project" (`searchReusableSpecs`) | KEEP | §11.4 |
+| SketchUp sync | DEFER | D-SF-06 stands |
+| Project chat / live providers | DEFER | D-SF-05 stands (platform messaging is separate) |
+| Studio settings: app title, UI settings, logo | ALREADY_REPLACED | Platform General Settings/Appearance |
 | Database backup/restore screen | PURGE | D-SF-02 stands |
-| Fixed `Role` enum, `core/rbac/*` matrices, project membership guards | PURGE | platform RBAC |
-| Audit compat readers | PURGE | platform audit |
-
-Rebuild concepts that are **PURGED** by this contract (they have no legacy
-counterpart the owner wants): Iteration, Response/ResponsePoint,
-IterationPoint, InternalApproval record, Requirement templates/project
-requirements/evidence, phase-template administration, per-project phase
-add/remove, `SfFile` three-treatment model (returns only if wave 2
-Deliverables needs it), global `SfProductCatalogue`, "Waiting on me" queue as
-home page.
+| Fixed `Role` enum, `core/rbac/*`, membership guards, audit compat readers | PURGE | platform RBAC and audit |
 
 ## 3. Permissions
 
-StudioFlow owns this vocabulary in `src/apps/studioflow/public`. Core owns
-grant mechanics. Registered set (replaces the old eleven):
+StudioFlow owns this vocabulary in `src/apps/studioflow/permissions.ts`; Core
+owns grant mechanics.
 
 | Permission | Grants |
 |---|---|
 | `studioflow.access` | Open the app |
-| `studioflow.project.read` | Read projects, clients, phases, revisions, tasks, MOM, schedule |
-| `studioflow.project.manage` | Create/edit clients and projects, PICs, priority, status, archive/restore |
-| `studioflow.phase.work` | Activate a phase, submit for internal review, add/edit/defer/complete activities |
-| `studioflow.phase.review` | Approve/reject internal, submit to client, approve/reject client, reopen, complete Supervision, bypass a pending phase |
-| `studioflow.phase.override` | Admin revision override (hard reset) |
-| `studioflow.task.manage` | Rename requirements, add and reorder subtasks |
-| `studioflow.settings.manage` | Naming toggle, checklist templates, schedule templates/prefixes |
+| `studioflow.project.read` | Read projects, clients, phases, rounds, requirements, files, MOM, schedule, presentation, library, timeline |
+| `studioflow.project.manage` | Create/edit clients and projects, PICs, priority, status, archive/restore, mark completed; see every running project on Home; edit planned phase dates |
+| `studioflow.project.override` | Pass every assignment gate (replaces legacy "admin always allowed") |
+| `studioflow.project.pic-designer` / `.pic-drafter` | Positions: who may be picked for each PIC seat |
+| `studioflow.phase.work` | Round commands (add, send, client answered, outcome, visits, rename, delete unsent, notes), pinned note, dismiss requirement, undo, CD list, files |
+| `studioflow.phase.review` | Skip a phase that has not started (bypass, reason required) |
+| `studioflow.phase.override` | Admin reset of a phase's rounds (audited snapshot) |
+| `studioflow.task.manage` | Rename requirements, add subtasks |
+| `studioflow.settings.manage` | Archive retention, checklist templates, phase templates, schedule templates and prefixes |
 | `studioflow.mom.manage` | Create/edit/delete MOM documents and content |
-| `studioflow.schedule.manage` | Create/edit/delete schedule entries and options, mark final |
+| `studioflow.schedule.manage` | Schedule entries, options, photos, card fields, sample requests |
+| `studioflow.presentation.manage` | Presentation boards, slides and pins |
 
 Rules:
 
-- One grant decision plus one assignment decision per mutating service operation (owner, 2026-09-30). No project membership table. The
-  assignment gate is one shared helper: project data = PIC designer; phase transitions = PIC designer on every phase, PIC drafter only on a
-  drafter-seat phase; phase content = drafter-seat phase: drafter or designer PIC, other phases: designer PIC; project-level documents (MOM,
-  Schedule, Presentation, Library) = designer OR drafter PIC. `studioflow.project.override` passes every gate (replaces legacy "admin always
-  allowed"). Reading stays open to `studioflow.project.read`. `studioflow.project.pic.designer` / `.pic.drafter` decide who may be picked for each seat.
-- PIC eligibility: `pic_designer_id` must be an active user holding
-  `studioflow.phase.work`; `pic_drafter_id` likewise. Legacy DIC/DRIC maps to
-  RBAC role configuration, not code.
-- Suggested holder configuration (owner configures in Platform Access):
-  Designer = access, read, phase.work, phase.review, task.manage, mom.manage,
-  schedule.manage; Drafter = access, read, phase.work, task.manage;
-  Admin = all.
+- One grant decision plus one assignment decision per mutating operation
+  (owner, 2026-09-30), in one shared helper (`requireProjectAccess`): project
+  data = PIC designer; phase transitions = PIC designer on every phase, PIC
+  drafter only on a drafter-seat phase; phase content = drafter-seat phase:
+  drafter or designer, other phases: designer; project documents (MOM,
+  Schedule, Presentation) = designer or drafter. `studioflow.project.override`
+  passes every gate. Reading needs only `studioflow.project.read`.
+- Suggested role configuration (owner configures in Platform Access):
+  Designer = access, read, pic-designer, phase.work, phase.review, task.manage,
+  mom.manage, schedule.manage, presentation.manage; Drafter = access, read,
+  pic-drafter, phase.work, task.manage; Admin = all.
 
 ## 4. Client and Project
 
 ### 4.1 Fields
 
-Client: `name` (unique, case-insensitive), `address?`, `logo_storage_key?`,
-timestamps, `archived_at?`.
+Client: `name` (unique, case-insensitive via `name_key`), `address?`,
+`logo_storage_key?`, timestamps, `archived_at?`.
 
-Project (legacy shape, rebuild conventions):
+Project:
 
 | Field | Rule |
 |---|---|
-| `name` | unique (duplicate gives `PROJECT_NAME_TAKEN`); free text, typed by the user |
+| `name` | unique (duplicate gives `PROJECT_NAME_TAKEN`); free text |
 | `client_id?` | StudioFlow client; create-in-context allowed |
 | `pic_designer_id`, `pic_drafter_id` | required plain references to platform `User` (no cross-schema FK) |
-| `opening_date?` | date-only |
+| `opening_date?`, `timeline_start_date?` | date-only; timeline start falls back to the created date (§8) |
 | `status` | `ACTIVE`, `ON_HOLD`, `COMPLETED` |
 | `priority` | `URGENT`, `NORMAL`, `LOW` |
 | `client_contact?`, `address?`, `area?` (decimal m²) | as legacy |
-| `archived_at?`, `archived_by_id?`, `archive_reason?` | reversible archive |
+| `archived_at?`, `archived_by_id?`, `archive_reason?`, `assets_purged_at?` | reversible archive and its file purge |
 
 ### 4.2 Naming
 
-Owner decision R8.213 (KB-062): project names are free text on create and
-edit; there is no naming convention, auto-numbering, settings toggle or
-separate project code (`project_code`, `project_type` and the sequence table
-were dropped by migration `20260930100000_sf_free_text_project_name`). A
-studio habit such as `2026-536 Sociolla …` is simply part of the name, and
-screens show the name as stored without parsing a code out of it.
+Project names are free text on create and edit (owner, R8.213, KB-062). There
+is no naming convention, auto-numbering, settings toggle or project code. A
+studio habit such as `2026-536 Sociolla …` is part of the name, and screens
+show the name as stored without parsing it.
 
 ### 4.3 Bootstrap (one transaction)
 
-Create/upsert client → create project → create the five phases (§5.1) with
-phase 1 `IN_PROGRESS` and the rest `PENDING` → create revision `1.0 ACTIVE` on
-phase 1 → seed checklist items from active templates (§6.3) → seed schedule
-default entries (§11.5, when SF-R4 exists) → audit `project.bootstrapped`.
+Create/upsert client → create project → create one phase per definition of the
+active default phase template (§5.1), snapshotting name, prefix, seat and
+`allow_parallel`; the first phase is `ACTIVE` with round 1 (`NOT_SENT`, named
+after the definition's first iteration kind or `<phase> 1`) and the rest are
+`PENDING` → seed requirements from active checklist templates (§6.3) → seed
+schedule rows from template items (§11.5) → audit `studioflow.project.created`.
+Without an active default template the create fails with
+`PROJECT_PHASE_TEMPLATE_MISSING`.
 
 ### 4.4 Lifecycle
 
-`executeCompleteProject` (legacy) sets `COMPLETED`. Since WO-SF-ITER-01 no
-phase change completes the project: completion is always a person's explicit
-choice. `ON_HOLD` blocks phase activation (legacy "Project must be ACTIVE").
-Archive requires a reason; an archived project is read-only everywhere and
-hidden from Today by default.
+- `ON_HOLD` blocks phase commands ("The project must be active").
+- **Completion (owner, 2026-10-04/05).** Completion is a person's explicit
+  choice; no phase change completes a project. Every phase must be done; a
+  project manager may complete a blocked project only with a written reason,
+  kept in the audit history. Requirements are only listed in the confirmation.
+  **A completed project is read-only everywhere** until a PIC or override
+  holder reopens it; archive/restore stay available. Enforced in the services
+  (`assertProjectWritable`, `requireProjectAccess`); the access model reports
+  `completed` so screens hide edit controls from one source.
+- **Archive** requires a reason and makes the project read-only. Its files are
+  kept for the archive retention window (default 90 days, 7–730, StudioFlow
+  settings); restoring inside the window keeps everything, after it a sweep
+  removes the project's own files and stamps `assets_purged_at`. The client
+  logo is never part of a project purge.
 
-**Completion (owner, 2026-10-04; feedback clause removed 2026-10-05).** Every
-phase must be done (client notes carry no open state, so the client's OK on
-each phase is the whole test); a project manager may complete a blocked project only
-with a written reason, kept in the audit history. Requirements and to-dos are
-reminders: they never block completion, are only listed in the confirmation,
-and stay on the project as they are. **A completed project is read-only
-everywhere** (phases, iterations, checklist, feedback, files, MOM, Product
-Schedule, presentation, project details) until a PIC or override holder
-reopens it; archiving and restoring stay available. The rule is enforced in
-the services (`assertProjectWritable`, `requireProjectAccess`), and the access
-model reports `completed` so screens hide edit controls from one source.
+## 5. Phases and rounds
 
-## 5. Phases and revisions
+### 5.1 Phase templates and definitions
 
-### 5.1 Fixed phase set
+Phases come from an office **phase template** (`SfPhaseTemplate`, one active
+default) whose ordered **definitions** (`SfPhaseDefinition`) carry name,
+prefix (≤ 4), order, `allow_parallel`, seat (`designer` | `drafter`) and
+optional ordered iteration kinds (e.g. `CD Mall`, `CD Final`). Managed in
+StudioFlow settings (`settings.manage`); a definition used by a project cannot
+be deleted. A project's phases snapshot these values at creation, so later
+template edits never rewrite existing projects. The studio default is
+Moodboard → Layout Plan → Design 3D → Construction Drawing (drafter seat,
+CD Mall then CD Final) → Supervision.
 
-`MOODBOARD(1) → LAYOUT(2) → DESIGN_3D(3) → CD(4) → SUPERVISION(5)`. LAYOUT,
-DESIGN_3D, CD are created with `allow_parallel = true`. Phase set is app code,
-not an administered template.
+A phase may start when it allows parallel work, is first, or the previous
+phase is done (`canActivatePhase`); otherwise the screen says
+"Starts after <previous phase>".
 
-### 5.2 State machine (port `PhasePolicy` + `phaseService`)
+### 5.2 Rounds (iterations)
 
-> **Superseded by WO-SF-ITER-01 (R8.285–R8.292); legacy commands removed in
-> R8.321.** Phases are `PENDING → ACTIVE → DONE`; the work is a chain of
-> client-sent iterations `NOT_SENT → SENT → ANSWERED → REVISED | DONE` (CD
-> Mall continues to CD Final; Supervision runs on site visits that close with
-> "Next visit" or "Done"). The commands are `addIteration`, `sendIteration`,
-> `recordClientAnswer`, `chooseIterationOutcome`, `createSupervisionVisit`,
-> `chooseSupervisionVisit`, plus `bypassPhase` and `overrideRevision`; each
-> writes an undoable phase event. Screens take their next steps from
-> `iterationChoices`, the same rule the commands enforce. There is no internal
-> review, nothing gates a step on checklist items, and finishing a phase never
-> completes the project (§4.4). The table below is kept as legacy evidence only.
+Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
+(`SfRevision`: `major`, `name`, `status`, `sent_at`, `answered_at`, `done_at`,
+`visit_date?`, `note?`):
 
-Stored states: `PENDING`, `IN_PROGRESS`, `ON_REVIEW_INTERNAL`,
-`APPROVED_INTERNAL`, `ON_REVIEW_CLIENT`, `READY_FOR_NEXT`, `COMPLETED`, plus
-`is_locked`, `allow_parallel`, `status_changed_at`.
+- `NOT_SENT` → **Send to client** → `SENT` (days waiting shown) → **Client
+  answered** (write the client notes) → `ANSWERED` → **Revision** (`REVISED`;
+  the next round opens with these notes as its brief) or **OK, done** (`DONE`;
+  phase done). "Save, decide later" keeps the answer and leaves the choice.
+- **CD Mall** (the first of two iteration kinds) answers with Revision or
+  **Continue to CD Final**; only CD Final's OK closes the phase.
+- **Supervision** runs on dated site visits: New visit, then **Next visit** or
+  **Done (handover)**.
+- A done phase can take **+ iteration** (reopen by adding a round); history is
+  kept and other phases keep running.
+- Screens take their buttons from `iterationChoices`
+  (`domain/iteration-kinds.ts`), the same rule the commands enforce.
+- Commands: `addIteration`, `sendIteration`, `recordClientAnswer`,
+  `chooseOutcome`, `createVisit`, `chooseVisit`, `renameIteration`,
+  `deleteIteration` (never-sent only), `setIterationNote`, `setPhaseNote`,
+  `dismissRequirement`, `bypass` (§5.3), `override` (§5.3). Each writes an
+  `SfPhaseEvent`; the person who made the latest change may **undo** it for
+  five minutes (`UNDO_WINDOW_MS`).
+- Round names default to `<phase> <n>`; screens show those as `Round <n>`
+  (`domain/phase-display.ts`). Other names (CD Mall, renamed rounds, visits)
+  show as stored.
 
-| Command | From | To | Side effects |
-|---|---|---|---|
-| activate | PENDING | IN_PROGRESS | sequential check (prev READY_FOR_NEXT/COMPLETED unless order 1 or `allow_parallel`); project must be ACTIVE; revision 1.0 |
-| bypass | PENDING | READY_FOR_NEXT (or COMPLETED if last) | locked; revision 1.0 COMPLETED; project COMPLETED if last |
-| submitInternal | IN_PROGRESS | ON_REVIEW_INTERNAL | blocked by unchecked root checklist items only (`todoBlockers`, V2-D1 — `SfActivity` carries no TODO mode or deferral) |
-| approveInternal | ON_REVIEW_INTERNAL | APPROVED_INTERNAL | full blocker (§6.4) |
-| submitClient | IN_PROGRESS / ON_REVIEW_INTERNAL / APPROVED_INTERNAL | ON_REVIEW_CLIENT | full blocker (§6.4) |
-| rejectInternal | ON_REVIEW_INTERNAL / ON_REVIEW_CLIENT | IN_PROGRESS | close revision; new `major.minor+1`; open FEEDBACK → TODO (assignee kept, fallback PIC designer, or PIC drafter when phase is CD) |
-| rejectClient | ON_REVIEW_CLIENT | IN_PROGRESS | close revision; new `major+1.0`; FEEDBACK → TODO as above |
-| approveClient | ON_REVIEW_CLIENT | READY_FOR_NEXT, locked | full blocker (§6.4); close revision; project COMPLETED if last phase |
-| reopen(intent) | locked or PENDING | IN_PROGRESS, unlocked | new revision (CLIENT → major+1, INTERNAL → minor+1); reason required (rebuild addition) |
-| completeSupervision | SUPERVISION + IN_PROGRESS | COMPLETED, locked | project COMPLETED |
-| override(mode, target, note) | any | IN_PROGRESS with target revision, or PENDING | wipes revisions/activities; full history snapshot in the audit payload |
+### 5.3 Skip and admin reset
 
-Rebuild addition: CD fallback assignee uses PIC drafter (legacy always used
-designer — FIX, matches RW-02). Every command writes one platform audit event
-with previous/next state, as legacy did. Content mutations obey
-`PhasePolicy.isModifiable` (not locked, not READY_FOR_NEXT/COMPLETED).
+- **Skip** (`bypass`, `phase.review`): a phase that has not started is marked
+  done without work; a reason is required and audited.
+- **Admin reset** (`override`, `phase.override`): rewrite a phase's rounds to
+  "restart at round N" or "back to not started"; a note is required and the
+  full history snapshot goes into the audit event.
 
-### 5.3 Simplified display (RW-01)
+### 5.4 Files (deliverables)
 
-| Stored | Shown label | Group chip |
-|---|---|---|
-| PENDING | Not started | Not started |
-| IN_PROGRESS | Working | Working |
-| ON_REVIEW_INTERNAL | Internal review | In review |
-| APPROVED_INTERNAL | Ready to send | In review |
-| ON_REVIEW_CLIENT | With client | In review |
-| READY_FOR_NEXT | Approved | Approved |
-| COMPLETED | Done | Done |
+Per phase, uploaded through an authenticated streaming route (default limit
+500 MB, `STUDIOFLOW_DELIVERABLE_MAX_BYTES`; PDF, PNG, JPEG, WebP, ZIP), stored
+privately and read through signed URLs. A file is tagged to the round that was
+current at upload. Files with the same name form a slot: one **Final** version
+is kept, plus the two newest working versions; working files expire after
+30 days (the uploader is warned in the last seven, and may extend). A daily
+sweep removes expired rows before object cleanup. Status per phase: no files
+/ current / outdated.
 
-Raw enum names never appear on screen. A phase shows "waiting N days" from
-`status_changed_at` (unknown → no duration). A phase that cannot be activated
-says why ("Layout starts after Moodboard is approved") instead of a silent
-lock.
+### 5.5 Drawing list (CD list)
 
-### 5.4 Revision
+On a drafter-seat phase only: drawings with code, name, status and optional
+assignee, grouped by hundreds series; it never blocks a step. Content gate as
+§3.
 
-`major` ≥ 1, `minor` ≥ 0, `status` ACTIVE/COMPLETED, at most one ACTIVE per
-phase (enforce with a partial unique index). Label `v{major}.{minor}`.
+## 6. Notes and requirements
 
-## 6. Work items
+### 6.1 Three kinds of text per phase
 
-### 6.1 Activity (revision work)
-
-Legacy `Activity`: `content`, `mode` TODO/FEEDBACK, `status` OPEN/COMPLETED,
-`assigned_to_id?`, `due_at?` (date-only), `project_id`, `phase_id?`,
-`revision_id?`, `deferred_from_version?`. Commands: add, edit, set due, toggle,
-delete, defer (detach from revision, keep phase tag, record version).
-
-**Superseded by V2-D1 (Todo SSOT migration, R8.9x):** `SfActivity` is
-FEEDBACK-only — the TODO mode, `due_at`, and `defer` command described above
-do not exist on the rebuilt model. Project/phase to-dos live exclusively in
-`SfChecklistItem` (§6.2); the deferral mesh (`deferred_from_version` and the
-defer command) was fully purged in R8.98. Adding a `mode: "TODO"` activity is
-rejected with `ACTIVITY_TODO_DEPRECATED`.
-
-**Superseded again: client notes per iteration (owner, 2026-10-05, R8.327).**
-Per-point feedback is retired. What the client said about an iteration is
-that iteration's **client notes** (`SfRevision.note`, one text; Supervision
-visits already used it). Flow: send → "Client answered" (write the notes) →
-OK (phase done) or Revision (the next iteration shows the previous notes as
-its brief) → … until OK. Notes are never copied, ticked, assigned or carried:
-a Revision answers them. They are editable on any iteration while the project
-is open (`setIterationNote`, undoable like every iteration event) and are kept
-in the admin reset snapshot. The R8.9x conversion of carried-forward feedback
-into root checklist items is removed: it had made client remarks
-indistinguishable from requirements (legacy at `c4b0c466` kept them apart —
-feedback became revision TODO activities, never checklist rows). The add/
-edit/tick/delete feedback commands, their actions and screens, the Today
-feedback rows, and the feedback count in the open-items projection are gone.
-Migration `20261005090000_sf_iteration_notes_replace_feedback` appended every
-feedback point to its iteration's notes, removed the checklist copies made
-from it, turned project-level loose feedback into general to-dos, and closed
-the `sf_activity` rows, which stay as history.
-
-Three kinds of text now exist per phase, kept apart:
-- **Client notes** (per iteration): what the client said.
+- **Client notes** (per round, `SfRevision.note`): what the client said.
+  Written at "Client answered", editable on any answered round while the
+  project is open, undoable, kept in the admin reset snapshot. Never copied,
+  ticked or assigned: a Revision answers them.
 - **Pinned note** (`SfPhase.note`, one per phase): what holds for the whole
-  phase, whatever the iteration.
-- **Requirements** (root checklist items of the phase, normally from
-  templates): the standard checklist; reminders that never block a step or
-  completing the project.
+  phase, whatever the round.
+- **Requirements** (§6.2): the standard checklist.
 
-### 6.2 Requirement (checklist item)
+`sf_activity` (legacy feedback rows) is closed history: no command writes it.
 
-Owner decision 2026-10-06 (WO-SF-NOTES-ONLY-01): StudioFlow has **no personal
-to-do, My Tasks, Quick add, assignee, priority, due date, task label or saved
-filter**. The checklist holds requirements only; phase notes (§6.1) replace
-the to-do list.
+### 6.2 Requirements
 
-`SfChecklistItem`: `project_id`, `phase_id?` (null = general), `label`,
-`is_checked`, `checked_at`, `parent_id?` (depth max 1, a subtask breaks a
-requirement down), `sort_order` (step spacing), `is_blocking` (kept; every
-requirement is a reminder and gates nothing), `template_id?` (SetNull),
-`dismissed_at?`. Root rows are created only from templates (§6.3); there is no
-command that creates a loose root row. Ticking cascades to children; children
-never roll up. A requirement stays visible after its phase is done until it is
-ticked or dismissed.
+`SfChecklistItem`: `project_id`, `phase_id?` (null = project-wide), `label`,
+`is_checked`, `checked_at`, `parent_id?` (depth max 1: a subtask breaks a
+requirement down), `sort_order`, `is_blocking` (kept; nothing is gated),
+`template_id?`, `dismissed_at?`. Root rows come only from templates (§6.3).
+Ticking cascades to children; children never roll up. A requirement is a
+reminder: it never blocks a step or completion, and it stays visible after its
+phase is done until ticked or dismissed.
 
-Screen: requirements are worked in the aside of the open phase on
-`/studioflow/projects/[projectId]`; phase requirements are shown first and
-general requirements are under the collapsed **Project-wide** disclosure.
-Anyone who works on the project may tick or dismiss; renaming and subtasks need
-`studioflow.task.manage`. A completed or archived project is read-only. There
-is no separate Requirements page.
+Screen: the aside of the open phase on `/studioflow/projects/[projectId]`
+shows that phase's requirements, with the project-wide ones under a collapsed
+**Project-wide** disclosure. Anyone who works on the project may tick or
+dismiss; renaming and subtasks need `studioflow.task.manage`. Read-only when
+the project is completed or archived.
 
 ### 6.3 Checklist templates
 
-Global (`phase_key = null`) or per phase; `label`, `is_active`, `sort_order`.
-Sync is idempotent on `(template_id, phase_id)` and appends after existing
-rows. Deleting a template detaches generated rows (they become plain tasks).
+Global (`definition_id = null`) or per phase definition; `label`,
+`is_active`, `sort_order`. Sync is idempotent per `(template, phase)` and
+appends after existing rows ("Apply checklist templates" on the project row
+menu). Deleting a template detaches generated rows.
 
-### 6.4 Blocker projection
+## 7. Home
 
-> Since WO-SF-ITER-01 nothing is gated by this projection, and since R8.327 it
-> counts only unchecked root checklist items (no feedback). Legacy text below.
+`/studioflow` is Home: one card per project.
 
-Two pure projections over the same counts (`domain/blockers.ts`), used by the
-phase commands and shown in the UI before the button is pressed:
-- `fullBlockers` (approveInternal, submitClient, approveClient): open FEEDBACK
-  activities in the active revision + unchecked **root** checklist items of
-  the phase.
-- `todoBlockers` (submitInternal): unchecked **root** checklist items only —
-  no activity or deferred bucket (V2-D1; superseded the original "TODO-only
-  subset of the same list" design, since `SfActivity` no longer carries a
-  TODO mode to subset from).
+- **Mine** = running projects where I am PIC designer or drafter.
+  **Everyone's** is available to holders of `studioflow.project.manage`.
+  A Running / Completed switch sits beside it.
+- A card shows the project name and client, badges (On hold, Completed, Check
+  later phases), the pinned-notes marker, the actions menu (Open, Mark as
+  completed…, Reopen), and the phase strip (`PipelineStrip variant="track"`)
+  with each phase's round, state and its next action. Only a decision after
+  the client answered is a primary button there.
 
-## 7. Home (StudioFlow home)
+## 7a. Library
 
-`/studioflow` is Home (D-SF-01 kept): one card per project, introduced in
-R8.331 and reduced to cards only in R8.343.
+`/studioflow/library`: a **read-only** discovery page over Master Data's Brand
+catalog through its public read port `listBrandLibraryReads` (name, notes,
+owner vendor, categories, hashtags, links; website preview images are fetched
+and cached). Never writes to Master Data. Read gate as every StudioFlow read.
+Search filters client-side by name, category, vendor or hashtag.
 
-- **My projects** = running projects where I am PIC designer or drafter.
-  **All projects** (every running project) is available to holders of
-  `studioflow.project.manage`. A Running / Completed switch sits beside it.
-- A card shows the track phase strip, the current round and its actions, plus
-  the pinned-notes marker. It does not repeat a requirements count.
-- There is no My Tasks list, task feed, Quick add, saved filter or inline add
-  (see §6.2). Requirements are worked in the open phase's aside.
-- Legacy KB-023 (general todos on the home page) is superseded by the owner
-  decision of 2026-10-06 and is not built.
-
-## 7a. Library (owner, 2026-09-23 — shipped ahead of wave 2)
-
-`/studioflow/library`. A **read-only** discovery page over Master Data's
-Brand catalog — never writes to Master Data, matching how Schedule's own
-Brand combobox already never writes to it (§11.10). `createLibraryService`
-(`src/apps/studioflow/library/service.ts`) is a thin passthrough onto Master
-Data's existing public read port, `listBrandLibraryReads` — the same method
-`STUDIOFLOW-LEGACY-AUDIT-ROADMAP.md`'s "Library" concept already named, just
-never consumed by a StudioFlow page until now. One list call returns
-everything the page shows per brand: name, slug, notes, owner vendor,
-categories, hashtags, links — no separate detail route. Gated by the same
-`requireRead` (access + `studioflow.project.read`) every other StudioFlow
-read uses; no new permission was added. Search filters client-side by name,
-category, vendor, or hashtag (the catalog is small enough not to need a
-server round trip per keystroke, matching the Clients directory's own
-client-side filter).
-
-## 8. Project workspace
-
-Routes (canonical, D-SF-07 redirects from `/projects/...` stay allowed):
+## 8. Project workspace and timeline
 
 | Route | Content |
 |---|---|
-| `/studioflow/projects` | project directory (legacy filters: status, priority, PIC, client; search) |
-| `/studioflow/timeline` | portfolio Gantt: one bar per project, filterable by client/PIC/status/date range (§ below) |
-| `/studioflow/projects/[projectId]` | overview: identity header, phase strip, open work |
-| `/studioflow/projects/[projectId]/phases/[phaseId]` | compatibility redirect to `/studioflow/projects/[projectId]?phase=[phaseId]` |
-| `/studioflow/projects/[projectId]/mom` and `/mom/[momId]` (+ print) | MOM |
-| `/studioflow/projects/[projectId]/schedule` | Product Schedule |
+| `/studioflow/projects` | project directory (filters: status, priority, PIC, client; search); administrative edits through the row menu (Edit details, Archive/Restore, Apply checklist templates) |
+| `/studioflow/timeline` | portfolio Gantt (below) |
+| `/studioflow/projects/[projectId]` | phase strip + the open phase (`?phase=`) |
+| `/studioflow/projects/[projectId]/phases/[phaseId]` | redirect to `?phase=` |
+| `/studioflow/projects/[projectId]/mom`, `/mom/[momId]` (+ print) | MOM (§10) |
+| `/studioflow/projects/[projectId]/schedule` (+ print) | Product Schedule (§11) |
+| `/studioflow/projects/[projectId]/presentation`, `/presentation/[boardId]` (+ print) | Presentation (§8a) |
 | `/studioflow/projects/[projectId]/history` | audit timeline for the project |
 | `/studioflow/clients`, `/studioflow/clients/[clientId]` | clients |
-| `/studioflow/settings` | naming, checklist templates, schedule templates/prefixes |
+| `/studioflow/library` | §7a |
+| `/studioflow/settings` | archive retention, checklist templates, phase templates |
+| `/studioflow/schedule-templates` | schedule prefixes and template items |
 
-The project workspace has one navigation level inside the app shell. The
-secondary project rail is PURGED. Every project sub-page shares a project
-header containing the stored project name, client and assigned designer /
-drafter, followed by a compact horizontal document nav for Phases, MOM,
-Schedule, Presentation and History. The current destination is marked and the
-nav scrolls horizontally when it cannot fit.
+**Project header (R8.347).** There is no project side rail. Every project
+sub-page shares one header: the project name as stored, client and assigned
+designer/drafter (read-only `MetaList`), and a compact nav — Phases, MOM,
+Schedule, Presentation, History — with counts, the current one marked. The
+layout renders the frame and breadcrumb at once; the header and the counts
+stream in their own `Suspense` boundaries with real links in the fallback.
 
-**The project header and its counts stream independently of page data
-(owner, 2026-09-24; consolidated R8.347).** The outer `ProjectLayout` returns
-the frame and breadcrumb synchronously. A `<Suspense>`-wrapped
-`ProjectHeader` fetches project identity and notices; a second boundary loads
-the MOM/Schedule/Presentation counts, with real destination links in its
-fallback. The segment `loading.tsx` keeps the phase strip and canvas fallback
-independent from the layout. `notFound()` on a missing project still discards
-the whole route through the nearest not-found boundary.
+**Open phase (R8.347).** Under the phase strip, two columns: the main column
+holds the current round card (round name, state, next step, its buttons and a
+More menu; the brief from the previous round when it had notes; the client
+notes once answered), Earlier rounds (each with dates, outcome and its client
+notes), and the Drawing list on a drafter phase; the aside holds the pinned
+note, requirements and files.
 
-**Administrative fields are edited from the Projects directory, not the
-project's own pages (owner, 2026-09-23).** Name, client, client contact,
-designer/drafter PIC, opening date, project type, area, address, priority,
-and status are all edited through one `EditProjectDialog` opened from a
-project's row-action menu on `/studioflow/projects`
-(`project-row-actions.tsx`, `edit-project-dialog.tsx`); archive/restore and
-"Apply checklist templates" are separate items in that same row menu, mirroring
-how the Clients directory already does Edit/Archive. The project's own header
-(`layout.tsx`) now only *displays* client/designer/drafter/status/priority as
-read-only text (`MetaList`) — it carries no edit affordance, so every project
-page (Overview, MOM, Schedule, History) is phase/record-focused only. The
-service/action layer is unchanged: `updateProjectAction` still covers
-name/client/designer/drafter/opening-date/type/contact/address/area, and
-`setProjectPriorityAction`/`setProjectStatusAction`/`archiveProjectAction`/
-`restoreProjectAction`/`syncChecklistAction` remain their own calls — only the
-caller moved. `timelineStartDate` (see below) also joined `updateProjectAction`.
+**Timeline.** A project's bar spans `timeline_start_date` (falls back to the
+created date) to `opening_date` (falls back to today + 30 days). Each phase is
+a segment coloured by its accent, dimmed while `PENDING`; a phase with
+`planned_start_date` and `planned_end_date` draws at its real position,
+otherwise it takes an equal-width slot (`domain/timeline.ts`).
+`/studioflow/timeline` shows one bar per non-archived project, filterable by
+client, designer/drafter, status and date range; clicking a segment
+(`project.manage`) sets or clears its planned dates. Planned dates are entered,
+not derived from status history.
 
-**Timeline / Gantt (owner, 2026-09-23 — shipped ahead of wave 2; upgraded to
-per-phase dates and a portfolio page the same day).** Every project's bar
-spans `timelineStartDate` (an overridable date, `SfProject.timeline_start_date`,
-falling back to the project's `created_at` date when unset — "starts when the
-project is added, unless overridden") to `openingDate` (falls back to "today
-+30 days, ongoing" when no opening date is set yet). Within that span, each
-phase draws as a segment colored by `phaseAccentDotClass`, dimmed while
-`PENDING`: a phase with both `SfPhase.planned_start_date` and
-`planned_end_date` set (owner-overridable, additive, unset by default) draws
-at its real position and width against the span; a phase without them keeps
-the original equal-width-by-sequence slot — so a project with no planned
-dates at all renders exactly as before this upgrade. This is still not a
-"phase 2 took 12 days" duration report derived from actual status-change
-history (`SfPhase` still only has the single latest `status_changed_at`, not
-a full transition log) — it is *planned* scheduling the owner enters, shown
-against the project's overall span. The shared geometry
-(`src/apps/studioflow/domain/timeline.ts`, `resolveTimelineSpan` +
-`computePhaseSegments`) is used by:
+## 8a. Presentation
 
-- `/studioflow/timeline` — a sidebar item, one bar per non-archived project
-  across the whole portfolio, filterable by client, designer/drafter (the
-  same PIC concept as the Projects directory), project status, and a date
-  range (kept when the project's span overlaps the selected range). Clicking
-  a phase segment (gated by `studioflow.project.manage`) opens a small dialog
-  to set or clear that phase's planned start/end; clearing both resets it to
-  the equal-width fallback. The page itself is read-only beyond that dialog
-  and is gated by `studioflow.project.read` like the rest of the app.
-
-**Removed from the Overview page (owner, 2026-09-24).** The per-project
-`ProjectTimeline` bar (originally between the phase-tab strip and the phase
-canvas) duplicated what `/studioflow/timeline` already shows for that one
-project, with no added information — owner: *"buang saja timeline di view
-ini"*. `project-timeline.tsx` is deleted; the shared geometry module stays,
-since the portfolio page is still its only consumer now. `timelineStartDate`
-remains editable in `EditProjectDialog` (§ above) and still drives the
-portfolio bar; planned per-phase dates are still edited only from
-`/studioflow/timeline`.
+Project-owned boards (`SfPresentationBoard`) of rendered-image slides
+(`SfPresentationSlide`, private images) with non-destructive pins
+(`SfPresentationAnnotation`: position, label side, note, optional link to a
+Product Schedule entry). Export is PDF through the print view, one slide per
+page; images are uploaded from the device (owner, 2026-09-28). Gate:
+`studioflow.presentation.manage` plus the project-document assignment rule;
+images are cleaned up only when no slide references them and are part of the
+archive purge.
 
 ## 9. Overrides of earlier ratified decisions
 
-- D-SF-03 (MOM lifecycle DRAFT/ISSUED/SUPERSEDED) → **replaced** by §10
-  (legacy content floor *and* legacy lifecycle). Closes KB-022/KB-012 by
-  purge.
-- D-SF-04 (project-owned catalogue) → kept in spirit: schedule options are
-  project-owned (§11). Global catalogue rows are dropped in SF-R1.
-- "No project-scoped authorization" → kept.
-- "Requirements are first-class" (R8.62) → **reversed**: requirements are
+- D-SF-03 (MOM lifecycle DRAFT/ISSUED/SUPERSEDED) → replaced by §10.
+- D-SF-04 (project-owned catalogue) → kept: schedule options are project-owned
+  (§11).
+- "No project-scoped authorization" → replaced by the assignment gate (§3,
+  owner 2026-09-30).
+- "Requirements are first-class" (R8.62) → reversed: requirements come from
   checklist templates (§6.3).
 
 ## 10. MOM (port `extensions/mom`)
@@ -526,7 +409,7 @@ who saved them and when, and restore any of them (replacing current content,
 own confirmation flow). Retention keeps the latest `revisionRetention` saved
 revisions, oldest pruned first. This is manual, user-triggered snapshotting,
 not automatic versioning tied to edits, and it's unrelated to StudioFlow
-Phase `SfRevision` (§5.4) — a different, project-phase-scoped concept.
+phase rounds (`SfRevision`, §5.2) — a different, project-phase-scoped concept.
 
 The Meeting Details header (topic/date/venue/prepared-by/attendees) renders
 collapsed to a `Topic · Date · Venue` summary by default and expands to the
@@ -671,8 +554,8 @@ live option always names a real product.
   deleted label is not reused. Approving sets siblings NOT_USED and keeps
   `active_index` on the final option; `version_locked` is not set (legacy did
   not use it). An entry may have no options ("reserved code").
-- New projects receive every active template item once and an empty row for
-  each default category without a row (same routine as "Apply templates").
+- New projects receive every active template item once (same routine as
+  "Apply templates"); a template item with Type left blank seeds a reserved row.
 - Moving a row to another category gives it the next code of that category's
   prefix and renumbers the old group; one category spelling per project.
 - CSV import accepts the legacy Google Sheets export (header row starting with
@@ -851,24 +734,6 @@ path as OptionDialog's "Add option") from whatever was filled in; if an
 option already exists, Save updates it instead — the same create-or-update
 branch already used by `OptionDialog`.
 
-**§11.11 Physical sample requests (owner, 2026-09-23).** A schedule option
-can carry a physical sample request: `requestedFrom` (vendor/supplier, free
-text — no live reference into Master Data, same reasoning as `brand_name`
-in §11.10) and an optional note. Status is `REQUESTED` → `RECEIVED`; an
-option can have only one open (`REQUESTED`) request at a time, but a new one
-may be started once the previous is `RECEIVED` (`SfScheduleSampleRequest`,
-`option_id` FK, cascades with the option). Receiving a sample **never writes
-to Master Data** — Master Data's public contract is read-only by design
-(masterdata `pricing-contract.md` §12), so adding the resulting SKU/price is
-a separate, manual step a Master Data user does themselves; StudioFlow only
-records that a sample arrived (`receivedNote`, `receivedByName`). The
-designer sees this as a `Badge` on the option card ("Sample requested" /
-"Sample received") plus a "Requested from …" line — not a notification bell,
-which per `CORE.md`'s own classification is a much larger, currently
-`DEFER`red Core-level port, out of scope here. Actions: `Request sample` /
-`Mark sample received` in the option's row-action menu
-(`requestScheduleSampleAction`/`receiveScheduleSampleAction`).
-
 ### 11.11 Print / export (R8.132, owner-scoped 2026-09-24)
 
 Legacy's `CatalogBoard` was itself the printable client-and-contractor
@@ -894,71 +759,67 @@ client, print date) appears once at the top of the document; adding a real
 "page N of M" would need a server-side PDF render pipeline, which the owner
 declined to add for this.
 
+### 11.12 Physical sample requests (owner, 2026-09-23)
+
+A schedule option can carry a physical sample request: `requestedFrom` (vendor/supplier, free
+text — no live reference into Master Data, same reasoning as `brand_name`
+in §11.10) and an optional note. Status is `REQUESTED` → `RECEIVED`; an
+option can have only one open (`REQUESTED`) request at a time, but a new one
+may be started once the previous is `RECEIVED` (`SfScheduleSampleRequest`,
+`option_id` FK, cascades with the option). Receiving a sample **never writes
+to Master Data** — Master Data's public contract is read-only by design
+(masterdata `pricing-contract.md` §12), so adding the resulting SKU/price is
+a separate, manual step a Master Data user does themselves; StudioFlow only
+records that a sample arrived (`receivedNote`, `receivedByName`). The
+designer sees a `Badge` on the option card ("Sample requested" / "Sample
+received") plus a "Requested from …" line. Master Data reads open requests
+through StudioFlow's public read (`public/sample-request-read.ts`) into its
+Sample requests queue, and the staff who work that queue get a platform
+notification when a request arrives (`sample-request-notifier.ts`; the
+requester is never notified of their own request). Actions: `Request sample` /
+`Mark sample received` in the option's row-action menu
+(`requestScheduleSampleAction`/`receiveScheduleSampleAction`).
+
 ## 12. Foundation centralization map
 
 | Need | Classification | Canonical home |
 |---|---|---|
 | Session/principal, grants, audit envelope, errors/action wrapper, Zod validation, transactions | REUSE | `platform/core/*` |
-| Date-only due dates, instant formatting, "N days" age | REUSE / EXTEND | `platform/utilities/date` (`currentDateOnly`, `diffDateOnlyDays` added in R8.71) and `FormattedInstant` |
+| Date-only dates, instant formatting, "N days" age | REUSE / EXTEND | `platform/utilities/date` (`currentDateOnly`, `diffDateOnlyDays`) and `FormattedInstant` |
 | Decimal area/qty | REUSE | `platform/utilities/decimal`, `measurement`, `unit` |
 | Text normalization for names/search keys | REUSE | `platform/utilities/normalization` |
-| Stepped sort order + sibling reorder (checklist, MOM, schedule, BQ lines) | APP-OWNED until a second app needs it (R8.71) | `apps/studioflow/domain/checklist.ts` `steppedSortOrders`; candidate `platform/utilities/ordering` |
-| Image storage for client logo and MOM images | REUSE | `platform/core/storage` + `ImageWorkspace` |
-| Confirm, unsaved-changes guard, dialogs, drawers, tables, toolbars, inline edit, creatable search, rich text | REUSE | UI Engine |
-| Drag-to-reorder list | DEFERRED (R8.71 uses Move up/Move down actions) | UI Engine pattern `SortableList` once MOM/Schedule also need drag |
-| Secondary context rail (project workspace nav) | PURGE | Replaced by the shared project header and compact document navigation. |
-| Assignee / PIC people lookup | ADD (R8.71) | `platform/core/rbac/people` (`peopleDirectory`) |
-| Phase strip / stepper | REUSE | UI Engine `PipelineStrip variant="track"`; app-owned helpers supply round and state wording. |
-| Phase state machine, revision numbering, blocker projection, schedule codes | APP-OWNED | `src/apps/studioflow/domain/*` |
+| Stepped sort order + sibling reorder | APP-OWNED until a second app needs it | `apps/studioflow/domain/checklist.ts` `steppedSortOrders` |
+| Private files and images (logo, MOM, schedule, presentation, deliverables) | REUSE | `platform/core/storage` + `ImageWorkspace` |
+| Confirm, unsaved-changes guard, dialogs, tables, toolbars, inline edit, creatable search, rich text, print view | REUSE | UI Engine |
+| Phase strip | REUSE | UI Engine `PipelineStrip variant="track"`; round names and state wording are app-owned (`domain/phase-display.ts`) |
+| PIC people lookup | REUSE | `platform/core/rbac/people` |
+| Undo bar on phase commands | APP-OWNED until a second app needs it | `_components/phase-commands.tsx` |
+| Drag-to-reorder | DEFERRED | Move up/down actions until a `SortableList` pattern is needed |
+| Round rules, phase activation, timeline geometry, schedule codes, retention | APP-OWNED | `src/apps/studioflow/domain/*` |
 
-`src/apps/studioflow` is modular (one folder per module: `projects`,
-`phases`, `tasks`, `today`, later `mom`, `schedule`) plus pure `domain/`
-rules and a thin `public/` boundary. No 100 KB single service file.
-
-Implementation notes recorded in R8.71:
-
-- Checklist root items come only from templates (legacy rule); people add
-  one level of subtasks. General ad-hoc work is a project-level to-do
-  (activity with no phase), which Quick add on Today also creates.
-- Legacy `#PHASE` tags inside to-do text are not ported. My Tasks Quick add
-  does not select a phase, because phase-scoped rows are requirements rather
-  than personal to-dos (owner, 2026-10-05).
-- Checked project-level to-dos older than 7 days drop out of Today (legacy
-  retention); nothing is deleted. Template-backed general requirements and
-  phase requirements do not enter Today.
+`src/apps/studioflow` is modular — `projects`, `phases`, `tasks`
+(requirements), `cd-list`, `mom`, `schedule`, `presentation`, `library` —
+plus pure `domain/` rules and a thin `public/` boundary.
 
 ## 13. UI/UX direction (owner may veto)
 
-1. **Today first.** Opening StudioFlow answers "what is on my plate" across
-   my projects; overdue and URGENT float up.
-2. **Phase strip.** Project overview shows five stops with the current one
-   highlighted, the simplified label, "waiting N days", and one primary
-   action (e.g. "Send to client"). Secondary actions live in a menu.
-3. **Named actions, not states.** Buttons read "Send for internal review",
-   "Approve internally", "Send to client", "Client approved", "Client asked for
-   changes", "Reopen". The reject dialogs list the open FEEDBACK items that
-   will become TODOs before confirming.
-4. **Designer / drafter lens.** CD phase header shows the drafter; other
-   phases show the designer. "My projects" filter uses both PIC fields.
-5. **Explained locks.** Disabled buttons carry the reason and, when the
-   blocker projection is non-empty, a link that scrolls to the open items.
-6. **Revision chip** `v2.1` with a history drawer (who/when/what changed).
-7. **Schedule as a board.** Keep the table for dense editing but add a card
-   view with option thumbnails; code chips `PT-01` stay visible in both.
-8. **Visual identity.** DESIGN.md stays authoritative. Proposed, pending owner
-   approval: a restrained five-hue phase accent set (tokens only, used for the
-   strip, rail dots, and Today group markers) so the app stops reading as
-   generic slate.
+1. **Projects first.** Home answers "where does each of my projects stand"
+   with one card per project; whatever waits on me is the only primary button.
+2. **One fact, one place** (R8.345). A phase list, round name, status or note
+   is shown once per screen.
+3. **Plain studio words.** Round 2, in progress, with client 6d, client
+   answered, Revision, OK, done. Raw states never appear on screen.
+4. **Designer / drafter lens.** The CD phase belongs to the drafter; Mine
+   uses both PIC fields.
+5. **Explained locks.** A step that cannot happen yet says why ("Starts after
+   Layout Plan").
+6. **Schedule as a board** with option photos; codes such as `PT-01` stay
+   visible.
+7. **Visual identity.** `DESIGN.md` is authoritative; per-phase accent colours
+   are used only on the timeline and the project directory.
 
-## 14. Non-goals for wave 1
+## 14. Not built
 
-CD drawing list, deliverables/files and uploads, SketchUp, render boards,
-product requests/vendor follow-up, comments/chat/presence, "Upcoming" as a
-distinct legacy nav surface, Google Drive, legacy data migration, undo.
-(Library/Brand discovery page, a per-project Gantt, owner-overridable
-per-phase planned dates, and a portfolio-wide `/studioflow/timeline` page all
-shipped 2026-09-23, ahead of schedule — see §7a and §8 — once the owner
-confirmed scope each time. Still not delivered: a duration report *derived*
-from actual phase status-change history (planned dates are entered, not
-computed), and "Upcoming" as its own distinct legacy nav surface/queue — the
-portfolio page above is a Gantt, not the legacy "waiting on me" queue.)
+Upcoming as a separate queue, task comments, SketchUp sync, product
+requests beyond physical samples, Google Drive, legacy data migration, a
+duration report derived from status history, drag-to-reorder.

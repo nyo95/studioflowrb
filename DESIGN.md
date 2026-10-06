@@ -12,8 +12,7 @@ StudioFlow uses a quiet, restrained professional UI:
 - one neutral light-grey ground, carrying warm near-black ink;
 - white working surfaces over a light canvas;
 - compact, information-dense layouts;
-- serif typography for major page headings;
-- sans-serif typography for controls, tables, forms, and operational UI;
+- one sans-serif family for headings and operational UI, with weight and size carrying the hierarchy;
 - border-led surfaces with shadow reserved for overlays or true elevation;
 - status color only when meaning is functional.
 
@@ -25,8 +24,8 @@ Three web fonts, each with a single job.
 
 | Font | Variable | Role |
 |---|---|---|
-| **Schibsted Grotesk** | `--font-sans` / `--ui-font-sans` | All operational UI — headings H3–H6, body, chrome, controls, tables |
-| **Instrument Serif** | `--font-serif` / `--ui-font-serif` | Display: H1, H2, document titles, MOM surface. Identity without decoration. |
+| **Schibsted Grotesk** | `--font-sans` / `--ui-font-sans` | Everything on screen — H1/H2 at black weight (900), H3–H6, body, chrome, controls, tables |
+| **Instrument Serif** | `--font-serif` / `--ui-font-serif` | Loaded and tokenized, with no current consumer. H1/H2 left it in R8.148 because the face ships at 400 only and a synthesized bold read thin. Use it again only by owner decision, at its real weight. |
 | **JetBrains Mono** | `--font-mono` / `--ui-font-mono` | Labels (`text-label`), identifiers, reference codes, data cells with codes |
 
 Type scale — five sizes, no others:
@@ -37,13 +36,13 @@ Type scale — five sizes, no others:
 | meta | 13.5px (`text-meta`) | 20px | Chrome: nav items, tabs, badges, meta lines, table chrome |
 | base | 16px (`text-base`) | 24px | Body copy, table cell values, form values |
 | title | 21px (`text-title`) | 25px | Section headings, H3 in sans |
-| display | 30px (`text-display`) | 34.5px | H1/H2 in serif only |
+| display | 30px (`text-display`) | 34.5px | H1/H2, Schibsted Grotesk black |
 
 **Body vs chrome.** Body is what the operator came to read — cell values, record names, form values. Chrome frames it: nav items, tabs, badges, meta lines, mono identifiers. Chrome sits one step down (`text-meta`) so it recedes behind the content it surrounds. Content never drops to meta size to win space — cut the column, not the type.
 
 **Mono identifiers.** `text-label` uses JetBrains Mono — not sans. Labels, eyebrows, group headings, and reference codes read as structured data rather than prose. This is the visual grammar of `NavItem`, `StatusBadge`, and table identifier cells.
 
-**Instrument Serif is not Instrument Sans.** Instrument Sans does not exist in this product. The serif earns its place on large display moments and the MOM document surface; it does not appear in operational chrome or data tables.
+**Instrument Serif is not Instrument Sans.** Instrument Sans does not exist in this product. The serif never appears in operational chrome or data tables.
 
 **Loading.** Schibsted Grotesk and JetBrains Mono load via `next/font/google`. Instrument Serif loads via `localFont` from `src/app/fonts/` (woff2 files committed to the repo) because Google Fonts does not serve it as a variable font.
 
@@ -105,10 +104,10 @@ Elevation model — shadow-carried hairlines replace drawn borders on content pl
 
 | Plane | Treatment | Shadow token |
 |---|---|---|
-| Ground | `--ui-canvas` `#F1EEE9`, no shadow | — |
+| Ground | `--ui-canvas` `#F0F0F0`, no shadow | — |
 | Content plane (resting) | `--ui-surface` + shadow hairline | `--ui-shadow-plane` |
 | Content plane (hover/focus) | `--ui-surface` + raised shadow | `--ui-shadow-raise` |
-| Rail / chrome | `--ui-rail` `#E8E3DB`, structural border | — |
+| Rail / chrome | `--ui-rail` `#E3E3E3`, structural border | — |
 | Dialog / menu / drawer | `--ui-surface` + full elevation | `--ui-shadow-over` |
 | Emphasis | `--ui-action-primary` `#231F1C` | — |
 
@@ -155,9 +154,9 @@ This is an operational tool, not a marketing site. Optimize for scanning and rep
 **BQ compact density.** Apply `data-density="compact"` on `<html>` for BQ only. This stamp tightens row padding to 6px, controls to 28px/24px, and section padding to 12/10px. It is a single attribute change — no component-level overrides.
 
 **Page measure variants.** `PageShell` accepts a `measure` prop:
-- default (1100px): Today, Overview, phase canvas
-- narrow (720px): Forms, settings
-- wide (1440px): Schedule board, Timeline
+- default (1100px): general content
+- narrow (720px): forms, settings
+- wide (1440px): StudioFlow Home, project workspace, Schedule board, Timeline
 
 ## 6. Page Structure
 

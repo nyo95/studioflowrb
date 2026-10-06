@@ -212,7 +212,7 @@ Keep domain UI inside the app:
 - `BrandPicker`
 - `SkuDetail`
 - `BqBreakdownGrid`
-- `ProjectPhaseCard`
+- `ProjectCard` (StudioFlow Home card; it composes `PipelineStrip`)
 - `MaterialPriceEditor`
 
 Rule: if removing StudioFlow/Master Data/BQ vocabulary makes the component meaningless, it is probably domain UI.

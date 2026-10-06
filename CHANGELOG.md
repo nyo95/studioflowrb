@@ -2,6 +2,17 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.349 | 2026-10-06 | docs: documentation and contracts reconciled with the code
+
+- Owner request: documents must match the code base once the re-layout landed. Every changed statement was checked against the schema, services, routes and screens.
+- `STUDIOFLOW-REWORK-CONTRACT.md` rewritten to the implemented state (layered "superseded" history removed): current decisions RW-01..06, disposition matrix, the real permission set (incl. project override, PIC positions, presentation), free-text names, bootstrap from the default phase template, completion and archive retention, phase templates/definitions, client-sent rounds with undo, skip and admin reset, files lifecycle, drawing list, client notes / pinned note / requirements, Home, project header and open-phase layout, timeline, Presentation (§8a, previously undocumented), and sample-request notifications. MOM (§10) and Product Schedule (§11) kept; the duplicate §11.11 is now §11.11 print and §11.12 sample requests. The pre-rewrite text is archived as `archive/studioflow-rb/STUDIOFLOW-REWORK-CONTRACT-2026-10-06.md`.
+- Archived as history: `STUDIOFLOW-PHASE-ENGINE-V2-CONTRACT.md`, `PHASE-ENGINE-V2-BASELINE-AUDIT.md` (superseded by WO-SF-ITER-01) and `SF-PRESENTATION-PLAN.md` (said "not built"; Presentation shipped in R8.194).
+- `docs/BACKLOG.md` now holds open items only, with stale facts corrected (no Today/My Tasks, file limits after R8.240, re-layout checks); the previous file with every closed narrative is `archive/backlog-2026-10-06.md`. Obsolete browser-acceptance entries removed (R8.173 revision-history panels and project-number rename, both made moot by R8.327 and R8.213).
+- `DESIGN.md`: headings are Schibsted Grotesk black (Instrument Serif has no consumer since R8.148), canvas/rail hex values match the tokens, page measures name real screens. `UI_ENGINE.md`, `MODULE-BOUNDARIES.md`, `UTILITY-INVENTORY.md` and `docs/README.md` updated to the current modules and documents. `PLAN.md` says no Work Order is active. An empty leftover `src/apps/studioflow/today/` folder was removed.
+- Not swept: Master Data and BQ contract bodies, `CORE.md` (no drift found by search, not read line by line), and historical migration comments that name the archived V2 contract.
+
+**Checks.** Documentation only; `git diff --check`.
+
 ## R8.348 | 2026-10-06 | fix(studioflow,ui-engine): Lead review of the re-layout and first polish
 
 - Lead review of R8.347 (WO-SF-RELAYOUT-01): PASS with polish. Read the full diff; the rail and Requirements page are gone, the shared project header and `PipelineStrip` track variant are used on Home and the project page, commands, choices and permissions are unchanged. Re-ran the checks independently.
