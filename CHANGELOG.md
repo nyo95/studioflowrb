@@ -2,6 +2,13 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.350 | 2026-10-06 | docs(plan): Product Schedule re-layout — Work Order WO-SF-SCHED-RELAYOUT-01
+
+- Owner review of the Product Schedule as a designer: the flow felt complicated. Findings: nine mixed toolbar controls, no view of what still needs a decision or a sample, a vertical category label with its count glued on, sample links on every card nested inside the card button, a three-column item dialog (card slots, card, fanned "hand") where a field cannot be filled until its slot is on, three editors for the same data and stacked dialogs. The owner approved the mockup and assigned the build to the Executor with Lead polish, same rules as WO-SF-RELAYOUT-01.
+- `PLAN.md` replaced with WO-SF-SCHED-RELAYOUT-01: compact toolbar with a Set up menu, progress and decision filters, `GroupHeader` categories with quick add, cleaner cards, and one right-side `Drawer` editor (options row, always-editable fields with show-on-card toggles, inline photo, sample request and reuse, explicit Save/Discard). UI only; every schedule rule is unchanged.
+
+**Checks.** Documentation only; none run.
+
 ## R8.349 | 2026-10-06 | docs: documentation and contracts reconciled with the code
 
 - Owner request: documents must match the code base once the re-layout landed. Every changed statement was checked against the schema, services, routes and screens.
