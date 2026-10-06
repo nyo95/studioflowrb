@@ -6,12 +6,13 @@ import {
   PageSection,
   PageShell,
 } from "@/platform/ui_engine";
-import { readPlatformGeneralSettings } from "@platform/core/settings";
+import { parseStoredTheme, PLATFORM_APPEARANCE_THEME_DEFAULT, readPlatformGeneralSettings } from "@platform/core/settings";
 import { formatInstant } from "@platform/utilities/date";
 import { listUserSessions, logoutAllSessions, requirePrincipal, requirePrincipalGrants, currentSessionId } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
 import { userPreferences } from "@platform/runtime";
 import { AccountForms } from "./account-forms";
+import { AppearancePreference } from "./appearance-preference";
 import { DisplayPreferencesForm } from "./display-preferences-form";
 import { SessionsTable } from "./sessions-table";
 
@@ -42,13 +43,15 @@ export default async function AccountPage() {
       <PageHeader
         context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "My preferences" }]} />}
         title="My preferences"
-        description="Your own profile, display, password and sessions. Changes here affect only you."
+        description="Your own profile, appearance, display, password and sessions. Changes here affect only you."
         divider
       />
 
       <PageSection title="Profile">
         <AccountForms displayName={principal.displayName} email={principal.email} />
       </PageSection>
+
+      <AppearancePreference theme={preferences.theme} organisationDefault={parseStoredTheme(organisation.theme) ?? PLATFORM_APPEARANCE_THEME_DEFAULT} />
 
       <DisplayPreferencesForm
         locale={preferences.locale}

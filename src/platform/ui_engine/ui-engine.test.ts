@@ -25,6 +25,7 @@ describe("UI Engine foundation", () => {
       "Select",
       "Checkbox",
       "RadioGroup",
+      "LogoFrame",
       "Switch",
       "Divider",
       "Badge",
@@ -118,6 +119,42 @@ describe("UI Engine foundation", () => {
     for (const deferred of ["WorkspaceShell", "SplitPane", "ReorderHandle"]) {
       assert.equal(deferred in ui, false, `${deferred} must remain deferred`);
     }
+  });
+
+  it("frames a logo without ever recolouring it, and falls back to initials", () => {
+    const withImage = renderToStaticMarkup(createElement(ui.LogoFrame, { src: "https://brand.example/logo.svg", name: "Acme Tiles" }));
+    assert.match(withImage, /<img[^>]+src="https:\/\/brand\.example\/logo\.svg"/);
+    assert.match(withImage, /alt="Acme Tiles logo"/);
+    assert.match(withImage, /object-contain/);
+    assert.match(withImage, /\[filter:var\(--ui-logo-halo\)\]/, "readability comes from the themed hairline token");
+    assert.doesNotMatch(withImage, /invert|brightness|grayscale|hue-rotate|saturate|mix-blend/, "a brand logo keeps its real colours");
+
+    const decorative = renderToStaticMarkup(createElement(ui.LogoFrame, { src: "https://brand.example/logo.png", name: "Acme Tiles", decorative: true }));
+    assert.match(decorative, /alt=""/);
+
+    for (const src of [null, undefined, ""]) {
+      const empty = renderToStaticMarkup(createElement(ui.LogoFrame, { src, name: "Acme Tiles" }));
+      assert.doesNotMatch(empty, /<img/);
+      assert.match(empty, /role="img" aria-label="Acme Tiles: logo unavailable"/);
+      assert.match(empty, />AT</);
+    }
+    assert.match(renderToStaticMarkup(createElement(ui.LogoFrame, { name: "Acme", fallback: "AC" })), />AC</);
+  });
+
+  it("defines the logo hairline for light and for both dark-theme paths", () => {
+    const tokens = readFileSync(fileURLToPath(new URL("./tokens/tokens.css", import.meta.url)), "utf8");
+    const definitions = tokens.match(/--ui-logo-halo:\s*([^;]+);/g) ?? [];
+    assert.equal(definitions.length, 3, ":root, prefers-color-scheme dark, and [data-theme=dark]");
+    assert.match(definitions[0]!, /rgb\(0 0 0/);
+    assert.match(definitions[1]!, /rgb\(255 255 255/);
+    assert.equal(definitions[1], definitions[2]);
+  });
+
+  it("keeps paper light: dark tokens are screen-only and never apply while a DocumentSheet is shown", () => {
+    const tokens = readFileSync(fileURLToPath(new URL("./tokens/tokens.css", import.meta.url)), "utf8");
+    assert.match(tokens, /@media screen and \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\):not\(:has\(\.ui-document\)\) \{/);
+    assert.match(tokens, /@media screen \{\s*:root\[data-theme="dark"\]:not\(:has\(\.ui-document\)\) \{/);
+    assert.doesNotMatch(tokens, /^:root\[data-theme="dark"\] \{/m, "no unscoped dark block");
   });
 
   it("gives colour-carried display atoms a text alternative", () => {

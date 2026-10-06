@@ -21,7 +21,7 @@ import {
   Select,
   Surface,
   Text,
-  initialsOf,
+  LogoFrame,
   usePagination,
 } from "@/platform/ui_engine";
 
@@ -153,17 +153,7 @@ function BrandCard({ brand, websiteMatch, onOpen }: { brand: LibraryBrand; websi
   return (
     <Surface as="article" className="overflow-hidden">
       <button type="button" onClick={onOpen} aria-label={`View ${brand.name}`} className="block w-full text-left focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus">
-        <div className="relative aspect-[4/3] overflow-hidden bg-surface-muted">
-          {brand.imageUrl ? (
-            // External website metadata is not a fixed image host, so Next Image optimization is intentionally skipped.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={brand.imageUrl} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-contain p-6" />
-          ) : (
-            <div role="img" aria-label="Brand image unavailable" className="grid h-full place-items-center text-ink-tertiary">
-              <Text size="md" weight="semibold">{initialsOf(brand.name)}</Text>
-            </div>
-          )}
-        </div>
+        <LogoFrame src={brand.imageUrl} name={brand.name} decorative aspect="4/3" />
         <div className="grid gap-1 p-3 pb-0">
           <Text weight="semibold">{brand.name}</Text>
           {brand.ownerVendor ? <Text tone="secondary" size="sm">{brand.ownerVendor.name}</Text> : null}
@@ -204,16 +194,7 @@ function BrandCard({ brand, websiteMatch, onOpen }: { brand: LibraryBrand; websi
 function BrandDetail({ brand }: { brand: LibraryBrand }) {
   return (
     <div className="grid gap-4">
-      <div className="aspect-[16/9] overflow-hidden rounded-card bg-surface-muted">
-        {brand.imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={brand.imageUrl} alt="" referrerPolicy="no-referrer" className="h-full w-full object-contain p-6" />
-        ) : (
-          <div role="img" aria-label="Brand image unavailable" className="grid h-full place-items-center text-ink-tertiary">
-            <Text size="md" weight="semibold">{initialsOf(brand.name)}</Text>
-          </div>
-        )}
-      </div>
+      <LogoFrame src={brand.imageUrl} name={brand.name} decorative aspect="16/9" rounded loading="eager" />
       {brand.notes ? <Text tone="secondary" className="whitespace-pre-wrap">{brand.notes}</Text> : null}
       {brand.categories.length > 0 ? (
         <div className="grid gap-1.5">

@@ -6,3 +6,4 @@ export * from "./sections";
 
 export * from "./formatted-instant";
 export * from "./stats";
+export * from "./logo-frame";

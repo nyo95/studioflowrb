@@ -163,7 +163,7 @@ describe("platform schema: settings singleton", () => {
     );
   });
 
-  it("pins the approved global appearance theme in SQL, not only in application code", async () => {
+  it("pins the approved organisation default theme in SQL, not only in application code", async () => {
     await truncatePlatformTables(db);
     await db.prisma.platformGeneralSettings.create({
       data: {
@@ -176,12 +176,17 @@ describe("platform schema: settings singleton", () => {
         week_starts_on: 1,
       },
     });
+    const seeded = await db.prisma.platformGeneralSettings.findUnique({ where: { id: "platform_general_settings" } });
+    assert.equal(seeded?.theme, "system", "the column default follows each device");
+    for (const theme of ["light", "dark", "system"]) {
+      await db.prisma.$executeRawUnsafe(`UPDATE "platform"."PlatformGeneralSettings" SET "theme" = '${theme}' WHERE "id" = 'platform_general_settings'`);
+    }
     await expectReject(
-      () => db.prisma.$executeRawUnsafe(`UPDATE "platform"."PlatformGeneralSettings" SET "theme" = 'dark' WHERE "id" = 'platform_general_settings'`),
+      () => db.prisma.$executeRawUnsafe(`UPDATE "platform"."PlatformGeneralSettings" SET "theme" = 'sepia' WHERE "id" = 'platform_general_settings'`),
       /check/i,
     );
     const row = await db.prisma.platformGeneralSettings.findUnique({ where: { id: "platform_general_settings" } });
-    assert.equal(row?.theme, "light");
+    assert.equal(row?.theme, "system");
   });
 });
 

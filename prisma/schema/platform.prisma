@@ -43,6 +43,7 @@ model User {
 /// Personal display and landing preferences. Null always means platform default.
 model UserPreference {
   user_id    String @id @db.Uuid
+  /// Active theme: system | light | dark (SQL CHECK); null follows the organisation default.
   theme      String?
   locale     String?
   timezone   String?
@@ -175,10 +176,10 @@ model PlatformGeneralSettings {
   /// from a safe external/site-relative URL and is resolved only at read time.
   brand_mark_storage_key String?
 
-  /// Typed global appearance theme (D-SF-02: Platform owns appearance/theme,
-  /// F-C / PF-4). DESIGN.md locks the canonical "light" theme; the SQL CHECK
-  /// constraint mirrors the typed union so no other value can be persisted.
-  theme String @default("light")
+  /// Organisation default theme for people who have not chosen their own in My preferences
+  /// (owner, 2026-10-06). Never the active switch for anyone who has. SQL CHECK mirrors
+  /// `THEME_PREFERENCES`: system | light | dark.
+  theme String @default("system")
 
   /// Owner-configured launcher routing (roadmap "configurable main-route
   /// settings"). Both are advisory: an id that is null, unknown, or no

@@ -356,7 +356,8 @@ Rules:
 - changing a display default never rewrites persisted business values or snapshots;
 - read/manage use `platform.settings.read/manage`; updates are transactional and audited with safe field deltas;
 - app-specific settings remain app-owned: StudioFlow templates/auto-numbering, Master Data dictionaries, and BQ markup/calculation policy do not belong here;
-- per-user theme/density/preferences are a deferred capability, not fields added speculatively to this singleton.
+- theme (owner, 2026-10-06): this singleton holds only the organisation **default** theme (`system` | `light` | `dark`, default `system`) for people who have not chosen; each person's active theme is their `UserPreference.theme` (null = organisation default). The root layout stamps `<html data-theme>` from the resolved value (`light`/`dark`; `system` = no attribute, follow the device). Business services never see the theme. Contract: `core/settings/appearance.ts`;
+- per-user density remains a deferred capability, not a field added speculatively to this singleton.
 
 ## 12. Public surfaces
 
@@ -477,7 +478,7 @@ Foundation is deliberately staged. A capability can be documented before it is i
 | notification delivery | Core port + app-owned notification meaning | first approved email/in-app notification workflow | **ACTIVATED for in-app inbox items in R8.184** (first workflow: sample requests): `core/notifications` owns the envelope, the transactional writer port and a per-user inbox; apps own who is told and what it says. Email, push, preferences, and digests remain **DEFER** |
 | observability/security event sink | Core infrastructure | deployment/identity implementation | **ADD with identity** for safe logs/rate-limit evidence; not business audit |
 | app registry/launcher | Core contract + app registrations | identity Stage F0 | **ADD NOW**; registrations contain metadata/routes, not permissions policy |
-| per-user preferences | Core/settings | proven user-specific theme/density need | **DEFER** |
+| per-user preferences | Core/preferences | proven user-specific need | **ACTIVATED** for theme, locale and timezone (R8.373–R8.374, My preferences); start page stored but not yet applied; density **DEFER** |
 | phone/email/URL scalar normalization | Utilities | second consumer or one foundation security need | **EXTEND on demand**, never a generic “format” bag |
 | stable-ID collection diff/merge | Utilities | repeated ID-preserving child editing with identical create/update/remove output | **DEFER**; deletion policy stays app-owned |
 | optimistic concurrency/idempotency primitives | Core/Utilities split | second stale-write flow or first externally retried command | **DEFER**; app decides which version/idempotency scope matters |

@@ -1,5 +1,21 @@
 # Changelog
 
+## R8.374 | 2026-10-06 | feat(platform): per-person Light/Dark/System theme and the shared LogoFrame — WO-THEME-01
+
+- Owner (2026-10-06): dark mode is an approved UI mode, chosen per person; read-only Master Data roles stay out of Settings (confirmed); merge to `main` after this work.
+- **Finding.** Nothing stamped `data-theme` before this change, so the tokens' `prefers-color-scheme` block already turned the app dark for anyone whose device was dark, while the contract said light-only. The organisation default therefore migrates from the never-applied `light` to `system`, which preserves what people actually saw.
+- **Ownership** (`core/settings/appearance.ts`): `UserPreference.theme` (`system` | `light` | `dark`, null = not chosen) is the active choice; `PlatformGeneralSettings.theme` is only the organisation default for people who have not chosen (General Settings: "Default theme"). Resolution: own choice → organisation default → `system`. Business services never see the theme.
+- **Application.** The root layout reads the theme once per request (memoised principal read shared with the platform layout) and stamps `<html data-theme="light|dark">`; `system` stamps nothing and the tokens follow the device. No flash: the attribute is in the first HTML. A database failure falls back to following the device.
+- **My preferences → Appearance:** System / Light / Dark, applied to the open page immediately and saved without a Save button (reverts with a message if saving fails).
+- **Paper stays light.** Both dark token blocks are screen-only and skip any page showing a `DocumentSheet` (`:has(.ui-document)`), so print previews and printing never go dark.
+- **LogoFrame** (UI Engine): neutral plate, fixed aspect, `object-contain`, initials when the URL is missing or fails; never recolours a logo. White/black logos get only the themed hairline `--ui-logo-halo`. StudioFlow Library's BrandCard and BrandDetail use it (crawler untouched).
+- **Dark leaks fixed:** white text on the action colour (Master Data workbook import steps, Presentation pins) → `text-action-ink`.
+- **Schema/migration** `20261006150000_platform_user_theme`: General Settings theme CHECK widened to `system|light|dark`, default `system`, existing `light` → `system`; `user_preference.theme` normalised to lowercase (legacy `SYSTEM/LIGHT/DARK`), unknown values cleared, CHECK added.
+- Tests: `appearance.test.ts` (values, legacy spelling, resolution, stamping), preferences integration (persistence of each theme, organisation fallback, own choice wins, SQL rejects unknown), settings/schema tests moved from "light only" to the new contract (unknown still rejected), UI Engine (LogoFrame fallback/no-recolour, halo token in all three blocks, dark blocks screen-only and document-safe), `e2e/theme.spec.ts` (5 checks incl. server stamping after reload, paper stays light, Light beats a dark device, System hands back).
+- Contracts: `CORE.md` §11 and decision table, `UI_ENGINE.md` §5 Themes + LogoFrame, `DESIGN.md`, `BACKLOG.md` (start page [PLANNED]; dark visual QA on real data [UNVERIFIED]).
+
+**Checks.** `npm run typecheck`, `npm run lint` (0 errors, 2 pre-existing warnings), `check:boundaries`, `check:legacy-runtime`, full `npm test` 866/866, `npm run build` (pass), `npm run test:e2e` 91/91 (disposable cloud-container Postgres).
+
 ## R8.373 | 2026-10-06 | feat(settings): settings split by owner, each with a way back — WO-SETTINGS-01
 
 - Owner (2026-10-06): "navbar ga konsisten, ga ada tombol back, akses settings bocor ke mana-mana; template terpisah, hanya untuk yang punya akses". Lead decided as product owner's delegate; the rule is in `UI_ENGINE.md` §SettingsShell.

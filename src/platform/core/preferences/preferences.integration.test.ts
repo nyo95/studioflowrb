@@ -20,18 +20,53 @@ describe("personal preferences", () => {
     const person = await user("preference@test.local");
     const preferences = createUserPreferencesService(db.prisma);
     const grants = ["masterdata.access"];
-    const saved = await preferences.update({ userId: person.id, grants, theme: "DARK", locale: "en-US", timezone: "UTC", startPage: "/masterdata" });
-    assert.deepEqual(saved, { theme: "DARK", locale: "en-US", timezone: "UTC", startPage: "/masterdata" });
+    const saved = await preferences.update({ userId: person.id, grants, theme: "dark", locale: "en-US", timezone: "UTC", startPage: "/masterdata" });
+    assert.deepEqual(saved, { theme: "dark", locale: "en-US", timezone: "UTC", startPage: "/masterdata" });
     await preferences.update({ userId: person.id, grants, theme: null, locale: null, timezone: null, startPage: null });
-    assert.deepEqual(await preferences.get({ userId: person.id }), { theme: "SYSTEM", locale: null, timezone: null, startPage: null });
+    assert.deepEqual(await preferences.get({ userId: person.id }), { theme: null, locale: null, timezone: null, startPage: null });
     await assert.rejects(() => preferences.update({ userId: person.id, grants, startPage: "/studioflow" }), (error: unknown) => error instanceof AppError && error.code === "PREFERENCE_START_PAGE");
     assert.deepEqual(await preferences.resolveDisplay({ userId: person.id }), { locale: "id-ID", timezone: "Asia/Jakarta" });
+  });
+
+  it("persists each theme choice and resolves the active theme: own choice, else organisation default, else system", async () => {
+    const person = await user("theme@test.local");
+    const preferences = createUserPreferencesService(db.prisma);
+    assert.equal(await preferences.resolveTheme({ userId: person.id }), "system", "nothing chosen anywhere follows the device");
+    assert.equal(await preferences.resolveTheme({ userId: null }), "system", "signed out gets the organisation default");
+    for (const theme of ["light", "dark", "system"] as const) {
+      await preferences.update({ userId: person.id, grants: [], theme });
+      assert.equal((await preferences.get({ userId: person.id })).theme, theme);
+      assert.equal(await preferences.resolveTheme({ userId: person.id }), theme);
+    }
+    await db.prisma.platformGeneralSettings.update({ where: { id: "platform_general_settings" }, data: { theme: "dark" } });
+    await preferences.update({ userId: person.id, grants: [], theme: null });
+    assert.equal(await preferences.resolveTheme({ userId: person.id }), "dark", "not chosen follows the organisation default");
+    assert.equal(await preferences.resolveTheme({ userId: null }), "dark");
+    await preferences.update({ userId: person.id, grants: [], theme: "light" });
+    assert.equal(await preferences.resolveTheme({ userId: person.id }), "light", "the person's own choice wins");
+  });
+
+  it("rejects unknown themes in the service and in the database, and reads the legacy uppercase spelling", async () => {
+    const person = await user("theme-guard@test.local");
+    const preferences = createUserPreferencesService(db.prisma);
+    await preferences.resolveTheme({ userId: null }); // creates the settings singleton
+    await assert.rejects(() => preferences.update({ userId: person.id, grants: [], theme: "sepia" as "light" }), (error: unknown) => error instanceof AppError && error.code === "PREFERENCE_THEME");
+    await assert.rejects(() => db.prisma.userPreference.create({ data: { user_id: person.id, theme: "sepia" } }));
+    await assert.rejects(() => db.prisma.platformGeneralSettings.update({ where: { id: "platform_general_settings" }, data: { theme: "sepia" } }));
+    await db.prisma.$executeRawUnsafe(`ALTER TABLE "platform"."user_preference" DROP CONSTRAINT "user_preference_theme_check"`);
+    try {
+      await db.prisma.userPreference.create({ data: { user_id: person.id, theme: "DARK" } });
+      assert.equal((await preferences.get({ userId: person.id })).theme, "dark");
+    } finally {
+      await db.prisma.userPreference.deleteMany({ where: { user_id: person.id } });
+      await db.prisma.$executeRawUnsafe(`ALTER TABLE "platform"."user_preference" ADD CONSTRAINT "user_preference_theme_check" CHECK ("theme" IS NULL OR "theme" IN ('system', 'light', 'dark'))`);
+    }
   });
 
   it("cascades the private row when its user is deleted", async () => {
     const person = await user("cascade@test.local");
     const preferences = createUserPreferencesService(db.prisma);
-    await preferences.update({ userId: person.id, grants: [], theme: "LIGHT" });
+    await preferences.update({ userId: person.id, grants: [], theme: "light" });
     await db.prisma.user.delete({ where: { id: person.id } });
     assert.equal(await db.prisma.userPreference.count({ where: { user_id: person.id } }), 0);
   });

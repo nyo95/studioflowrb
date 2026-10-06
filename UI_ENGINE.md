@@ -268,7 +268,28 @@ icon-xs
 icon-sm
 icon-md
 icon-lg
+logo-halo
 ```
+
+**Themes (R8.374).** Light and Dark are both approved. `tokens.css` is the only
+theme implementation: `:root` is light; dark is redefined for
+`@media screen and (prefers-color-scheme: dark)` when `<html>` has no
+`data-theme="light"`, and for `<html data-theme="dark">`. Both dark blocks are
+screen-only and skip any page showing a `DocumentSheet` (`:has(.ui-document)`),
+so printing and document previews stay on paper colours. Components never check
+the theme; they use semantic tokens, and text on `bg-action` uses
+`text-action-ink`, never `text-white`. `--ui-logo-halo` is a hairline
+drop-shadow (dark in light, light in dark) used only by `LogoFrame`.
+
+### LogoFrame
+
+`LogoFrame` (`components/logo-frame.tsx`) shows a brand or client logo on the
+neutral `surface-muted` plate with `object-contain`, a fixed aspect (`square`,
+`4/3`, `16/9`) and padding, and falls back to initials when the URL is missing or
+fails to load. It never recolours a logo (no invert, brightness, grayscale or
+blend); readability of white-on-light and black-on-dark logos comes only from
+`--ui-logo-halo`. Finding the URL (crawling, official-logo choice) stays app
+logic. Consumers: StudioFlow Library (BrandCard, BrandDetail).
 
 Motion and icon size are part of this list as of R8.202. They were the two
 scales the contract had opinions about but no tokens for, so every component

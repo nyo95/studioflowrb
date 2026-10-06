@@ -1,8 +1,8 @@
 # Active Plan
 
-Plan ID: WO-SF-SAFE-01 / 02 / 03 (production-safety closure) + WO-SETTINGS-01 (DRAFT)
+Plan ID: WO-SF-SAFE-01 / 02 / 03 (production-safety closure) + WO-SETTINGS-01 + WO-THEME-01
 Scope: Close three confirmed StudioFlow data-integrity gaps found at c6f1cb7 (R8.368) without changing the iteration or project flow; plan the Settings rework separately.
-Target revisions: R8.369 (this plan), R8.370 / R8.371 / R8.372 (WO-SF-SAFE-01/02/03), R8.373 (WO-SETTINGS-01).
+Target revisions: R8.369 (this plan), R8.370 / R8.371 / R8.372 (WO-SF-SAFE-01/02/03), R8.373 (WO-SETTINGS-01), R8.374 (WO-THEME-01: per-person theme + LogoFrame; see CHANGELOG).
 Status: DONE — owner (2026-10-06) had the Lead execute as Planner + Executor on branch `claude/sf-safety-settings-rework`; all four commits pushed. Owner review of the Settings layout in the browser is the remaining acceptance.
 Priority: P0 (01), P1 (02, 03), P2 (follow-ups)
 Owner: Product Owner.

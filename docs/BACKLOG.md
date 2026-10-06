@@ -45,10 +45,15 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   owner call: a required CI (typecheck, boundaries, tests, build) once a remote
   runs it; PostgreSQL and file-storage backup with a restore drill on a clean
   machine; split `phases/service.ts` by responsibility.
-- [ ] [BLOCKED] Personal theme and start page (owner decision): `UserPreference`
-  stores `theme` and `start_page`, but nothing applies them and My preferences
-  (R8.373) exposes only date/number format and timezone. Decide whether people
-  may choose their own theme (DESIGN locks light) and landing app.
+- [ ] [PLANNED] Personal start page (owner approved, 2026-10-06): `UserPreference.start_page`
+  is stored and validated but nothing applies it and My preferences does not
+  offer it. Theme shipped in R8.374.
+- [ ] [UNVERIFIED] Dark mode visual QA with real data: R8.374 walked the main
+  screens on seed data only; brand logos with real crawled images (LogoFrame
+  hairline on white and black logos), long tables, the Gantt timeline and
+  the MOM/Presentation editors still need a pass in Dark. Focus rings use a
+  fixed light-theme shadow colour (`rgb(87 83 78 / .12)`) that is nearly
+  invisible in Dark; the focus border still shows.
 - [ ] [PLANNED][P3] Lifecycle sweeps (deliverable expiry, archived-asset purge,
   cleanup-ledger retry) run on in-process boot timers. That fits the always-on
   PC with a local storage root; a serverless host would first need object
