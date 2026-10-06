@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 
-import { ErrorState, PageHeader, PageShell, SectionCard, SettingsShell } from "@/platform/ui_engine";
+import { Breadcrumb, ErrorState, PageHeader, PageShell, SectionCard, SettingsShell } from "@/platform/ui_engine";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasAllPermissions } from "@platform/core/rbac";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors";
 import { platformAccess } from "@platform/runtime";
-import { SettingsNavigation } from "../../settings-navigation";
+import { SettingsSectionNav } from "../../settings-navigation";
+import { platformSettingsGroups } from "../../settings-sections";
 import { groupAndOrderRoles } from "./role-grouping";
 import { UsersDirectory } from "./users-directory";
 
@@ -20,7 +21,7 @@ export default async function UsersPage() {
   if (!hasAllPermissions(grants, ["platform.user.read"])) {
     return (
       <PageShell>
-        <PageHeader eyebrow="Settings · Access" title="Users" divider />
+        <PageHeader context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "Platform settings", href: "/settings" }, { label: "Users" }]} />} title="Users" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view the user directory." />
         </SectionCard>
@@ -41,12 +42,12 @@ export default async function UsersPage() {
   return (
     <PageShell fill>
       <PageHeader
-        eyebrow="Settings · Access"
+        context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "Platform settings", href: "/settings" }, { label: "Users" }]} />}
         title="Users"
         description="Platform accounts, their roles, and their status."
         divider
       />
-      <SettingsShell fill navigation={<SettingsNavigation grants={grants} active="users" />}>
+      <SettingsShell fill navigation={<SettingsSectionNav groups={platformSettingsGroups(grants)} active="users" />}>
         {failure || !directory || !roles ? (
           <SectionCard>
             <ErrorState title="Unable to load users" description={failure?.safeMessage ?? "The directory is unavailable."} />

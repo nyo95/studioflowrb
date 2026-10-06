@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 
-import { ArchiveRetentionSettings } from "./archive-retention-settings";
 
 import {
   Badge,
@@ -38,20 +37,14 @@ import { useCommand } from "../_components/use-command";
 type Template = { id: string; definitionId: string | null; label: string; isBlocking: boolean; isActive: boolean; sortOrder: number; usedBy: number };
 type PhaseDefinitionDraft = { id: string; name: string; prefix: string; orderIndex: number; allowParallel: boolean; seat: "designer" | "drafter" };
 type PhaseTemplateDraft = { id: string; name: string; isDefault: boolean; isActive: boolean; definitions: PhaseDefinitionDraft[] };
-export function StudioSettingsView({
-  archiveRetentionDays,
-  canManageProjects,
+/** Checklist templates: the items every new project's general and per-phase checklists start with. */
+export function ChecklistTemplatesView({
   templates,
   phases,
-  phaseTemplates,
   canManage,
 }: {
-  archiveRetentionDays: number;
-  /** Project-manage holders may run the archived-files cleanup; settings-manage holders may change the window. */
-  canManageProjects: boolean;
   templates: Template[];
   phases: Array<{ id: string; label: string }>;
-  phaseTemplates: PhaseTemplateDraft[];
   canManage: boolean;
 }) {
   const { run, pendingKey, error } = useCommand();
@@ -62,17 +55,25 @@ export function StudioSettingsView({
 
   return (
     <div className="grid gap-4">
-      <ArchiveRetentionSettings retentionDays={archiveRetentionDays} canManage={canManage} canCleanup={canManageProjects} />
-
       {error ? <InlineError>{error}</InlineError> : null}
-
-      <div id="checklist-templates" className="grid scroll-mt-20 grid-cols-2 gap-4 max-[1100px]:grid-cols-1">
+      <div className="grid grid-cols-2 gap-4 max-[1100px]:grid-cols-1">
         {groups.map((group) => (
           <TemplateGroup key={group.key ?? "general"} group={group} templates={templates.filter((t) => t.definitionId === group.key)} canManage={canManage} run={run} pendingKey={pendingKey} />
         ))}
       </div>
+      <Text size="sm" tone="tertiary">Changes apply to new projects. Use “Apply checklist templates” on a project to add new items to it; renamed items are not rewritten in existing projects.</Text>
+    </div>
+  );
+}
+
+/** Phase templates: which phases a new project gets. */
+export function PhaseTemplatesView({ phaseTemplates, canManage }: { phaseTemplates: PhaseTemplateDraft[]; canManage: boolean }) {
+  const { run, pendingKey, error } = useCommand();
+  return (
+    <div className="grid gap-4">
+      {error ? <InlineError>{error}</InlineError> : null}
       <PhaseTemplatesSection phaseTemplates={phaseTemplates} canManage={canManage} run={run} pendingKey={pendingKey} />
-      <Text size="sm" tone="tertiary">Changes apply to new projects. Use “Apply checklist templates” on a project to add new items to it; renamed items are not rewritten in existing projects. The Product Schedule templates (codes such as PT-01) have their own page, “Schedule templates”.</Text>
+      <Text size="sm" tone="tertiary">Changes apply to new projects; existing project phases keep their names.</Text>
     </div>
   );
 }
@@ -141,7 +142,7 @@ function PhaseTemplatesSection({
   };
 
   return (
-    <SectionCard id="phase-templates" className="scroll-mt-20" title="Phase Templates (V2)" description="Templates define the phases a project gets on creation. The default template is applied automatically." padded={false}>
+    <SectionCard title="Templates" count={phaseTemplates.length} padded={false}>
       {phaseTemplates.length === 0 ? (
         <div className="px-(--ui-section-px) py-4"><Text tone="tertiary" size="sm">No phase templates yet. {canManage ? "Add one below." : ""}</Text></div>
       ) : phaseTemplates.map((template) => (

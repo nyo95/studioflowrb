@@ -401,6 +401,9 @@ Owns canvas, max width, page padding, responsive container behavior.
 Apps should prefer this over custom title/action markup.
 
 ### PageSection
+
+Its direct children may shrink below their content width (`[&>*]:min-w-0`), so a wide table inside a section scrolls in its own surface instead of widening the page (R8.373).
+
 Generic logical content grouping. Do not turn every empty space into a card.
 
 ### Directory/List Template
@@ -436,9 +439,27 @@ The navigation column is composed from `ContextNavHeading` and `ContextNavLink`
 (R8.71, `layouts/context-nav.tsx`). `ContextNavLink` takes `active`, an optional
 decorative `marker` (e.g. a phase state dot), a trailing `detail` count, and a
 `component` (pass Next.js `Link` for client routing). The module is deliberately
-not a client module so server components can pass `Link`. Consumers: Platform
-settings navigation and the StudioFlow project workspace (same two-column
-shell, `navigationLabel="Project navigation"`).
+not a client module so server components can pass `Link`. Consumers: every
+settings page through `SettingsFrame`/`SettingsSectionNav`
+(`src/app/(platform)/settings/settings-navigation.tsx`) and the StudioFlow
+project workspace (same two-column shell, `navigationLabel="Project navigation"`).
+
+**Settings ownership (owner, 2026-10-06).** Settings are split by owner and never
+merged into one sidebar:
+
+| Area | Route | Who sees it | Sidebar |
+|---|---|---|---|
+| My preferences | `/account` | everyone (personal only) | none |
+| Platform settings | `/settings/*` (General, Users, Roles & Access) | platform settings/user/role read | platform pages only |
+| App settings | `/studioflow/settings/*`, `/masterdata/settings/*` | per page: only people who may change or decide something on it | that app's pages only |
+
+Each area's sections live in one pure `*SettingsGroups(grants)` function
+(`settings-sections.ts`, `studioflow/settings/sections.ts`,
+`masterdata/settings/sections.ts`); the sidebar, the area root redirect, the
+rail's Settings entry and each page's access check all read it. Every settings
+page has a capsule breadcrumb as its way back. The rail shows on app routes and on
+`/settings` and `/account` (with an "Apps" group there); app Settings sit in the
+rail's utility area, Platform settings in the rail footer with its own icon.
 
 Compact-rail submenus open only through intentional click or keyboard activation.
 Pointer movement and focus traversal alone must not open a portalled menu over the

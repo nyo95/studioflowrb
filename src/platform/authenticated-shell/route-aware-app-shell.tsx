@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 
 import { AppShell, type AppShellProps } from "@/platform/ui_engine";
-import { isApplicationPath } from "./shell-rules";
+import { isRailPath } from "./shell-rules";
 
 export function RouteAwareAppShell({ appRootPaths, ...shellProps }: AppShellProps & {
   appRootPaths: readonly string[];
@@ -13,7 +13,7 @@ export function RouteAwareAppShell({ appRootPaths, ...shellProps }: AppShellProp
   return (
     <AppShell
       {...shellProps}
-      railVisible={isApplicationPath(pathname, appRootPaths)}
+      railVisible={isRailPath(pathname, appRootPaths)}
     />
   );
 }

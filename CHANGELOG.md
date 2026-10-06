@@ -1,5 +1,20 @@
 # Changelog
 
+## R8.373 | 2026-10-06 | feat(settings): settings split by owner, each with a way back — WO-SETTINGS-01
+
+- Owner (2026-10-06): "navbar ga konsisten, ga ada tombol back, akses settings bocor ke mana-mana; template terpisah, hanya untuk yang punya akses". Lead decided as product owner's delegate; the rule is in `UI_ENGINE.md` §SettingsShell.
+- **Ownership.** One pure section list per owner (`settings/settings-sections.ts` `platformSettingsGroups`, `studioflow/settings/sections.ts`, `masterdata/settings/sections.ts`) drives the sidebar, the area root redirect, the rail entry and each page's access check. `SettingsNavigation` (one sidebar listing every app) is replaced by `SettingsSectionNav` + `SettingsFrame`; no sidebar links into another owner's area.
+- **Platform settings** (`/settings` → first allowed page; General, Users, Roles & Access): the Master Data notice on General is gone; rail footer and account menu say "Platform settings" with their own icon.
+- **StudioFlow settings** split into Phase templates, Checklist templates, Schedule templates (moved from `/studioflow/schedule-templates`) and Archived files, each its own page; visible only to `studioflow.settings.manage` (Archived files also `project.manage`). The rail's Settings entry hides for everyone else.
+- **Master Data settings** moved from `/settings/general/masterdata` into the app (`/masterdata/settings/units|categories|supplier-types|deletions|bq-approvals`), keeping the Master Data rail; Settings sits in the rail's utility area like StudioFlow's. The orphan duplicate pages `/masterdata/units|categories|deletions` and every old URL redirect.
+- **My preferences** (`/account`) is personal only: no settings sidebar, new Display section (date/number format, timezone; organisation default when empty) using the existing `updateMyPreferencesAction`.
+- **Shell.** The rail now also shows on `/settings` and `/account` with an "Apps" group, so every settings page has the same chrome (`isRailPath`). `PageSection` lets its children shrink (`[&>*]:min-w-0`) so the sessions table no longer widens the page at phone width.
+- Tests: `settings-sections.test.ts` (no cross-owner links; visibility per permission), `shell-rules.test.ts` (rail paths; app permissions never show Platform settings), `e2e/settings.spec.ts` (11 checks: own sidebar, breadcrumb back, old URLs, personal page, rail entries), new routes in `e2e/screen-size.spec.ts`.
+- `schedule.regression.test.ts` reads the moved schedule-templates view.
+- `BACKLOG.md`: personal theme/start page [BLOCKED], lifecycle timers vs serverless [PLANNED P3], schedule/presentation pre-enqueue [CLEANUP].
+
+**Checks.** `npm run typecheck`, `npm run lint` (0 errors, 2 pre-existing warnings), `check:boundaries`, `check:legacy-runtime`, full `npm test` 857/857, `npm run test:e2e` 89/89 (disposable cloud-container Postgres; Chromium from the preinstalled image).
+
 ## R8.372 | 2026-10-06 | fix(studioflow): every blob delete goes through the cleanup ledger — WO-SF-SAFE-03
 
 - `asset-cleanup.ts` gains `discardObjects` (removes keys already judged unreferenced; records each failure, resolves on success), `enqueueObjectCleanup` (puts keys in `SfAssetCleanupFailure` with `attempts = 0` inside the deleting transaction) and `enqueueUnreferencedCleanup` (same, after re-checking that no row still points at the key). `removeUnreferenced` now uses the shared reference check and `discardObjects`; its behaviour and result shape are unchanged.

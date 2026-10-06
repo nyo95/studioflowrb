@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 
-import Link from "next/link";
-import { ErrorState, PageHeader, PageShell, SectionCard, Notice, SettingsShell } from "@/platform/ui_engine";
+import { Breadcrumb, ErrorState, PageHeader, PageShell, SectionCard, SettingsShell } from "@/platform/ui_engine";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import { toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors";
 import { platformSettings } from "@platform/runtime";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import type { PlatformGeneralSettings } from "@platform/core/settings";
-import { SettingsNavigation } from "../settings-navigation";
+import { SettingsSectionNav } from "../settings-navigation";
+import { platformSettingsGroups } from "../settings-sections";
 import { GeneralSettingsForm } from "./general-settings-form";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export default async function GeneralSettingsPage() {
   if (!hasPermission(grants, "platform.settings.read")) {
     return (
       <PageShell>
-        <PageHeader eyebrow="Settings" title="General Settings" divider />
+        <PageHeader context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "Platform settings", href: "/settings" }, { label: "General" }]} />} title="General Settings" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view platform settings." />
         </SectionCard>
@@ -40,15 +40,14 @@ export default async function GeneralSettingsPage() {
   }
 
   return (
-    <PageShell>
+    <PageShell measure="wide">
       <PageHeader
-        eyebrow="Settings"
+        context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "Platform settings", href: "/settings" }, { label: "General" }]} />}
         title="General Settings"
         description="Shared display defaults and the global appearance for every application."
         divider
       />
-      <SettingsShell navigation={<SettingsNavigation grants={grants} active="general" />}>
-        {hasPermission(grants, "masterdata.dictionary.read") ? <Notice title="Master Data Settings">Manage Units, Categories, Supplier Types, and protected deletion review in <Link className="underline" href="/settings/general/masterdata">Master Data Settings</Link>.</Notice> : null}
+      <SettingsShell navigation={<SettingsSectionNav groups={platformSettingsGroups(grants)} active="general" />}>
         {failure ? (
           <SectionCard>
             <ErrorState title="Unable to load settings" description={failure.safeMessage} />

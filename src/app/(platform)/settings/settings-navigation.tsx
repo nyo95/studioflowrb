@@ -1,93 +1,77 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
-import { hasPermission, type PermissionGrants } from "@platform/core/rbac";
-import { ContextNavHeading, ContextNavLink } from "@/platform/ui_engine";
+import { Breadcrumb, ContextNavHeading, ContextNavLink, ErrorState, PageHeader, PageShell, SectionCard, SettingsShell } from "@/platform/ui_engine";
 
-export type SettingsNavActive =
-  | "account"
-  | "general"
-  | "users"
-  | "roles"
-  | "masterdata"
-  | "studioflow"
-  | "schedule-templates";
-
-type Item = { key: SettingsNavActive; href: string; label: string; visible: boolean };
-type Group = { heading: string; items: Item[] };
+import { canOpenSettingsSection, visibleSettingsGroups, type SettingsSectionGroup } from "./settings-sections";
 
 /**
- * The one settings sidebar (`SettingsShell`'s `navigation` slot) that every settings destination renders,
- * whichever area it lives in, so settings look and behave the same everywhere:
- *
- * - **My Preferences** — the signed-in person's own account (everyone).
- * - **Platform** — General, Users, Roles & Access (platform administrators).
- * - **One group per application** with settings (Master Data, StudioFlow). An application with nothing to
- *   configure has no group; add one here when it gets its first setting.
- *
- * Each application also keeps a single "Settings" entry in its own side menu that lands on its group here.
- * A link only shows when the person may open that page; each page still checks access itself.
- * `onThisPage` lets a long page add its own in-page jump links under the list.
+ * The sidebar of one settings area (`SettingsShell`'s `navigation` slot). It renders only the groups it is
+ * given — platform settings pass the platform groups, an app passes its own — so a settings area never
+ * links into another owner's settings. See `settings-sections.ts` for the ownership rule.
  */
-export function SettingsNavigation({
-  grants,
-  active,
-  onThisPage,
-}: {
-  grants: PermissionGrants;
-  active: SettingsNavActive;
-  onThisPage?: ReactNode;
-}) {
-  const groups: Group[] = [
-    {
-      heading: "My Preferences",
-      items: [{ key: "account", href: "/account", label: "Account & security", visible: true }],
-    },
-    {
-      heading: "Platform",
-      items: [
-        { key: "general", href: "/settings/general", label: "General Settings", visible: hasPermission(grants, "platform.settings.read") },
-        { key: "users", href: "/settings/access/users", label: "Users", visible: hasPermission(grants, "platform.user.read") },
-        { key: "roles", href: "/settings/access/roles", label: "Roles & Access", visible: hasPermission(grants, "platform.role.read") },
-      ],
-    },
-    {
-      heading: "Master Data",
-      items: [
-        {
-          key: "masterdata",
-          href: "/settings/general/masterdata",
-          label: "Dictionaries & approvals",
-          visible: hasPermission(grants, "masterdata.dictionary.read") || hasPermission(grants, "masterdata.promotion.approve"),
-        },
-      ],
-    },
-    {
-      heading: "StudioFlow",
-      items: [
-        { key: "studioflow", href: "/studioflow/settings", label: "Studio Settings", visible: hasPermission(grants, "studioflow.project.read") },
-        { key: "schedule-templates", href: "/studioflow/schedule-templates", label: "Schedule templates", visible: hasPermission(grants, "studioflow.project.read") },
-      ],
-    },
-  ];
-
+export function SettingsSectionNav({ groups, active, onThisPage }: { groups: readonly SettingsSectionGroup[]; active: string; onThisPage?: ReactNode }) {
   return (
     <>
-      {groups.map((group) => {
-        const items = group.items.filter((item) => item.visible);
-        if (items.length === 0) return null;
-        return (
-          <div key={group.heading} className="grid gap-1">
-            <ContextNavHeading>{group.heading}</ContextNavHeading>
-            {items.map((item) => (
-              <ContextNavLink key={item.key} component={Link} href={item.href} active={active === item.key}>
-                {item.label}
-              </ContextNavLink>
-            ))}
-          </div>
-        );
-      })}
+      {visibleSettingsGroups(groups).map((group) => (
+        <div key={group.heading} className="grid gap-1 not-first:mt-3">
+          <ContextNavHeading>{group.heading}</ContextNavHeading>
+          {group.items.map((item) => (
+            <ContextNavLink key={item.key} component={Link} href={item.href} active={active === item.key}>
+              {item.label}
+            </ContextNavLink>
+          ))}
+        </div>
+      ))}
       {onThisPage}
     </>
   );
+}
+
+/**
+ * One settings page: capsule breadcrumb (the way back), title, the area's own sidebar, and the content.
+ * A person who may not open this section gets an access-denied state, never the content.
+ * `withPageShell={false}` is for an app whose layout already wraps pages in a `PageShell` (Master Data).
+ */
+export function SettingsFrame({
+  appMark,
+  trail,
+  title,
+  description,
+  groups,
+  active,
+  withPageShell = true,
+  fill = false,
+  children,
+}: {
+  appMark?: string;
+  /** Breadcrumb entries before the page itself, e.g. `[{ label: "StudioFlow", href: "/studioflow" }, { label: "Settings", href: "/studioflow/settings" }]`. */
+  trail: Array<{ label: string; href: string }>;
+  title: string;
+  description?: string;
+  groups: readonly SettingsSectionGroup[];
+  active: string;
+  withPageShell?: boolean;
+  fill?: boolean;
+  children: ReactNode;
+}) {
+  const allowed = canOpenSettingsSection(groups, active);
+  const body = (
+    <>
+      <PageHeader
+        context={<Breadcrumb variant="capsule" appMark={appMark} entries={[...trail, { label: title }]} />}
+        title={title}
+        description={allowed ? description : undefined}
+        divider
+      />
+      {allowed ? (
+        <SettingsShell fill={fill} navigation={<SettingsSectionNav groups={groups} active={active} />}>{children}</SettingsShell>
+      ) : (
+        <SectionCard>
+          <ErrorState title="Access denied" description="You do not have permission to change these settings." />
+        </SectionCard>
+      )}
+    </>
+  );
+  return withPageShell ? <PageShell measure="wide" fill={fill}>{body}</PageShell> : body;
 }

@@ -45,6 +45,19 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   owner call: a required CI (typecheck, boundaries, tests, build) once a remote
   runs it; PostgreSQL and file-storage backup with a restore drill on a clean
   machine; split `phases/service.ts` by responsibility.
+- [ ] [BLOCKED] Personal theme and start page (owner decision): `UserPreference`
+  stores `theme` and `start_page`, but nothing applies them and My preferences
+  (R8.373) exposes only date/number format and timezone. Decide whether people
+  may choose their own theme (DESIGN locks light) and landing app.
+- [ ] [PLANNED][P3] Lifecycle sweeps (deliverable expiry, archived-asset purge,
+  cleanup-ledger retry) run on in-process boot timers. That fits the always-on
+  PC with a local storage root; a serverless host would first need object
+  storage off the local disk and then a real scheduled trigger. Parked until a
+  hosting change is planned.
+- [ ] [CLEANUP][P3] Schedule and Presentation image deletes still decide and
+  remove after commit (`removeUnreferenced`): a failure is recorded in the
+  cleanup ledger, but a process crash between commit and removal is not
+  pre-enqueued as deliverable and MOM deletes are (R8.372).
 
 ## UI Engine and Shared Utilities
 

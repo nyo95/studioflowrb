@@ -1,36 +1,23 @@
-import { hasPermission } from "@platform/core/rbac";
-import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
-import { studioFlow } from "@/apps/studioflow/runtime";
-import { PageHeader, PageShell, SettingsShell } from "@/platform/ui_engine";
+import { redirect } from "next/navigation";
+
+import { firstSettingsHref } from "@/app/(platform)/settings/settings-sections";
+import { ErrorState, PageShell, SectionCard } from "@/platform/ui_engine";
 
 import { pageSession } from "../_components/session";
-import { SettingsNavigation } from "@/app/(platform)/settings/settings-navigation";
-import { StudioSettingsAnchors } from "./studio-settings-nav";
-import { StudioSettingsView } from "./studio-settings-view";
+import { studioFlowSettingsGroups } from "./sections";
 
 export const dynamic = "force-dynamic";
 
-export default async function StudioSettingsPage() {
+/** StudioFlow settings root: the first settings page this person may open. */
+export default async function StudioFlowSettingsIndex() {
   const { grants } = await pageSession();
-  const [settings, templates, phaseTemplates] = await Promise.all([
-    studioFlow.projects.getStudioSettings({ grants }),
-    studioFlow.tasks.listTemplates({ grants, includeInactive: true }),
-    studioFlow.phases.listPhaseTemplates({ grants }),
-  ]);
-  const defaultTemplate = phaseTemplates.find((template) => template.isDefault && template.isActive);
+  const first = firstSettingsHref(studioFlowSettingsGroups(grants));
+  if (first) redirect(first);
   return (
     <PageShell measure="wide">
-      <PageHeader title="Studio Settings" description="Which checklist every project gets." divider />
-      <SettingsShell navigation={<SettingsNavigation grants={grants} active="studioflow" onThisPage={<StudioSettingsAnchors />} />}>
-        <StudioSettingsView
-          archiveRetentionDays={settings.archiveRetentionDays}
-          canManageProjects={hasPermission(grants, P.projectManage)}
-          templates={templates}
-          phases={(defaultTemplate?.definitions ?? []).map((definition) => ({ id: definition.id, label: definition.name }))}
-          phaseTemplates={phaseTemplates}
-          canManage={hasPermission(grants, P.settingsManage)}
-        />
-      </SettingsShell>
+      <SectionCard>
+        <ErrorState title="Access denied" description="You do not have permission to change StudioFlow settings." />
+      </SectionCard>
     </PageShell>
   );
 }

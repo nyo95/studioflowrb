@@ -14,7 +14,10 @@ import { logoutAction } from "./logout-action";
 import { BqNav } from "./bq/nav";
 import { StudioFlowHeaderSearch } from "./studioflow/header-search";
 import { StudioFlowNav, StudioFlowUtilityNav } from "./studioflow/nav";
-import { MasterDataNav } from "./masterdata/nav";
+import { MasterDataNav, MasterDataUtilityNav } from "./masterdata/nav";
+import { masterDataSettingsGroups } from "./masterdata/settings/sections";
+import { firstSettingsHref } from "./settings/settings-sections";
+import { studioFlowSettingsGroups } from "./studioflow/settings/sections";
 
 export const dynamic = "force-dynamic";
 
@@ -34,14 +37,16 @@ export default async function PlatformLayout({ children }: { children: ReactNode
     .map(({ appId, name, rootPath, icon }) => ({ appId, name, rootPath, icon }));
 
   const domainNavigation = <>
-    {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav canManageSampleRequests={canManageSampleRequests} openSampleRequests={openSampleRequests} canOpenSettings={hasPermission(grants, MASTERDATA_PERMISSIONS.dictionaryRead) || hasPermission(grants, MASTERDATA_PERMISSIONS.promotionApprove)} canUseWorkbook={(hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) || (hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage))} /> : null}
+    {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav canManageSampleRequests={canManageSampleRequests} openSampleRequests={openSampleRequests} canUseWorkbook={(hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) || (hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage))} /> : null}
     {apps.some((app) => app.appId === "bq") ? <BqNav /> : null}
     {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav waitingOnYou={studioFlowStats?.waitingOnYou ?? 0} /> : null}
   </>;
 
-  const domainUtilityNavigation = apps.some((app) => app.appId === "studioflow")
-    ? <StudioFlowUtilityNav />
-    : null;
+  // Each app's Settings sits in the rail's utility area; each component renders only inside its own app.
+  const domainUtilityNavigation = <>
+    {apps.some((app) => app.appId === "masterdata") ? <MasterDataUtilityNav canOpenSettings={firstSettingsHref(masterDataSettingsGroups(grants)) !== null} /> : null}
+    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowUtilityNav canOpenSettings={firstSettingsHref(studioFlowSettingsGroups(grants)) !== null} /> : null}
+  </>;
 
   const contextSlot = apps.some((app) => app.appId === "studioflow") ? <StudioFlowHeaderSearch /> : null;
 

@@ -2,8 +2,8 @@
 
 Plan ID: WO-SF-SAFE-01 / 02 / 03 (production-safety closure) + WO-SETTINGS-01 (DRAFT)
 Scope: Close three confirmed StudioFlow data-integrity gaps found at c6f1cb7 (R8.368) without changing the iteration or project flow; plan the Settings rework separately.
-Target revisions: R8.369 (this plan, Lead), R8.370 / R8.371 / R8.372 (one Executor commit per WO).
-Status: READY for WO-SF-SAFE-01/02/03 · DRAFT for WO-SETTINGS-01 (owner decisions listed)
+Target revisions: R8.369 (this plan), R8.370 / R8.371 / R8.372 (WO-SF-SAFE-01/02/03), R8.373 (WO-SETTINGS-01).
+Status: DONE — owner (2026-10-06) had the Lead execute as Planner + Executor on branch `claude/sf-safety-settings-rework`; all four commits pushed. Owner review of the Settings layout in the browser is the remaining acceptance.
 Priority: P0 (01), P1 (02, 03), P2 (follow-ups)
 Owner: Product Owner.
 Last updated: 2026-10-06
@@ -83,16 +83,15 @@ Not a finding, but noted: `SfActivity` has no runtime creator in app code (only 
 - **P2 deployment hardening:** document in `docs/operations` that the lifecycle sweeps are in-process and assume an always-on Node host with a local storage root; add a one-line `/api/health` style check only if the owner wants one. Moving to serverless would first need object storage off the local disk, then real scheduled triggers — record it as `PARKED` in `BACKLOG.md`, no work now.
 - **Note:** `retryFailedAssetCleanup` deletes without re-checking references; safe because keys are random per upload, but add the check if keys ever become reusable.
 
-## WO-SETTINGS-01 — Settings rework (DRAFT, owner decisions needed)
+## WO-SETTINGS-01 — Settings rework (DONE, R8.373)
 
-Current state found in code: three tiers already exist — **Platform** (`PlatformGeneralSettings` singleton + `/settings/general`), **per app** (`SfSettings` with only `archive_retention_days`, `/studioflow/settings`; Master Data settings under `/settings/general/masterdata`; BQ none), **per user** (`UserPreference`: theme, locale, timezone, start page) with one shared sidebar (`settings-navigation.tsx`). So this is a re-layering, not a greenfield. Before locking a plan I need the owner to answer (plain-language, with a recommendation):
+Owner (2026-10-06): navigation inconsistent, no way back, settings reachable across owners (platform ↔ StudioFlow), templates should be separate pages, only for people with access. Decisions taken as Lead on the owner's behalf, recorded in `UI_ENGINE.md` §SettingsShell:
 
-1. **Apa yang salah sekarang?** Saya tidak menemukan bug di sini. Mana yang mau diubah: (a) letak menu (Master Data settings masih di bawah "General"), (b) pengaturan yang belum ada (BQ, banyak angka tetap seperti 30 hari file kedaluwarsa dan 500 MB batas upload yang masih ditanam di kode), (c) pengaturan pribadi yang belum benar-benar dipakai? **Rekomendasi:** (a)+(b), dikerjakan bertahap.
-2. **Angka tetap jadi bisa diatur?** Contoh: masa simpan file 30 hari, batas ukuran upload. **Rekomendasi:** ya, tapi hanya yang memang dibutuhkan studio; sisanya tetap di kode.
-3. **Siapa boleh ubah?** **Rekomendasi:** General = admin platform; per aplikasi = pemegang izin pengaturan aplikasi itu; preferensi pribadi = tiap user untuk dirinya sendiri.
-4. **Pindahkan Master Data settings keluar dari "General" ke grup Master Data sendiri?** **Rekomendasi:** ya.
-
-Technical shape to lock after answers (proposal, not decided): one typed settings registry per tier in Core (platform) and one public settings contract per app (app-owned policy, REUSE `SettingsShell` + the single sidebar), each value with a typed default, validation, permission and audit; no platform→app import; user preferences stay a typed row with null = inherit. Split into small WOs per app after the owner answers.
+1. Three owners, never one merged sidebar: **My preferences** (`/account`, personal), **Platform settings** (`/settings/*`: General, Users, Roles & Access), **app settings** inside each app (`/studioflow/settings/*`, `/masterdata/settings/*`).
+2. A settings page shows only to people who may change or decide something on it. StudioFlow templates (phase, checklist, schedule) → `studioflow.settings.manage`; Archived files → that or `studioflow.project.manage`. Master Data dictionaries → `masterdata.dictionary.manage`; Deletion review → `deletion.approve`; BQ approvals → `promotion.approve`. Read-only roles no longer see settings.
+3. Every settings page: capsule breadcrumb back, same rail (now also on `/settings` and `/account`, with an "Apps" group), app Settings in the rail's utility area, Platform settings in the rail footer with its own icon.
+4. Old URLs redirect (`/settings/general/masterdata`, `/masterdata/units|categories|deletions`, `/studioflow/schedule-templates`).
+5. My preferences gains the personal Display section (date/number format, timezone; empty = organisation default). Theme and start page stay unexposed (`BACKLOG.md` [BLOCKED]).
 
 ## Verification (each WO, before commit)
 

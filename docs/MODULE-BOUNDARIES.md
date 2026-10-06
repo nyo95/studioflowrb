@@ -18,7 +18,7 @@ The rule that matters: **an app may know another app's capability, never its imp
 | Module | Owns | Code | Postgres schema |
 |---|---|---|---|
 | Platform | identity, RBAC, audit, settings, storage, runtime, UI Engine, utilities | `src/platform/**` | `platform` |
-| MasterData | brands, vendors, SKUs, units, categories, pricing, deletion requests | `src/apps/masterdata/**`, `src/app/(platform)/masterdata/**`, `src/app/(platform)/settings/general/masterdata/**` | `master_data` |
+| MasterData | brands, vendors, SKUs, units, categories, pricing, deletion requests | `src/apps/masterdata/**`, `src/app/(platform)/masterdata/**`, `src/app/(platform)/masterdata/settings/**` | `master_data` |
 | StudioFlow | clients, projects, phases and rounds, files, drawing list, requirements, MOM, schedule, presentation, library reads | `src/apps/studioflow/**`, `src/app/(platform)/studioflow/**`, `src/app/(document)/studioflow/**` | `studioflow` |
 | BQ | bills of quantity, library, templates, promotion requests | `src/apps/bq/**`, `src/app/(platform)/bq/**` | `bq` |
 | Shell | composition only: app registration, layout, cross-app wiring | `src/app/*.ts(x)`, `src/app/(platform)/{layout,page,…}`, `src/application/**` | — |

@@ -18,6 +18,11 @@ const ROUTES = [
   "/bq/library",
   `/bq/${bqProjectId}`,
   "/settings/general",
+  "/settings/access/users",
+  "/studioflow/settings/phases",
+  "/studioflow/settings/schedule",
+  "/masterdata/settings/units",
+  "/account",
 ];
 const WIDTHS = [375, 640, 839, 840, 841];
 

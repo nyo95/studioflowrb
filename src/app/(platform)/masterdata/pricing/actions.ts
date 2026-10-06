@@ -134,7 +134,7 @@ export async function createPricingWorkCategoryQuickAction(formData: FormData): 
     });
     refreshPricing();
     revalidatePath("/masterdata/categories");
-    revalidatePath("/settings/general/masterdata");
+    revalidatePath("/masterdata/settings", "layout");
     revalidatePath("/masterdata");
     return result;
   });

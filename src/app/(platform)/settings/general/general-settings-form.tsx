@@ -18,19 +18,11 @@ import type { ActionResult } from "@platform/core/actions";
 import type { PlatformGeneralSettings } from "@platform/core/settings";
 import { PLATFORM_APPEARANCE_THEMES, type PlatformTheme } from "@platform/core/settings/appearance";
 import { updateGeneralSettingsAction } from "./actions";
+import { TIMEZONE_CHOICES } from "../display-options";
 
 const INITIAL: ActionResult<{ changed: boolean }> | null = null;
 
-const TIMEZONES = [
-  "Asia/Jakarta",
-  "Asia/Makassar",
-  "Asia/Jayapura",
-  "Asia/Singapore",
-  "Asia/Tokyo",
-  "UTC",
-  "Europe/London",
-  "America/New_York",
-];
+const TIMEZONES: readonly string[] = TIMEZONE_CHOICES;
 
 const THEME_LABELS: Record<PlatformTheme, string> = {
   light: "Light",
