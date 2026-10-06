@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.348 | 2026-10-06 | fix(studioflow,ui-engine): Lead review of the re-layout and first polish
+
+- Lead review of R8.347 (WO-SF-RELAYOUT-01): PASS with polish. Read the full diff; the rail and Requirements page are gone, the shared project header and `PipelineStrip` track variant are used on Home and the project page, commands, choices and permissions are unchanged. Re-ran the checks independently.
+- Polish: the round card on the phase page is the one place to act, so its forward step (Send to client, Client answered, Start, New visit) is a primary button there (`IterationButtons lead`); Home keeps them quiet. The "Brief from Round N" block appears only when that round has client notes (a "no notes" line was repeated under Earlier rounds). The phase workspace no longer nests a second `<main>` landmark. The supervision check uses `LEGACY_PHASE_DEFINITION_IDS.supervision` instead of a literal id. The loading skeleton matches the new layout. The track marker's check uses the `ink-inverse` token instead of literal white.
+- Browser (owner's signed-in session, read-only): Home card, project page with the phase strip, round card, Earlier rounds, pinned note, requirements with the Project-wide disclosure, files, and the MOM page under the shared header all render. No command was clicked, so no owner data changed; the send/answer/revision/CD Final/visit pass stays on `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`.
+- Noted, not changed: the project title uses the canonical H1 and wraps to two lines on a narrow window, and the project name also stands in the sticky breadcrumb; both are UI Engine defaults.
+
+**Checks.** `npm run typecheck`; `npm run lint` (0 errors, 2 existing `<img>` warnings); `check:boundaries`; `check:legacy-runtime`; `npm test` **829/829** (none failed, skipped or cancelled).
+
 ## R8.347 | 2026-10-06 | feat(studioflow,ui-engine): consolidate project phase workspace
 
 - Removed the project secondary rail and standalone Requirements page. Every project sub-page now shares one streamed header with the stored free-text project name, client/PIC metadata and compact Phases/MOM/Schedule/Presentation/History navigation; legacy phase URLs redirect to the overview query form.

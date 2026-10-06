@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
+import { LEGACY_PHASE_DEFINITION_IDS } from "@/apps/studioflow/domain/phase";
 import { phaseStepPresentation } from "@/apps/studioflow/domain/phase-display";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import {
@@ -47,7 +48,7 @@ export default async function ProjectOverviewPage({
       phaseStatus: phase.status,
       previousPhaseName: index > 0 ? phases[index - 1]!.label : null,
       canStart: phase.status === "PENDING" && !phase.startBlockedReason,
-      isSupervision: phase.definitionId === "00000000-0000-4000-8000-000000000105",
+      isSupervision: phase.definitionId === LEGACY_PHASE_DEFINITION_IDS.supervision,
       iteration: phase.iterationName && phase.iterationState ? { name: phase.iterationName, state: phase.iterationState, waitingDays: phase.waitingDays } : null,
     });
     return {
@@ -104,15 +105,14 @@ function PhaseCanvasSkeleton() {
           <SkeletonBlock className="h-8 w-40" />
         </div>
       </SectionCard>
-      <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-4 max-[1100px]:grid-cols-1">
-        <SectionCard title="Revision work" padded>
+      <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)] items-start gap-4 max-[1100px]:grid-cols-1">
+        <SectionCard title="Earlier rounds" padded>
           <div className="grid gap-2">
             <SkeletonBlock className="h-4 w-3/4" />
             <SkeletonBlock className="h-4 w-1/2" />
-            <SkeletonBlock className="h-4 w-2/3" />
           </div>
         </SectionCard>
-        <SectionCard title="Phase checklist" padded>
+        <SectionCard title="Requirements" padded>
           <div className="grid gap-2">
             <SkeletonBlock className="h-4 w-full" />
             <SkeletonBlock className="h-4 w-4/5" />

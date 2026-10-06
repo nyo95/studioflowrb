@@ -71,17 +71,17 @@ export function PhasePanel({ projectId, phase, current, previous, iterations, no
   return (
     <>
       <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)] items-start gap-4 max-[1100px]:grid-cols-1">
-        <main className="grid min-w-0 gap-4">
+        <div className="grid min-w-0 gap-4">
           <SectionCard
             title={title}
-            action={<div className="flex flex-wrap items-center gap-1.5"><IterationButtons phase={phase} current={current} commands={commands} canAct={acting} onNewVisit={() => setVisitOpen(true)} />{currentMenu.length > 0 ? <ButtonMenu label="More" variant="ghost" items={currentMenu} /> : null}</div>}
+            action={<div className="flex flex-wrap items-center gap-1.5"><IterationButtons phase={phase} current={current} commands={commands} canAct={acting} onNewVisit={() => setVisitOpen(true)} lead />{currentMenu.length > 0 ? <ButtonMenu label="More" variant="ghost" items={currentMenu} /> : null}</div>}
           >
             <div className="grid gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={phase.status === "DONE" ? "success" : current ? STATE_TONE[current.state] : "neutral"}>{phase.status === "PENDING" ? "Not started" : phase.status === "DONE" ? "Done" : current ? STATE_LABEL[current.state] : "In progress"}</Badge>
                 <Text tone="secondary" size="sm">{nextStep}</Text>
               </div>
-              {current?.state === "NOT_SENT" && previous ? <Notice tone="neutral" title={`Brief from ${roundDisplayName(phase.name, previous.name)}`}>{previous.note ? <span className="whitespace-pre-line">{previous.note}</span> : <span className="text-ink-tertiary">No client notes were recorded for that round.</span>}</Notice> : null}
+              {current?.state === "NOT_SENT" && previous?.note ? <Notice tone="neutral" title={`Brief from ${roundDisplayName(phase.name, previous.name)}`}><span className="whitespace-pre-line">{previous.note}</span></Notice> : null}
               {current?.state === "ANSWERED" ? <Text as="p" tone={current.note ? "secondary" : "tertiary"} size="sm" className="whitespace-pre-line">{current.note ?? "No client notes recorded."}</Text> : null}
               <UndoBar commands={commands} />
               {commands.error && !visitOpen && !renaming && !notesFor && !skipOpen && !resetOpen ? <InlineError>{commands.error}</InlineError> : null}
@@ -107,7 +107,7 @@ export function PhasePanel({ projectId, phase, current, previous, iterations, no
             </ul>
           </SectionCard> : null}
           {children}
-        </main>
+        </div>
 
         <aside className="grid min-w-0 gap-4">
           <SectionCard title="Pinned note" action={canNote && !archived && !noteEditing ? <Button size="sm" variant="ghost" onClick={() => setNoteEditing(true)}>Edit</Button> : null}>

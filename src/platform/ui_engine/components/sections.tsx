@@ -207,7 +207,7 @@ export function PipelineStrip({
         {steps.map((step, index) => {
           const state = step.state ?? "upcoming";
           const marker = state === "done"
-            ? "border-success bg-success text-white"
+            ? "border-success bg-success text-ink-inverse"
             : state === "current"
               ? "border-ink bg-surface"
               : state === "waiting"

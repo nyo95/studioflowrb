@@ -84,20 +84,27 @@ export type IterationView = {
 
 export type PhaseView = { id: string; name: string; status: "PENDING" | "ACTIVE" | "DONE"; isSupervision: boolean; canStart: boolean };
 
-/** The buttons that move a phase forward from where it is now. Which ones exist is decided by the server's `choices`. */
+/**
+ * The buttons that move a phase forward from where it is now. Which ones exist is decided by the server's `choices`.
+ * On Home several phases sit side by side, so only a decision after the client answered is a primary button. With
+ * `lead` (the phase page's round card, the one place to act) the forward step is primary too.
+ */
 export function IterationButtons({
   phase,
   current,
   commands,
   canAct,
   onNewVisit,
+  lead = false,
 }: {
   phase: PhaseView;
   current: IterationView | null;
   commands: PhaseCommands;
   canAct: boolean;
   onNewVisit: () => void;
+  lead?: boolean;
 }) {
+  const startVariant = lead ? "primary" : "secondary";
   const [answering, setAnswering] = useState(false);
   const base = { phaseId: phase.id };
   const run = (key: string, body: PhaseCommandBody, summary: string) => void commands.exec(`${phase.id}:${key}`, body, summary);
@@ -106,18 +113,18 @@ export function IterationButtons({
   if (!current) {
     if (phase.status === "PENDING") {
       if (!phase.canStart) return null;
-      return canAct ? <Button size="sm" variant="secondary" pending={busy("start")} onClick={() => phase.isSupervision ? onNewVisit() : run("start", { ...base, command: "addIteration" }, `${phase.name} started`)}>Start</Button> : null;
+      return canAct ? <Button size="sm" variant={startVariant} pending={busy("start")} onClick={() => phase.isSupervision ? onNewVisit() : run("start", { ...base, command: "addIteration" }, `${phase.name} started`)}>Start</Button> : null;
     }
     if (!canAct) return null;
-    if (phase.isSupervision && phase.status === "ACTIVE") return <Button size="sm" variant="secondary" onClick={onNewVisit}>New visit</Button>;
+    if (phase.isSupervision && phase.status === "ACTIVE") return <Button size="sm" variant={startVariant} onClick={onNewVisit}>New visit</Button>;
     return <Button size="sm" variant="secondary" pending={busy("add")} onClick={() => phase.isSupervision ? onNewVisit() : run("add", { ...base, command: "addIteration" }, `New ${phase.name} iteration added`)}>+ iteration</Button>;
   }
 
   if (!canAct) return null;
   const it = { ...base, iterationId: current.id };
   const known: Record<string, { label: string; primary?: boolean; run: () => void }> = {
-    send: { label: "Send to client", run: () => run("send", { ...it, command: "sendIteration" }, `${current.name} sent to the client`) },
-    record_answer: { label: "Client answered", run: () => setAnswering(true) },
+    send: { label: "Send to client", primary: lead, run: () => run("send", { ...it, command: "sendIteration" }, `${current.name} sent to the client`) },
+    record_answer: { label: "Client answered", primary: lead, run: () => setAnswering(true) },
     revision: { label: "Revision", run: () => run("revision", { ...it, command: "chooseOutcome", outcome: "REVISION" }, `${current.name} needs a revision`) },
     done: phase.isSupervision
       ? { label: "Done (handover)", primary: true, run: () => run("done", { ...it, command: "chooseVisit", outcome: "DONE" }, `${phase.name} done`) }
