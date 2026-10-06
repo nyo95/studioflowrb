@@ -2,6 +2,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { createPrivateObjectKey } from "@platform/core/storage";
 import { currentDateOnly, isDateOnlyString } from "@platform/utilities/date";
 
+import { discardObjects, enqueueObjectCleanup } from "../asset-cleanup";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { sniffImage } from "../domain/images";
 import {
@@ -133,9 +134,9 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     return tx.sfMomItem.create({ data: { document_id: documentId, sort_order: sortOrder } });
   }
 
-  /** Storage cleanup runs after commit; a failure leaves an orphan object, never a broken row. */
+  /** Storage cleanup runs after commit; a failure stays in the retry ledger, never a silent orphan. */
   async function removeObjects(keys: readonly string[]) {
-    await Promise.all(keys.map((key) => storage.remove(key).catch(() => undefined)));
+    await discardObjects(db, storage, keys);
   }
 
   async function readSnapshot(tx: TxClient, documentId: string): Promise<MomSnapshot> {
@@ -143,7 +144,10 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
     return snapshotOf(row);
   }
 
-  /** Objects still needed by the working copy or any kept revision must survive a delete. */
+  /**
+   * Objects still needed by the working copy or any kept revision must survive a delete. Called last in the
+   * deleting transaction: the keys it returns are enqueued in the retry ledger before the rows' delete commits.
+   */
   async function unreferenced(tx: TxClient, documentId: string, candidates: readonly string[]): Promise<string[]> {
     if (candidates.length === 0) return [];
     const [working, revisions] = await Promise.all([
@@ -155,7 +159,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
       const snapshot = parseMomSnapshot(revision.snapshot);
       if (snapshot) for (const key of momSnapshotImageKeys(snapshot)) live.add(key);
     }
-    return [...new Set(candidates)].filter((key) => !live.has(key));
+    return enqueueObjectCleanup(tx, [...new Set(candidates)].filter((key) => !live.has(key)));
   }
 
   /**
@@ -352,7 +356,7 @@ export function createMomService(db: Db, ports: StudioFlowPorts) {
             snapshot: { topic: existing.topic, meetingDate: dateToDateOnly(existing.meeting_date), venue: existing.venue, preparedByName: existing.prepared_by_name, sections, images: images.length, revisions: revisions.length },
           },
         });
-        return [...new Set([...images.map((image) => image.storage_key), ...revisionKeys])];
+        return enqueueObjectCleanup(tx, [...images.map((image) => image.storage_key), ...revisionKeys]);
       });
       await removeObjects(keys);
       return { documentId: input.documentId };

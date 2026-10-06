@@ -268,7 +268,28 @@ icon-xs
 icon-sm
 icon-md
 icon-lg
+logo-halo
 ```
+
+**Themes (R8.374).** Light and Dark are both approved. `tokens.css` is the only
+theme implementation: `:root` is light; dark is redefined for
+`@media screen and (prefers-color-scheme: dark)` when `<html>` has no
+`data-theme="light"`, and for `<html data-theme="dark">`. Both dark blocks are
+screen-only and skip any page showing a `DocumentSheet` (`:has(.ui-document)`),
+so printing and document previews stay on paper colours. Components never check
+the theme; they use semantic tokens, and text on `bg-action` uses
+`text-action-ink`, never `text-white`. `--ui-logo-halo` is a hairline
+drop-shadow (dark in light, light in dark) used only by `LogoFrame`.
+
+### LogoFrame
+
+`LogoFrame` (`components/logo-frame.tsx`) shows a brand or client logo on the
+neutral `surface-muted` plate with `object-contain`, a fixed aspect (`square`,
+`4/3`, `16/9`) and padding, and falls back to initials when the URL is missing or
+fails to load. It never recolours a logo (no invert, brightness, grayscale or
+blend); readability of white-on-light and black-on-dark logos comes only from
+`--ui-logo-halo`. Finding the URL (crawling, official-logo choice) stays app
+logic. Consumers: StudioFlow Library (BrandCard, BrandDetail).
 
 Motion and icon size are part of this list as of R8.202. They were the two
 scales the contract had opinions about but no tokens for, so every component
@@ -401,6 +422,9 @@ Owns canvas, max width, page padding, responsive container behavior.
 Apps should prefer this over custom title/action markup.
 
 ### PageSection
+
+Its direct children may shrink below their content width (`[&>*]:min-w-0`), so a wide table inside a section scrolls in its own surface instead of widening the page (R8.373).
+
 Generic logical content grouping. Do not turn every empty space into a card.
 
 ### Directory/List Template
@@ -436,9 +460,27 @@ The navigation column is composed from `ContextNavHeading` and `ContextNavLink`
 (R8.71, `layouts/context-nav.tsx`). `ContextNavLink` takes `active`, an optional
 decorative `marker` (e.g. a phase state dot), a trailing `detail` count, and a
 `component` (pass Next.js `Link` for client routing). The module is deliberately
-not a client module so server components can pass `Link`. Consumers: Platform
-settings navigation and the StudioFlow project workspace (same two-column
-shell, `navigationLabel="Project navigation"`).
+not a client module so server components can pass `Link`. Consumers: every
+settings page through `SettingsFrame`/`SettingsSectionNav`
+(`src/app/(platform)/settings/settings-navigation.tsx`) and the StudioFlow
+project workspace (same two-column shell, `navigationLabel="Project navigation"`).
+
+**Settings ownership (owner, 2026-10-06).** Settings are split by owner and never
+merged into one sidebar:
+
+| Area | Route | Who sees it | Sidebar |
+|---|---|---|---|
+| My preferences | `/account` | everyone (personal only) | none |
+| Platform settings | `/settings/*` (General, Users, Roles & Access) | platform settings/user/role read | platform pages only |
+| App settings | `/studioflow/settings/*`, `/masterdata/settings/*` | per page: only people who may change or decide something on it | that app's pages only |
+
+Each area's sections live in one pure `*SettingsGroups(grants)` function
+(`settings-sections.ts`, `studioflow/settings/sections.ts`,
+`masterdata/settings/sections.ts`); the sidebar, the area root redirect, the
+rail's Settings entry and each page's access check all read it. Every settings
+page has a capsule breadcrumb as its way back. The rail shows on app routes and on
+`/settings` and `/account` (with an "Apps" group there); app Settings sit in the
+rail's utility area, Platform settings in the rail footer with its own icon.
 
 Compact-rail submenus open only through intentional click or keyboard activation.
 Pointer movement and focus traversal alone must not open a portalled menu over the

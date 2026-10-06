@@ -1,6 +1,6 @@
 import { createPrivateObjectKey } from "@platform/core/storage";
 
-import { removeUnreferenced as removeUnreferencedAssets } from "../asset-cleanup";
+import { discardObjects, removeUnreferenced as removeUnreferencedAssets } from "../asset-cleanup";
 import { STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import { scheduleCode } from "../domain/schedule";
 import {
@@ -255,7 +255,8 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
           return { slideIds: slides.map((slide) => slide.id) };
         });
       } catch (error) {
-        await Promise.all(keys.map((key) => storage.remove(key).catch(() => undefined)));
+        // No slide row committed; removal failures still go to the retry ledger.
+        await discardObjects(db, storage, keys);
         throw error;
       }
     },

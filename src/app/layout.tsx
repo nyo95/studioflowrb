@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Schibsted_Grotesk, JetBrains_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
+import { activeThemeAttribute } from "./active-theme";
 
 const sans = Schibsted_Grotesk({
   subsets: ["latin"],
@@ -22,9 +23,15 @@ const serif = localFont({
   display: "swap",
 });
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+/**
+ * The theme is stamped on `<html>` on the server, so the first paint is already right (no flash): `light` or
+ * `dark` forces it, no attribute follows the device through the `prefers-color-scheme` tokens. My preferences
+ * changes the attribute in place when a person picks a theme, hence `suppressHydrationWarning`.
+ */
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const theme = await activeThemeAttribute();
   return (
-    <html lang="id" className={`${sans.variable} ${mono.variable} ${serif.variable}`}>
+    <html lang="id" data-theme={theme} suppressHydrationWarning className={`${sans.variable} ${mono.variable} ${serif.variable}`}>
       <body>{children}</body>
     </html>
   );

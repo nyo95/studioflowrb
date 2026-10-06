@@ -10,13 +10,19 @@ import { validationError } from "@platform/core/validation";
 import { normalizeText } from "@platform/utilities/normalization";
 
 import {
+  isThemePreference,
+  parseStoredTheme,
   PLATFORM_APPEARANCE_THEME_DEFAULT,
   PLATFORM_APPEARANCE_THEMES,
+  resolveThemePreference,
+  THEME_PREFERENCES,
+  themeAttribute,
   type PlatformTheme,
+  type ThemePreference,
 } from "./appearance";
 
-export { PLATFORM_APPEARANCE_THEME_DEFAULT, PLATFORM_APPEARANCE_THEMES };
-export type { PlatformTheme };
+export { isThemePreference, parseStoredTheme, PLATFORM_APPEARANCE_THEME_DEFAULT, PLATFORM_APPEARANCE_THEMES, resolveThemePreference, THEME_PREFERENCES, themeAttribute };
+export type { PlatformTheme, ThemePreference };
 
 /**
  * Typed Platform General Settings singleton (CORE.md §11, Foundation F0 §7).
@@ -27,8 +33,8 @@ export type { PlatformTheme };
  * deltas, and emit no audit event on a no-op. There is no arbitrary key/value
  * API, no file upload, and no per-user preference surface here.
  *
- * Platform Appearance (`theme`) is global and typed — it belongs to the same
- * singleton row, never to per-app or per-user storage.
+ * `theme` here is only the organisation default for people who have not chosen
+ * their own; each person's active theme is their `UserPreference` (see `appearance.ts`).
  */
 
 export const PLATFORM_GENERAL_SETTINGS_ID = "platform_general_settings";

@@ -91,8 +91,9 @@ export function PageSection({
   className,
   ...props
 }: PageSectionProps) {
+  // Children may shrink below their content width so a wide table scrolls inside its own surface (DESIGN §12).
   return (
-    <section className={cx("grid gap-(--ui-section-gap)", className)} {...props}>
+    <section className={cx("grid gap-(--ui-section-gap) [&>*]:min-w-0", className)} {...props}>
       {title || description || action ? (
         <div className="flex items-start justify-between gap-4">
           <div className="grid gap-[3px]">

@@ -4,8 +4,8 @@ import { useState, type ReactNode } from "react";
 
 import { fallbackPrefix, normalizeExtraFields, normalizeScheduleCategory, scheduleCode } from "@/apps/studioflow/domain/schedule";
 
-import { ExtraFieldsEditor } from "../_components/extra-fields-editor";
-import { useCommand } from "../_components/use-command";
+import { ExtraFieldsEditor } from "../../_components/extra-fields-editor";
+import { useCommand } from "../../_components/use-command";
 import {
   createScheduleTemplateItemAction,
   deleteSchedulePrefixAction,
@@ -13,7 +13,7 @@ import {
   setScheduleTemplateItemActiveAction,
   updateScheduleTemplateItemAction,
   upsertSchedulePrefixAction,
-} from "../actions";
+} from "../../actions";
 
 import {
   Badge,

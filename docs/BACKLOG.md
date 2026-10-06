@@ -45,6 +45,24 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   owner call: a required CI (typecheck, boundaries, tests, build) once a remote
   runs it; PostgreSQL and file-storage backup with a restore drill on a clean
   machine; split `phases/service.ts` by responsibility.
+- [ ] [PLANNED] Personal start page (owner approved, 2026-10-06): `UserPreference.start_page`
+  is stored and validated but nothing applies it and My preferences does not
+  offer it. Theme shipped in R8.374.
+- [ ] [UNVERIFIED] Dark mode visual QA with real data: R8.374 walked the main
+  screens on seed data only; brand logos with real crawled images (LogoFrame
+  hairline on white and black logos), long tables, the Gantt timeline and
+  the MOM/Presentation editors still need a pass in Dark. Focus rings use a
+  fixed light-theme shadow colour (`rgb(87 83 78 / .12)`) that is nearly
+  invisible in Dark; the focus border still shows.
+- [ ] [PLANNED][P3] Lifecycle sweeps (deliverable expiry, archived-asset purge,
+  cleanup-ledger retry) run on in-process boot timers. That fits the always-on
+  PC with a local storage root; a serverless host would first need object
+  storage off the local disk and then a real scheduled trigger. Parked until a
+  hosting change is planned.
+- [ ] [CLEANUP][P3] Schedule and Presentation image deletes still decide and
+  remove after commit (`removeUnreferenced`): a failure is recorded in the
+  cleanup ledger, but a process crash between commit and removal is not
+  pre-enqueued as deliverable and MOM deletes are (R8.372).
 
 ## UI Engine and Shared Utilities
 

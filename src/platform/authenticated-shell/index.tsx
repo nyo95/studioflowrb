@@ -75,7 +75,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       )}
       collapsible
       navigationLabel={`${settings.appTitle} navigation`}
-      navigation={<AuthenticatedPlatformNavigation domainNavigation={domainNavigation} />}
+      navigation={<AuthenticatedPlatformNavigation domainNavigation={domainNavigation} apps={apps} />}
       utility={domainUtilityNavigation}
       /* DESIGN v2 §10.1-10.2 (owner decision 1): the account and the General group live in the rail;
          search, messages and notifications stay in the thin top bar. */

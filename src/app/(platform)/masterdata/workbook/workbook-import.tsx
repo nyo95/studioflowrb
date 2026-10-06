@@ -81,7 +81,7 @@ export function WorkbookImport({ canExport, canImport }: { canExport: boolean; c
 
   const step = (number: number, title: string, active: boolean) => (
     <span className="flex items-center gap-2">
-      <span className={active ? "grid size-5 place-items-center rounded-full bg-action text-xs font-semibold text-white" : "grid size-5 place-items-center rounded-full bg-surface-muted text-xs font-semibold text-ink-tertiary"}>{number}</span>
+      <span className={active ? "grid size-5 place-items-center rounded-full bg-action text-xs font-semibold text-action-ink" : "grid size-5 place-items-center rounded-full bg-surface-muted text-xs font-semibold text-ink-tertiary"}>{number}</span>
       <span>{title}</span>
     </span>
   );

@@ -12,7 +12,7 @@ import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
 function revalidateCategories(): void {
   revalidatePath("/masterdata/categories");
-  revalidatePath("/settings/general/masterdata");
+  revalidatePath("/masterdata/settings", "layout");
   revalidatePath("/masterdata");
 }
 

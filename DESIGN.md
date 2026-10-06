@@ -123,6 +123,7 @@ spanned only 14 L\* — are one palette to a reader who separates hues easily an
 one flat smear to a reader who does not, and a 7px dot on a Gantt row gives
 colour no help from a label. These steps are ~7.6 L\* apart in light and ~9 in
 dark, and every one clears 3:1 against surface, canvas and rail in both themes.
+Both themes are approved UI modes (owner, 2026-10-06); each person picks System, Light or Dark in My preferences.
 `design-contract.test.ts` asserts both properties; do not add a sixth phase
 without re-spacing the ramp.
 

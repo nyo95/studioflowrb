@@ -44,6 +44,7 @@ import {
   type TxClient,
 } from "../shared";
 import { readBlockerCounts, readBlockerCountsBatch, readBlockerItems } from "./blocker-query";
+import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
 import { assertProjectCompletionReady, readProjectCompletionReadiness } from "../projects/completion";
 
 type PhaseRow = Awaited<ReturnType<TxClient["sfPhase"]["findUniqueOrThrow"]>>;
@@ -121,8 +122,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         let deletedIteration: { iteration: ReturnType<typeof iterationUndo> } | undefined;
         let createdIteration: ReturnType<typeof iterationUndo> | undefined;
         if (current) {
-          const files = await tx.sfDeliverable.count({ where: { revision_id: current.id } });
-          const emptyNeverSent = current.status === "NOT_SENT" && !current.note?.trim() && files === 0;
+          const [files, activities] = await Promise.all([
+            tx.sfDeliverable.count({ where: { revision_id: current.id } }),
+            tx.sfActivity.count({ where: { revision_id: current.id } }),
+          ]);
+          // Only a round with nothing attached may be deleted; anything else is kept as closed history.
+          const emptyNeverSent = current.status === "NOT_SENT" && !current.note?.trim() && files === 0 && activities === 0;
           if (emptyNeverSent) {
             deletedIteration = { iteration: iterationUndo(current) };
             await tx.sfRevision.delete({ where: { id: current.id } });
@@ -383,7 +388,10 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!iteration) throw iterationNotFound(); if (iteration.name === name) return { iterationId: iteration.id }; await tx.sfRevision.update({ where: { id: iteration.id }, data: { name } }); await recordEvent(tx, input, phase, iteration.id, iteration.name, name, { beforeIteration: iterationUndo(iteration) }); await audit(tx, input.actor, "iteration-renamed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async deleteNeverSentIteration(input: PhaseCommandInput & { iterationId: string }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id }, include: { activities: true, deliverables: true } }); if (!iteration) throw iterationNotFound(); if (iteration.status !== "NOT_SENT") throw invalidState("Only a round that was never sent can be deleted."); const snapshot = { iteration: iterationUndo(iteration), activities: iteration.activities.map((a) => ({ id: a.id, revisionId: a.revision_id })), deliverables: iteration.deliverables.map((d) => ({ id: d.id, revisionId: d.revision_id })) }; await tx.sfRevision.delete({ where: { id: iteration.id } }); await recordEvent(tx, input, phase, null, "NOT_SENT", "DELETED", { deletedIteration: snapshot }); await audit(tx, input.actor, "iteration-deleted", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id }, include: { _count: { select: { activities: true, deliverables: true } } } }); if (!iteration) throw iterationNotFound(); if (iteration.status !== "NOT_SENT") throw invalidState("Only a round that was never sent can be deleted.");
+      // Deleting the round would cascade-delete its activities and detach its files (SetNull), and undo only recreates
+      // the round row — so a round with persisted work is never deleted.
+      if (iteration._count.activities + iteration._count.deliverables > 0) throw conflict("ITERATION_HAS_ATTACHED_WORK", "This round has files or notes attached. Remove them first, then delete the round."); const snapshot = { iteration: iterationUndo(iteration) }; await tx.sfRevision.delete({ where: { id: iteration.id } }); await recordEvent(tx, input, phase, null, "NOT_SENT", "DELETED", { deletedIteration: snapshot }); await audit(tx, input.actor, "iteration-deleted", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async setPhaseNote(input: PhaseCommandInput & { note: string | null }) {
       return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const note = input.note === null ? null : requiredText(input.note, "PHASE_NOTE_REQUIRED", "Note", 2000); if (phase.note === note) return { phaseId: phase.id }; await tx.sfPhase.update({ where: { id: phase.id }, data: { note } }); await recordEvent(tx, input, phase, null, phase.note, note ?? "", { phaseNoteBefore: phase.note }); await audit(tx, input.actor, "note-set", phase, phase.status as PhaseStatus, phase.status as PhaseStatus); return { phaseId: phase.id }; });
@@ -941,11 +949,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const older = await tx.sfDeliverable.findMany({ where: { phase_id: input.phaseId, slot_key: created.slot_key, is_final: false }, orderBy: [{ created_at: "desc" }, { id: "desc" }], skip: 2, select: { id: true, storage_key: true } });
         if (older.length) await tx.sfDeliverable.deleteMany({ where: { id: { in: older.map((row) => row.id) } } });
         await writeAudit(ports, tx, { action: "studioflow.deliverable.uploaded", entityType: "deliverable", entityId: created.id, actor: input.actor, metadata: { projectId: input.projectId, phaseId: input.phaseId, name, bytes: stored.bytes, declaredBytes, pruned: older.length } });
-        return older;
+        return enqueueUnreferencedCleanup(tx, older.map((row) => row.storage_key));
       });
-      for (const row of pruned) await ports.storage.remove(row.storage_key).catch(() => console.warn("StudioFlow deliverable cleanup failed."));
+      await discardObjects(db, ports.storage, pruned);
     } catch (error) {
-      await ports.storage.remove(key).catch(() => undefined);
+      // No row ever committed for this key; a failed removal is still recorded for retry.
+      await discardObjects(db, ports.storage, [key]);
       throw error;
     }
     return { phaseId: input.phaseId };
@@ -1068,9 +1077,9 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           await tx.sfDeliverable.delete({ where: { id: d.id } });
           await writeAudit(ports, tx, { action: "studioflow.deliverable.expiry-deleted", entityType: "deliverable", entityId: d.id, actor: { kind: "SYSTEM", label: "deliverable-expiry-sweep" }, metadata: { projectId: d.project_id, phaseId: d.phase_id, name: d.name } });
         }
-        return rows;
+        return { count: rows.length, keys: await enqueueUnreferencedCleanup(tx, rows.map((d) => d.storage_key)) };
       });
-      for (const d of expired) await ports.storage.remove(d.storage_key).catch(() => console.warn("StudioFlow deliverable cleanup failed."));
+      await discardObjects(db, ports.storage, expired.keys);
       const warningUntil = new Date(now.getTime() + DELIVERABLE_WARNING_DAYS * 86_400_000);
       const warnings = await runTransaction(async (tx) => {
         const rows = await tx.sfDeliverable.findMany({ where: { is_final: false, expires_at: { gte: now, lte: warningUntil }, expiry_warned_at: null, created_by_id: { not: null } }, orderBy: [{ expires_at: "asc" }, { id: "asc" }], take: DELIVERABLE_SWEEP_BATCH, include: { phase: { select: { name_snapshot: true } }, project: { select: { name: true } } } });
@@ -1080,21 +1089,21 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         }
         return rows.length;
       });
-      return { deleted: expired.length, warned: warnings };
+      return { deleted: expired.count, warned: warnings };
     },
 
     async deleteDeliverable(input: CommandContext & { projectId: string; deliverableId: string }) {
 
       requireCommand(input, P.projectManage);
-      const key = await runTransaction(async (tx) => {
+      const keys = await runTransaction(async (tx) => {
         const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId }, select: { id: true, project_id: true, phase_id: true, storage_key: true } });
         if (!d || d.project_id !== input.projectId) throw notFound("deliverable");
         await loadWritableProject(tx, input.projectId);
         await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: d.phase_id, kind: "content" });
         await tx.sfDeliverable.delete({ where: { id: d.id } });
-        return d.storage_key;
+        return enqueueUnreferencedCleanup(tx, [d.storage_key]);
       });
-      await ports.storage.remove(key).catch(() => undefined);
+      await discardObjects(db, ports.storage, keys);
       return { deliverableId: input.deliverableId };
     },
   };

@@ -6,7 +6,10 @@ import { usePathname } from "next/navigation";
 import { Popover } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 
+import { NavGroup, NavItem } from "@/platform/ui_engine";
+
 import { AppIcon } from "./app-icons";
+import { isPlatformAreaPath } from "./shell-rules";
 
 export type ShellAppLink = { appId: string; name: string; rootPath: string; icon?: string };
 
@@ -109,12 +112,27 @@ export function HeaderApplicationNavigation({ apps }: { apps: readonly ShellAppL
   );
 }
 
-export function AuthenticatedPlatformNavigation({ domainNavigation }: {
+export function AuthenticatedPlatformNavigation({ domainNavigation, apps = [] }: {
   domainNavigation?: React.ReactNode;
+  apps?: readonly ShellAppLink[];
 }) {
   return (
     <div className="grid gap-1 max-[840px]:contents">
+      <PlatformAreaNavigation apps={apps} />
       {domainNavigation}
     </div>
+  );
+}
+
+/** On Platform settings and My preferences the rail lists the person's apps, so every app is one click back. */
+function PlatformAreaNavigation({ apps }: { apps: readonly ShellAppLink[] }) {
+  const pathname = usePathname();
+  if (!isPlatformAreaPath(pathname) || apps.length === 0) return null;
+  return (
+    <NavGroup label="Applications" heading="Apps">
+      {apps.map((app) => (
+        <NavItem key={app.appId} href={app.rootPath} icon={<AppIcon icon={app.icon} />} active={false} prefetch={false}>{app.name}</NavItem>
+      ))}
+    </NavGroup>
   );
 }

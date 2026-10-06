@@ -30,8 +30,8 @@ export async function updateGeneralSettingsAction(
       timezone: String(formData.get("timezone") ?? ""),
       currency: String(formData.get("currency") ?? ""),
       weekStartsOn: Number(formData.get("weekStartsOn") ?? "1"),
-      // Theme is global, typed, and submitted from the read-only Appearance
-      // surface; a tampered or missing value is rejected by the union.
+      // Organisation default theme (system | light | dark); a tampered or
+      // missing value is rejected by the union. Each person's own choice wins.
       theme: String(formData.get("theme") ?? ""),
       // The browser never supplies a durable storage key or a signed URL.
       brandMarkUrl: null,

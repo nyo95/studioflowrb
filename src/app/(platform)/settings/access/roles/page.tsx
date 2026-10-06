@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import { ErrorState, PageHeader, PageShell, SectionCard, SettingsShell } from "@/platform/ui_engine";
+import { Breadcrumb, ErrorState, PageHeader, PageShell, SectionCard, SettingsShell } from "@/platform/ui_engine";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasAllPermissions } from "@platform/core/rbac";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
@@ -8,7 +8,8 @@ import { toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors
 import { platformAccess } from "@platform/runtime";
 import { listGrantIntegrityIssues } from "@platform/core/rbac/services";
 import { prisma } from "@platform/core/db";
-import { SettingsNavigation } from "../../settings-navigation";
+import { SettingsSectionNav } from "../../settings-navigation";
+import { platformSettingsGroups } from "../../settings-sections";
 import { groupPermissionsByApp } from "./permission-grouping";
 import { RolesDirectory } from "./roles-directory";
 
@@ -22,7 +23,7 @@ export default async function RolesPage() {
   if (!hasAllPermissions(grants, ["platform.role.read"])) {
     return (
       <PageShell>
-        <PageHeader eyebrow="Settings · Access" title="Roles & Access" divider />
+        <PageHeader context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "Platform settings", href: "/settings" }, { label: "Roles & Access" }]} />} title="Roles & Access" divider />
         <SectionCard>
           <ErrorState title="Access denied" description="You do not have permission to view roles." />
         </SectionCard>
@@ -45,12 +46,12 @@ export default async function RolesPage() {
   return (
     <PageShell fill>
       <PageHeader
-        eyebrow="Settings · Access"
+        context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "Platform settings", href: "/settings" }, { label: "Roles & Access" }]} />}
         title="Roles & Access"
         description="Roles compose the registered permissions their members hold."
         divider
       />
-      <SettingsShell fill navigation={<SettingsNavigation grants={grants} active="roles" />}>
+      <SettingsShell fill navigation={<SettingsSectionNav groups={platformSettingsGroups(grants)} active="roles" />}>
         {failure || !directory || !integrityIssues ? (
           <SectionCard>
             <ErrorState title="Unable to load roles" description={failure?.safeMessage ?? "The role directory is unavailable."} />

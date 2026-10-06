@@ -74,7 +74,7 @@ export async function revokeSessionAction(sessionId: string): Promise<ActionResu
 }
 
 const PreferenceInput = z.strictObject({
-  theme: z.enum(["SYSTEM", "LIGHT", "DARK"]).nullable().optional(),
+  theme: z.enum(["system", "light", "dark"]).nullable().optional(),
   locale: z.string().max(80).nullable().optional(),
   timezone: z.string().max(120).nullable().optional(),
   startPage: z.string().max(300).nullable().optional(),

@@ -9,8 +9,8 @@ import {
 } from "@/apps/studioflow/domain/retention";
 import { Button, ConfirmDialog, Dialog, Field, FormActions, Input, Notice, SectionCard, Text } from "@/platform/ui_engine";
 
-import { getAssetCleanupPreviewAction, runAssetCleanupAction, setArchiveRetentionAction } from "../actions";
-import { useCommand } from "../_components/use-command";
+import { getAssetCleanupPreviewAction, runAssetCleanupAction, setArchiveRetentionAction } from "../../actions";
+import { useCommand } from "../../_components/use-command";
 
 /** Most projects one manual cleanup handles; the action accepts 1 to 100. */
 const MANUAL_CLEANUP_LIMIT = 100;

@@ -4,13 +4,22 @@ export function isApplicationPath(pathname: string, appRootPaths: readonly strin
   return appRootPaths.some((rootPath) => pathname === rootPath || pathname.startsWith(`${rootPath}/`));
 }
 
+/** Platform settings and My preferences: not an app, but they keep the same rail so every settings page looks alike. */
+export const PLATFORM_AREA_ROOTS = ["/settings", "/account"] as const;
+
+export function isPlatformAreaPath(pathname: string): boolean {
+  return PLATFORM_AREA_ROOTS.some((rootPath) => pathname === rootPath || pathname.startsWith(`${rootPath}/`));
+}
+
+/** Where the rail shows: inside an app, and on the platform settings/preferences area. The launcher (`/`) has none. */
+export function isRailPath(pathname: string, appRootPaths: readonly string[]): boolean {
+  return isApplicationPath(pathname, appRootPaths) || isPlatformAreaPath(pathname);
+}
+
 /**
- * One flag for the account menu's single "Settings" entry — General
- * Settings, Users, and Roles & Access all live inside the same settings
- * canvas now (one sidebar, `SettingsShell`), so the menu only needs to know
- * whether the principal can read into that canvas at all, not which
- * individual destination. Per-destination gating still happens on each
- * settings page itself.
+ * The account menu's and rail footer's single "Platform settings" entry (General, Users, Roles & Access).
+ * It shows for any platform-settings read permission; `/settings` then opens the first page the person may
+ * use. App settings are not reached from here: each app has its own Settings entry in its rail.
  */
 export function getSettingsMenuVisibility(grants: readonly string[]) {
   const showSettings = hasPermission(grants, "platform.settings.read")

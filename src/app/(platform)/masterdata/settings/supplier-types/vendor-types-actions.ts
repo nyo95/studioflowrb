@@ -9,7 +9,7 @@ import { hasPermission } from "@platform/core/rbac";
 import { masterDataService } from "@/apps/masterdata/runtime";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 
-function refresh() { revalidatePath("/settings/general/masterdata"); revalidatePath("/masterdata/vendors"); }
+function refresh() { revalidatePath("/masterdata/settings", "layout"); revalidatePath("/masterdata/vendors"); }
 function actor(principal: { userId: string; displayName: string }) { return { kind: "USER" as const, userId: principal.userId, label: principal.displayName }; }
 const formSchema = z.object({ code: z.string().min(1).max(32), name: z.string().min(1).max(64), material: z.boolean(), labor: z.boolean() });
 const idSchema = z.string().uuid();

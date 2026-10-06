@@ -177,10 +177,36 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     assert.equal(notReady.openReminders, 1);
     assert.equal(notReady.ready, false);
     await rejectsWith(sf.phases.markProjectCompleted({ ...as(designer, ALL.filter((grant) => grant !== P.projectManage)), projectId }), "PROJECT_COMPLETION_NOT_READY");
-    await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED" }), "PROJECT_COMPLETION_OVERRIDE_REASON_REQUIRED");
-    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED", overrideReason: "Client accepted the remaining close-out item." });
-    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.project.status-changed", entity_id: projectId } });
+    await rejectsWith(sf.phases.markProjectCompleted({ ...as(designer), projectId }), "PROJECT_COMPLETION_OVERRIDE_REASON_REQUIRED");
+    await sf.phases.markProjectCompleted({ ...as(designer), projectId, overrideReason: "Client accepted the remaining close-out item." });
+    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.project.completed", entity_id: projectId } });
     assert.equal((audit.metadata as { completionOverrideReason?: string }).completionOverrideReason, "Client accepted the remaining close-out item.");
+  });
+
+  it("keeps completion and reopening out of the generic status command", async () => {
+    const { projectId } = await newProject("Generic status boundary");
+    const status = async () => (await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } })).status;
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
+    assert.equal(await status(), "ON_HOLD");
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ACTIVE" });
+    assert.equal(await status(), "ACTIVE");
+    // A caller outside the typed surface (API, AI, another UI) still cannot complete through it.
+    await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED" as "ACTIVE" }), "PROJECT_STATUS_USE_COMPLETION_FLOW");
+    assert.equal(await status(), "ACTIVE");
+
+    await testDb.prisma.sfPhase.updateMany({ where: { project_id: projectId }, data: { status: "DONE", is_locked: true } });
+    await sf.phases.markProjectCompleted({ ...as(designer), projectId });
+    assert.equal(await status(), "COMPLETED");
+    await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ACTIVE" }), "PROJECT_COMPLETED");
+    await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" }), "PROJECT_COMPLETED");
+    assert.equal(await status(), "COMPLETED");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.project.status-changed", entity_id: projectId, changes: { path: ["status", "to"], equals: "COMPLETED" } } }), 0);
+
+    await sf.phases.reopenProject({ ...as(designer), projectId });
+    assert.equal(await status(), "ACTIVE");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.project.reopened", entity_id: projectId } }), 1);
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
+    assert.equal(await status(), "ON_HOLD");
   });
 
   it("lets open requirements stay as reminders: only unfinished phases block completion", async () => {
@@ -279,6 +305,59 @@ describe("WO-SF-PHASE-MENU-01 skip lifecycle", () => {
     await sf.phases.addIteration({ ...as(designer), projectId, phaseId: phase.id });
     assert.equal((await openIteration(phase.id)).status, "NOT_SENT");
     await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: phase.id }), "PHASE_INVALID_STATE");
+  });
+
+  it("refuses to delete a never-sent round that holds files or activities, and leaves them intact", async () => {
+    const { projectId } = await newProject("Round with attached work");
+    const phase = await phaseOf(projectId, "moodboard");
+    const open = await openIteration(phase.id);
+    const file = await testDb.prisma.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: open.id, name: "Moodboard v1", storage_key: "studioflow/deliverables/attached.pdf" } });
+    await rejectsWith(sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id }), "ITERATION_HAS_ATTACHED_WORK");
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: open.id } })).status, "NOT_SENT");
+    const kept = await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { id: file.id } });
+    assert.equal(kept.revision_id, open.id);
+    assert.equal(kept.storage_key, "studioflow/deliverables/attached.pdf");
+
+    await testDb.prisma.sfDeliverable.delete({ where: { id: file.id } });
+    const activity = await testDb.prisma.sfActivity.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: open.id, content: "Client asked for warmer tones" } });
+    await rejectsWith(sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id }), "ITERATION_HAS_ATTACHED_WORK");
+    assert.equal((await testDb.prisma.sfActivity.findUniqueOrThrow({ where: { id: activity.id } })).revision_id, open.id);
+
+    await testDb.prisma.sfActivity.delete({ where: { id: activity.id } });
+    await sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id });
+    assert.equal(await testDb.prisma.sfRevision.count({ where: { id: open.id } }), 0);
+  });
+
+  it("undoes the deletion of an empty never-sent round back to the identical round", async () => {
+    const { projectId } = await newProject("Undo empty round delete");
+    const phase = await phaseOf(projectId, "moodboard");
+    const open = await openIteration(phase.id);
+    await sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id });
+    await sf.phases.undoPhaseEvent({ ...as(designer), projectId, eventId: (await latestPhaseEvent(projectId)).id });
+    const restored = await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: open.id } });
+    assert.deepEqual(
+      { phase: restored.phase_id, major: restored.major, name: restored.name, status: restored.status, note: restored.note },
+      { phase: open.phase_id, major: open.major, name: open.name, status: "NOT_SENT", note: open.note },
+    );
+    await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: phase.id }), "PHASE_INVALID_STATE");
+  });
+
+  it("keeps a never-sent round with an activity as closed history when its phase is skipped", async () => {
+    const { projectId } = await newProject("Skip round with activity");
+    const phase = await phaseOf(projectId, "moodboard");
+    const open = await openIteration(phase.id);
+    const activity = await testDb.prisma.sfActivity.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: open.id, content: "Keep me" } });
+    await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: phase.id, reason: "Client supplied the concept" });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: open.id } })).status, "DONE");
+    assert.equal((await testDb.prisma.sfActivity.findUniqueOrThrow({ where: { id: activity.id } })).revision_id, open.id);
+
+    const filed = await newProject("Skip round with file");
+    const filedPhase = await phaseOf(filed.projectId, "moodboard");
+    const filedRound = await openIteration(filedPhase.id);
+    const file = await testDb.prisma.sfDeliverable.create({ data: { project_id: filed.projectId, phase_id: filedPhase.id, revision_id: filedRound.id, name: "Concept", storage_key: "studioflow/deliverables/concept.pdf" } });
+    await sf.phases.bypassPhase({ ...as(designer), projectId: filed.projectId, phaseId: filedPhase.id, reason: "Client supplied the concept" });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: filedRound.id } })).status, "DONE");
+    assert.equal((await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { id: file.id } })).revision_id, filedRound.id);
   });
 
   it("refuses to skip a phase that is already done", async () => {
@@ -1916,6 +1995,79 @@ describe("Deliverable reference revision", () => {
     await testDb.prisma.sfDeliverable.update({ where: { id: row.id }, data: { expires_at: new Date(clock.getTime() - 1) } });
     assert.equal((await sf.phases.sweepDeliverableExpiry()).deleted, 1);
     assert.equal(storage.objects.has(row.storage_key), false);
+  });
+
+  describe("every deliverable/MOM blob delete is tracked until it really happens (WO-SF-SAFE-03)", () => {
+    const ledger = (key: string) => testDb.prisma.sfAssetCleanupFailure.findUnique({ where: { storage_key: key } });
+    async function uploaded(name: string) {
+      const { projectId } = await newProject(name);
+      const phase = await phaseOf(projectId, "moodboard");
+      await sf.phases.uploadDeliverable({ ...as(designer), projectId, phaseId: phase.id, name: `${name}.pdf`, file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
+      return { projectId, phase, row: await testDb.prisma.sfDeliverable.findFirstOrThrow({ where: { phase_id: phase.id } }) };
+    }
+    function failingRemoves() {
+      return mock.method(storage, "remove", async () => { throw new Error("disk unavailable"); });
+    }
+    function retry() {
+      return import("./asset-cleanup").then(({ retryFailedAssetCleanup }) => retryFailedAssetCleanup(testDb.prisma, storage));
+    }
+
+    it("manual delete: success removes the blob and leaves the ledger entry resolved", async () => {
+      const { projectId, row } = await uploaded("Delete ok");
+      await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id });
+      assert.equal(storage.objects.has(row.storage_key), false);
+      assert.ok((await ledger(row.storage_key))?.resolved_at instanceof Date);
+    });
+
+    it("manual delete: a storage failure keeps the key pending, and a later retry resolves it", async () => {
+      const { projectId, row } = await uploaded("Delete fails");
+      const failing = failingRemoves();
+      try { await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id }); } finally { failing.mock.restore(); }
+      assert.equal(await testDb.prisma.sfDeliverable.count({ where: { id: row.id } }), 0, "the row is gone");
+      assert.equal(storage.objects.has(row.storage_key), true, "the blob is still there");
+      const pending = await ledger(row.storage_key);
+      assert.equal(pending?.resolved_at, null);
+      assert.equal(pending?.attempts, 1);
+      const result = await retry();
+      assert.equal(result.resolved >= 1, true);
+      assert.equal(storage.objects.has(row.storage_key), false);
+      assert.ok((await ledger(row.storage_key))?.resolved_at instanceof Date);
+    });
+
+    it("expiry sweep follows the same rule", async () => {
+      const { row } = await uploaded("Expiry fails");
+      await testDb.prisma.sfDeliverable.update({ where: { id: row.id }, data: { expires_at: new Date(clock.getTime() - 1) } });
+      const failing = failingRemoves();
+      let swept;
+      try { swept = await sf.phases.sweepDeliverableExpiry(); } finally { failing.mock.restore(); }
+      assert.equal(swept.deleted, 1);
+      assert.equal((await ledger(row.storage_key))?.resolved_at, null);
+      await retry();
+      assert.equal(storage.objects.has(row.storage_key), false);
+    });
+
+    it("never removes a key another row still points at", async () => {
+      const { projectId, phase, row } = await uploaded("Shared key");
+      const twin = await testDb.prisma.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, name: "Twin", storage_key: row.storage_key } });
+      await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id });
+      assert.equal(storage.objects.has(row.storage_key), true);
+      assert.equal(await ledger(row.storage_key), null, "a still-referenced key is never enqueued");
+      await testDb.prisma.sfDeliverable.delete({ where: { id: twin.id } });
+    });
+
+    it("MOM image delete records a storage failure for retry", async () => {
+      const { projectId } = await newProject("MOM image failure");
+      const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Site visit" });
+      const item = await testDb.prisma.sfMomItem.findFirstOrThrow({ where: { document_id: documentId } });
+      const key = `${projectId}/mom-image`;
+      await storage.put({ key, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
+      const image = await testDb.prisma.sfMomImage.create({ data: { item_id: item.id, slot: 0, storage_key: key, content_type: "image/png", bytes: 1 } });
+      const failing = failingRemoves();
+      try { await sf.mom.deleteImage({ ...as(designer), projectId, imageId: image.id }); } finally { failing.mock.restore(); }
+      assert.equal((await ledger(key))?.resolved_at, null);
+      await retry();
+      assert.equal(storage.objects.has(key), false);
+    });
   });
 });
 

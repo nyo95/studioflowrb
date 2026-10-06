@@ -5,7 +5,7 @@ import { describe, it } from "node:test";
 const scheduleBoard = readFileSync("src/app/(platform)/studioflow/projects/[projectId]/schedule/schedule-board.tsx", "utf8");
 const serviceTs = readFileSync("src/apps/studioflow/schedule/service.ts", "utf8");
 const actionsTs = readFileSync("src/app/(platform)/studioflow/actions.ts", "utf8");
-const settingsView = readFileSync("src/app/(platform)/studioflow/schedule-templates/schedule-templates-view.tsx", "utf8");
+const settingsView = readFileSync("src/app/(platform)/studioflow/settings/schedule/schedule-templates-view.tsx", "utf8");
 const scheduleDomain = readFileSync("src/apps/studioflow/domain/schedule.ts", "utf8");
 
 describe("WO-SF-SCHED-RELAYOUT-01 board structure", () => {

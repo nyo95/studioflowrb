@@ -37,15 +37,18 @@ export function StudioFlowNav({ waitingOnYou = 0 }: { waitingOnYou?: number }) {
   );
 }
 
-export function StudioFlowUtilityNav() {
+/** `canOpenSettings`: the Settings entry shows only to people who may open at least one StudioFlow settings page. */
+export function StudioFlowUtilityNav({ canOpenSettings = false }: { canOpenSettings?: boolean }) {
   const pathname = usePathname();
   if (!pathname.startsWith("/studioflow")) return null;
+  const links = STUDIOFLOW_NAV_LINKS.utility.filter((link) => link.href !== "/studioflow/settings" || canOpenSettings);
+  if (links.length === 0) return null;
   return (
     <UtilitySection>
-      {STUDIOFLOW_NAV_LINKS.utility.map(({ href, label, exact }) => {
+      {links.map(({ href, label, exact }) => {
         const Icon = ICONS[href] ?? Settings;
         return (
-          <NavItem key={href} href={href} icon={<Icon size={16} />} active={isActive(pathname, href, exact) || (href === "/studioflow/settings" && isActive(pathname, "/studioflow/schedule-templates"))} prefetch={false}>
+          <NavItem key={href} href={href} icon={<Icon size={16} />} active={isActive(pathname, href, exact)} prefetch={false}>
             {label}
           </NavItem>
         );

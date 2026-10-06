@@ -213,11 +213,12 @@ export async function setProjectPriorityAction(projectId: string, priority: stri
   });
 }
 
-export async function setProjectStatusAction(projectId: string, status: string, overrideReason?: string): Promise<ActionResult<unknown>> {
+/** Active ↔ On hold only; completing and reopening have their own actions. */
+export async function setProjectStatusAction(projectId: string, status: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();
     const id = parse(Id, projectId);
-    const result = await studioFlow.projects.setProjectStatus({ ...ctx, projectId: id, status: parse(z.enum(["ACTIVE", "ON_HOLD", "COMPLETED"]), status), overrideReason });
+    const result = await studioFlow.projects.setProjectStatus({ ...ctx, projectId: id, status: parse(z.enum(["ACTIVE", "ON_HOLD"]), status) });
     refresh(id);
     return result;
   });

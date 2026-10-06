@@ -14,6 +14,9 @@
   --ui-surface:         #FFFFFF;  /* content: cards, tables, toolbars, rail    */
   --ui-surface-raised:  #FAFAF9;  /* inset: table headers, code, muted input   */
   --ui-surface-muted:   #F0EFED;  /* hover, selected, disabled, icon chips     */
+  /* LogoFrame: a hairline on a logo's own outline so white logos read on light plates (and black ones on
+     dark). It never recolours the logo, it only edges it; the colour flips with the theme.               */
+  --ui-logo-halo:       drop-shadow(0 0 0.6px rgb(0 0 0 / .32)) drop-shadow(0 0 0.6px rgb(0 0 0 / .18));
   --ui-rail:            #FFFFFF;  /* navigation rail: a white plane            */
   --ui-rail-soft:       #F0EFED;  /* softer rail accent                        */
 
@@ -182,15 +185,20 @@
    DARK THEME
    Both blocks (media query + explicit stamp) so the toggle overrides in
    either direction. Every token defined in :root is redefined here.
+   Who decides (owner, 2026-10-06): the person's own theme preference,
+   stamped on <html data-theme> by the root layout; no attribute = follow
+   the device. Paper stays light: printing (screen-only blocks) and any page
+   showing a DocumentSheet (`:has(.ui-document)`) always use the light set.
 ═══════════════════════════════════════════════════════════════════════════ */
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not(:has(.ui-document)) {
     color-scheme: dark;
     --ui-canvas:          #131211;
     --ui-surface:         #1C1A18;
     --ui-surface-raised:  #232120;
     --ui-surface-muted:   #2A2825;
+    --ui-logo-halo:       drop-shadow(0 0 0.6px rgb(255 255 255 / .38)) drop-shadow(0 0 0.6px rgb(255 255 255 / .22));
     --ui-rail:            #1C1A18;
     --ui-rail-soft:       #201E1C;
     --ui-border-subtle:   #272422;
@@ -231,47 +239,50 @@
   }
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --ui-canvas:          #131211;
-  --ui-surface:         #1C1A18;
-  --ui-surface-raised:  #232120;
-  --ui-surface-muted:   #2A2825;
-  --ui-rail:            #1C1A18;
-  --ui-rail-soft:       #201E1C;
-  --ui-border-subtle:   #272422;
-  --ui-border-default:  #332F2B;
-  --ui-border-strong:   #4D4740;
-  --ui-border-focus:    #F3F1EE;
-  --ui-text-primary:    #F3F1EE;
-  --ui-text-secondary:  #A39C94;
-  --ui-text-tertiary:   #8A837A;
-  --ui-text-inverse:    #1C1A18;
-  --ui-action-primary:       #F0EDE9;
-  --ui-action-primary-hover: #DED9D3;
-  --ui-action-ink:           #17150F;
-  --ui-sel-wash: color-mix(in srgb, var(--ui-text-primary) 8%, var(--ui-surface));
-  --ui-sel-line: var(--ui-border-strong);
-  --ui-danger-fg:       #E07068;
-  --ui-danger-bg:       #200F0F;
-  --ui-danger-border:   #7F1D1D;
-  --ui-success-fg:      #5DB87A;
-  --ui-success-bg:      #0C1E15;
-  --ui-success-border:  #065F46;
-  --ui-warning-fg:      #D4975A;
-  --ui-warning-bg:      #1E1800;
-  --ui-warning-border:  #78350F;
-  --ph-mood:       #827B72;  /* L* 52.0 */
-  --ph-layout:     #9B9287;  /* L* 61.0 */
-  --ph-3d:         #B4AA9D;  /* L* 70.1 */
-  --ph-cd:         #CDC2B4;  /* L* 79.0 */
-  --ph-sup:        #E8DBCB;  /* L* 88.0 */
-  --ui-mark:            var(--ph-mood);
-  --ui-table-header-bg: var(--ui-surface-raised);
-  --ui-table-header-fg: var(--ui-text-secondary);
-  --ui-shadow-plane:    0 0 0 1px var(--ui-border-subtle);
-  --ui-shadow-raise:    0 0 0 1px var(--ui-border-default), 0 4px 14px rgb(0 0 0 / .45);
+@media screen {
+  :root[data-theme="dark"]:not(:has(.ui-document)) {
+    color-scheme: dark;
+    --ui-canvas:          #131211;
+    --ui-surface:         #1C1A18;
+    --ui-surface-raised:  #232120;
+    --ui-surface-muted:   #2A2825;
+    --ui-logo-halo:       drop-shadow(0 0 0.6px rgb(255 255 255 / .38)) drop-shadow(0 0 0.6px rgb(255 255 255 / .22));
+    --ui-rail:            #1C1A18;
+    --ui-rail-soft:       #201E1C;
+    --ui-border-subtle:   #272422;
+    --ui-border-default:  #332F2B;
+    --ui-border-strong:   #4D4740;
+    --ui-border-focus:    #F3F1EE;
+    --ui-text-primary:    #F3F1EE;
+    --ui-text-secondary:  #A39C94;
+    --ui-text-tertiary:   #8A837A;
+    --ui-text-inverse:    #1C1A18;
+    --ui-action-primary:       #F0EDE9;
+    --ui-action-primary-hover: #DED9D3;
+    --ui-action-ink:           #17150F;
+    --ui-sel-wash: color-mix(in srgb, var(--ui-text-primary) 8%, var(--ui-surface));
+    --ui-sel-line: var(--ui-border-strong);
+    --ui-danger-fg:       #E07068;
+    --ui-danger-bg:       #200F0F;
+    --ui-danger-border:   #7F1D1D;
+    --ui-success-fg:      #5DB87A;
+    --ui-success-bg:      #0C1E15;
+    --ui-success-border:  #065F46;
+    --ui-warning-fg:      #D4975A;
+    --ui-warning-bg:      #1E1800;
+    --ui-warning-border:  #78350F;
+    --ph-mood:       #827B72;  /* L* 52.0 */
+    --ph-layout:     #9B9287;  /* L* 61.0 */
+    --ph-3d:         #B4AA9D;  /* L* 70.1 */
+    --ph-cd:         #CDC2B4;  /* L* 79.0 */
+    --ph-sup:        #E8DBCB;  /* L* 88.0 */
+    --ui-mark:            var(--ph-mood);
+    --ui-table-header-bg: var(--ui-surface-raised);
+    --ui-table-header-fg: var(--ui-text-secondary);
+    --ui-shadow-plane:    0 0 0 1px var(--ui-border-subtle);
+    --ui-shadow-raise:    0 0 0 1px var(--ui-border-default), 0 4px 14px rgb(0 0 0 / .45);
     --ui-shadow-float:    0 0 0 1px var(--ui-border-default), 0 8px 24px rgb(0 0 0 / .45);
-  --ui-shadow-over:     0 0 0 .5px rgb(255 255 255 / .10), 0 22px 50px rgb(0 0 0 / .60), 0 4px 12px rgb(0 0 0 / .35);
-  --ui-shadow-elevated: var(--ui-shadow-over);
+    --ui-shadow-over:     0 0 0 .5px rgb(255 255 255 / .10), 0 22px 50px rgb(0 0 0 / .60), 0 4px 12px rgb(0 0 0 / .35);
+    --ui-shadow-elevated: var(--ui-shadow-over);
+  }
 }

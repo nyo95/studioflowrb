@@ -14,7 +14,7 @@ const PromotionSchema = z.object({
 });
 
 function refresh(): void {
-  revalidatePath("/settings/general/masterdata");
+  revalidatePath("/masterdata/settings", "layout");
   revalidatePath("/bq/library");
   revalidatePath("/masterdata");
 }

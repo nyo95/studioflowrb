@@ -18,22 +18,16 @@ import type { ActionResult } from "@platform/core/actions";
 import type { PlatformGeneralSettings } from "@platform/core/settings";
 import { PLATFORM_APPEARANCE_THEMES, type PlatformTheme } from "@platform/core/settings/appearance";
 import { updateGeneralSettingsAction } from "./actions";
+import { TIMEZONE_CHOICES } from "../display-options";
 
 const INITIAL: ActionResult<{ changed: boolean }> | null = null;
 
-const TIMEZONES = [
-  "Asia/Jakarta",
-  "Asia/Makassar",
-  "Asia/Jayapura",
-  "Asia/Singapore",
-  "Asia/Tokyo",
-  "UTC",
-  "Europe/London",
-  "America/New_York",
-];
+const TIMEZONES: readonly string[] = TIMEZONE_CHOICES;
 
 const THEME_LABELS: Record<PlatformTheme, string> = {
+  system: "Follow each device (System)",
   light: "Light",
+  dark: "Dark",
 };
 
 export function GeneralSettingsForm({
@@ -51,7 +45,6 @@ export function GeneralSettingsForm({
 
   return (
     <form action={action}>
-      <input type="hidden" name="theme" value={settings.theme} />
       <div className="grid gap-5">
         <SectionCard title="General" description="Shared display defaults for every application.">
           <div className="grid gap-4 md:grid-cols-2">
@@ -126,8 +119,8 @@ export function GeneralSettingsForm({
                 {settings.brandMarkUrl ? <label className="mt-2 flex items-center gap-2 text-sm"><input name="removeBrandMark" type="checkbox" disabled={disabled} /> Remove the current Brand mark</label> : null}
               </div>
             </Field>
-            <Field id="settings-theme" label="Theme" description="The canonical light theme is the only approved global appearance variant; changing it is a future approved-variant decision.">
-              <Select id="settings-theme" value={settings.theme} disabled>
+            <Field id="settings-theme" label="Default theme" description="Only for people who have not picked their own theme in My preferences. Each person's own choice always wins.">
+              <Select id="settings-theme" name="theme" defaultValue={settings.theme} disabled={disabled}>
                 {PLATFORM_APPEARANCE_THEMES.map((theme) => (
                   <option key={theme} value={theme}>
                     {THEME_LABELS[theme]}

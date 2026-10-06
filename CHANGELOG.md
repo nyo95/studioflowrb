@@ -1,5 +1,71 @@
 # Changelog
 
+## R8.374 | 2026-10-06 | feat(platform): per-person Light/Dark/System theme and the shared LogoFrame — WO-THEME-01
+
+- Owner (2026-10-06): dark mode is an approved UI mode, chosen per person; read-only Master Data roles stay out of Settings (confirmed); merge to `main` after this work.
+- **Finding.** Nothing stamped `data-theme` before this change, so the tokens' `prefers-color-scheme` block already turned the app dark for anyone whose device was dark, while the contract said light-only. The organisation default therefore migrates from the never-applied `light` to `system`, which preserves what people actually saw.
+- **Ownership** (`core/settings/appearance.ts`): `UserPreference.theme` (`system` | `light` | `dark`, null = not chosen) is the active choice; `PlatformGeneralSettings.theme` is only the organisation default for people who have not chosen (General Settings: "Default theme"). Resolution: own choice → organisation default → `system`. Business services never see the theme.
+- **Application.** The root layout reads the theme once per request (memoised principal read shared with the platform layout) and stamps `<html data-theme="light|dark">`; `system` stamps nothing and the tokens follow the device. No flash: the attribute is in the first HTML. A database failure falls back to following the device.
+- **My preferences → Appearance:** System / Light / Dark, applied to the open page immediately and saved without a Save button (reverts with a message if saving fails).
+- **Paper stays light.** Both dark token blocks are screen-only and skip any page showing a `DocumentSheet` (`:has(.ui-document)`), so print previews and printing never go dark.
+- **LogoFrame** (UI Engine): neutral plate, fixed aspect, `object-contain`, initials when the URL is missing or fails; never recolours a logo. White/black logos get only the themed hairline `--ui-logo-halo`. StudioFlow Library's BrandCard and BrandDetail use it (crawler untouched).
+- **Dark leaks fixed:** white text on the action colour (Master Data workbook import steps, Presentation pins) → `text-action-ink`.
+- **Schema/migration** `20261006150000_platform_user_theme`: General Settings theme CHECK widened to `system|light|dark`, default `system`, existing `light` → `system`; `user_preference.theme` normalised to lowercase (legacy `SYSTEM/LIGHT/DARK`), unknown values cleared, CHECK added.
+- Tests: `appearance.test.ts` (values, legacy spelling, resolution, stamping), preferences integration (persistence of each theme, organisation fallback, own choice wins, SQL rejects unknown), settings/schema tests moved from "light only" to the new contract (unknown still rejected), UI Engine (LogoFrame fallback/no-recolour, halo token in all three blocks, dark blocks screen-only and document-safe), `e2e/theme.spec.ts` (5 checks incl. server stamping after reload, paper stays light, Light beats a dark device, System hands back).
+- Contracts: `CORE.md` §11 and decision table, `UI_ENGINE.md` §5 Themes + LogoFrame, `DESIGN.md`, `BACKLOG.md` (start page [PLANNED]; dark visual QA on real data [UNVERIFIED]).
+
+**Checks.** `npm run typecheck`, `npm run lint` (0 errors, 2 pre-existing warnings), `check:boundaries`, `check:legacy-runtime`, full `npm test` 866/866, `npm run build` (pass), `npm run test:e2e` 91/91 (disposable cloud-container Postgres).
+
+## R8.373 | 2026-10-06 | feat(settings): settings split by owner, each with a way back — WO-SETTINGS-01
+
+- Owner (2026-10-06): "navbar ga konsisten, ga ada tombol back, akses settings bocor ke mana-mana; template terpisah, hanya untuk yang punya akses". Lead decided as product owner's delegate; the rule is in `UI_ENGINE.md` §SettingsShell.
+- **Ownership.** One pure section list per owner (`settings/settings-sections.ts` `platformSettingsGroups`, `studioflow/settings/sections.ts`, `masterdata/settings/sections.ts`) drives the sidebar, the area root redirect, the rail entry and each page's access check. `SettingsNavigation` (one sidebar listing every app) is replaced by `SettingsSectionNav` + `SettingsFrame`; no sidebar links into another owner's area.
+- **Platform settings** (`/settings` → first allowed page; General, Users, Roles & Access): the Master Data notice on General is gone; rail footer and account menu say "Platform settings" with their own icon.
+- **StudioFlow settings** split into Phase templates, Checklist templates, Schedule templates (moved from `/studioflow/schedule-templates`) and Archived files, each its own page; visible only to `studioflow.settings.manage` (Archived files also `project.manage`). The rail's Settings entry hides for everyone else.
+- **Master Data settings** moved from `/settings/general/masterdata` into the app (`/masterdata/settings/units|categories|supplier-types|deletions|bq-approvals`), keeping the Master Data rail; Settings sits in the rail's utility area like StudioFlow's. The orphan duplicate pages `/masterdata/units|categories|deletions` and every old URL redirect.
+- **My preferences** (`/account`) is personal only: no settings sidebar, new Display section (date/number format, timezone; organisation default when empty) using the existing `updateMyPreferencesAction`.
+- **Shell.** The rail now also shows on `/settings` and `/account` with an "Apps" group, so every settings page has the same chrome (`isRailPath`). `PageSection` lets its children shrink (`[&>*]:min-w-0`) so the sessions table no longer widens the page at phone width.
+- Tests: `settings-sections.test.ts` (no cross-owner links; visibility per permission), `shell-rules.test.ts` (rail paths; app permissions never show Platform settings), `e2e/settings.spec.ts` (11 checks: own sidebar, breadcrumb back, old URLs, personal page, rail entries), new routes in `e2e/screen-size.spec.ts`.
+- `schedule.regression.test.ts` reads the moved schedule-templates view.
+- `BACKLOG.md`: personal theme/start page [BLOCKED], lifecycle timers vs serverless [PLANNED P3], schedule/presentation pre-enqueue [CLEANUP].
+
+**Checks.** `npm run typecheck`, `npm run lint` (0 errors, 2 pre-existing warnings), `check:boundaries`, `check:legacy-runtime`, full `npm test` 857/857, `npm run test:e2e` 89/89 (disposable cloud-container Postgres; Chromium from the preinstalled image).
+
+## R8.372 | 2026-10-06 | fix(studioflow): every blob delete goes through the cleanup ledger — WO-SF-SAFE-03
+
+- `asset-cleanup.ts` gains `discardObjects` (removes keys already judged unreferenced; records each failure, resolves on success), `enqueueObjectCleanup` (puts keys in `SfAssetCleanupFailure` with `attempts = 0` inside the deleting transaction) and `enqueueUnreferencedCleanup` (same, after re-checking that no row still points at the key). `removeUnreferenced` now uses the shared reference check and `discardObjects`; its behaviour and result shape are unchanged.
+- Deliverable manual delete, expiry sweep and the prune of older versions enqueue the key in their transaction, then remove it after commit; a storage failure (or a crash before removal) leaves a pending ledger entry that `retryFailedAssetCleanup` (daily asset sweep) finishes. Before, these paths called `storage.remove(...).catch(...)` and a failure left an untracked file.
+- MOM's own snapshot-aware `unreferenced` check now enqueues its result in the same transaction; MOM, Presentation and Schedule upload rollbacks and the deliverable upload rollback use `discardObjects`. No bare `storage.remove` remains in StudioFlow outside `asset-cleanup.ts`.
+- Residual (recorded, not widened): Schedule/Presentation committed deletes still decide and remove after commit via `removeUnreferenced` (failure-recorded, but a process crash between commit and removal is not pre-enqueued).
+- Schema doc comment only (no migration).
+- Tests: manual delete success and failure + retry, expiry sweep failure + retry, a still-referenced key is neither removed nor enqueued, MOM image delete failure + retry, enqueue/discard unit test.
+
+**Checks.** `npm run typecheck`, `asset-cleanup.test.ts`, `asset-sweep.test.ts`, `service.integration.test.ts` 141/141.
+
+## R8.371 | 2026-10-06 | fix(studioflow): completion and reopening have one owner each — WO-SF-SAFE-02
+
+- `projects.setProjectStatus` now owns only `ACTIVE ↔ ON_HOLD` (new `PROJECT_HOLD_STATUSES`/`ProjectHoldStatus`). A COMPLETED target is refused (`PROJECT_STATUS_USE_COMPLETION_FLOW`) and a COMPLETED project is refused (`PROJECT_COMPLETED`, it no longer loads with `allowCompleted`). Before, any `projectManage` holder could complete or un-complete a project through it without the PIC check, readiness owner, or `completed`/`reopened` audit actions.
+- `setProjectStatusAction` accepts only `ACTIVE`/`ON_HOLD` and drops its unused `overrideReason` argument. The edit dialog already sent only those two.
+- No data change: stored statuses and older `status-changed` history rows stay as they are.
+- Tests: Active/On hold both ways; generic COMPLETED refused; completed project refused to Active and On hold; completion and reopen through their own commands with their audit actions; the readiness/override test now drives `markProjectCompleted`.
+
+**Checks.** `npm run typecheck`, eslint on changed files, `service.integration.test.ts` 127/127.
+
+## R8.370 | 2026-10-06 | fix(studioflow): a round holding work can no longer be deleted — WO-SF-SAFE-01
+
+- Owner (2026-10-06): Lead executes as Planner + Executor. `deleteNeverSentIteration` now refuses (`ITERATION_HAS_ATTACHED_WORK`, conflict) a never-sent round that has any activity or deliverable attached. Before, the delete cascade-removed its activities and detached its files (`onDelete: SetNull`), and undo recreated only the round row. The undo snapshot now holds only the round.
+- `bypassPhase` counts activities as well as files and note before treating the open round as empty; a round with activities is kept as closed (`DONE`) history instead of being deleted.
+- Tests: rejected delete with a file and with an activity leaves both attached; undo restores an empty deleted round exactly; skip keeps a round holding an activity or a file.
+
+**Checks.** `npm run typecheck`, eslint on changed files, `service.integration.test.ts` 126/126 (disposable cloud-container Postgres).
+
+## R8.369 | 2026-10-06 | docs(plan): StudioFlow production-safety closure — WO-SF-SAFE-01/02/03 (Lead)
+
+- Verified three reported findings against c6f1cb7: round deletion can cascade-delete activities and detach deliverables (confirmed, P0, plus `bypassPhase` ignoring activities); `setProjectStatus` can reopen/complete outside the explicit lifecycle (confirmed, P1); bare `storage.remove` paths bypass the cleanup failure ledger (confirmed, P1). Lifecycle timers are acceptable for the always-on PC runtime.
+- `PLAN.md` replaced with the three Work Orders, locked decisions, tests, and a DRAFT Settings rework (WO-SETTINGS-01) awaiting owner answers. No code changed. WO-UI-V2-03 Lead acceptance remains owed.
+
+**Checks.** Documentation only.
+
 ## R8.368 | 2026-10-06 | fix(studioflow): one name for the client's round notes
 
 - Owner (2026-10-06, Lead and Executor combined): the "Brief from Round N" box and the "Client notes" dialog showed the same text (each round has one note; the next round displays the previous one). Wording only, no data or behaviour change: the box is now "Client notes from Round N", and both notes dialogs (project page and project card) say "The client's notes for this round. They carry over to the next round."

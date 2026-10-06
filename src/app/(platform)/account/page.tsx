@@ -1,18 +1,19 @@
 import { redirect } from "next/navigation";
 
-import { SettingsNavigation } from "@/app/(platform)/settings/settings-navigation";
-
 import {
+  Breadcrumb,
   PageHeader,
   PageSection,
   PageShell,
-  SettingsShell,
 } from "@/platform/ui_engine";
+import { parseStoredTheme, PLATFORM_APPEARANCE_THEME_DEFAULT, readPlatformGeneralSettings } from "@platform/core/settings";
 import { formatInstant } from "@platform/utilities/date";
 import { listUserSessions, logoutAllSessions, requirePrincipal, requirePrincipalGrants, currentSessionId } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
 import { userPreferences } from "@platform/runtime";
 import { AccountForms } from "./account-forms";
+import { AppearancePreference } from "./appearance-preference";
+import { DisplayPreferencesForm } from "./display-preferences-form";
 import { SessionsTable } from "./sessions-table";
 
 export const dynamic = "force-dynamic";
@@ -27,27 +28,37 @@ async function logoutAllAction(): Promise<void> {
 export default async function AccountPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
-  const { principal, grants } = principalGrants;
+  const { principal } = principalGrants;
 
-  const [sessions, currentId, settings] = await Promise.all([
+  const [sessions, currentId, settings, preferences, organisation] = await Promise.all([
     listUserSessions(prisma, principal.userId),
     currentSessionId(),
     userPreferences.resolveDisplay({ userId: principal.userId }),
+    userPreferences.get({ userId: principal.userId }),
+    readPlatformGeneralSettings(prisma),
   ]);
 
   return (
     <PageShell>
       <PageHeader
-        eyebrow="My Preferences"
-        title="Account & security"
-        description="Update your profile, secure your password, and manage active sessions."
+        context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "My preferences" }]} />}
+        title="My preferences"
+        description="Your own profile, appearance, display, password and sessions. Changes here affect only you."
         divider
       />
 
-      <SettingsShell navigation={<SettingsNavigation grants={grants} active="account" />}>
       <PageSection title="Profile">
         <AccountForms displayName={principal.displayName} email={principal.email} />
       </PageSection>
+
+      <AppearancePreference theme={preferences.theme} organisationDefault={parseStoredTheme(organisation.theme) ?? PLATFORM_APPEARANCE_THEME_DEFAULT} />
+
+      <DisplayPreferencesForm
+        locale={preferences.locale}
+        timezone={preferences.timezone}
+        organisationLocale={organisation.locale}
+        organisationTimezone={organisation.timezone}
+      />
 
       <PageSection
         title="Sessions"
@@ -66,7 +77,6 @@ export default async function AccountPage() {
           onLogoutAll={logoutAllAction}
         />
       </PageSection>
-      </SettingsShell>
     </PageShell>
   );
 }
