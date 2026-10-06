@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.366 | 2026-10-06 | docs(plan): DESIGN v2 adoption in Master Data and BQ — Work Order WO-UI-V2-03
+
+- Lead review of R8.365 (WO-SF-BRAND-LOGO-01, Executor): PASS. The Library crawler now prefers JSON-LD Organization/Brand logos, then header/nav `logo` images (banners, heroes and product shots excluded), then touch icons, before social images; unsafe URLs are still refused. Full suite re-run by the Lead: 842/842. Brand images already cached in memory (24 h) refresh after the cache expires or the server restarts.
+- Owner (2026-10-06): plan the next UI/UX step for the Executor. `PLAN.md` replaced with WO-UI-V2-03: `PillTabs` gains disabled items and an actions slot and replaces page-level `Tabs` in BQ Projects, BQ Library, Master Data Pricing and Master Data Settings (panel/dialog tabs stay `Tabs`); BQ project pages get the context capsule; the Playwright checks cover those screens. Executor R8.367, Lead review R8.368.
+
+**Checks.** Documentation only (plus the R8.365 re-run above).
+
 ## R8.365 | 2026-10-06 | fix(studioflow): prefer official Brand logos in Library
 
 - Library Brand image extraction now prefers structured and marked official logo assets, then site icons; social preview images remain fallback only.
