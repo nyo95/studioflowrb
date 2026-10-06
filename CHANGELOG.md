@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.368 | 2026-10-06 | fix(studioflow): one name for the client's round notes
+
+- Owner (2026-10-06, Lead and Executor combined): the "Brief from Round N" box and the "Client notes" dialog showed the same text (each round has one note; the next round displays the previous one). Wording only, no data or behaviour change: the box is now "Client notes from Round N", and both notes dialogs (project page and project card) say "The client's notes for this round. They carry over to the next round."
+- Note: R8.368 was reserved for the Lead's review of R8.367; that review is still open and takes the next revision.
+
+**Checks.** `npm run typecheck`, `npm run lint`, full `npm test`.
+
 ## R8.367 | 2026-10-06 | feat(ui): DESIGN v2 adoption in Master Data and BQ — WO-UI-V2-03 (Executor)
 
 - `PillTabs` gains per-item `disabled`/`disabledReason` (`aria-disabled`, not clickable, reason as tooltip) and an `actions` slot at the bar's right end. New `PillTabPanels` (same file) adds in-place content switching for page views with no address of their own; one canonical wrapper instead of three private ones.
