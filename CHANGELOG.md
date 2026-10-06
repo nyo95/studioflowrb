@@ -2,6 +2,12 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.358 | 2026-10-06 | docs(plan): remaining DESIGN v2 slices — Work Order WO-UI-V2-02
+
+- Owner (2026-10-06): hand the remaining DESIGN v2 work to the Executor; the Lead reviews. `PLAN.md` replaced with WO-UI-V2-02: Part A (R8.359) adds the `PillTabs` pattern, a capsule variant of `Breadcrumb` with a `PageHeader` `context` slot, `StatCard`/`StatGrid`, adopts them in StudioFlow (project header, Product Schedule, Home) and Master Data's dashboard, and adds read-only counts on the StudioFlow Home and Master Data Sample requests rail items; Part B (R8.360) adds Playwright screen-size checks at 375/640/839/840/841 px against the disposable test database only. Lead review and polish is R8.361.
+
+**Checks.** Documentation only; none run.
+
 ## R8.357 | 2026-10-06 | feat(ui-engine,platform): DESIGN v2 in force — tokens, rail and thin top bar
 
 - Owner approved DESIGN v2 after the interactive mockup (2026-10-06). `DESIGN.md` is now v2 (the draft file is removed); its header says what is built and what is not yet.
