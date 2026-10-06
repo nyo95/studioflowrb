@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.363 | 2026-10-06 | chore(lint): ignore the e2e build folder
+
+- After the first `npm run test:e2e`, `npm run lint` scanned the generated `.next-e2e/` build output and reported 282 warnings. ESLint now ignores `.next-e2e/**` and `e2e/.tmp/**` like it ignores `.next/**`.
+
+**Checks.** `npm run lint` (0 errors, the 2 existing `<img>` warnings).
+
 ## R8.362 | 2026-10-06 | test(e2e): Playwright screen-size checks (WO-UI-V2-02 Part B)
 
 - Owner (2026-10-06): the Lead finishes WO-UI-V2-02 Part B. New `npm run test:e2e` (`@playwright/test`, Chromium, owner-approved dependency added in R8.360): `playwright.config.ts`, `e2e/seed.ts`, `e2e/global-setup.ts`, `e2e/screen-size.spec.ts`. It checks, at 375, 640, 839, 840 and 841 px, that StudioFlow Home, a project page, its schedule, Master Data, BQ and Settings never scroll sideways, that at 840px and wider the mark cell and the rail share one width collapsed and expanded and the rail does not expand on hover, and that below 840px the rail is a strip with the account menu in the top bar.
