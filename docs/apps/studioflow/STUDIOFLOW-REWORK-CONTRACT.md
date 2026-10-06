@@ -321,6 +321,7 @@ catalog through its public read port `listBrandLibraryReads` (name, notes,
 owner vendor, categories, hashtags, links; website preview images are fetched
 and cached). Never writes to Master Data. Read gate as every StudioFlow read.
 Search filters client-side by name, category, vendor or hashtag.
+Brand cards choose official logo metadata or logo assets first; social preview images are fallback only.
 
 ## 8. Project workspace and timeline
 
