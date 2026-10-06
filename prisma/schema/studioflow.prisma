@@ -77,10 +77,11 @@ model SfSettings {
   @@schema("studioflow")
 }
 
-/// A storage key that failed to delete during cleanup (archive purge or a schedule
-/// image being replaced/removed). By the time a delete is attempted the DB row that
-/// referenced the key is already gone, so this is the only remaining record of what
-/// leaked; the cleanup sweep retries against it until the delete finally succeeds.
+/// Retry ledger for StudioFlow blob deletes. A row is either a key whose delete failed
+/// (archive purge, schedule/presentation/MOM image, deliverable delete/prune/expiry, upload
+/// rollback) or a key enqueued (attempts = 0) in the same transaction that deleted its last
+/// owner row and not yet confirmed removed. The owning row is already gone, so this is the
+/// only remaining record; the cleanup sweep retries it until the delete succeeds.
 model SfAssetCleanupFailure {
   id              String    @id @default(uuid())
   storage_key     String    @unique

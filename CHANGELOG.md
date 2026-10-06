@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.372 | 2026-10-06 | fix(studioflow): every blob delete goes through the cleanup ledger — WO-SF-SAFE-03
+
+- `asset-cleanup.ts` gains `discardObjects` (removes keys already judged unreferenced; records each failure, resolves on success), `enqueueObjectCleanup` (puts keys in `SfAssetCleanupFailure` with `attempts = 0` inside the deleting transaction) and `enqueueUnreferencedCleanup` (same, after re-checking that no row still points at the key). `removeUnreferenced` now uses the shared reference check and `discardObjects`; its behaviour and result shape are unchanged.
+- Deliverable manual delete, expiry sweep and the prune of older versions enqueue the key in their transaction, then remove it after commit; a storage failure (or a crash before removal) leaves a pending ledger entry that `retryFailedAssetCleanup` (daily asset sweep) finishes. Before, these paths called `storage.remove(...).catch(...)` and a failure left an untracked file.
+- MOM's own snapshot-aware `unreferenced` check now enqueues its result in the same transaction; MOM, Presentation and Schedule upload rollbacks and the deliverable upload rollback use `discardObjects`. No bare `storage.remove` remains in StudioFlow outside `asset-cleanup.ts`.
+- Residual (recorded, not widened): Schedule/Presentation committed deletes still decide and remove after commit via `removeUnreferenced` (failure-recorded, but a process crash between commit and removal is not pre-enqueued).
+- Schema doc comment only (no migration).
+- Tests: manual delete success and failure + retry, expiry sweep failure + retry, a still-referenced key is neither removed nor enqueued, MOM image delete failure + retry, enqueue/discard unit test.
+
+**Checks.** `npm run typecheck`, `asset-cleanup.test.ts`, `asset-sweep.test.ts`, `service.integration.test.ts` 141/141.
+
 ## R8.371 | 2026-10-06 | fix(studioflow): completion and reopening have one owner each — WO-SF-SAFE-02
 
 - `projects.setProjectStatus` now owns only `ACTIVE ↔ ON_HOLD` (new `PROJECT_HOLD_STATUSES`/`ProjectHoldStatus`). A COMPLETED target is refused (`PROJECT_STATUS_USE_COMPLETION_FLOW`) and a COMPLETED project is refused (`PROJECT_COMPLETED`, it no longer loads with `allowCompleted`). Before, any `projectManage` holder could complete or un-complete a project through it without the PIC check, readiness owner, or `completed`/`reopened` audit actions.

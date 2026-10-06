@@ -1,4 +1,4 @@
-import { removeUnreferenced as removeUnreferencedAssets } from "../asset-cleanup";
+import { discardObjects, removeUnreferenced as removeUnreferencedAssets } from "../asset-cleanup";
 import { Prisma } from "@/generated/prisma/client";
 
 import { createPrivateObjectKey } from "@platform/core/storage";
@@ -763,7 +763,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         await removeUnreferenced([result.previousKey]);
         return { optionId: result.optionId };
       } catch (error) {
-        await storage.remove(key).catch(() => undefined);
+        await discardObjects(db, storage, [key]);
         throw error;
       }
     },

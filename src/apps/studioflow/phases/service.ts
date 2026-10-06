@@ -44,6 +44,7 @@ import {
   type TxClient,
 } from "../shared";
 import { readBlockerCounts, readBlockerCountsBatch, readBlockerItems } from "./blocker-query";
+import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
 import { assertProjectCompletionReady, readProjectCompletionReadiness } from "../projects/completion";
 
 type PhaseRow = Awaited<ReturnType<TxClient["sfPhase"]["findUniqueOrThrow"]>>;
@@ -948,11 +949,12 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const older = await tx.sfDeliverable.findMany({ where: { phase_id: input.phaseId, slot_key: created.slot_key, is_final: false }, orderBy: [{ created_at: "desc" }, { id: "desc" }], skip: 2, select: { id: true, storage_key: true } });
         if (older.length) await tx.sfDeliverable.deleteMany({ where: { id: { in: older.map((row) => row.id) } } });
         await writeAudit(ports, tx, { action: "studioflow.deliverable.uploaded", entityType: "deliverable", entityId: created.id, actor: input.actor, metadata: { projectId: input.projectId, phaseId: input.phaseId, name, bytes: stored.bytes, declaredBytes, pruned: older.length } });
-        return older;
+        return enqueueUnreferencedCleanup(tx, older.map((row) => row.storage_key));
       });
-      for (const row of pruned) await ports.storage.remove(row.storage_key).catch(() => console.warn("StudioFlow deliverable cleanup failed."));
+      await discardObjects(db, ports.storage, pruned);
     } catch (error) {
-      await ports.storage.remove(key).catch(() => undefined);
+      // No row ever committed for this key; a failed removal is still recorded for retry.
+      await discardObjects(db, ports.storage, [key]);
       throw error;
     }
     return { phaseId: input.phaseId };
@@ -1075,9 +1077,9 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           await tx.sfDeliverable.delete({ where: { id: d.id } });
           await writeAudit(ports, tx, { action: "studioflow.deliverable.expiry-deleted", entityType: "deliverable", entityId: d.id, actor: { kind: "SYSTEM", label: "deliverable-expiry-sweep" }, metadata: { projectId: d.project_id, phaseId: d.phase_id, name: d.name } });
         }
-        return rows;
+        return { count: rows.length, keys: await enqueueUnreferencedCleanup(tx, rows.map((d) => d.storage_key)) };
       });
-      for (const d of expired) await ports.storage.remove(d.storage_key).catch(() => console.warn("StudioFlow deliverable cleanup failed."));
+      await discardObjects(db, ports.storage, expired.keys);
       const warningUntil = new Date(now.getTime() + DELIVERABLE_WARNING_DAYS * 86_400_000);
       const warnings = await runTransaction(async (tx) => {
         const rows = await tx.sfDeliverable.findMany({ where: { is_final: false, expires_at: { gte: now, lte: warningUntil }, expiry_warned_at: null, created_by_id: { not: null } }, orderBy: [{ expires_at: "asc" }, { id: "asc" }], take: DELIVERABLE_SWEEP_BATCH, include: { phase: { select: { name_snapshot: true } }, project: { select: { name: true } } } });
@@ -1087,21 +1089,21 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         }
         return rows.length;
       });
-      return { deleted: expired.length, warned: warnings };
+      return { deleted: expired.count, warned: warnings };
     },
 
     async deleteDeliverable(input: CommandContext & { projectId: string; deliverableId: string }) {
 
       requireCommand(input, P.projectManage);
-      const key = await runTransaction(async (tx) => {
+      const keys = await runTransaction(async (tx) => {
         const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId }, select: { id: true, project_id: true, phase_id: true, storage_key: true } });
         if (!d || d.project_id !== input.projectId) throw notFound("deliverable");
         await loadWritableProject(tx, input.projectId);
         await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: d.phase_id, kind: "content" });
         await tx.sfDeliverable.delete({ where: { id: d.id } });
-        return d.storage_key;
+        return enqueueUnreferencedCleanup(tx, [d.storage_key]);
       });
-      await ports.storage.remove(key).catch(() => undefined);
+      await discardObjects(db, ports.storage, keys);
       return { deliverableId: input.deliverableId };
     },
   };

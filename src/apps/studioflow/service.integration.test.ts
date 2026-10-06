@@ -1996,6 +1996,79 @@ describe("Deliverable reference revision", () => {
     assert.equal((await sf.phases.sweepDeliverableExpiry()).deleted, 1);
     assert.equal(storage.objects.has(row.storage_key), false);
   });
+
+  describe("every deliverable/MOM blob delete is tracked until it really happens (WO-SF-SAFE-03)", () => {
+    const ledger = (key: string) => testDb.prisma.sfAssetCleanupFailure.findUnique({ where: { storage_key: key } });
+    async function uploaded(name: string) {
+      const { projectId } = await newProject(name);
+      const phase = await phaseOf(projectId, "moodboard");
+      await sf.phases.uploadDeliverable({ ...as(designer), projectId, phaseId: phase.id, name: `${name}.pdf`, file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
+      return { projectId, phase, row: await testDb.prisma.sfDeliverable.findFirstOrThrow({ where: { phase_id: phase.id } }) };
+    }
+    function failingRemoves() {
+      return mock.method(storage, "remove", async () => { throw new Error("disk unavailable"); });
+    }
+    function retry() {
+      return import("./asset-cleanup").then(({ retryFailedAssetCleanup }) => retryFailedAssetCleanup(testDb.prisma, storage));
+    }
+
+    it("manual delete: success removes the blob and leaves the ledger entry resolved", async () => {
+      const { projectId, row } = await uploaded("Delete ok");
+      await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id });
+      assert.equal(storage.objects.has(row.storage_key), false);
+      assert.ok((await ledger(row.storage_key))?.resolved_at instanceof Date);
+    });
+
+    it("manual delete: a storage failure keeps the key pending, and a later retry resolves it", async () => {
+      const { projectId, row } = await uploaded("Delete fails");
+      const failing = failingRemoves();
+      try { await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id }); } finally { failing.mock.restore(); }
+      assert.equal(await testDb.prisma.sfDeliverable.count({ where: { id: row.id } }), 0, "the row is gone");
+      assert.equal(storage.objects.has(row.storage_key), true, "the blob is still there");
+      const pending = await ledger(row.storage_key);
+      assert.equal(pending?.resolved_at, null);
+      assert.equal(pending?.attempts, 1);
+      const result = await retry();
+      assert.equal(result.resolved >= 1, true);
+      assert.equal(storage.objects.has(row.storage_key), false);
+      assert.ok((await ledger(row.storage_key))?.resolved_at instanceof Date);
+    });
+
+    it("expiry sweep follows the same rule", async () => {
+      const { row } = await uploaded("Expiry fails");
+      await testDb.prisma.sfDeliverable.update({ where: { id: row.id }, data: { expires_at: new Date(clock.getTime() - 1) } });
+      const failing = failingRemoves();
+      let swept;
+      try { swept = await sf.phases.sweepDeliverableExpiry(); } finally { failing.mock.restore(); }
+      assert.equal(swept.deleted, 1);
+      assert.equal((await ledger(row.storage_key))?.resolved_at, null);
+      await retry();
+      assert.equal(storage.objects.has(row.storage_key), false);
+    });
+
+    it("never removes a key another row still points at", async () => {
+      const { projectId, phase, row } = await uploaded("Shared key");
+      const twin = await testDb.prisma.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, name: "Twin", storage_key: row.storage_key } });
+      await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id });
+      assert.equal(storage.objects.has(row.storage_key), true);
+      assert.equal(await ledger(row.storage_key), null, "a still-referenced key is never enqueued");
+      await testDb.prisma.sfDeliverable.delete({ where: { id: twin.id } });
+    });
+
+    it("MOM image delete records a storage failure for retry", async () => {
+      const { projectId } = await newProject("MOM image failure");
+      const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Site visit" });
+      const item = await testDb.prisma.sfMomItem.findFirstOrThrow({ where: { document_id: documentId } });
+      const key = `${projectId}/mom-image`;
+      await storage.put({ key, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
+      const image = await testDb.prisma.sfMomImage.create({ data: { item_id: item.id, slot: 0, storage_key: key, content_type: "image/png", bytes: 1 } });
+      const failing = failingRemoves();
+      try { await sf.mom.deleteImage({ ...as(designer), projectId, imageId: image.id }); } finally { failing.mock.restore(); }
+      assert.equal((await ledger(key))?.resolved_at, null);
+      await retry();
+      assert.equal(storage.objects.has(key), false);
+    });
+  });
 });
 
 describe("Project timeline start (Gantt, owner 2026-09-23)", () => {

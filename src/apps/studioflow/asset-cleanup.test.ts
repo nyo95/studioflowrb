@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { it } from "node:test";
 
 import type { ObjectStorage } from "@platform/core/storage";
-import { removeUnreferenced, retryFailedAssetCleanup } from "./asset-cleanup";
+import { discardObjects, enqueueObjectCleanup, removeUnreferenced, retryFailedAssetCleanup } from "./asset-cleanup";
 import type { Db } from "./shared";
 
 type FailureRow = { id: string; storage_key: string; attempts: number; resolved_at: Date | null };
@@ -14,10 +14,10 @@ function unreferencedDb(failures: Map<string, FailureRow>) {
   return {
     ...Object.fromEntries(owners.map((name) => [name, { count: async () => 0 }])),
     sfAssetCleanupFailure: {
-      upsert: async ({ where, create }: { where: { storage_key: string }; create: { storage_key: string } }) => {
+      upsert: async ({ where, create, update }: { where: { storage_key: string }; create: { storage_key: string; attempts?: number }; update: { attempts?: { increment: number } } }) => {
         const existing = failures.get(where.storage_key);
-        if (existing) { existing.attempts++; existing.resolved_at = null; return existing; }
-        const row = { id: randomUUID(), storage_key: create.storage_key, attempts: 1, resolved_at: null };
+        if (existing) { if (update.attempts) existing.attempts += update.attempts.increment; existing.resolved_at = null; return existing; }
+        const row = { id: randomUUID(), storage_key: create.storage_key, attempts: create.attempts ?? 1, resolved_at: null };
         failures.set(where.storage_key, row);
         return row;
       },
@@ -88,4 +88,16 @@ it("retryFailedAssetCleanup resolves what it can and leaves the rest counted for
 it("retryFailedAssetCleanup does nothing when there is nothing pending", async () => {
   const db = unreferencedDb(new Map());
   assert.deepEqual(await retryFailedAssetCleanup(db, storageThatFails(new Set())), { retried: 0, resolved: 0, stillFailing: 0 });
+});
+
+it("enqueue-then-discard: a key is pending before removal, resolved after it, and counted once when it fails", async () => {
+  const failures = new Map<string, FailureRow>();
+  const db = unreferencedDb(failures);
+  assert.deepEqual(await enqueueObjectCleanup(db, ["a", "a", null, "b"]), ["a", "b"]);
+  assert.equal(failures.get("a")?.attempts, 0, "enqueued, not yet attempted");
+  assert.equal(failures.get("a")?.resolved_at, null);
+  assert.deepEqual(await discardObjects(db, storageThatFails(new Set(["b"])), ["a", "b"]), { removed: 1, failures: 1 });
+  assert.ok(failures.get("a")?.resolved_at instanceof Date);
+  assert.equal(failures.get("b")?.resolved_at, null);
+  assert.equal(failures.get("b")?.attempts, 1);
 });
