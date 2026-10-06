@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.347] StudioFlow Home and project phase re-layout
+- Surface: `/studioflow` and `/studioflow/projects/[projectId]`, plus MOM, Schedule, Presentation and History project pages
+- Fixture: signed-in designer PIC; a project with requirements, a pinned note, a deliverable, CD and Supervision phases, and at least two rounds
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Inspect Home and switch Mine/Everyone's plus Running/Completed. 2. Open a project and each document section; follow an old phase URL. 3. Run send → client answered with notes → Revision → OK and verify the next round brief. 4. Run CD Mall → CD Final. 5. Add and close a supervision visit. 6. Tick, dismiss, rename and add a subtask to requirements in the phase aside. 7. Inspect a missing-deliverable phase. 8. Repeat Home, the project header/nav and phase canvas at 375 px.
+- Acceptance: the project rail and Requirements page are gone; the shared header/nav stays usable and marks the current section; old phase URLs redirect; each round and its notes appear once; every existing command and permission still works; project-wide and phase requirements remain editable under their existing rules; missing files are neutral; narrow layouts retain every action.
+- Status: PENDING
+
 ### [R8.266] Master Data write-path hardening
 - Surface: Suppliers, Categories, Settings → Supplier Types, workbook import, and audit history
 - Fixture: signed-in Master Data manager; a Supplier with one contact; active Categories attached to a SKU, Brand, Supplier, and work price; a capability-dependent Supplier Type

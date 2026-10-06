@@ -2276,7 +2276,6 @@ describe("WO-SF-ITER-01 screens support (Lead)", () => {
     const after = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: moodboard.id });
     assert.deepEqual(after.map((item) => [item.label, item.isChecked]), [["Late requirement", true]], "the dismissed requirement is gone and the ticked one stays");
     const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((item) => item.id === projectId)!;
-    assert.equal(card.requirements_waiting, 0);
   });
 
   it("offers the latest change for undo only to the same person within five minutes, and lists phase notes", async () => {

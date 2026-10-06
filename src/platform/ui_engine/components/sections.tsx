@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react";
-import { CircleHelp } from "lucide-react";
+import { Check, CircleHelp } from "lucide-react";
 
 import { cx } from "../internal/cx";
 import { Tooltip } from "../layouts/overlays";
@@ -143,7 +143,7 @@ export function GroupHeader({
   );
 }
 
-export type PipelineStepState = "done" | "current" | "upcoming" | "blocked";
+export type PipelineStepState = "done" | "current" | "waiting" | "attention" | "upcoming" | "blocked";
 
 export type PipelineStep = {
   /** Stable key; also the accessible identity of the list item. */
@@ -159,11 +159,15 @@ export type PipelineStep = {
   href?: string;
   /** Marks this step as the currently viewed tab — renders a bottom border indicator. */
   selected?: boolean;
+  /** Optional action below the note; the track variant aligns actions at the bottom. */
+  action?: ReactNode;
 };
 
 const PIPELINE_STATE_DOT_CLASSES: Record<PipelineStepState, string> = {
   done: "bg-success",
   current: "bg-warning",
+  waiting: "bg-warning",
+  attention: "bg-ink",
   upcoming: "bg-line-strong",
   blocked: "bg-danger",
 };
@@ -171,6 +175,8 @@ const PIPELINE_STATE_DOT_CLASSES: Record<PipelineStepState, string> = {
 const PIPELINE_STATE_LABEL_CLASSES: Record<PipelineStepState, string> = {
   done: "text-success",
   current: "text-warning",
+  waiting: "text-warning",
+  attention: "text-ink",
   upcoming: "text-ink-tertiary",
   blocked: "text-danger",
 };
@@ -184,10 +190,69 @@ const PIPELINE_STATE_LABEL_CLASSES: Record<PipelineStepState, string> = {
 export function PipelineStrip({
   steps,
   label = "Pipeline",
+  variant = "band",
   className,
   ...props
-}: Omit<HTMLAttributes<HTMLOListElement>, "children"> & { steps: PipelineStep[]; label?: string }) {
+}: Omit<HTMLAttributes<HTMLOListElement>, "children"> & { steps: PipelineStep[]; label?: string; variant?: "band" | "track" }) {
   if (steps.length === 0) return null;
+  if (variant === "track") {
+    return (
+      <ol
+        aria-label={label}
+        className={cx("m-0 grid list-none overflow-x-auto bg-transparent p-0", className)}
+        style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(8rem, 1fr))` }}
+        data-variant="track"
+        {...props}
+      >
+        {steps.map((step, index) => {
+          const state = step.state ?? "upcoming";
+          const marker = state === "done"
+            ? "border-success bg-success text-white"
+            : state === "current"
+              ? "border-ink bg-surface"
+              : state === "waiting"
+                ? "border-warning bg-surface"
+                : state === "attention"
+                  ? "border-ink bg-ink"
+                  : state === "blocked"
+                    ? "border-danger bg-danger"
+                    : "border-line-strong bg-surface";
+          const body = (
+            <>
+              <span className="relative flex h-5 items-center" aria-hidden="true">
+                <span className={cx("relative z-[1] grid h-4 w-4 place-items-center rounded-full border-2", marker)}>
+                  {state === "done" ? <Check size={10} strokeWidth={3} /> : null}
+                </span>
+                {index < steps.length - 1 ? (
+                  <span className={cx("absolute left-4 right-[-1px] h-px", state === "done" ? "bg-success" : "bg-line-strong")} />
+                ) : null}
+              </span>
+              <span className={cx("truncate text-sm font-semibold", state === "upcoming" ? "text-ink-tertiary" : "text-ink")}>{step.label}</span>
+              <span className={cx(
+                "min-h-5 text-xs text-ink-tertiary",
+                state === "waiting" && "text-warning",
+                state === "attention" && "font-semibold text-ink",
+              )}>{step.note}</span>
+              {step.detail ? <span className="font-ui-mono text-micro text-ink-tertiary">{step.detail}</span> : null}
+            </>
+          );
+          return (
+            <li
+              key={step.id}
+              aria-current={state === "current" || state === "attention" ? "step" : undefined}
+              className={cx(
+                "flex min-w-0 flex-col px-3 py-3",
+                step.selected && "shadow-[inset_0_-3px_0_0_theme(colors.ink.DEFAULT)]",
+              )}
+            >
+              {step.href ? <a href={step.href} className="grid flex-1 content-start gap-1 no-underline hover:underline">{body}</a> : <span className="grid flex-1 content-start gap-1">{body}</span>}
+              {step.action ? <span className="mt-2 flex min-h-8 flex-wrap items-end gap-1.5">{step.action}</span> : null}
+            </li>
+          );
+        })}
+      </ol>
+    );
+  }
   return (
     <ol
       aria-label={label}
@@ -212,7 +277,7 @@ export function PipelineStrip({
         return (
           <li
             key={step.id}
-            aria-current={state === "current" ? "step" : undefined}
+            aria-current={state === "current" || state === "attention" ? "step" : undefined}
             className={cx(
               "grid min-w-0 content-start gap-[5px] px-3 py-2.5 transition-colors",
               step.selected

@@ -105,19 +105,19 @@ export function IterationButtons({
 
   if (!current) {
     if (phase.status === "PENDING") {
-      if (!phase.canStart) return <span className="text-xs text-ink-tertiary">Waits for the previous phase</span>;
+      if (!phase.canStart) return null;
       return canAct ? <Button size="sm" variant="secondary" pending={busy("start")} onClick={() => phase.isSupervision ? onNewVisit() : run("start", { ...base, command: "addIteration" }, `${phase.name} started`)}>Start</Button> : null;
     }
     if (!canAct) return null;
     if (phase.isSupervision && phase.status === "ACTIVE") return <Button size="sm" variant="secondary" onClick={onNewVisit}>New visit</Button>;
-    return <Button size="sm" variant="ghost" pending={busy("add")} onClick={() => phase.isSupervision ? onNewVisit() : run("add", { ...base, command: "addIteration" }, `New ${phase.name} iteration added`)}>+ iteration</Button>;
+    return <Button size="sm" variant="secondary" pending={busy("add")} onClick={() => phase.isSupervision ? onNewVisit() : run("add", { ...base, command: "addIteration" }, `New ${phase.name} iteration added`)}>+ iteration</Button>;
   }
 
   if (!canAct) return null;
   const it = { ...base, iterationId: current.id };
   const known: Record<string, { label: string; primary?: boolean; run: () => void }> = {
-    send: { label: "Send to client", primary: true, run: () => run("send", { ...it, command: "sendIteration" }, `${current.name} sent to the client`) },
-    record_answer: { label: "Client answered", primary: true, run: () => setAnswering(true) },
+    send: { label: "Send to client", run: () => run("send", { ...it, command: "sendIteration" }, `${current.name} sent to the client`) },
+    record_answer: { label: "Client answered", run: () => setAnswering(true) },
     revision: { label: "Revision", run: () => run("revision", { ...it, command: "chooseOutcome", outcome: "REVISION" }, `${current.name} needs a revision`) },
     done: phase.isSupervision
       ? { label: "Done (handover)", primary: true, run: () => run("done", { ...it, command: "chooseVisit", outcome: "DONE" }, `${phase.name} done`) }

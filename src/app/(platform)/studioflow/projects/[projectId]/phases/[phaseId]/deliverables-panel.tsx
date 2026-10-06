@@ -23,7 +23,7 @@ type Deliverable = {
 type DeliverableStatus = "MISSING" | "CURRENT" | "OUTDATED";
 
 const STATUS_CONFIG: Record<DeliverableStatus, { label: string; tone: "success" | "warning" | "danger"; icon: typeof CheckCircle2 }> = {
-  MISSING: { label: "No deliverable", tone: "danger", icon: AlertTriangle },
+  MISSING: { label: "No files", tone: "warning", icon: AlertTriangle },
   CURRENT: { label: "Current", tone: "success", icon: CheckCircle2 },
   OUTDATED: { label: "Outdated", tone: "warning", icon: AlertTriangle },
 };
@@ -125,12 +125,12 @@ export function DeliverablesPanel({
       count={deliverables.length}
       description="Files produced and uploaded during this phase."
     >
-      <div className="mb-3 flex items-center gap-2">
+      {status !== "MISSING" ? <div className="mb-3 flex items-center gap-2">
         <StatusIcon className={`size-4 ${status === "CURRENT" ? "text-success" : status === "OUTDATED" ? "text-warning" : "text-danger"}`} />
         <Badge tone={statusConfig.tone}>{statusConfig.label}</Badge>
-      </div>
+      </div> : null}
       {deliverables.length === 0 ? (
-        <Text tone="secondary" size="sm">No deliverables uploaded yet.</Text>
+        <Text tone="secondary" size="sm">No files uploaded yet.</Text>
       ) : (
         <ul className="divide-y divide-line-subtle">
           {deliverables.map((d) => (
@@ -186,7 +186,7 @@ export function DeliverablesPanel({
       )}
 
       {canWork ? (
-        <div className="mt-3">
+        <div className={`mt-3 ${status === "MISSING" ? "rounded-control bg-surface-muted p-3" : ""}`}>
           <input
             ref={fileRef}
             type="file"
@@ -204,7 +204,7 @@ export function DeliverablesPanel({
           </label>
           {progress !== null ? <progress className="mt-2 block h-1.5 w-full max-w-xs" max={100} value={progress} aria-label="Upload progress" /> : null}
           {uploadError ? <p className="mt-1.5 text-xs text-danger">{uploadError}</p> : null}
-          <p className="mt-1 text-xs text-ink-tertiary">PDF, PNG, JPEG, WebP, ZIP — up to 500 MB. Files that are not marked final delete themselves after 30 days; only the 2 newest versions of a file are kept.</p>
+          <p className="mt-1 text-xs text-ink-tertiary" title="Files that are not marked final delete themselves after 30 days; only the 2 newest versions of a file are kept.">PDF, PNG, JPEG, WebP or ZIP · up to 500 MB. Temporary files expire.</p>
         </div>
       ) : null}
     </SectionCard>

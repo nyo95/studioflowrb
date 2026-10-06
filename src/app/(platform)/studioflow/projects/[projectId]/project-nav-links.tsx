@@ -3,31 +3,23 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { ContextNavLink } from "@/platform/ui_engine";
+import { CountBadge, filterChipClasses } from "@/platform/ui_engine";
 
-type Item = { href: string; label: string; exact?: boolean; marker: string | null; detail: string | null; title?: string };
+export type ProjectNavItem = { href: string; label: string; exact?: boolean; detail: string | null };
 
-export function ProjectNavLinks({ items }: { items: Item[] }) {
+export function ProjectNavLinks({ items }: { items: ProjectNavItem[] }) {
   const pathname = usePathname();
   return (
-    <>
+    <nav className="flex max-w-full gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Project sections">
       {items.map((item) => {
         const active = item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
-          <ContextNavLink
-            key={item.href}
-            component={Link}
-            surface="rail"
-            href={item.href}
-            active={active}
-            title={item.title}
-            marker={item.marker ? <span className={`h-[7px] w-[7px] rounded-pill ${item.marker}`} /> : undefined}
-            detail={item.detail}
-          >
+          <Link key={item.href} href={item.href} prefetch={false} className={`${filterChipClasses(active)} shrink-0 gap-1.5`} aria-current={active ? "page" : undefined}>
             {item.label}
-          </ContextNavLink>
+            {item.detail ? <CountBadge>{item.detail}</CountBadge> : null}
+          </Link>
         );
       })}
-    </>
+    </nav>
   );
 }

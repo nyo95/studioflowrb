@@ -140,6 +140,21 @@ describe("UI Engine foundation", () => {
     assert.match(strip, /aria-current="step"/);
   });
 
+  it("renders the track pipeline markers, current states, and action slot", () => {
+    const track = renderToStaticMarkup(createElement(ui.PipelineStrip, {
+      variant: "track",
+      steps: [
+        { id: "done", label: "Brief", note: "Done", state: "done" },
+        { id: "current", label: "Design", note: "In progress", state: "current" },
+        { id: "attention", label: "Review", note: "Needs a decision", state: "attention", action: createElement("button", null, "Decide") },
+      ],
+    }));
+    assert.match(track, /data-variant="track"/);
+    assert.equal(track.match(/aria-current="step"/g)?.length, 2);
+    assert.match(track, />Decide<\/button>/);
+    assert.match(track, /rounded-full border-2/);
+  });
+
   it("paginates by href for server-rendered directories and by callback for client ones", () => {
     const paginationSource = readFileSync(new URL("./components/pagination.tsx", import.meta.url), "utf8");
     // URL pagination is rendered by server pages; importing the client Button

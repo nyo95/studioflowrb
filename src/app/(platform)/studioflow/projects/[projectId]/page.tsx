@@ -2,11 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
-import {
-  isPhaseFinished,
-  phaseAccentDotClass,
-  phaseStatusDisplay,
-} from "@/apps/studioflow/domain/phase";
+import { phaseStepPresentation } from "@/apps/studioflow/domain/phase-display";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import {
   PipelineStrip,
@@ -45,16 +41,20 @@ export default async function ProjectOverviewPage({
   const activePhase = phases.find((p) => p.status === "ACTIVE") ?? null;
   const selectedPhaseId = (sp.phase || null) ?? activePhase?.id ?? phases[0]?.id ?? null;
 
-  const pipelineSteps = phases.map((phase) => {
-    const display = phaseStatusDisplay(phase.status);
-    const pipelineState = phase.status === "PENDING" ? "upcoming" : isPhaseFinished(phase.status) ? "done" : "current";
+  const pipelineSteps = phases.map((phase, index) => {
+    const display = phaseStepPresentation({
+      phaseName: phase.label,
+      phaseStatus: phase.status,
+      previousPhaseName: index > 0 ? phases[index - 1]!.label : null,
+      canStart: phase.status === "PENDING" && !phase.startBlockedReason,
+      isSupervision: phase.definitionId === "00000000-0000-4000-8000-000000000105",
+      iteration: phase.iterationName && phase.iterationState ? { name: phase.iterationName, state: phase.iterationState, waitingDays: phase.waitingDays } : null,
+    });
     return {
       id: phase.id,
       label: phase.label,
-      note: display.label,
-      detail: phase.iterationName ?? undefined,
-      state: pipelineState as "done" | "current" | "upcoming",
-      accentClass: phaseAccentDotClass(phase.definitionId),
+      note: display.note,
+      state: display.state,
       href: `?phase=${phase.id}`,
       selected: phase.id === selectedPhaseId,
     };
@@ -64,7 +64,7 @@ export default async function ProjectOverviewPage({
     <div className="grid gap-4">
       {/* Pipeline tabs — always immediate, no hero card */}
       <SectionCard padded={false}>
-        <PipelineStrip steps={pipelineSteps} label="Phase tabs" />
+        <PipelineStrip variant="track" steps={pipelineSteps} label="Phase tabs" />
       </SectionCard>
 
       {/* Canvas — suspends independently; key forces reset on phase switch */}
@@ -122,4 +122,3 @@ function PhaseCanvasSkeleton() {
     </div>
   );
 }
-

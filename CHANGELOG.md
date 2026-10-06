@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.347 | 2026-10-06 | feat(studioflow,ui-engine): consolidate project phase workspace
+
+- Removed the project secondary rail and standalone Requirements page. Every project sub-page now shares one streamed header with the stored free-text project name, client/PIC metadata and compact Phases/MOM/Schedule/Presentation/History navigation; legacy phase URLs redirect to the overview query form.
+- Extended the shared `PipelineStrip` with the domain-neutral `track` variant, six accessible states and a bottom-aligned action slot. Home cards and the project overview now use it with one app-owned, unit-tested source for round names and phase wording; the old per-phase colours, progress count and requirements count are gone.
+- Rebuilt the phase canvas around the current round, earlier rounds and a responsive aside for pinned note, phase/project-wide requirements and files. Client notes stay inside their round, unsent work shows the prior round as its brief, the drawing list remains CD-only, and a missing deliverable is now a neutral upload area. Existing commands, permission gates, undo and read-only rules are unchanged.
+- Updated the StudioFlow and UI Engine contracts and added the Reviewer browser pass to `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`. No schema, migration or dependency change.
+
+**Checks.** Baseline `npm test`: 826 pass. Final `npm test`: 829 pass, 0 fail/skipped/cancelled. `npm run typecheck`; `npm run lint` (0 errors; two existing `no-img-element` warnings); `npm run check:boundaries`; `npm run check:legacy-runtime`; `npm run build`; focused UI/helper tests 52 pass; staged and unstaged whitespace checks. Browser acceptance and final visual polish remain for the Lead in R8.348.
+
 ## R8.346 | 2026-10-06 | docs(plan,studioflow): no project code in the re-layout; contract naming drift fixed
 
 - Executor BLOCKED report on WO-SF-RELAYOUT-01 (before any code change; baseline 826 pass): the plan asked for the project code as the header eyebrow, but projects have no code since R8.213. Lead verdict: option A — the header and the Home card show the free-text name as stored, with no eyebrow and no code line; option B (a fixed "Project" eyebrow) was rejected as a repeated, low-information label. `PLAN.md` carries the correction; implementation moves to R8.347 and polish to R8.348.

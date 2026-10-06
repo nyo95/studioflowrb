@@ -324,10 +324,12 @@ command that creates a loose root row. Ticking cascades to children; children
 never roll up. A requirement stays visible after its phase is done until it is
 ticked or dismissed.
 
-Screen: `/studioflow/projects/[projectId]/requirements` shows the whole
-checklist of one project, the general list first and then one list per phase.
+Screen: requirements are worked in the aside of the open phase on
+`/studioflow/projects/[projectId]`; phase requirements are shown first and
+general requirements are under the collapsed **Project-wide** disclosure.
 Anyone who works on the project may tick or dismiss; renaming and subtasks need
-`studioflow.task.manage`. A completed or archived project is read-only.
+`studioflow.task.manage`. A completed or archived project is read-only. There
+is no separate Requirements page.
 
 ### 6.3 Checklist templates
 
@@ -358,10 +360,10 @@ R8.331 and reduced to cards only in R8.343.
 - **My projects** = running projects where I am PIC designer or drafter.
   **All projects** (every running project) is available to holders of
   `studioflow.project.manage`. A Running / Completed switch sits beside it.
-- A card shows the phase strip, the current iteration and its actions, the
-  waiting-requirements count and the phase notes (§6.1).
+- A card shows the track phase strip, the current round and its actions, plus
+  the pinned-notes marker. It does not repeat a requirements count.
 - There is no My Tasks list, task feed, Quick add, saved filter or inline add
-  (see §6.2). Requirements are worked on the project's Requirements page.
+  (see §6.2). Requirements are worked in the open phase's aside.
 - Legacy KB-023 (general todos on the home page) is superseded by the owner
   decision of 2026-10-06 and is not built.
 
@@ -391,34 +393,28 @@ Routes (canonical, D-SF-07 redirects from `/projects/...` stay allowed):
 | `/studioflow/projects` | project directory (legacy filters: status, priority, PIC, client; search) |
 | `/studioflow/timeline` | portfolio Gantt: one bar per project, filterable by client/PIC/status/date range (§ below) |
 | `/studioflow/projects/[projectId]` | overview: identity header, phase strip, open work |
-| `/studioflow/projects/[projectId]/requirements` | requirements: the general list and each phase's list (§6.2) |
-| `/studioflow/projects/[projectId]/phases/[phaseId]` | phase page: state + actions, active revision, activities, revision history |
+| `/studioflow/projects/[projectId]/phases/[phaseId]` | compatibility redirect to `/studioflow/projects/[projectId]?phase=[phaseId]` |
 | `/studioflow/projects/[projectId]/mom` and `/mom/[momId]` (+ print) | MOM |
 | `/studioflow/projects/[projectId]/schedule` | Product Schedule |
 | `/studioflow/projects/[projectId]/history` | audit timeline for the project |
 | `/studioflow/clients`, `/studioflow/clients/[clientId]` | clients |
 | `/studioflow/settings` | naming, checklist templates, schedule templates/prefixes |
 
-The project workspace keeps the legacy two-level navigation: app rail +
-project rail listing Overview, the five phases (state dot + open-root-task
-count), MOM, Schedule, History. Mobile: drawer.
+The project workspace has one navigation level inside the app shell. The
+secondary project rail is PURGED. Every project sub-page shares a project
+header containing the stored project name, client and assigned designer /
+drafter, followed by a compact horizontal document nav for Phases, MOM,
+Schedule, Presentation and History. The current destination is marked and the
+nav scrolls horizontally when it cannot fit.
 
-**The project rail is app shell and streams independently of page data
-(owner, 2026-09-24).** `layout.tsx` used to `await` the project record and
-the MOM/Schedule counts before returning *any* JSX, so the rail/header
-waited on the same data the page content did — owner: *"harusnya saat
-loading, yang loading ini nya aja, side bar itu kan app shell harusnya."*
-Split into three pieces: the outer `ProjectLayout` returns the `SettingsShell`
-frame and static nav links (hrefs need no data) synchronously; a
-`<Suspense>`-wrapped `ProjectHeader` fetches the project record for the
-breadcrumb/title/meta/archived-notice; a second `<Suspense>`-wrapped
-`ProjectExtensionsNav` fetches the MOM/Schedule counts for their nav badges,
-falling back to the same links with no badge while counting. A new
-`loading.tsx` for this segment (Next.js's own convention) gives `page.tsx`'s
-own content area — the phase-tab strip and canvas — its own independent
-fallback, decoupled from the layout entirely. `notFound()` on a missing
-project still discards the whole route (Next.js resolves it up to the
-nearest not-found boundary regardless of which Suspense boundary threw it).
+**The project header and its counts stream independently of page data
+(owner, 2026-09-24; consolidated R8.347).** The outer `ProjectLayout` returns
+the frame and breadcrumb synchronously. A `<Suspense>`-wrapped
+`ProjectHeader` fetches project identity and notices; a second boundary loads
+the MOM/Schedule/Presentation counts, with real destination links in its
+fallback. The segment `loading.tsx` keeps the phase strip and canvas fallback
+independent from the layout. `notFound()` on a missing project still discards
+the whole route through the nearest not-found boundary.
 
 **Administrative fields are edited from the Projects directory, not the
 project's own pages (owner, 2026-09-23).** Name, client, client contact,
@@ -910,9 +906,9 @@ declined to add for this.
 | Image storage for client logo and MOM images | REUSE | `platform/core/storage` + `ImageWorkspace` |
 | Confirm, unsaved-changes guard, dialogs, drawers, tables, toolbars, inline edit, creatable search, rich text | REUSE | UI Engine |
 | Drag-to-reorder list | DEFERRED (R8.71 uses Move up/Move down actions) | UI Engine pattern `SortableList` once MOM/Schedule also need drag |
-| Secondary context rail (project workspace nav) | EXTEND (R8.71) | UI Engine `SettingsShell` + new `ContextNavLink`/`ContextNavHeading`, shared with Platform settings navigation |
+| Secondary context rail (project workspace nav) | PURGE | Replaced by the shared project header and compact document navigation. |
 | Assignee / PIC people lookup | ADD (R8.71) | `platform/core/rbac/people` (`peopleDirectory`) |
-| Phase strip / stepper | REUSE | UI Engine `PipelineStrip` (already existed) |
+| Phase strip / stepper | REUSE | UI Engine `PipelineStrip variant="track"`; app-owned helpers supply round and state wording. |
 | Phase state machine, revision numbering, blocker projection, schedule codes | APP-OWNED | `src/apps/studioflow/domain/*` |
 
 `src/apps/studioflow` is modular (one folder per module: `projects`,

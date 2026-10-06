@@ -139,7 +139,7 @@ inline markup in more than one app.
 | `ProgressBar` | Primitive | A measure that always carries `role="progressbar"` and a label. |
 | `SegmentBar` | Primitive | Compact ordered stage bar for a table cell; decorative, so `label` is required. |
 | `GroupHeader` | Pattern | Worklist bucket head: uppercase label, count, rule to the end of the measure. |
-| `PipelineStrip` | Pattern | Ordered stages as one hairline-separated band; the current stage is `aria-current="step"`, never colour alone. |
+| `PipelineStrip` | Pattern | Ordered stages as the default hairline-separated `band` or the marker-and-connector `track`. Track supports `done`, `current`, `waiting`, `attention`, `upcoming`, and `blocked`, plus a bottom-aligned per-step action. Current and attention use `aria-current="step"`; note text carries state so colour is never the only channel. |
 
 `Pagination` takes either `onPageChange` (client directories holding page state
 locally) or `getHref` (server-rendered directories, where paging must survive a
