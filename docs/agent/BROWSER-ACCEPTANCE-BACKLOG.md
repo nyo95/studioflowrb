@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.355] StudioFlow phase menu and active skip
+- Surface: `/studioflow` and `/studioflow/projects/[projectId]?phase=...`
+- Fixture: signed-in designer PIC; one fresh project and one project whose active phase has a sent round with client notes
+- Viewport: desktop (default) and 375 px
+- Steps: 1. On the fresh project, open Moodboard's ⋯ menu, skip it with a reason, inspect the next phase, then Undo. 2. Skip the phase with the sent round and inspect Earlier rounds. 3. Inspect each Home phase menu in pending, active, sent and done states. 4. Sweep Home, phase canvas, dialogs, toasts and History for the word “iteration”.
+- Acceptance: empty unsent round 1 disappears on skip and returns on Undo; sent history and notes stay; auto-advance is identical to a normal finish; Home and the strip say Skipped and the phase page shows the reason; menus expose only allowed actions; every visible workflow label says round.
+- Status: PENDING
+
 ### [R8.351] StudioFlow Product Schedule re-layout
 - Surface: StudioFlow project → Schedule, Board and List views
 - Fixture: editable project with Material and Fixture categories, reserved and multi-option items, final choices, photos, and requested/received samples; designer PIC and read-only staff

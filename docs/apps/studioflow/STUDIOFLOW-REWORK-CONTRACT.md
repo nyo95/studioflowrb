@@ -96,8 +96,8 @@ owns grant mechanics.
 | `studioflow.project.manage` | Create/edit clients and projects, PICs, priority, status, archive/restore, mark completed; see every running project on Home; edit planned phase dates |
 | `studioflow.project.override` | Pass every assignment gate (replaces legacy "admin always allowed") |
 | `studioflow.project.pic-designer` / `.pic-drafter` | Positions: who may be picked for each PIC seat |
-| `studioflow.phase.work` | Round commands (add, send, client answered, outcome, visits, rename, delete unsent, notes), pinned note, dismiss requirement, undo, CD list, files |
-| `studioflow.phase.review` | Skip a phase that has not started (bypass, reason required) |
+| `studioflow.phase.work` | Round commands (add, send, client answered, outcome, visits, rename, delete unsent, notes), pinned note, dismiss requirement, undo of those commands, CD list, files |
+| `studioflow.phase.review` | Skip a phase that is pending or active (bypass, reason required) and undo that skip |
 | `studioflow.phase.override` | Admin reset of a phase's rounds (audited snapshot) |
 | `studioflow.task.manage` | Rename requirements, add subtasks |
 | `studioflow.settings.manage` | Archive retention, checklist templates, phase templates, schedule templates and prefixes |
@@ -206,7 +206,7 @@ Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
   **Continue to CD Final**; only CD Final's OK closes the phase.
 - **Supervision** runs on dated site visits: New visit, then **Next visit** or
   **Done (handover)**.
-- A done phase can take **+ iteration** (reopen by adding a round); history is
+- A done phase can take **+ New round** (reopen by adding a round); history is
   kept and other phases keep running.
 - Screens take their buttons from `iterationChoices`
   (`domain/iteration-kinds.ts`), the same rule the commands enforce.
@@ -218,12 +218,19 @@ Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
   five minutes (`UNDO_WINDOW_MS`).
 - Round names default to `<phase> <n>`; screens show those as `Round <n>`
   (`domain/phase-display.ts`). Other names (CD Mall, renamed rounds, visits)
-  show as stored.
+  show as stored. **Round** is the only user-facing word; `iteration` remains
+  only in code and persistence identifiers.
 
 ### 5.3 Skip and admin reset
 
-- **Skip** (`bypass`, `phase.review`): a phase that has not started is marked
-  done without work; a reason is required and audited.
+- **Skip** (`bypass`, `phase.review`): a pending or active phase is marked done
+  and locked; a reason is required and audited. A sent or otherwise populated
+  open round is closed and kept in history. A never-sent round is removed only
+  when it has no client notes or files; skipping a pending phase
+  still records its closed round 1. The next eligible phase opens by the normal
+  auto-advance rule. Home and the phase strip say **Skipped**, and the phase
+  page shows the reason. The same actor may undo the skip for five minutes;
+  undo restores the exact phase/round state and removes the auto-opened phase.
 - **Admin reset** (`override`, `phase.override`): rewrite a phase's rounds to
   "restart at round N" or "back to not started"; a note is required and the
   full history snapshot goes into the audit event.
@@ -293,7 +300,11 @@ menu). Deleting a template detaches generated rows.
   later phases), the pinned-notes marker, the actions menu (Open, Mark as
   completed…, Reopen), and the phase strip (`PipelineStrip variant="track"`)
   with each phase's round, state and its next action. Only a decision after
-  the client answered is a primary button there.
+  the client answered is a primary button there. Each phase also has a ⋯ menu:
+  **Open phase**; **Client notes…** for an editable open round (hidden while it
+  is with the client); **+ New round** for a finished phase; and **Skip phase…**
+  for an eligible pending/active phase when the viewer can act and holds
+  `phase.review`.
 
 ## 7a. Library
 

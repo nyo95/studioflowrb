@@ -10,6 +10,7 @@ import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
 import { iterationChoices, iterationKinds } from "../domain/iteration-kinds";
+import { phaseSkipReason } from "../domain/phase-display";
 import { waitingDays, type PhaseStatus } from "../domain/phase";
 import {
   P,
@@ -606,6 +607,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           phases: { orderBy: { order_index: "asc" }, include: {
             definition: { select: { default_iteration_kinds: true } },
             revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true, note: true } },
+            events: { where: { to_state: "DONE", undone_at: null }, orderBy: { occurred_at: "desc" }, take: 1, select: { auto_created: true } },
           } },
         },
       });
@@ -623,6 +625,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
             id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,
             current_iteration: current ? { id: current.id, name: current.name, state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices, answer_choices: iterationChoices({ state: "ANSWERED", phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision }), note: current.note } : null,
             iteration_count: phase.revisions.length, has_note: Boolean(phase.note?.trim()),
+            skipped_reason: phaseSkipReason(phase.events[0]),
+            can_add_round: choices.includes("add_iteration"),
             is_supervision: isSupervision,
             seat: phase.seat_snapshot as "designer" | "drafter",
             /** A not-started phase may be started now: the project is active and the phase is parallel or its predecessor is done. */

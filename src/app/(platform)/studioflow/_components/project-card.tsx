@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { phaseStepPresentation } from "@/apps/studioflow/domain/phase-display";
-import { Badge, IconButton, InlineError, PipelineStrip, RowActionMenu, SectionCard, type RowActionItem } from "@/platform/ui_engine";
+import { Badge, Button, Dialog, Field, FormActions, IconButton, InlineError, PipelineStrip, RowActionMenu, SectionCard, Textarea, type RowActionItem } from "@/platform/ui_engine";
 
 import { projectCompletionAction } from "../actions";
 import { IterationButtons, UndoBar, usePhaseCommands, VisitDialog, type IterationView, type PhaseView } from "./phase-commands";
@@ -23,6 +23,8 @@ export type ProjectCardPhase = {
   can_start: boolean;
   has_note: boolean;
   iteration_count: number;
+  skipped_reason: string | null;
+  can_add_round: boolean;
   last_visit_days_ago: number | null;
   current_iteration: { id: string; name: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[]; note: string | null } | null;
 };
@@ -39,7 +41,7 @@ export type ProjectCardData = {
   phases: ProjectCardPhase[];
 };
 
-export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: ProjectCardData; viewer: { userId: string; canOverride: boolean }; defaultExpanded?: boolean }) {
+export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: ProjectCardData; viewer: { userId: string; canOverride: boolean; canWork: boolean; canReview: boolean }; defaultExpanded?: boolean }) {
   const router = useRouter();
   const commands = usePhaseCommands(card.id);
   const completion = useCommand();
@@ -47,6 +49,10 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
   const [notesOpen, setNotesOpen] = useState(false);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [notesFor, setNotesFor] = useState<{ phaseId: string; phaseName: string; iterationId: string; iterationName: string; note: string | null } | null>(null);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [skipPhase, setSkipPhase] = useState<{ id: string; name: string } | null>(null);
+  const [skipReason, setSkipReason] = useState("");
 
   const completed = card.status === "COMPLETED";
   const isPic = viewer.userId === card.pic_ids.designer || viewer.userId === card.pic_ids.drafter;
@@ -62,6 +68,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
     const current = phase.current_iteration;
     const view: PhaseView = { id: phase.id, name: phase.name, status: phase.status, isSupervision: phase.is_supervision, canStart: phase.can_start };
     const iteration: IterationView | null = current ? { id: current.id, name: current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices, note: current.note } : null;
+    const canAct = !completed && projectActive && viewer.canWork && seatOwner(phase);
     const display = phaseStepPresentation({
       phaseName: phase.name,
       phaseStatus: phase.status,
@@ -69,15 +76,22 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
       canStart: phase.can_start,
       isSupervision: phase.is_supervision,
       iterationCount: phase.iteration_count,
+      skippedReason: phase.skipped_reason,
       iteration: current ? { name: current.name, state: current.state, waitingDays: current.waiting_days } : null,
     });
+    const phaseMenu: RowActionItem[] = [
+      { label: "Open phase", onSelect: () => router.push(`/studioflow/projects/${card.id}?phase=${phase.id}`) },
+      ...(current && current.state !== "SENT" && canAct ? [{ label: "Client notes…", onSelect: () => { setNotesFor({ phaseId: phase.id, phaseName: phase.name, iterationId: current.id, iterationName: current.name, note: current.note }); setNotesDraft(current.note ?? ""); } }] : []),
+      ...(phase.can_add_round && canAct ? [{ label: "+ New round", onSelect: () => void commands.exec(`${phase.id}:add`, { command: "addIteration", phaseId: phase.id }, `New ${phase.name} round added`) }] : []),
+      ...((phase.status === "PENDING" || phase.status === "ACTIVE") && !completed && projectActive && viewer.canReview && seatOwner(phase) ? [{ label: "Skip phase…", separatorBefore: true, onSelect: () => { setSkipPhase({ id: phase.id, name: phase.name }); setSkipReason(""); } }] : []),
+    ];
     return {
       id: phase.id,
       label: phase.name,
       note: display.note,
       state: display.state,
       href: `/studioflow/projects/${card.id}?phase=${phase.id}`,
-      action: <IterationButtons phase={view} current={iteration} commands={commands} canAct={!completed && projectActive && seatOwner(phase)} onNewVisit={() => setVisitPhaseId(phase.id)} />,
+      action: <div className="flex items-center gap-1"><IterationButtons phase={view} current={iteration} commands={commands} canAct={canAct} onNewVisit={() => setVisitPhaseId(phase.id)} /><RowActionMenu items={phaseMenu} label={`${phase.name} actions`} /></div>,
     };
   });
 
@@ -117,6 +131,8 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
       <VisitDialog open={visitPhaseId !== null} onOpenChange={(open) => { if (!open) setVisitPhaseId(null); }} pending={visitPhaseId !== null && commands.isPending(`${visitPhaseId}:visit`)} error={commands.error} onSave={(visitDate, note) => commands.exec(`${visitPhaseId}:visit`, { command: "createVisit", phaseId: visitPhaseId!, visitDate, note }, "Site visit added")} />
       <PhaseNotesDialog projectId={card.id} open={notesOpen} onOpenChange={setNotesOpen} canEdit={canManage || card.phases.some(seatOwner)} />
       <ProjectCompletionDialog projectId={card.id} projectName={card.name} open={confirmComplete} onOpenChange={setConfirmComplete} />
+      {notesFor ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("card-notes")) setNotesFor(null); }} title={`${notesFor.phaseName}: client notes`} description="What the client said about this round."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("card-notes", { command: "setIterationNote", phaseId: notesFor.phaseId, iterationId: notesFor.iterationId, note: notesDraft.trim() || null }, `${notesFor.iterationName}: notes saved`)) setNotesFor(null); }}><Field label="Client notes"><Textarea rows={6} maxLength={4000} value={notesDraft} autoFocus onChange={(event) => setNotesDraft(event.target.value)} /></Field>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setNotesFor(null)} disabled={commands.isPending("card-notes")}>Cancel</Button><Button type="submit" variant="primary" pending={commands.isPending("card-notes")}>Save notes</Button></FormActions></form></Dialog> : null}
+      {skipPhase ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("card-skip")) setSkipPhase(null); }} title="Skip this phase" description="The phase is marked done without work. A reason is recorded."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("card-skip", { command: "bypass", phaseId: skipPhase.id, reason: skipReason }, `${skipPhase.name} skipped`)) setSkipPhase(null); }}><Field label="Reason" required><Textarea rows={2} value={skipReason} maxLength={500} onChange={(event) => setSkipReason(event.target.value)} /></Field>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setSkipPhase(null)} disabled={commands.isPending("card-skip")}>Cancel</Button><Button type="submit" variant="primary" pending={commands.isPending("card-skip")} disabled={!skipReason.trim()}>Skip phase</Button></FormActions></form></Dialog> : null}
     </article>
   );
 }

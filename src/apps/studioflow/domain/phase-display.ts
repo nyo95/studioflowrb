@@ -14,12 +14,13 @@ export function phaseStepPresentation(input: {
   canStart: boolean;
   isSupervision: boolean;
   iterationCount?: number;
+  skippedReason?: string | null;
   iteration: { name: string; state: IterationState; waitingDays: number | null } | null;
 }): { state: PhaseStepState; note: string } {
   if (input.phaseStatus === "DONE") {
     return {
       state: "done",
-      note: input.iterationCount && input.iterationCount > 1 ? `Done in ${input.iterationCount} rounds` : "Done",
+      note: input.skippedReason ? "Skipped" : input.iterationCount && input.iterationCount > 1 ? `Done in ${input.iterationCount} rounds` : "Done",
     };
   }
   if (input.phaseStatus === "PENDING") {
@@ -38,4 +39,11 @@ export function phaseStepPresentation(input: {
   if (iteration.state === "ANSWERED") return { state: "attention", note: `${round} · client answered` };
   if (input.isSupervision && iteration.state === "NOT_SENT") return { state: "current", note: "Visit planned" };
   return { state: "current", note: `${round} · in progress` };
+}
+
+/** A skipped finish is stored in the existing phase-event JSON snapshot, not in a new schema column. */
+export function phaseSkipReason(event: { auto_created: unknown } | null | undefined): string | null {
+  if (!event?.auto_created || typeof event.auto_created !== "object" || Array.isArray(event.auto_created)) return null;
+  const snapshot = event.auto_created as { kind?: unknown; reason?: unknown };
+  return snapshot.kind === "bypass" && typeof snapshot.reason === "string" && snapshot.reason.trim() ? snapshot.reason : null;
 }

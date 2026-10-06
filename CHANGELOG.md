@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.355 | 2026-10-06 | feat(studioflow): add phase menus and undoable active-phase skip
+
+- **Skip lifecycle.** `phase.review` may now skip a pending or active phase with a reason. A sent/populated round is closed and kept; an empty never-sent round without client notes or files is removed. The phase is locked as done, the next eligible phase opens by the existing rule, and the existing five-minute/same-actor undo restores the exact phase, round and auto-advanced state. The reason remains in the audit/event record; no schema, migration, service boundary, action shape or permission vocabulary changed.
+- **State projection and wording.** Home and both phase strips derive the latest finishing event and show **Skipped** instead of Done; the phase canvas also shows the reason. Every visible StudioFlow workflow label now says **round** while code and persistence identifiers remain unchanged. Auto-opened empty Supervision placeholders yield cleanly to the first dated visit without discarding populated work.
+- **Phase commands.** Each Home phase has a ⋯ menu in the track action slot: Open phase, Client notes when the open round is not with the client, + New round when finished, and permission/state-gated Skip phase. The phase-page More menu also permits active skip. Existing UI Engine menus, dialogs, buttons, confirmation/undo surfaces and command paths are reused; no visual polish beyond the Work Order.
+- Updated the StudioFlow contract and queued the Lead's authenticated desktop/phone acceptance for R8.356 in the browser backlog.
+
+**Checks.** Baseline `npm test`: 831 pass. Final `npm test`: 837 pass, 0 fail/skipped/cancelled (six new skip-lifecycle integration tests). `npm run typecheck`; `npm run lint` (0 errors; two existing `no-img-element` warnings); `npm run check:boundaries`; `npm run check:legacy-runtime`; `npm run build`; staged and unstaged whitespace checks. Browser acceptance and final visual polish remain for the Lead in R8.356.
+
 ## R8.354 | 2026-10-06 | fix(studioflow,ui-engine): no sideways page scroll on a phone; DESIGN v2 draft
 
 - **Phone bug (owner, 2026-10-06), found in the sidebar/rail study.** At 375px the Home page was 660px wide: the project card, a grid item, grew to its phase strip's 640px, so the whole content scrolled sideways and the title was cut off. The card now has `min-w-0` and the strip scrolls inside it. The same study found the project pages 414px wide at 375px: `PageHeader`'s action row (the project section nav) sized itself to its content when the header stacked; it is now capped at the page width (`max-w-full`), which fixes every app that puts a wide action row in a page header. Browser-checked at 375 and 640px on StudioFlow Home, project, schedule, MOM, presentation, history, Projects, Timeline, Clients, Library, Master Data and BQ: no page-level sideways scroll (BQ's wide table still scrolls inside its own surface, as intended).

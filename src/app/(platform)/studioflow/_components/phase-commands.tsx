@@ -117,7 +117,8 @@ export function IterationButtons({
     }
     if (!canAct) return null;
     if (phase.isSupervision && phase.status === "ACTIVE") return <Button size="sm" variant={startVariant} onClick={onNewVisit}>New visit</Button>;
-    return <Button size="sm" variant="secondary" pending={busy("add")} onClick={() => phase.isSupervision ? onNewVisit() : run("add", { ...base, command: "addIteration" }, `New ${phase.name} iteration added`)}>+ iteration</Button>;
+    if (!lead) return null;
+    return <Button size="sm" variant="secondary" pending={busy("add")} onClick={() => phase.isSupervision ? onNewVisit() : run("add", { ...base, command: "addIteration" }, `New ${phase.name} round added`)}>+ New round</Button>;
   }
 
   if (!canAct) return null;
@@ -180,7 +181,7 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
       open
       onOpenChange={(open) => { if (!open && !busyKey) onClose(); }}
       title={`${iteration.name}: the client answered`}
-      description="Write what the client said. If you choose Revision, the next iteration shows these notes as its brief."
+      description="Write what the client said. If you choose Revision, the next round shows these notes as its brief."
       dismissible={!busyKey}
       footer={
         <div className="flex flex-wrap justify-end gap-2">

@@ -217,6 +217,83 @@ describe("WO-SF-ITER-01 phase 3 card reads", () => {
   });
 });
 
+describe("WO-SF-PHASE-MENU-01 skip lifecycle", () => {
+  const latestPhaseEvent = (projectId: string) => testDb.prisma.sfPhaseEvent.findFirstOrThrow({ where: { project_id: projectId }, orderBy: { occurred_at: "desc" } });
+
+  it("skips an active phase and removes its empty never-sent round", async () => {
+    const { projectId } = await newProject("Skip empty active round");
+    const phase = await phaseOf(projectId, "moodboard");
+    const open = await openIteration(phase.id);
+    await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: phase.id, reason: "Client supplied the concept" });
+    assert.equal(await testDb.prisma.sfRevision.count({ where: { id: open.id } }), 0);
+    assert.deepEqual(await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: phase.id }, select: { status: true, is_locked: true } }), { status: "DONE", is_locked: true });
+    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id })).skippedReason, "Client supplied the concept");
+    assert.equal((await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((card) => card.id === projectId)!.phases[0]!.skipped_reason, "Client supplied the concept");
+  });
+
+  it("keeps a sent round as closed history when its active phase is skipped", async () => {
+    const { projectId } = await newProject("Skip sent round");
+    const phase = await phaseOf(projectId, "moodboard");
+    const open = await openIteration(phase.id);
+    await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id });
+    const sentAt = (await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: open.id } })).sent_at;
+    await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: phase.id, reason: "Client stopped review" });
+    const kept = await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: open.id } });
+    assert.equal(kept.status, "DONE");
+    assert.deepEqual(kept.sent_at, sentAt);
+  });
+
+  it("refuses to skip a phase that is already done", async () => {
+    const { projectId } = await newProject("Skip done refusal");
+    const phase = await phaseOf(projectId, "moodboard");
+    await clientRound({ ...as(designer), projectId, phaseId: phase.id }, "DONE");
+    await rejectsWith(sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: phase.id, reason: "Too late" }), "PHASE_INVALID_STATE");
+  });
+
+  it("auto-advances after a skip by the same rule as a normal finish", async () => {
+    const { projectId } = await newProject("Skip auto advance");
+    const phase = await phaseOf(projectId, "moodboard");
+    const result = await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: phase.id, reason: "No concept phase needed" });
+    const next = await phaseOf(projectId, "layout");
+    assert.deepEqual(result.autoAdvance, { phaseId: next.id, iterationId: (await openIteration(next.id)).id });
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: next.id } })).status, "ACTIVE");
+  });
+
+  it("undoes pending, empty-active, and sent-active skips with their exact round state", async () => {
+    const emptyProject = await newProject("Undo empty skip");
+    const emptyPhase = await phaseOf(emptyProject.projectId, "moodboard");
+    const emptyRound = await openIteration(emptyPhase.id);
+    await sf.phases.bypassPhase({ ...as(designer), projectId: emptyProject.projectId, phaseId: emptyPhase.id, reason: "Temporary" });
+    await sf.phases.undoPhaseEvent({ ...as(designer), projectId: emptyProject.projectId, eventId: (await latestPhaseEvent(emptyProject.projectId)).id });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: emptyRound.id } })).status, "NOT_SENT");
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: emptyPhase.id } })).status, "ACTIVE");
+
+    const sentProject = await newProject("Undo sent skip");
+    const sentPhase = await phaseOf(sentProject.projectId, "moodboard");
+    const sentRound = await openIteration(sentPhase.id);
+    await sf.phases.sendIteration({ ...as(designer), projectId: sentProject.projectId, phaseId: sentPhase.id, iterationId: sentRound.id });
+    await sf.phases.bypassPhase({ ...as(designer), projectId: sentProject.projectId, phaseId: sentPhase.id, reason: "Temporary" });
+    await sf.phases.undoPhaseEvent({ ...as(designer), projectId: sentProject.projectId, eventId: (await latestPhaseEvent(sentProject.projectId)).id });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: sentRound.id } })).status, "SENT");
+
+    const pendingProject = await newProject("Undo pending skip");
+    const pendingPhase = await phaseOf(pendingProject.projectId, "supervision");
+    await sf.phases.bypassPhase({ ...as(designer), projectId: pendingProject.projectId, phaseId: pendingPhase.id, reason: "Temporary" });
+    await sf.phases.undoPhaseEvent({ ...as(designer), projectId: pendingProject.projectId, eventId: (await latestPhaseEvent(pendingProject.projectId)).id });
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: pendingPhase.id } })).status, "PENDING");
+    assert.equal(await testDb.prisma.sfRevision.count({ where: { phase_id: pendingPhase.id } }), 0);
+  });
+
+  it("requires phase-review permission for skip and its undo", async () => {
+    const { projectId } = await newProject("Skip permission");
+    const phase = await phaseOf(projectId, "moodboard");
+    const withoutReview = ALL.filter((grant) => grant !== P.phaseReview);
+    await rejectsWith(sf.phases.bypassPhase({ ...as(designer, withoutReview), projectId, phaseId: phase.id, reason: "No permission" }), "PERMISSION_DENIED");
+    await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: phase.id, reason: "Allowed" });
+    await rejectsWith(sf.phases.undoPhaseEvent({ ...as(designer, withoutReview), projectId, eventId: (await latestPhaseEvent(projectId)).id }), "PERMISSION_DENIED");
+  });
+});
+
 describe("WO-SF-CDLIST-01 Construction Drawing list", () => {
   it("lets both PICs manage sorted drawing items, records one audit event per change, and keeps the list informational", async () => {
     const { projectId } = await newProject();

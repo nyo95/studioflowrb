@@ -53,8 +53,10 @@ export async function PhaseCanvas({ projectId, phaseId, people, archived }: { pr
         previous={phase.previousIteration ? { name: phase.previousIteration.name, note: phase.previousIteration.note } : null}
         iterations={phase.iterations}
         note={phase.note}
+        skippedReason={phase.skippedReason}
         startBlockedReason={phase.startBlockedReason}
         canAct={canAct}
+        canSkip={canTransition && caps.review}
         canNote={canAct}
         canOverride={caps.override}
         archived={archived}
