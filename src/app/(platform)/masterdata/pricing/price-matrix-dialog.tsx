@@ -5,6 +5,7 @@ import { useState, type ClipboardEvent, type FormEvent, type ReactNode } from "r
 
 import { Button, ConfirmDialog, CreatableMultiSelect, CreatableSearch, Dialog, Field, FormActions, IconButton, InlineError, Input, PrefixedInput, Select, Text } from "@/platform/ui_engine";
 import { formatDecimal } from "@platform/utilities/decimal";
+import { currencyPrefix } from "@platform/utilities/money";
 
 import { blurDisplay, parsePastedAmount, readTypedAmount, shouldShowAmountPrefix } from "./amount-format";
 import { saveWorkPriceMatrixAction } from "./actions";
@@ -150,7 +151,7 @@ export function PriceMatrixDialog({ kind, modes, onSwitch, vendors, categories, 
                     </Select>
                     {chosen.map((vendor, column) => {
                       const cell = row.cells[vendor.id] ?? { value: "", display: "" };
-                      return <PrefixedInput key={vendor.id} prefix="Rp." prefixVisible={shouldShowAmountPrefix(cell.value, cell.display)} aria-label={`${vendor.name}, row ${index + 1}`} density="compact" inputMode="text" placeholder="–" className="tabular-nums" value={cell.display}
+                      return <PrefixedInput key={vendor.id} prefix={currencyPrefix("IDR")} prefixVisible={shouldShowAmountPrefix(cell.value, cell.display)} aria-label={`${vendor.name}, row ${index + 1}`} density="compact" inputMode="text" placeholder="–" className="tabular-nums" value={cell.display}
                         onChange={(event) => { const read = readTypedAmount(event.target.value); if (read === null) return; patchCell(row.key, vendor.id, { value: read.value, display: read.display }); }}
                         onBlur={() => { const current = row.cells[vendor.id]; if (current) patchCell(row.key, vendor.id, { value: current.value, display: blurDisplay(current.value) }); }}
                         onKeyDown={(event) => { if (event.key === "Enter" && index === rows.length - 1 && column === chosen.length - 1) { event.preventDefault(); addRow(); } }} />;

@@ -11,6 +11,8 @@ export const DONE_RETENTION_DAYS = 7;
 export type TodayAddTarget = {
   projectId: string;
   projectName: string;
+  /** The same rule the server applies to a project-level add: a PIC or an override holder. */
+  canAdd: boolean;
 };
 
 export function createTodayService(db: Db, ports: StudioFlowPorts) {
@@ -51,6 +53,7 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
         };
       };
 
+      const override = hasPermission(input.grants, P.projectOverride);
       const addTargets: TodayAddTarget[] = [];
       for (const project of projects) {
         const todoRootIds = new Set(
@@ -63,7 +66,7 @@ export function createTodayService(db: Db, ports: StudioFlowPorts) {
             rows.push(itemRow(project.id, null, null, item));
           }
         }
-        addTargets.push({ projectId: project.id, projectName: project.name });
+        addTargets.push({ projectId: project.id, projectName: project.name, canAdd: override || project.pic_designer_id === userId || project.pic_drafter_id === userId });
       }
 
       const groups = groupFeed(

@@ -191,7 +191,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
           <Text size="sm" tone="tertiary">Nothing open for you in this project.</Text>
         )}
 
-        {canManageTasks && group ? <InlineAddRow projectId={group.project.id} /> : null}
+        {canManageTasks && group && addTargets.find((t) => t.projectId === group.project.id)?.canAdd ? <InlineAddRow projectId={group.project.id} /> : null}
       </div>
     );
   }
@@ -229,7 +229,7 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
               {savedFilters.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
             </Select></div>
           ) : null}
-          {canManageTasks && addTargets.length > 0 ? (
+          {canManageTasks && addTargets.some((t) => t.canAdd) ? (
             <Button variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setQuickAdd(true)}>Quick add</Button>
           ) : null}
         </div>
@@ -285,14 +285,14 @@ export function TodayView({ groups, addTargets, people, currentUserId, labels, s
             ) : (
               <ul className="m-0 grid list-none gap-px p-0">{group.tasks.map((task) => renderTask(task))}</ul>
             )}
-            {canManageTasks && !collapsed.includes(group.project.id) ? (
+            {canManageTasks && !collapsed.includes(group.project.id) && addTargets.find((t) => t.projectId === group.project.id)?.canAdd ? (
               <InlineAddRow projectId={group.project.id} />
             ) : null}
           </SectionCard>
         ))
       )}
 
-      {quickAdd ? <QuickAddDialog targets={addTargets} people={people} onClose={() => setQuickAdd(false)} /> : null}
+      {quickAdd ? <QuickAddDialog targets={addTargets.filter((t) => t.canAdd)} people={people} onClose={() => setQuickAdd(false)} /> : null}
     </div>
   );
 }

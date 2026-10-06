@@ -17,6 +17,14 @@ export function isValidCurrencyCode(currency: string): boolean {
   return CURRENCY_CODE_PATTERN.test(currency);
 }
 
+/**
+ * Short symbol shown in front of an amount being typed. Matches `formatMoney`:
+ * IDR is "Rp."; any other currency falls back to its code.
+ */
+export function currencyPrefix(currency: string): string {
+  return currency === "IDR" ? "Rp." : currency;
+}
+
 /** Builds a canonical Money value from a decimal amount and explicit currency. */
 export function createMoney(amount: DecimalString | string, currency: string): Money {
   if (!isValidCurrencyCode(currency)) {
@@ -41,7 +49,8 @@ export function formatMoney(value: Money, options: { locale?: string } = {}): st
   }
   if (value.currency === "IDR" && (options.locale === undefined || options.locale === DEFAULT_MONEY_LOCALE)) {
     const amount = formatDecimal(value.amount, { locale: DEFAULT_MONEY_LOCALE });
-    return amount.startsWith("-") ? `-Rp.${amount.slice(1)}` : `Rp.${amount}`;
+    const prefix = currencyPrefix(value.currency);
+    return amount.startsWith("-") ? `-${prefix}${amount.slice(1)}` : `${prefix}${amount}`;
   }
   // ECMA-402 formats decimal strings as exact mathematical values; the TS
   // library only admits literal numeric strings, so bridge the branded type

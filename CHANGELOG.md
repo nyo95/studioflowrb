@@ -2,6 +2,13 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.340 | 2026-10-06 | fix(studioflow,platform): add-to-do only where allowed; one shared currency prefix
+
+- Re-check of the merged local + GitHub work. My Today lists a project for someone who only has a to-do assigned there, but the add-to-do field and Quick add were offered for it and then refused by the server. Today now says per project whether the viewer may add (`canAdd`: a PIC or an override holder, the server's own rule); the inline add row and Quick add follow it.
+- Shared consistency: the currency prefix was typed as a literal "Rp." in four places. The money utility now owns `currencyPrefix` (also used by `formatMoney`), so every price field and every formatted amount agree. `PrefixedInput` pads a text prefix by its length, so a currency code such as USD no longer overlaps the typed value.
+
+**Checks.** `npm run typecheck`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime` passed; `npm test` **841/841** (none failed, skipped or cancelled).
+
 ## R8.339 | 2026-10-06 | fix(studioflow): distinguish general requirements from to-dos
 
 - Owner correction: scope alone does not make an item a to-do. A row copied from a requirement template remains a requirement even when its scope is General, so My Tasks now contains only ad-hoc project-level to-dos and their subtasks. Subtasks beneath a template requirement stay with that requirement instead of being promoted as orphan to-dos.
@@ -232,8 +239,8 @@ Logic, backend and flow review of the StudioFlow phase, task and Today code afte
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.339**
-- Next local revision: **R8.340**
+- Current revision after this entry is committed: **R8.340**
+- Next local revision: **R8.341**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.

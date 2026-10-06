@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import { toDecimalString } from "@platform/utilities/decimal";
 
-import { createMoney, formatMoney, isValidCurrencyCode } from "./index";
+import { createMoney, currencyPrefix, formatMoney, isValidCurrencyCode } from "./index";
 
 describe("currency validation", () => {
   it("accepts uppercase ISO-style three-letter codes only", () => {
@@ -62,5 +62,12 @@ describe("formatMoney", () => {
     const value = createMoney("0.005", "USD");
     assert.equal(formatMoney(value, { locale: "en-US" }), "$0.01");
     assert.equal(value.amount, "0.005");
+  });
+});
+
+describe("currencyPrefix", () => {
+  it("uses Rp. for IDR and the code for any other currency", () => {
+    assert.equal(currencyPrefix("IDR"), "Rp.");
+    assert.equal(currencyPrefix("USD"), "USD");
   });
 });

@@ -105,8 +105,10 @@ export const PrefixedInput = forwardRef<
       <Input
         ref={ref}
         density={density}
-        className={cx(prefixVisible && (density === "compact" ? "pl-8" : "pl-9"), className)}
+        className={cx(prefixVisible && typeof prefix !== "string" && (density === "compact" ? "pl-8" : "pl-9"), className)}
         {...props}
+        // A text prefix is measured in characters so a longer one (a currency code) never overlaps the value.
+        style={prefixVisible && typeof prefix === "string" ? { paddingLeft: `calc(${prefix.length}ch + ${density === "compact" ? "1.1rem" : "1.35rem"})`, ...props.style } : props.style}
       />
     </span>
   );

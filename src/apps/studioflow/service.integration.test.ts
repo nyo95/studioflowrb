@@ -233,6 +233,7 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     const read = () => sf.today.getToday({ grants: [P.access, P.projectRead], actor: assigned.actor, scope: "mine" });
     const listed = await read();
     assert.equal(listed.groups.some((group) => group.project.id === projectId), true);
+    assert.equal(listed.addTargets.find((target) => target.projectId === projectId)!.canAdd, false, "a non-PIC assignee cannot add tasks to this project");
     await testDb.prisma.sfChecklistItem.update({ where: { id: itemId }, data: { is_checked: true, checked_at: new Date() } });
     const after = await read();
     assert.equal(after.groups.some((group) => group.project.id === projectId && group.tasks.some((task) => !task.isChecked)), false);
@@ -1798,6 +1799,7 @@ describe("Snapshot runtime truth", () => {
     assert.deepEqual(result.addTargets.find((target) => target.projectId === projectId), {
       projectId,
       projectName: "Quick-add project",
+      canAdd: true,
     });
   });
 
