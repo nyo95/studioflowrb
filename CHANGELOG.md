@@ -2,6 +2,13 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.345 | 2026-10-06 | docs(plan): StudioFlow re-layout — Work Order WO-SF-RELAYOUT-01
+
+- Owner review of Home and the phase page as a designer: the same facts appeared several times (phase list in the rail and the strip, the round name four times, client notes in two places, requirements in three places, "Active" under every phase, a red "No deliverable" on a phase that just started). The owner approved a de-duplicated layout (mockup), decided that the project rail, its Phases menu and the Requirements page go, and assigned the UI build to the Executor with Lead polish afterwards.
+- `PLAN.md` replaced (WO-SF-NOTES-ONLY-01 fully landed in R8.342-R8.343) with WO-SF-RELAYOUT-01: shared project header instead of the rail, `PipelineStrip` extended with a `track` variant used on Home and the project page, current-round card with the previous round's notes as its brief, earlier rounds with their notes, requirements/pinned note/files in the phase aside. No rule, command, permission or data change. The mockup's serif titles are not adopted; UI Engine headings stay as they are.
+
+**Checks.** Documentation only; none run.
+
 ## R8.344 | 2026-10-06 | fix(studioflow): honest, easier-to-find header search
 
 - The header search said "Search projects, items, MOM" but only finds projects and clients; the placeholder now says "Search projects or clients".
