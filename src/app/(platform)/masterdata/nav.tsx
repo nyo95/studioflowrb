@@ -36,7 +36,7 @@ export function MasterDataNav({ canManageSampleRequests = false, canUseWorkbook 
   const links = MASTERDATA_NAV_LINKS.filter((link) => (link.href !== "/masterdata/sample-requests" || canManageSampleRequests) && (link.href !== "/masterdata/workbook" || canUseWorkbook));
 
   return (
-    <NavGroup label="Master Data navigation">
+    <NavGroup label="Master Data navigation" heading="Master Data">
       {links.map(({ href, label, exact }) => {
         const Icon = iconMap[href] ?? LayoutGrid;
         const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
@@ -54,7 +54,7 @@ export function MasterDataNav({ canManageSampleRequests = false, canUseWorkbook 
       })}
       {/* Settings live in the shared settings area, outside this app's route root, so the link is added here rather than in the app's public route list. */}
       {canOpenSettings ? (
-        <NavItem icon={<Settings size={16} />} active={false} href="/settings/general/masterdata" prefetch={false}>Settings</NavItem>
+        <NavItem icon={<Settings size={16} />} active={false} href="/settings/general/masterdata" prefetch={false}>Master Data settings</NavItem>
       ) : null}
     </NavGroup>
   );

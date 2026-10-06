@@ -1,20 +1,57 @@
-# DESIGN.md — StudioFlow Rebuild Design Contract
+# DESIGN.md — StudioFlow Rebuild Design Contract (v2)
 
-Status: **LOCKED — canonical minimalist shared visual contract (PM/TL, revised by owner direction 2026-08-25; foundations pass under owner direction 2026-09-29, R8.202)**
-Scope: Shared visual language for StudioFlow, Master Data, BQ, and future subapps.
-Source basis: current owner direction plus the legacy UI engine, design tokens, shared shells/components, and proven app workflows. Every visual migration must record the exact legacy commit and distinguish committed evidence from working-tree-only evidence; no moving branch or prose summary is an implicit design authority.
+Status: **LOCKED — v2, owner-approved 2026-10-06 (R8.357)**, after review of the
+interactive mockup. Replaces v1 (R8.202 foundations, R8.148 headings).
+Scope: shared visual language for StudioFlow, Master Data, BQ, and future apps.
 
-Authority: this is the single shared visual contract. Product/domain policy remains owned by an owner-approved app contract; none is executable in the current foundation-only phase.
+**Built so far (R8.357):** tokens (§3–§5) and the rail and thin top bar
+(§10.1–§10.2). **Not built yet**, tracked in `docs/BACKLOG.md`: the pill tab bar
+and context capsule (§10.3), stat cards (§6.1), the per-app counts on rail items,
+and the Playwright size checks (§12). Until a pattern is built, screens keep the
+v1 component it replaces (e.g. filter chips for in-page tabs, the sticky
+breadcrumb strip).
+
+## 0. What changed from v1
+
+Owner direction (2026-10-06): an **Apple / Linear** feel — quiet, minimal, more
+air around things, hairline borders, soft depth — taken from three reference
+screenshots for their **structure only** (no red accent, no dark glass, no green,
+no 3D art). Owner decisions recorded with it:
+
+| # | Decision | Effect on this contract |
+|---|---|---|
+| 1 | Account, Settings and Log out move into the rail; search, notifications and messages stay in a thin top bar | §10.1, §10.2; reverses R8.110's "Settings in the account menu"; loosens R8.329 (the top bar keeps the mark cell, app chip and search, loses the account menu) |
+| 2 | The rounded pill bar is for in-page tabs and context only, not main navigation | §10.3 |
+| 3 | Chrome and the space between sections get airier; tables and the schedule keep their density | §1, §5 |
+| 4 | The active rail item is a full-width white block | §10.1 |
+| 5 | Playwright guards screen sizes (375, ~640, 839/840/841 px) | §12 |
+
+| Area | v1 | v2 |
+|---|---|---|
+| Intent | "compact, information-dense; an operational tool, not a marketing site" | calm chrome, dense data: air around pages and sections, unchanged density inside tables |
+| Ground | `#F0F0F0`, 1.13:1 under white | lighter `#F5F5F4`; planes separate by a hairline, not by contrast |
+| Planes | shadow-carried hairline (`--ui-shadow-plane`) | 1px hairline border `--ui-border-subtle`; shadow only on things that float |
+| Rail | recessed, darker than the ground | white plane on the left edge with one hairline; groups, round icon chips, counts |
+| Card radius | 14px | 16px (controls 10px, actions 8px, pills 999px) |
+| Section padding / gap | 16 / 16px | 20 / 24px (tables unchanged) |
+| Page padding | 20–24px | 24–32px (16px on a phone) |
+| Page head | breadcrumb in a separate sticky strip | context capsule above the title; large title; one line of context |
+| New patterns | — | pill tab bar (§10.3), stat card (§6.1) |
+| Unchanged | fonts and type scale, ink, semantic colours, phase marks, motion, tables, forms, dialogs, print, governance | — |
 
 ## 1. Design Intent
 
-StudioFlow uses a quiet, restrained professional UI:
-- one neutral light-grey ground, carrying warm near-black ink;
-- white working surfaces over a light canvas;
-- compact, information-dense layouts;
-- one sans-serif family for headings and operational UI, with weight and size carrying the hierarchy;
-- border-led surfaces with shadow reserved for overlays or true elevation;
-- status color only when meaning is functional.
+StudioFlow looks and behaves like a calm professional tool in the Apple / Linear
+manner:
+- one light neutral ground with warm near-black ink;
+- white working planes edged by a single hairline, with generous space between them;
+- **calm chrome, dense data**: page heads, cards and the gaps between sections are
+  airy; inside a table, schedule or list the rows stay as compact as v1, because
+  the operator scans them all day;
+- one sans family for everything, with weight and size carrying the hierarchy;
+- depth only for what floats (menus, dialogs, the pill bar, drawers);
+- status colour only when meaning is functional;
+- every screen answers "where am I" and "what needs me" before anything else.
 
 All apps must feel like one product. Do not create a separate visual language per app.
 
@@ -50,13 +87,25 @@ Type scale — five sizes, no others:
 
 Three planes in a fixed depth order: **ground → content → emphasis**.
 
-**Ground** (`--ui-canvas`, `#F0F0F0`): the page behind everything. At 1.13:1 under white it is a real plane — visible, not a hint. Nothing sits on it directly except spacing. There is **one** ground, chosen by the owner and neutral on purpose; the warmth in this product comes from the ink, not the paper. Alternate ground ramps and the `[data-ground]` switch were removed in R8.202 rather than left dormant — a contract that documents options nobody ships is how a contract starts drifting.
+**Ground** (`--ui-canvas`, `#F5F5F4`): the page behind everything — lighter than
+v1 so the page reads as open space. Nothing sits on it directly except spacing.
+There is **one** ground.
 
-**Planes** (`--ui-surface`, `#FFFFFF`): cards, tables, toolbars, topbar — everything the operator reads or acts on. Shadow-carried hairlines define the edge (`--ui-shadow-plane`). The ground is deep enough that shadow alone separates white planes from it; drawn borders are retained only where a shadow would be invisible (structural rail dividers, focus rings).
+**Planes** (`--ui-surface`, `#FFFFFF`): cards, tables, toolbars, the rail, the top
+bar. A plane is edged by **one 1px hairline** (`--ui-border-subtle`), not by a
+shadow; at this ground contrast a hairline is what separates white from the page.
+Shadows are reserved for planes that float above others (§4).
 
-**Rail** (`--ui-rail`, `#E3E3E3`): recesses below the ground — it reads as application chrome, not a content card. A rail darker than the ground is deliberate: it says "this is the machine, not the work." Both rails use this one token: the application rail in `AppShell` and the record workspace rail beside it, so the two never drift apart.
+**Rail** (`--ui-surface` with a hairline on its inner edge): v1 recessed the rail
+below the ground to say "this is the machine". v2 makes it a quiet white column
+like the reference layouts, and lets its structure (groups, chips, the active
+block) say "navigation". The record workspace rail, where one exists, uses the
+same treatment.
 
-**Emphasis** (`--ui-action-primary`, `#231F1C`): constant graphite. It never changes per screen. "The dark button is the one that commits" is true everywhere.
+**Emphasis** (`--ui-action-primary`, `#231F1C`): constant graphite. "The dark
+button is the one that commits" stays true everywhere. A selected chip or the
+active item of a pill bar may also use the graphite fill (it already does for
+filter chips); a navigation item never does — the active rail item is white (§10.1).
 
 **Phase marks** — five steps of **one** hue family, shapes only:
 
@@ -95,23 +144,22 @@ Concentric radii — inner controls are tighter than their outer containers:
 
 | Element | Radius | Token |
 |---|---|---|
-| Cards, sections, modals | 14px | `--ui-radius-card` |
+| Cards, sections, modals, drawers | 16px | `--ui-radius-card` |
 | Controls, toolbars, dropdowns | 10px | `--ui-radius-control` |
-| Inputs, action buttons | 7px | `--ui-radius-action` |
-| Badges, chips | 999px | `--ui-radius-pill` |
+| Inputs, action buttons, rail items | 8px | `--ui-radius-action` |
+| Badges, chips, pill bar, context capsule, icon chips | 999px | `--ui-radius-pill` |
 
-Elevation model — shadow-carried hairlines replace drawn borders on content planes:
+Elevation model — a hairline edges what rests; a shadow lifts only what floats:
 
-| Plane | Treatment | Shadow token |
+| Plane | Treatment | Token |
 |---|---|---|
-| Ground | `--ui-canvas` `#F0F0F0`, no shadow | — |
-| Content plane (resting) | `--ui-surface` + shadow hairline | `--ui-shadow-plane` |
-| Content plane (hover/focus) | `--ui-surface` + raised shadow | `--ui-shadow-raise` |
-| Rail / chrome | `--ui-rail` `#E3E3E3`, structural border | — |
+| Ground | `--ui-canvas`, no edge | — |
+| Content plane (resting) | `--ui-surface` + 1px `--ui-border-subtle` | — |
+| Content plane (hover/focus, when interactive) | + `--ui-border-default` | — |
+| Rail, top bar | `--ui-surface` + one structural hairline | — |
+| Pill bar, context capsule | `--ui-surface` + hairline + soft shadow | `--ui-shadow-float` (new) |
 | Dialog / menu / drawer | `--ui-surface` + full elevation | `--ui-shadow-over` |
-| Emphasis | `--ui-action-primary` `#231F1C` | — |
-
-`--ui-shadow-plane`: a 0.5px hairline ring + 1px micro shadow. This replaces the `1px border` on cards and tables. Structural dividers (sidebar separator, header bottom) keep a drawn border because a shadow would be invisible against an adjacent surface.
+| Emphasis | `--ui-action-primary` | — |
 
 Do not stack cards inside cards. One elevation depth per screen section.
 
@@ -124,7 +172,7 @@ action, they are not decoration.
 |---|---|---|---|
 | xs | 12px | `--ui-icon-xs` | Inline marks inside a text line — breadcrumb and rail chevrons, separators |
 | sm | 14px | `--ui-icon-sm` | Inside controls, table rows, menu items, trailing affordances |
-| md | 16px | `--ui-icon-md` | The default — nav entries, toolbar buttons, section heads |
+| md | 16px | `--ui-icon-md` | The default — nav entries (inside their round chip), toolbar buttons, section heads |
 | lg | 20px | `--ui-icon-lg` | Empty states and page-level marks |
 
 Before R8.202 the product used nine sizes between 10px and 20px, each chosen at
@@ -136,22 +184,29 @@ An icon-only control still needs an accessible name and a tooltip (§14).
 
 ## 5. Spacing & Density
 
-Canonical base:
+Two densities, one rule: **air belongs to the frame, density belongs to the data.**
+
+Frame (page, page head, cards, gaps between sections):
+
+| Token | v2 value |
+|---|---|
+| `--ui-page-padding` | 24–32px (clamped); 16px below 560px |
+| `--ui-section-px` | 20px |
+| `--ui-section-py` | 20px |
+| `--ui-section-gap` | 24px |
+| `--ui-page-max` | 1440px |
+
+Data (tables, schedule, lists, directory rows) — unchanged from v1:
 
 | Token | Value |
 |---|---|
-| `--ui-section-px` | 16px |
-| `--ui-section-py` | 16px |
-| `--ui-section-gap` | 16px |
-| `--ui-page-padding` | 20–24px (clamped) |
-| `--ui-page-max` | 1440px |
-| `--ui-row-y` | 9px (comfortable row padding) |
+| `--ui-row-y` | 9px |
 | `--ui-control-height-md` | 36px |
 | `--ui-control-height-sm` | 32px |
+| table header / cell padding | 6px / 7px (compact directories) |
 
-This is an operational tool, not a marketing site. Optimize for scanning and repeated daily use.
-
-**BQ compact density.** Apply `data-density="compact"` on `<html>` for BQ only. This stamp tightens row padding to 6px, controls to 28px/24px, and section padding to 12/10px. It is a single attribute change — no component-level overrides.
+**BQ compact density.** `data-density="compact"` on `<html>` for BQ only, as in
+v1 (rows 6px, controls 28/24px, section padding 12/10px).
 
 **Page measure variants.** `PageShell` accepts a `measure` prop:
 - default (1100px): general content
@@ -161,25 +216,37 @@ This is an operational tool, not a marketing site. Optimize for scanning and rep
 ## 6. Page Structure
 
 ```text
-AppShell
+AppShell (rail + thin top bar)
 └── PageShell
     ├── PageHeader
-    │   ├── Eyebrow/context?
-    │   ├── Title
-    │   ├── Description?
-    │   ├── Meta?
-    │   └── Primary action?
+    │   ├── Context capsule?   (app · section · record — §10.3)
+    │   ├── Title + status badge?
+    │   ├── One line of context?
+    │   └── Actions (view toggle, primary action)
+    ├── Stat cards?             (§6.1)
     └── PageContent
+        ├── Pill tab bar?       (§10.3)
         ├── Toolbar/Filters?
-        └── Sections/Table/Detail
+        └── Sections / Table / Canvas + detail panel
 ```
 
 Rules:
 - one clear H1 per page;
-- primary action belongs in PageHeader or main toolbar;
+- primary action belongs in PageHeader or the main toolbar;
 - descriptions and metadata are optional, never filler;
 - reuse shared shells instead of creating custom page wrappers;
-- apps may provide navigation configuration, not separate shell styling.
+- apps may provide navigation configuration, not separate shell styling;
+- a canvas with a selection (a board, a plan, a schedule) may pair with a
+  **detail panel** on the right: a white plane of label-left / value-right spec
+  rows, using `Drawer` or `DetailShell`.
+
+## 6.1 Stat cards
+
+A row of up to four cards, each: small label (optional icon in a round chip), one
+large figure in `MetricValue`, one quiet caption. Use them only where the numbers
+drive a decision on that page (e.g. "3 of 12 final", "2 samples waiting"); never
+as decoration, never repeating a count the page already shows. They stack two-up,
+then one-up, on narrow screens.
 
 ## 7. Tables
 
@@ -306,6 +373,45 @@ Do not invent arbitrary modal widths per feature.
 - one shared back-navigation pattern;
 - tabs are for sibling views of one domain.
 
+## 10.1 The rail (owner decisions 1 and 4)
+
+Collapsed by default: icons only, in a slim column. It expands **when pressed**
+(the collapse/expand control), never on hover, and pushes the content rather than
+covering it. Expanded, top to bottom:
+
+1. **Account block** — avatar, name, a chevron that opens Account (profile,
+   switch account where available). Collapsed: the avatar alone.
+2. **Groups** — a small uppercase, letter-spaced label (`text-label`) and a hairline
+   divider between groups. Apps supply groups through `NavGroup` headings.
+3. **Items** — each icon sits in a small round chip; the label follows; a count, if
+   any, is a right-aligned pill (`badge`), hidden when collapsed (a dot remains).
+   The **active item is a full-width white block** with a hairline, semibold label
+   and an ink icon chip, so "where am I" reads on three channels.
+4. **General** at the foot — **Settings** and **Log out**, then the collapse control.
+
+A count is shown only when it asks for action (e.g. items waiting on me); it is
+supplied by the owning app, never computed in the UI Engine.
+
+## 10.2 The top bar (owner decision 1)
+
+One thin line (`--ui-topbar-height`): the mark in a cell exactly as wide as the
+rail (R8.329's boundary is kept), the app chip beside it (R8.121 kept), the search
+field, then notifications and messages pinned right. The account menu leaves the
+top bar for the rail. On a phone (below 840px) the account avatar returns to the
+top bar's right end, because the rail becomes a strip there (§12).
+
+## 10.3 Pill tab bar and context capsule (owner decision 2)
+
+- **Pill tab bar** — for sibling views inside a page only (e.g. Phases / MOM /
+  Schedule / Presentation / History; Material / Fixture; Board / List). A rounded,
+  floating `--ui-surface` bar with a hairline and `--ui-shadow-float`. Items are
+  icon + label; on narrow widths inactive items may drop to icon-only while the
+  **active item always shows icon + label** in the graphite fill. It scrolls inside
+  itself when it cannot fit. It never replaces the rail or the top bar.
+- **Context capsule** — a small rounded capsule above the page title: app · section
+  · record (e.g. "StudioFlow · Projects · 2026-536 Sociolla …"), each part a link
+  back. It replaces the separate sticky breadcrumb strip.
+
 ## 11. Loading, Empty, Error & Disabled States
 
 Every reusable data surface supports:
@@ -320,22 +426,28 @@ Error must not look like empty data. Do not silently hide unresolved or invalid 
 
 Desktop operational use is primary, but narrower layouts must remain functional:
 - navigation can collapse/reflow;
-- tables scroll horizontally;
+- tables scroll horizontally inside their own surface;
 - form grids collapse progressively;
-- dialogs respect viewport height;
+- dialogs respect viewport height; drawers go full width on a phone;
 - actions remain reachable.
 
 Do not improve mobile by removing core information.
 
-The collapsible icon rail is a desktop behavior. At `840px` and below, navigation
-always returns to labeled horizontal form even when the stored desktop preference
-is collapsed. The preference is preserved and may resume when the viewport widens;
-UI Engine does not persist it.
+**Fixed frame, scrolling content.** The shell is one viewport high: the top bar
+and the navigation strip stay put; only the content scrolls. **The content never
+scrolls sideways.** Anything wider than the screen — a phase strip, a pill tab bar,
+a table — scrolls inside its own container, and every container between it and the
+page must be allowed to shrink (`min-w-0` on grid and flex items).
 
-Every collapsible app supplies a genuinely compact `collapsedBrand`; the full
-brand is not a safe 60px fallback. Rail content is clipped to the rail plane,
-never creates page-level horizontal overflow, and its utility navigation remains
-reachable in both expanded and collapsed desktop presentations.
+The collapsible rail is a desktop behavior. Below `840px` it becomes a labeled
+horizontal strip under the top bar, even when the desktop preference is collapsed;
+the preference is preserved and resumes when the viewport widens; UI Engine does
+not persist it.
+
+**Guarded sizes.** Playwright checks run at 375px, around 640px, and at 839 / 840 /
+841px (rail collapsed, expanded, and with long content): no page-level horizontal
+overflow, the mark cell and the rail share one width, and the rail expands only on
+press.
 
 ## 13. Interaction Contract
 
@@ -409,6 +521,8 @@ Forbidden without PM/TL approval:
 - schema-driven UI frameworks or app-specific PDF templates inside UI Engine.
 
 If a shared pattern is missing, report it rather than creating a parallel design system.
+
+(v2 note) The owner's approval of this draft is the PM/TL approval required above for a new visual language and spacing/radius values.
 
 ## 17. Legacy Evidence Used
 

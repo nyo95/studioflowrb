@@ -2,6 +2,17 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.357 | 2026-10-06 | feat(ui-engine,platform): DESIGN v2 in force — tokens, rail and thin top bar
+
+- Owner approved DESIGN v2 after the interactive mockup (2026-10-06). `DESIGN.md` is now v2 (the draft file is removed); its header says what is built and what is not yet.
+- **Tokens (all apps).** Lighter ground `#F5F5F4`; resting planes are edged by one 1px hairline (`--ui-shadow-plane` now draws it, so no component changed); new `--ui-shadow-float`; warmer hairline colours; card radius 16px, action radius 8px; frame spacing 20/20/24px and page padding 24–32px (16px below 560px). Table row density and BQ's compact stamp are unchanged. The rail is a white plane (`--ui-rail`), 64px collapsed and 236px expanded. Dark theme follows the same rules.
+- **Rail (UI Engine `AppShell`, `NavItem`, `NavGroup`).** New `railHeader` and `railFooter` slots; icons sit in round chips; the current entry is a full-width white block with a hairline, semibold type and a graphite chip; a `badge` shows at the right when expanded and as a dot when collapsed; a `NavGroup` heading draws a small label under a hairline. New `NavAction` for command entries. Still expands only on press.
+- **Account and General (owner decision 1; reverses R8.110's account-menu Settings, loosens R8.329).** The rail carries the account block (avatar, name, organisation; opens My preferences) at the top and the General group (Settings, Log out) at the foot. The top bar keeps the mark, app chip, search, messages and notifications; its account menu shows only below 840px inside an app (the rail is a strip there) and on surfaces without a rail (Settings, Account). App groups are headed StudioFlow, Master Data and BQ; the apps' own settings entries are renamed "StudioFlow settings" and "Master Data settings" so they no longer read like the General Settings.
+- Browser (owner's session, read-only): StudioFlow, Master Data, BQ and Settings at 1000px collapsed and expanded, 375px phone (account in the top bar, rail strip, no sideways scroll), and dark theme.
+- `UI_ENGINE.md` (AppShell, rail) and `docs/BACKLOG.md` (remaining DESIGN v2 slices: pill tab bar and context capsule, stat cards, rail counts, Playwright) updated.
+
+**Checks.** `tsc --noEmit`; `npm run lint` (0 errors, 2 existing warnings); `check:boundaries`; `npm test` **839/839** (new rail test; the token lock now expects the 8px action radius).
+
 ## R8.356 | 2026-10-06 | fix(studioflow): Lead review of the phase menu and skip; stuck active phase can take a round
 
 - Lead review of R8.355 (WO-SF-PHASE-MENU-01): PASS with corrections. Read the service, read-model and UI diff: skip accepts pending and active phases, keeps populated rounds, removes an empty never-sent round, auto-advances, writes an undoable event (undo of a skip needs `phase.review`, as the skip does), and exposes the reason; Home has the per-phase ⋯ menu and the screens say "round". The Executor also let a supervision phase drop an empty auto-opened round when the first visit is added (needed after a skip auto-advances into Supervision); accepted.

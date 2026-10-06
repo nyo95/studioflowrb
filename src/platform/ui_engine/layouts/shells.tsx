@@ -50,6 +50,10 @@ export type AppShellProps = {
   collapseLabel?: string;
   /** Remove the application rail when the current surface has no navigation. */
   railVisible?: boolean;
+  /** Top of the rail (DESIGN v2 §10.1): the account block. Desktop only; a phone shows the account in the top bar. */
+  railHeader?: ReactNode;
+  /** Foot of the rail: General entries such as Settings and Log out. Desktop only. */
+  railFooter?: ReactNode;
 };
 
 export function AppShell({
@@ -67,6 +71,8 @@ export function AppShell({
   expandLabel = "Expand navigation",
   collapseLabel = "Collapse navigation",
   railVisible = true,
+  railHeader,
+  railFooter,
 }: AppShellProps) {
   const [internalCollapsed, setInternalCollapsed] = useState(defaultCollapsed);
   const narrowNavigation = useNarrowNavigation();
@@ -146,16 +152,21 @@ export function AppShell({
             aria-label={navigationLabel}
             data-collapsed={isCollapsed || undefined}
           >
+            {railHeader ? (
+              <div className="shrink-0 px-2.5 pt-3 pb-1 group-data-collapsed:px-2.5 max-[840px]:hidden">{railHeader}</div>
+            ) : null}
             <nav
               className={cx(
-                "min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain px-[9px] pt-2 pb-2 print:overflow-visible",
-                isCollapsed && "px-[5px]",
+                "min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain px-2.5 pt-2 pb-2 print:overflow-visible",
                 "max-[840px]:flex max-[840px]:flex-none max-[840px]:gap-1 max-[840px]:overflow-x-auto max-[840px]:p-2.5 max-[840px]:[scrollbar-width:none] max-[840px]:[&::-webkit-scrollbar]:hidden",
               )}
             >
               {navigation}
             </nav>
             {utility ?? null}
+            {railFooter ? (
+              <div className="grid shrink-0 gap-0.5 border-t border-line-subtle px-2.5 pt-2 pb-1 max-[840px]:hidden">{railFooter}</div>
+            ) : null}
             {/* The rail's expand control belongs at its foot, below the utility
                 icons (prototype `.a-rail-toggle`). It was a 16px sliver pinned to
                 the rail's outer edge at mid-height — an easy thing to hit by
@@ -164,10 +175,10 @@ export function AppShell({
               <button
                 type="button"
                 className={cx(
-                  "mx-[9px] mb-2 grid h-7 shrink-0 items-center justify-items-start rounded-action border-0 bg-transparent px-2 font-ui-mono text-xs text-ink-tertiary transition-colors",
+                  "mx-2.5 mb-2 grid h-8 shrink-0 items-center justify-items-start rounded-action border-0 bg-transparent px-2.5 font-ui-mono text-xs text-ink-tertiary transition-colors",
                   "hover:bg-[color-mix(in_srgb,var(--ui-text-primary)_7%,transparent)] hover:text-ink",
                   "focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus",
-                  "group-data-collapsed:mx-auto group-data-collapsed:w-9 group-data-collapsed:justify-items-center group-data-collapsed:px-0",
+                  "group-data-collapsed:mx-auto group-data-collapsed:w-11 group-data-collapsed:justify-items-center group-data-collapsed:px-0",
                   "max-[840px]:hidden",
                 )}
                 aria-label={isCollapsed ? expandLabel : collapseLabel}
@@ -191,9 +202,11 @@ export function NavGroup({ label, heading, children }: { label: string; heading?
   return (
     <div role="group" aria-label={label} className="grid gap-0.5 max-[840px]:contents">
       {heading ? (
-        <p className="mt-1.5 mb-0.5 px-2.5 text-label text-ink-tertiary group-data-collapsed:hidden max-[840px]:hidden">
-          {heading}
-        </p>
+        /* DESIGN v2 §10.1: a small uppercase group label under a hairline. Collapsed, the hairline alone
+           still separates the groups. */
+        <div className="mt-1 border-t border-line-subtle pt-3 pb-1 max-[840px]:hidden group-data-collapsed:mx-1.5 group-data-collapsed:pt-2">
+          <p className="m-0 px-2 text-label text-ink-tertiary group-data-collapsed:hidden">{heading}</p>
+        </div>
       ) : null}
       {children}
     </div>
@@ -227,17 +240,57 @@ export type NavItemProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
 };
 
 const NAV_ITEM_BASE_CLASSES =
-  "relative flex w-full min-h-[29px] items-center gap-2.5 rounded-action border-0 bg-transparent px-2 py-0 text-[13px] text-left font-[inherit] text-ink-secondary no-underline transition-colors max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:min-h-[34px]";
+  "group/nav relative flex w-full min-h-9 items-center gap-2.5 rounded-action border-0 bg-transparent px-1.5 py-1 text-[13.5px] text-left font-[inherit] text-ink-secondary no-underline transition-colors max-[840px]:w-auto max-[840px]:shrink-0 max-[840px]:pr-2.5";
 
 const NAV_ITEM_STATE_CLASSES = {
   idle: "hover:bg-[color-mix(in_srgb,var(--ui-text-primary)_7%,transparent)] hover:text-ink",
-  /* Current location, per the prototype's `.a-icon.on`: the item lifts off the
-     recessed rail as a white plane. Fill alone would not separate it from hover,
-     so it is still marked on three channels — plane fill, the shadow that plane
-     casts, and heavier type. */
-  active: "bg-surface text-ink font-semibold shadow-plane max-[840px]:bg-transparent max-[840px]:shadow-none",
+  /* Current location (DESIGN v2 §10.1, owner decision 4): a full-width white block on the white rail,
+     edged by a hairline with a soft lift, heavier type, and the icon chip turned graphite. Three channels,
+     so it never reads as hover. On the phone strip the chip and the type carry it. */
+  active: "bg-surface text-ink font-semibold shadow-raise max-[840px]:shadow-none",
   disabled: "cursor-not-allowed opacity-48",
 } as const;
+
+/** The round icon chip of a rail entry; graphite when current. `dot` marks a count while the rail is collapsed. */
+function NavIconChip({ active, dot = false, children }: { active: boolean; dot?: boolean; children: ReactNode }) {
+  return (
+    <span
+      className={cx(
+        "relative grid h-7 w-7 shrink-0 place-items-center rounded-pill transition-colors [&_svg]:h-4 [&_svg]:w-4",
+        active ? "bg-action text-action-ink" : "bg-surface-muted text-ink-secondary group-hover/nav:text-ink",
+      )}
+      aria-hidden="true"
+    >
+      {children}
+      {dot ? <span className="absolute -right-0.5 -top-0.5 hidden h-2 w-2 rounded-pill border-2 border-rail bg-warning group-data-collapsed:block max-[840px]:group-data-collapsed:hidden" /> : null}
+    </span>
+  );
+}
+
+/**
+ * A rail entry that runs a command instead of navigating (e.g. Log out). Same look as `NavItem`, so the
+ * General group at the foot of the rail reads as one list.
+ */
+export function NavAction({ icon, children, className, ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & { icon?: ReactNode; children: ReactNode }) {
+  const { collapsed } = useContext(RailContext);
+  const item = (
+    <button
+      type="button"
+      className={cx(
+        NAV_ITEM_BASE_CLASSES,
+        NAV_ITEM_STATE_CLASSES.idle,
+        "disabled:cursor-progress disabled:opacity-60",
+        "group-data-collapsed:h-11 group-data-collapsed:w-11 group-data-collapsed:justify-center group-data-collapsed:gap-0 group-data-collapsed:px-0",
+        className,
+      )}
+      {...props}
+    >
+      {icon ? <NavIconChip active={false}>{icon}</NavIconChip> : null}
+      <span className="group-data-collapsed:sr-only">{children}</span>
+    </button>
+  );
+  return collapsed ? <Tooltip content={children} side="right">{item}</Tooltip> : item;
+}
 
 /**
  * A single navigation entry. Owned by the engine rather than each app so that
@@ -261,8 +314,8 @@ export function NavItem({ icon, active = false, disabled = false, badge, childre
     NAV_ITEM_BASE_CLASSES,
     disabled ? NAV_ITEM_STATE_CLASSES.disabled : active ? NAV_ITEM_STATE_CLASSES.active : NAV_ITEM_STATE_CLASSES.idle,
     /* Collapsed rail degrades the item to its icon without the app re-rendering. */
-    "group-data-collapsed:h-[34px] group-data-collapsed:w-9 group-data-collapsed:justify-center group-data-collapsed:gap-0 group-data-collapsed:px-0 group-data-collapsed:text-center",
-    "max-[840px]:group-data-collapsed:w-auto max-[840px]:group-data-collapsed:justify-start max-[840px]:group-data-collapsed:gap-2.5 max-[840px]:group-data-collapsed:px-2.5 max-[840px]:group-data-collapsed:py-[7px] max-[840px]:group-data-collapsed:text-left",
+    "group-data-collapsed:h-11 group-data-collapsed:w-11 group-data-collapsed:justify-center group-data-collapsed:gap-0 group-data-collapsed:px-0 group-data-collapsed:text-center",
+    "max-[840px]:group-data-collapsed:h-9 max-[840px]:group-data-collapsed:w-auto max-[840px]:group-data-collapsed:justify-start max-[840px]:group-data-collapsed:gap-2.5 max-[840px]:group-data-collapsed:px-1.5 max-[840px]:group-data-collapsed:pr-2.5 max-[840px]:group-data-collapsed:text-left",
     className,
   );
 
@@ -274,7 +327,7 @@ export function NavItem({ icon, active = false, disabled = false, badge, childre
 
   const content = (
     <>
-      {icon ? <span className="inline-flex shrink-0 [&_svg]:h-4 [&_svg]:w-4" aria-hidden="true">{icon}</span> : null}
+      {icon ? <NavIconChip active={active && !disabled} dot={Boolean(badge) && !disabled}>{icon}</NavIconChip> : null}
       <span className={labelClasses}>{children}</span>
       {trailing}
     </>
@@ -467,7 +520,7 @@ export function PageHeader({
  */
 export function UtilitySection({ children }: { children: ReactNode }) {
   return (
-    <div className="grid gap-0.5 border-t border-line-subtle px-[9px] pt-2 pb-1 max-[840px]:hidden group-data-collapsed:px-[5px]">
+    <div className="grid gap-0.5 border-t border-line-subtle px-2.5 pt-2 pb-1 max-[840px]:hidden">
       {children}
     </div>
   );

@@ -300,17 +300,24 @@ with `min-height: 0` through the bounded ancestors, never an app-owned root lock
 or an arbitrary content height. Printing releases the screen-only containment;
 standalone `DocumentSheet` flow is unchanged.
 
-The expanded rail is warm application chrome rather than a white content card.
+DESIGN v2 (R8.357): the rail is a white plane edged by one hairline. It holds,
+top to bottom, the `railHeader` (the account block), the app's navigation
+groups (a `NavGroup` `heading` draws a small label under a hairline), the
+`utility` area, the `railFooter` (the General group: Settings and Log out) and
+the collapse control. The rail expands only when that control is pressed.
 The sticky topbar is one fixed 46px line: its height, width and content never
 depend on the rail state, and it is the shell's only brand position — the rail
 carries no brand block of its own. `brand` is therefore a compact mark (a
 monogram or small logo), never a wordmark, which would repeat the application
 name already shown by the app chip beside it. The engine owns the label hiding
 and tooltip behavior; apps only provide navigation data.
-Active navigation lifts off the recessed rail as a white plane with the shadow
-that plane casts plus heavier type; hover remains a lighter transient state.
+Each entry's icon sits in a round chip. The current entry is a full-width white
+block with a hairline and soft lift, semibold type and a graphite chip; hover
+remains a lighter transient state. A `badge` (count) shows at the right when
+expanded and as a dot on the chip when collapsed. `NavAction` is the same entry
+as a command button (e.g. Log out).
 
-**Collapsible rail.** `collapsible` opts the rail into a 212px <-> 48px icon rail
+**Collapsible rail.** `collapsible` opts the rail into a 236px <-> 64px icon rail
 (`--ui-rail-expanded-width` / `--ui-rail-width`).
 State is controlled (`collapsed` + `onCollapsedChange`) or uncontrolled
 (`defaultCollapsed`). UI Engine owns the affordance, the widths, the transition,
@@ -331,6 +338,8 @@ is not shown, and the stored state resumes only when the viewport widens.
 | `onCollapsedChange` | `(collapsed: boolean) => void` | — | Fires on toggle |
 | `expandLabel` / `collapseLabel` | `string` | "Expand/Collapse navigation" | Accessible name for the toggle |
 | `railVisible` | `boolean` | `true` | Drops the rail column on surfaces with no application navigation |
+| `railHeader` | `ReactNode` | — | Top of the rail (account block); hidden below `840px`, where the account returns to the top bar |
+| `railFooter` | `ReactNode` | — | Foot of the rail (General: Settings, Log out); hidden below `840px` |
 
 The rail clips its own visual contents and must never create document-level
 horizontal overflow; utility navigation stays mounted and reachable when

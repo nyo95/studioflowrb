@@ -89,6 +89,7 @@
   /* Shadows */
   --shadow-plane:    var(--ui-shadow-plane);
   --shadow-raise:    var(--ui-shadow-raise);
+  --shadow-float:    var(--ui-shadow-float);
   --shadow-over:     var(--ui-shadow-over);
   --shadow-elevated: var(--ui-shadow-elevated);
 

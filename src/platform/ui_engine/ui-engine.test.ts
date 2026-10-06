@@ -240,7 +240,7 @@ describe("UI Engine foundation", () => {
 
   it("locks token source, action radius, widths, and horizontal overflow", () => {
     const css = readFileSync(new URL("./tokens/tokens.css", import.meta.url), "utf8");
-    assert.match(css, /--ui-radius-action:\s*7px/);
+    assert.match(css, /--ui-radius-action:\s*8px/);
     assert.match(css, /--ui-dialog-sm:\s*420px/);
     assert.match(css, /--ui-dialog-full:\s*1180px/);
     assert.match(css, /--ui-dialog-max-height:\s*90dvh/);
@@ -323,7 +323,7 @@ describe("UI Engine foundation", () => {
 
     const shells = readFileSync(new URL("./layouts/shells.tsx", import.meta.url), "utf8");
     assert.match(shells, /collapsible && !narrowNavigation/);
-    assert.match(shells, /group-data-collapsed:h-\[34px\] group-data-collapsed:w-9/);
+    assert.match(shells, /group-data-collapsed:h-11 group-data-collapsed:w-11/);
     assert.match(shells, /max-\[840px\]:group-data-collapsed:w-auto/);
     assert.doesNotMatch(shells, /max-\[840px\]:group-data-collapsed:h-auto/);
   });
@@ -333,6 +333,20 @@ describe("UI Engine foundation", () => {
 
     assert.match(shells, /railVisible \? <aside/);
     assert.match(shells, /: "grid-cols-1"/);
+  });
+
+  it("draws the DESIGN v2 rail: round icon chips, a white current block, account and General slots", () => {
+    const current = renderToStaticMarkup(createElement(ui.NavItem, { href: "/a", active: true, icon: createElement("svg") }, "Home"));
+    assert.match(current, /shadow-raise/);
+    assert.match(current, /bg-action text-action-ink/);
+    const idle = renderToStaticMarkup(createElement(ui.NavItem, { href: "/b", icon: createElement("svg"), badge: "3" }, "Samples"));
+    assert.match(idle, /bg-surface-muted text-ink-secondary/);
+    assert.match(idle, /group-data-collapsed:block/); // the count's dot while collapsed
+    const logout = renderToStaticMarkup(createElement(ui.NavAction, { icon: createElement("svg") }, "Log out"));
+    assert.match(logout, /<button type="button"/);
+    const shell = renderToStaticMarkup(createElement(ui.AppShell, { brand: "B", navigation: "N", topbar: "T", railHeader: createElement("span", null, "ACCOUNT"), railFooter: createElement("span", null, "GENERAL") }, "Body"));
+    assert.ok(shell.indexOf("ACCOUNT") < shell.indexOf("GENERAL"));
+    assert.match(shell, /max-\[840px\]:hidden">\<span>ACCOUNT/);
   });
 
   it("keeps a page header's action row inside the page on a phone", () => {

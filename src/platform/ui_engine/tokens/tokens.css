@@ -8,20 +8,21 @@
   /* ── Ground & surfaces ────────────────────────────────────────────────────
      Three planes in a fixed depth order:
        ground  →  content planes  →  emphasis
-     Rail recedes BELOW the ground; dialogs float ABOVE content planes.      */
-  --ui-canvas:          #F0F0F0;  /* ground — 1.13:1 under white, neutral grey  */
-  --ui-surface:         #FFFFFF;  /* content: cards, tables, toolbars          */
-  --ui-surface-raised:  #F5F5F5;  /* inset: table headers, code, muted input   */
-  --ui-surface-muted:   #EBEBEB;  /* hover, selected, disabled                 */
-  --ui-rail:            #E3E3E3;  /* recessed chrome (sidebar rail)            */
-  --ui-rail-soft:       #EBEBEB;  /* softer rail accent                        */
+     DESIGN v2 (R8.357): a light ground; white planes (the rail included)
+     separate from it by a hairline, not by contrast; dialogs float.        */
+  --ui-canvas:          #F5F5F4;  /* ground — light, warm-neutral              */
+  --ui-surface:         #FFFFFF;  /* content: cards, tables, toolbars, rail    */
+  --ui-surface-raised:  #FAFAF9;  /* inset: table headers, code, muted input   */
+  --ui-surface-muted:   #F0EFED;  /* hover, selected, disabled, icon chips     */
+  --ui-rail:            #FFFFFF;  /* navigation rail: a white plane            */
+  --ui-rail-soft:       #F0EFED;  /* softer rail accent                        */
 
   /* ── Borders ─────────────────────────────────────────────────────────────
-     Shadow-carried hairlines are the primary edge. Keep border tokens for
-     components that still use drawn borders (structural dividers, focus).    */
-  --ui-border-subtle:   #E8E8E8;
-  --ui-border-default:  #D5D5D5;
-  --ui-border-strong:   #BDBDBD;
+     A 1px hairline is the edge of every resting plane (carried by
+     --ui-shadow-plane so components need no border of their own).          */
+  --ui-border-subtle:   #E7E5E3;
+  --ui-border-default:  #D6D3D0;
+  --ui-border-strong:   #BDB8B2;
   --ui-border-focus:    #1A1714;
 
   /* ── Ink (text) ──────────────────────────────────────────────────────────  */
@@ -91,27 +92,28 @@
   --ui-font-mono:  var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
   /* ── Radii (concentric: inner → outer) ──────────────────────────────────
-     7 inputs/actions  ·  10 controls/toolbars  ·  14 cards/sections         */
-  --ui-radius-card:    14px;
+     8 inputs/actions/rail items  ·  10 controls/toolbars  ·  16 cards       */
+  --ui-radius-card:    16px;
   --ui-radius-control: 10px;
-  --ui-radius-action:   7px;
+  --ui-radius-action:   8px;
   --ui-radius-pill:    999px;
 
   /* ── Spacing ─────────────────────────────────────────────────────────────  */
-  --ui-section-px:   16px;
-  --ui-section-py:   16px;
-  --ui-section-gap:  16px;
-  --ui-page-padding: clamp(20px, 2.5vw, 24px);
+  /* DESIGN v2 §5: air belongs to the frame; table rows keep --ui-row-y.    */
+  --ui-section-px:   20px;
+  --ui-section-py:   20px;
+  --ui-section-gap:  24px;
+  --ui-page-padding: clamp(24px, 2.5vw, 32px);
   --ui-page-narrow:  720px;   /* forms, settings              */
-  --ui-page-content: 1100px;  /* Today, Overview, phase canvas */
+  --ui-page-content: 1100px;  /* general content               */
   --ui-page-max:     1440px;  /* schedule, timeline (wide)    */
   --ui-page-wide-max:1920px;  /* full-bleed (dense workspaces, print) */
 
   /* ── Shell layout ────────────────────────────────────────────────────────  */
-  /* --ui-rail-width is the live column width: 48px at rest, overridden to
+  /* --ui-rail-width is the live column width: 64px at rest, overridden to
      --ui-rail-expanded-width by AppShell while the rail is expanded. */
-  --ui-rail-width:           48px;   /* icon rail, icon-only (at rest)       */
-  --ui-rail-expanded-width: 212px;   /* icon rail expanded (with labels)     */
+  --ui-rail-width:           64px;   /* icon rail, icon chips only (at rest) */
+  --ui-rail-expanded-width: 236px;   /* rail expanded (account, labels)      */
   --ui-secondary-width:     220px;   /* contextual secondary sidebar         */
   --ui-topbar-height:        46px;   /* global top bar (brand + app switch)  */
   --ui-header-height:        44px;   /* sticky context bar                   */
@@ -148,18 +150,25 @@
   --ui-dialog-full:      1180px;
   --ui-dialog-max-height:  90dvh;
 
-  /* ── Elevation (shadow-carried hairlines replace drawn borders) ──────────
-     plane  = the card sits still, a whisper hairline defines its edge
-     raise  = card rises on hover or focus
-     over   = dialogs, menus, floating toolbars                              */
-  --ui-shadow-plane:    0 0 0 .5px rgb(26 23 20 / .07),  0 1px  2px rgb(26 23 20 / .05);
-  --ui-shadow-raise:    0 0 0 .5px rgb(26 23 20 / .08),  0 4px 14px rgb(26 23 20 / .07);
+  /* ── Elevation ────────────────────────────────────────────────────────────
+     plane  = a resting plane: one 1px hairline, no depth (DESIGN v2 §4)
+     raise  = an interactive plane under the pointer or focus
+     float  = things that float over content: pill bar, context capsule
+     over   = dialogs, menus, drawers                                        */
+  --ui-shadow-plane:    0 0 0 1px var(--ui-border-subtle);
+  --ui-shadow-raise:    0 0 0 1px var(--ui-border-default), 0 4px 14px rgb(26 23 20 / .06);
+  --ui-shadow-float:    0 0 0 1px var(--ui-border-subtle), 0 1px 2px rgb(26 23 20 / .05), 0 8px 24px rgb(26 23 20 / .08);
   --ui-shadow-over:     0 0 0 .5px rgb(26 23 20 / .10),  0 22px 50px rgb(26 23 20 / .16), 0 4px 12px rgb(26 23 20 / .07);
   /* Legacy alias */
   --ui-shadow-elevated: var(--ui-shadow-over);
 }
 
 /* ── Compact density stamp (opt in with data-density="compact") ──────────── */
+/* A phone keeps a 16px gutter (DESIGN v2 §5). */
+@media (width < 560px) {
+  :root { --ui-page-padding: 16px; }
+}
+
 [data-density="compact"] {
   --ui-row-y:              6px;
   --ui-control-height-sm: 24px;
@@ -182,7 +191,7 @@
     --ui-surface:         #1C1A18;
     --ui-surface-raised:  #232120;
     --ui-surface-muted:   #2A2825;
-    --ui-rail:            #181615;
+    --ui-rail:            #1C1A18;
     --ui-rail-soft:       #201E1C;
     --ui-border-subtle:   #272422;
     --ui-border-default:  #332F2B;
@@ -214,8 +223,9 @@
     --ui-mark:            var(--ph-mood);
     --ui-table-header-bg: var(--ui-surface-raised);
     --ui-table-header-fg: var(--ui-text-secondary);
-    --ui-shadow-plane:    0 0 0 .5px rgb(255 255 255 / .07), 0 1px  2px rgb(0 0 0 / .40);
-    --ui-shadow-raise:    0 0 0 .5px rgb(255 255 255 / .08), 0 4px 14px rgb(0 0 0 / .45);
+    --ui-shadow-plane:    0 0 0 1px var(--ui-border-subtle);
+    --ui-shadow-raise:    0 0 0 1px var(--ui-border-default), 0 4px 14px rgb(0 0 0 / .45);
+    --ui-shadow-float:    0 0 0 1px var(--ui-border-default), 0 8px 24px rgb(0 0 0 / .45);
     --ui-shadow-over:     0 0 0 .5px rgb(255 255 255 / .10), 0 22px 50px rgb(0 0 0 / .60), 0 4px 12px rgb(0 0 0 / .35);
     --ui-shadow-elevated: var(--ui-shadow-over);
   }
@@ -227,7 +237,7 @@
   --ui-surface:         #1C1A18;
   --ui-surface-raised:  #232120;
   --ui-surface-muted:   #2A2825;
-  --ui-rail:            #181615;
+  --ui-rail:            #1C1A18;
   --ui-rail-soft:       #201E1C;
   --ui-border-subtle:   #272422;
   --ui-border-default:  #332F2B;
@@ -259,8 +269,9 @@
   --ui-mark:            var(--ph-mood);
   --ui-table-header-bg: var(--ui-surface-raised);
   --ui-table-header-fg: var(--ui-text-secondary);
-  --ui-shadow-plane:    0 0 0 .5px rgb(255 255 255 / .07), 0 1px  2px rgb(0 0 0 / .40);
-  --ui-shadow-raise:    0 0 0 .5px rgb(255 255 255 / .08), 0 4px 14px rgb(0 0 0 / .45);
+  --ui-shadow-plane:    0 0 0 1px var(--ui-border-subtle);
+  --ui-shadow-raise:    0 0 0 1px var(--ui-border-default), 0 4px 14px rgb(0 0 0 / .45);
+    --ui-shadow-float:    0 0 0 1px var(--ui-border-default), 0 8px 24px rgb(0 0 0 / .45);
   --ui-shadow-over:     0 0 0 .5px rgb(255 255 255 / .10), 0 22px 50px rgb(0 0 0 / .60), 0 4px 12px rgb(0 0 0 / .35);
   --ui-shadow-elevated: var(--ui-shadow-over);
 }

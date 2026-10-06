@@ -17,7 +17,7 @@ export function BqNav() {
   if (!pathname.startsWith("/bq")) return null;
 
   return (
-    <NavGroup label="BQ navigation">
+    <NavGroup label="BQ navigation" heading="BQ">
       {BQ_NAV_LINKS.map(({ href, label, exact }) => {
         const Icon = iconMap[href] ?? FileText;
         const isActive = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);

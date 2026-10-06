@@ -1,4 +1,4 @@
-import { AccountMenu } from "./account-menu";
+import { RailAccount, RailGeneral, TopbarAccount } from "./account-menu";
 
 import { DisplaySettingsProvider } from "./display-settings";
 
@@ -77,6 +77,10 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation domainNavigation={domainNavigation} />}
       utility={domainUtilityNavigation}
+      /* DESIGN v2 §10.1-10.2 (owner decision 1): the account and the General group live in the rail;
+         search, messages and notifications stay in the thin top bar. */
+      railHeader={<RailAccount name={principal.displayName} detail={settings.organizationName || settings.appTitle} />}
+      railFooter={<RailGeneral logoutAction={logoutAction} showSettings={showSettings} />}
       /* Prototype `.a-top` order: mark, app chip, search, then the personal
          controls pinned right. The search grows to its own 300px cap and the
          personal group's auto margin takes the remainder, so the field keeps
@@ -89,7 +93,10 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
         <div className="ml-auto flex shrink-0 items-center gap-2.5">
           <QuickMessenger />
           <NotificationBell />
-          <AccountMenu
+          {/* A phone has no rail column, so the account menu stays here below 840px. A surface without a rail
+              (Settings, Account) keeps it at every width. */}
+          <TopbarAccount
+            appRootPaths={apps.map((app) => app.rootPath)}
             name={principal.displayName}
             logoutAction={logoutAction}
             showSettings={showSettings}

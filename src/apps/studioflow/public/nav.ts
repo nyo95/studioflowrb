@@ -36,5 +36,5 @@ export const STUDIOFLOW_NAV_LINKS: {
     { href: "/studioflow/clients", label: "Clients" },
     { href: "/studioflow/library", label: "Library" },
   ],
-  utility: [{ href: "/studioflow/settings", label: "Settings" }],
+  utility: [{ href: "/studioflow/settings", label: "StudioFlow settings" }],
 };
