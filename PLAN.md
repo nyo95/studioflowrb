@@ -2,7 +2,7 @@
 
 Plan ID: WO-SF-NOTES-ONLY-01
 Scope: Remove the personal to-do / My Tasks concept from StudioFlow, including its data. Phase notes replace it. Requirements stay as one general checklist per project.
-Target revisions: R8.342 (backend + data, Executor), R8.343 (UI, Lead). R8.341 is this plan.
+Target revisions: R8.342 (backend, data and removal of every UI/test that depends on them, Executor), R8.343 (Lead: new Projects/Requirements UI and contract rewrite). R8.341 is this plan.
 Status: READY (owner decision 2026-10-06: "hapus tampilan dan datanya")
 Priority: P1
 Owner: Product Owner.
@@ -31,6 +31,10 @@ Backend (`src/apps/studioflow`):
 - Requirement commands that remain: list, tick/untick, dismiss, rename, create-from-template sync, subtask on a requirement, reorder, template CRUD. Keep their RBAC and project-status guards.
 - Add a project-level requirements read (all general + phase requirements of one project) if `listChecklist` does not already return it.
 
+## Correction 2026-10-06 (Reviewer verdict on the BLOCKED report): option A
+
+R8.342 is authorized to delete or update every UI file, test and export that depends on the removed to-do/My Tasks contracts, so typecheck, lint and the full suite pass in one commit. No compatibility wiring or temporary To-do API may remain. Concretely allowed: delete `today-view.tsx`, `checklist-tree.tsx`, `item-edit-dialog.tsx`, the Home My Tasks dialog and per-project task area, and the phase checklist UI in `phase-canvas.tsx`; delete the integration tests of removed behavior. Do not build new UI: Home keeps its project cards; where a deleted section had no replacement, leave it out and note it in the report. Requirement ticking on the phase canvas may be dropped for now (the Lead rebuilds the Requirements surface in R8.343); the requirement data and commands stay. The Executor commits `PLAN.md` together with its change (it carries this correction). The migration may now be applied to the dev and test databases (counts reported: 3 ad-hoc roots, 0 subtasks, 0 labels, 0 filter views, 0 assigned rows).
+
 ## What the Lead does afterwards (R8.343, not the Executor)
 
 Home / Projects UI: remove `today-view.tsx`, My Tasks dialog, per-project task area, `due-label` task use; expose My projects / All projects; project page gets a Requirements section; phase notes stay as built. Contract doc rewrite. Browser acceptance only if the owner asks.
@@ -45,4 +49,4 @@ Home / Projects UI: remove `today-view.tsx`, My Tasks dialog, per-project task a
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: kantor (load `.env.kantor`, set `STUDIOFLOW_LOCATION=kantor`). Implement WO-SF-NOTES-ONLY-01 exactly as written in PLAN.md as revision R8.342, preserving unrelated work. Verify the explicit database target belongs only to studioflow-rebuild before any database command. Remove the to-do/My Tasks backend and data as listed, keep requirements and their subtasks, keep the minimal UI wiring needed for typecheck to pass (the Lead finishes the UI as R8.343). Commit locally once and reply with a Planner/Reviewer prompt containing outcome, commit, checks, deleted-row counts, limitations and dirty files.
+You are the Backend Executor. Location: kantor (load `.env.kantor`, set `STUDIOFLOW_LOCATION=kantor`). Implement WO-SF-NOTES-ONLY-01 exactly as written in PLAN.md as revision R8.342, preserving unrelated work. Verify the explicit database target belongs only to studioflow-rebuild before any database command. Remove the to-do/My Tasks backend and data as listed, keep requirements and their subtasks, delete every UI file and test that depends on the removed contracts, as authorized by the "Correction 2026-10-06" section (option A); no compatibility wiring. Apply the migration to the dev and test databases, commit PLAN.md with your change; the Lead builds the new Requirements/Projects UI as R8.343. Commit locally once and reply with a Planner/Reviewer prompt containing outcome, commit, checks, deleted-row counts, limitations and dirty files.

@@ -2,6 +2,14 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.342 | 2026-10-06 | refactor(studioflow): remove My Tasks and ad-hoc to-dos
+
+- Removed personal to-do/My Tasks backend, persistence, server actions, home and phase task UI, and tests that depended on them. Template-backed requirements, their subtasks, and the remaining requirement/template commands stay intact; the Lead will build their replacement surface in R8.343.
+- Added the hand-written destructive migration `20261006110000_sf_remove_todos`: before applying it, the rebuild dev database contained 3 ad-hoc roots, 0 ad-hoc subtasks, 0 labels, 0 filter views, and 0 rows with an assignee. It deletes the ad-hoc roots (with cascading children), drops task label/filter tables and task-only columns/index, and was applied to both `studioflow_rebuild` and `studioflow_rebuild_test`.
+- `PLAN.md` includes the Reviewer correction authorizing removal of every dependent UI and test without temporary compatibility APIs.
+
+**Checks.** `npm run typecheck`, `npm run lint` (0 errors; 2 existing `<img>` warnings), `npm run check:boundaries`, `npm run check:legacy-runtime`, and the full `npm test` against `studioflow_rebuild_test` passed. Production build is not required by this Work Order.
+
 ## R8.341 | 2026-10-06 | docs(plan): notes replace to-dos — Work Order WO-SF-NOTES-ONLY-01
 
 - Owner decision (2026-10-06): StudioFlow has no personal to-do or My Tasks. Projects have two views (My projects, All projects); a project holds Requirements (one general checklist), MOM, Project Schedule and the Phase system; phase notes replace Todoist/task/to-do. The owner chose to remove both the screens and the data.

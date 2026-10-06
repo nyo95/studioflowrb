@@ -8,7 +8,6 @@ import { DeliverablesPanel } from "../projects/[projectId]/phases/[phaseId]/deli
 import { PhasePanel } from "../projects/[projectId]/phase-panel";
 import { ClientNotes } from "./client-notes";
 import { CdList } from "./cd-list";
-import { ChecklistTree } from "./checklist-tree";
 import { ReadOnlyNotice } from "./read-only-notice";
 import { pageProjectAccess, pageSession } from "./session";
 
@@ -26,8 +25,7 @@ export async function PhaseCanvas({ projectId, phaseId, people, archived }: { pr
   });
   if (!phase) return <SectionCard padded><Text tone="secondary" size="sm">Phase not found.</Text></SectionCard>;
 
-  const [checklist, deliverablesResult, cdItems] = await Promise.all([
-    studioFlow.tasks.listChecklist({ grants, projectId, phaseId: phase.id }),
+  const [deliverablesResult, cdItems] = await Promise.all([
     studioFlow.phases.listDeliverables({ grants, projectId, phaseId: phase.id }),
     phase.seat === "drafter" ? studioFlow.cdList.list({ grants, projectId, phaseId: phase.id }) : Promise.resolve(null),
   ]);
@@ -64,21 +62,6 @@ export async function PhaseCanvas({ projectId, phaseId, people, archived }: { pr
             phaseStatus={phase.status}
             canEdit={canAct && !archived}
           />
-          <SectionCard
-            title="Requirements"
-            description="The standard checklist for this phase. Reminders only: they never stop a step or completing the project, and stay here after the phase is done until ticked or dismissed."
-          >
-            <ChecklistTree
-              projectId={projectId}
-              phaseId={phase.id}
-              nodes={checklist}
-              people={people}
-              canEdit={canWork && hasPermission(grants, P.taskManage)}
-              canToggleOptional={caps.work && canContent}
-              canDismiss={canAct && !archived}
-              emptyText="No requirements for this phase"
-            />
-          </SectionCard>
         </div>
       </PhasePanel>
 

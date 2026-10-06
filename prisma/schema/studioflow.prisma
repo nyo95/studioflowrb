@@ -1,7 +1,7 @@
 // ============================================================================
 // STUDIOFLOW — legacy-behavior rework (STUDIOFLOW-REWORK-CONTRACT.md, SF-R1)
 // No foreign keys into platform, master_data, or bq tables. User references
-// (pic_designer_id, assigned_to_id, ...) are plain ids resolved through the
+// (pic_designer_id, pic_drafter_id, ...) are plain ids resolved through the
 // platform, never through a cross-schema FK.
 // ============================================================================
 enum SfProjectStatus {
@@ -268,7 +268,7 @@ model SfChecklistTemplate {
 model SfChecklistItem {
   id             String    @id @default(uuid())
   project_id     String
-  /// Null = general project task.
+  /// Null = a general project requirement.
   phase_id       String?
   /// Depth capped at one level by the service.
   parent_id      String?
@@ -280,11 +280,6 @@ model SfChecklistItem {
   /// False = warning-only (the former SfRequirement); an unticked root item blocks approval only when true.
   is_blocking    Boolean   @default(true)
   sort_order     Int       @default(0)
-  /// 1 = P1 (highest) … 4 = none.
-  priority       Int       @default(4)
-  /// Date-only.
-  due_at         DateTime? @db.Date
-  assigned_to_id String?
   template_id    String?
   created_by_id  String?
   created_at     DateTime  @default(now())
@@ -295,12 +290,10 @@ model SfChecklistItem {
   parent   SfChecklistItem?     @relation("SfChecklistTree", fields: [parent_id], references: [id], onDelete: Cascade)
   children SfChecklistItem[]    @relation("SfChecklistTree")
   template SfChecklistTemplate? @relation(fields: [template_id], references: [id], onDelete: SetNull)
-  labels   SfChecklistItemLabel[]
 
   @@index([project_id, phase_id, parent_id])
   @@index([phase_id, is_checked])
   @@index([phase_id, is_blocking, is_checked])
-  @@index([assigned_to_id, is_checked])
   @@map("sf_checklist_item")
   @@schema("studioflow")
 }
@@ -320,44 +313,6 @@ model SfCdItem {
 
   @@index([phase_id])
   @@map("sf_cd_item")
-  @@schema("studioflow")
-}
-
-model SfChecklistLabel {
-  id         String   @id @default(uuid())
-  name       String   @unique
-  color      String   @default("neutral")
-  created_at DateTime @default(now())
-
-  items SfChecklistItemLabel[]
-
-  @@map("sf_checklist_label")
-  @@schema("studioflow")
-}
-
-model SfChecklistItemLabel {
-  item_id  String
-  label_id String
-
-  item  SfChecklistItem  @relation(fields: [item_id], references: [id], onDelete: Cascade)
-  label SfChecklistLabel @relation(fields: [label_id], references: [id], onDelete: Cascade)
-
-  @@id([item_id, label_id])
-  @@index([label_id])
-  @@map("sf_checklist_item_label")
-  @@schema("studioflow")
-}
-
-model SfChecklistFilterView {
-  id         String   @id @default(uuid())
-  owner_id   String
-  name       String
-  query_json Json
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  @@unique([owner_id, name])
-  @@map("sf_checklist_filter_view")
   @@schema("studioflow")
 }
 

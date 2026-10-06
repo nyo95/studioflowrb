@@ -77,7 +77,7 @@ async function reset() {
   await testDb.pool.query(`TRUNCATE TABLE ${[
     "sf_schedule_option", "sf_schedule_entry", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix",
     "sf_mom_image", "sf_mom_item", "sf_mom_document",
-    "sf_checklist_item_label", "sf_checklist_label", "sf_checklist_filter_view", "sf_checklist_item", "sf_checklist_template",
+    "sf_checklist_item", "sf_checklist_template",
     "sf_deliverable", "sf_asset_cleanup_failure",
     "sf_activity", "sf_revision", "sf_phase",
     "sf_phase_definition", "sf_phase_template",
@@ -166,7 +166,7 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: iteration.id });
   });
 
-  it("keeps closed-phase requirements out of My Tasks and applies the same project completion gate everywhere", async () => {
+  it("keeps closed-phase requirements while applying the same project completion gate everywhere", async () => {
     const { projectId } = await newProject("Completion readiness");
     const supervision = await phaseOf(projectId, "supervision");
     const layout = await phaseOf(projectId, "layout");
@@ -178,8 +178,6 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     assert.equal(notReady.ready, false);
     await rejectsWith(sf.phases.markProjectCompleted({ ...as(designer, ALL.filter((grant) => grant !== P.projectManage)), projectId }), "PROJECT_COMPLETION_NOT_READY");
     await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED" }), "PROJECT_COMPLETION_OVERRIDE_REASON_REQUIRED");
-    const today = await sf.today.getToday({ ...as(designer), scope: "mine" });
-    assert.equal(today.groups.flatMap((group) => group.tasks).some((task) => task.label === "Close-out detail"), false, "phase requirements stay in their phase");
     await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED", overrideReason: "Client accepted the remaining close-out item." });
     const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.project.status-changed", entity_id: projectId } });
     assert.equal((audit.metadata as { completionOverrideReason?: string }).completionOverrideReason, "Client accepted the remaining close-out item.");
@@ -204,45 +202,10 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     assert.equal(await testDb.prisma.sfChecklistItem.count({ where: { project_id: projectId, is_checked: false } }), 2, "reminders stay on the project as they are");
   });
 
-  it("makes a completed project read-only in every module until it is reopened, while archive and reopen still work", async () => {
-    const { projectId } = await newProject("Read-only after completion");
-    const moodboard = await phaseOf(projectId, "moodboard");
-    const item = await sf.tasks.createItem({ ...as(designer), projectId, phaseId: moodboard.id, label: "Before completion" });
-    await testDb.prisma.sfPhase.updateMany({ where: { project_id: projectId }, data: { status: "DONE", is_locked: true } });
-    await sf.phases.markProjectCompleted({ ...as(designer), projectId });
-    const access = await sf.projects.getAccess({ ...as(designer), projectId });
-    assert.deepEqual({ completed: access.completed, project: access.canEditProject, documents: access.canEditDocuments, phases: access.phases.some((phase) => phase.canTransition || phase.canEditContent) }, { completed: true, project: false, documents: false, phases: false });
-    await rejectsWith(sf.tasks.createItem({ ...as(designer), projectId, phaseId: null, label: "After completion" }), "PROJECT_COMPLETED");
-    await rejectsWith(sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: item.itemId, checked: true }), "PROJECT_COMPLETED");
-    await rejectsWith(sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" }), "PROJECT_COMPLETED");
-    await rejectsWith(sf.mom.createDocument({ ...as(designer), projectId, topic: "After completion" }), "PROJECT_COMPLETED");
-    await rejectsWith(sf.phases.setPhaseNote({ ...as(designer), projectId, phaseId: moodboard.id, note: "After completion" }), "PROJECT_COMPLETED");
-    await rejectsWith(sf.projects.setProjectPriority({ ...as(designer), projectId, priority: "URGENT" }), "PROJECT_COMPLETED");
-    await rejectsWith(sf.projects.updateProject({ ...as(designer), projectId, name: "Renamed" }), "PROJECT_COMPLETED");
-    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Done and handed over" });
-    await sf.projects.restoreProject({ ...as(designer), projectId });
-    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ACTIVE" });
-    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId: item.itemId, checked: true });
-  });
-
-  it("includes a project in My Today when the user has an open task assigned there, and drops it once the task is ticked", async () => {
-    const assigned = await seedUser("Task assignee", [P.access, P.projectRead]);
-    const { projectId } = await newProject("Assigned-task Today");
-    const itemId = randomUUID();
-    await testDb.prisma.sfChecklistItem.create({ data: { id: itemId, project_id: projectId, label: "Assigned task", assigned_to_id: assigned.id } });
-    const read = () => sf.today.getToday({ grants: [P.access, P.projectRead], actor: assigned.actor, scope: "mine" });
-    const listed = await read();
-    assert.equal(listed.groups.some((group) => group.project.id === projectId), true);
-    assert.equal(listed.addTargets.find((target) => target.projectId === projectId)!.canAdd, false, "a non-PIC assignee cannot add tasks to this project");
-    await testDb.prisma.sfChecklistItem.update({ where: { id: itemId }, data: { is_checked: true, checked_at: new Date() } });
-    const after = await read();
-    assert.equal(after.groups.some((group) => group.project.id === projectId && group.tasks.some((task) => !task.isChecked)), false);
-  });
-
 });
 
 describe("WO-SF-ITER-01 phase 3 card reads", () => {
-  it("returns one bounded project-card projection and reuses Today for My tasks", async () => {
+  it("returns one bounded project-card projection", async () => {
     const { projectId } = await newProject("Card projection");
     const moodboard = await phaseOf(projectId, "moodboard");
     await sf.phases.setPhaseNote({ ...as(designer), projectId, phaseId: moodboard.id, note: "Confirm palette" });
@@ -251,10 +214,6 @@ describe("WO-SF-ITER-01 phase 3 card reads", () => {
     assert.ok(card);
     assert.equal(card.note_phases.includes(moodboard.id), true);
     assert.equal(card.phases[0]?.current_iteration?.state, "NOT_SENT");
-    const summary = await sf.today.myTasksSummary({ ...as(designer) });
-    assert.ok(Array.isArray(summary.items));
-    assert.equal(typeof summary.today, "number");
-    assert.equal(typeof summary.overdue, "number");
   });
 });
 
@@ -732,7 +691,6 @@ describe("SF-R1 bootstrap and naming", () => {
 
     await rejectsWith(sf.projects.setProjectPriority({ ...as(outsider, unassignedGrants), projectId, priority: "URGENT" }), "PERMISSION_DENIED");
     await rejectsWith(sf.phases.sendIteration({ ...as(outsider, unassignedGrants), projectId, phaseId: moodboard.id, iterationId: (await openIteration(moodboard.id)).id }), "PERMISSION_DENIED");
-    await rejectsWith(sf.tasks.createItem({ ...as(outsider, unassignedGrants), projectId, phaseId: null, label: "Denied" }), "PERMISSION_DENIED");
     await rejectsWith(sf.mom.createDocument({ ...as(outsider, unassignedGrants), projectId, topic: "Denied" }), "PERMISSION_DENIED");
     await rejectsWith(sf.schedule.createEntry({ ...as(outsider, unassignedGrants), projectId, section: "MATERIAL", category: "Panel" }), "PERMISSION_DENIED");
     await rejectsWith(sf.presentation.createBoard({ ...as(outsider, unassignedGrants), projectId, title: "Denied" }), "PERMISSION_DENIED");
@@ -905,62 +863,17 @@ describe("Iteration workflow (WO-SF-ITER-01)", () => {
   });
 });
 
-describe("SF-R1 checklist and Today", () => {
-  it("keeps template rows, syncs idempotently, reorders, labels, and detaches", async () => {
-    const general = await sf.tasks.createTemplate({ ...as(designer), definitionId: null, label: "Site survey" });
+describe("WO-SF-NOTES-ONLY-01 requirements", () => {
+  it("keeps template-backed requirements and their subtasks while removing the ad-hoc creation command", async () => {
+    await sf.tasks.createTemplate({ ...as(designer), definitionId: null, label: "Site survey" });
     const { projectId } = await newProject();
-    assert.equal((await sf.tasks.syncProjectChecklist({ ...as(designer), projectId })).created, 0);
-    await sf.tasks.createTemplate({ ...as(designer), definitionId: null, label: "Contract signed" });
-    await sf.tasks.updateTemplate({ ...as(designer), templateId: general.templateId, label: "Site survey (renamed)" });
-    assert.equal((await sf.tasks.syncProjectChecklist({ ...as(designer), projectId })).created, 1);
-    const roots = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: null });
-    assert.deepEqual(roots.map((r) => r.label), ["Site survey", "Contract signed"]);
-    await rejectsWith(sf.tasks.deleteItem({ ...as(designer), projectId, itemId: roots[0].id }), "CHECKLIST_TEMPLATE_ROW");
-    const sub = await sf.tasks.createSubtask({ ...as(designer), projectId, parentId: roots[0].id, label: "Measure", priority: 1, dueDate: "2026-09-10" });
-    await rejectsWith(sf.tasks.createSubtask({ ...as(designer), projectId, parentId: sub.itemId, label: "too deep" }), "CHECKLIST_DEPTH");
-    await sf.tasks.reorderItems({ ...as(designer), projectId, orderedIds: [roots[1].id, roots[0].id] });
-    await rejectsWith(sf.tasks.reorderItems({ ...as(designer), projectId, orderedIds: [roots[1].id] }), "REORDER_SCOPE");
-    await sf.tasks.attachLabel({ ...as(designer), projectId, itemId: sub.itemId, name: "Urgent", color: "danger" });
-    await sf.tasks.detachFromTemplate({ ...as(designer), projectId, itemId: roots[0].id });
-    await sf.tasks.deleteTemplate({ ...as(designer), templateId: general.templateId });
-    const after = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: null });
-    assert.deepEqual(after.map((r) => [r.label, r.children.map((c) => c.labels.map((l) => l.name))]), [["Contract signed", []], ["Site survey", [["urgent"]]]]);
-    await sf.tasks.deleteItem({ ...as(designer), projectId, itemId: roots[0].id });
-    assert.equal(await testDb.prisma.sfChecklistItem.count({ where: { parent_id: roots[0].id } }), 0);
-  });
-
-  it("builds Today per project for the PIC, including empty and general work", async () => {
-    await sf.tasks.createTemplate({ ...as(designer), definitionId: null, label: "File Existing Project" });
-    const one = await newProject("One");
-    await newProject("Two");
-    await sf.projects.setProjectPriority({ ...as(designer), projectId: one.projectId, priority: "URGENT" });
-    const todo = await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: null, label: "Call client", dueDate: "2026-09-14" });
-    await sf.tasks.createSubtask({ ...as(designer), projectId: one.projectId, parentId: todo.itemId, label: "Prepare talking points" });
-    const generalRequirement = (await sf.tasks.listChecklist({ grants: ALL, projectId: one.projectId, phaseId: null }))
-      .find((item) => item.label === "File Existing Project")!;
-    await sf.tasks.createSubtask({ ...as(designer), projectId: one.projectId, parentId: generalRequirement.id, label: "Collect old drawings" });
-    const moodboard = await phaseOf(one.projectId, "moodboard");
-    await sf.tasks.createItem({ ...as(designer), projectId: one.projectId, phaseId: moodboard.id, label: "Board", assignedToId: drafter.id });
-
-    const today = await sf.today.getToday({ ...as(drafter, DRAFTER_GRANTS), scope: "all" });
-    assert.equal(today.scope, "mine", "scope all needs manage grant");
-    assert.deepEqual(today.groups.map((g) => [g.project.name, g.project.isUrgent, g.tasks.length]), [["One", true, 1], ["Two", false, 0]]);
-    assert.deepEqual(today.groups[0].tasks.map((t) => [t.label, t.children.map((child) => child.label)]), [["Call client", ["Prepare talking points"]]], "template and phase requirements stay out while an ad-hoc to-do keeps its children");
-    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((item) => item.id === one.projectId)!;
-    assert.equal(card.requirements_waiting, 2, "general template requirements and phase requirements both contribute to the waiting count");
-
-    const outsider = await seedUser("Other", ALL);
-    const empty = await sf.today.getToday({ ...as(outsider) });
-    assert.equal(empty.groups.length, 0);
-    const all = await sf.today.getToday({ ...as(outsider), scope: "all" });
-    assert.equal(all.groups.length, 2);
-  });
-
-  it("stores saved filters per user", async () => {
-    await sf.tasks.saveFilterView({ ...as(designer), name: "My P1", query: { status: "OPEN", priority: "P1", assignee: "ME", due: null } });
-    await rejectsWith(sf.tasks.saveFilterView({ ...as(designer), name: "Bad", query: { status: "X" } as never }), "FILTER_QUERY_INVALID");
-    assert.equal((await sf.tasks.listFilterViews({ ...as(designer) })).length, 1);
-    assert.equal((await sf.tasks.listFilterViews({ ...as(drafter) })).length, 0);
+    const [requirement] = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: null });
+    assert.ok(requirement);
+    const subtask = await sf.tasks.createSubtask({ ...as(designer), projectId, parentId: requirement.id, label: "Measure rooms" });
+    const after = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: undefined });
+    assert.deepEqual(after.map((item) => [item.label, item.children.map((child) => child.label)]), [["Site survey", ["Measure rooms"]]]);
+    assert.equal("createItem" in sf.tasks, false, "an ad-hoc checklist row has no creation command");
+    assert.ok(subtask.itemId);
   });
 });
 
@@ -1793,16 +1706,6 @@ describe("Snapshot runtime truth", () => {
     assert.equal(moodboard.label, "Moodboard", "label from snapshot, not legacy key");
   });
 
-  it("today quick-add exposes projects without phase requirement destinations", async () => {
-    const { projectId } = await newProject("Quick-add project");
-    const result = await sf.today.getToday({ ...as(designer) });
-    assert.deepEqual(result.addTargets.find((target) => target.projectId === projectId), {
-      projectId,
-      projectName: "Quick-add project",
-      canAdd: true,
-    });
-  });
-
   it("project directory uses snapshot phase labels", async () => {
     const { projectId } = await newProject();
     const projects = await sf.projects.listProjects({ ...as(designer) });
@@ -1811,55 +1714,6 @@ describe("Snapshot runtime truth", () => {
     const moodboardPhase = project.phases.find((p) => p.definitionId === LEGACY.moodboard);
     assert.ok(moodboardPhase);
     assert.equal(moodboardPhase.label, "Moodboard", "listProjects uses snapshot label");
-  });
-});
-
-/**
- * Requirements merged into the checklist (2026-09-22): a warning-only item is an
- * ordinary checklist item with `is_blocking = false`, so it inherits phase-lock
- * enforcement and must stay out of the approval gate.
- */
-describe("Optional (warning-only) checklist items", () => {
-  async function optionalItem(projectId: string, phaseId: string) {
-    const { itemId } = await sf.tasks.createItem({ ...as(designer), projectId, phaseId, label: "Verify site access", isBlocking: false });
-    return itemId;
-  }
-
-  it("does not block approval but is reported as a warning", async () => {
-    const { projectId } = await newProject();
-    const phase = await phaseOf(projectId, "moodboard");
-    await optionalItem(projectId, phase.id);
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
-    assert.equal(detail.blockers.total, 0, "an optional item never gates approval");
-    assert.equal(detail.warnings.optionalOpen, 1, "it surfaces as a warning instead");
-  });
-
-  it("blocks approval once made blocking", async () => {
-    const { projectId } = await newProject();
-    const phase = await phaseOf(projectId, "moodboard");
-    const itemId = await optionalItem(projectId, phase.id);
-    await sf.tasks.updateItem({ ...as(designer), projectId, itemId, isBlocking: true });
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
-    assert.equal(detail.blockers.total, 1, "flipping the flag moves it into the gate");
-    assert.equal(detail.warnings.optionalOpen, 0);
-  });
-
-  it("a locked phase still lets a requirement be ticked, but blocks deleting it", async () => {
-    const { projectId } = await newProject();
-    const phase = await phaseOf(projectId, "moodboard");
-    const itemId = await optionalItem(projectId, phase.id);
-    await testDb.prisma.sfPhase.update({ where: { id: phase.id }, data: { is_locked: true } });
-    await sf.tasks.setItemChecked({ ...as(designer), projectId, itemId, checked: true });
-    assert.equal((await testDb.prisma.sfChecklistItem.findUniqueOrThrow({ where: { id: itemId } })).is_checked, true);
-    await rejectsWith(sf.tasks.deleteItem({ ...as(designer), projectId, itemId }), "PHASE_LOCKED");
-  });
-
-  it("refuses to make a subtask blocking", async () => {
-    const { projectId } = await newProject();
-    const phase = await phaseOf(projectId, "moodboard");
-    const parentId = await optionalItem(projectId, phase.id);
-    const { itemId: subtaskId } = await sf.tasks.createSubtask({ ...as(designer), projectId, parentId, label: "Call the building manager" });
-    await rejectsWith(sf.tasks.updateItem({ ...as(designer), projectId, itemId: subtaskId, isBlocking: true }), "CHECKLIST_SUBTASK_NEVER_BLOCKS");
   });
 });
 
@@ -2484,18 +2338,6 @@ describe("R8.332 logic review fixes", () => {
     await rejectsWith(sf.phases.chooseIterationOutcome({ ...base, iterationId: second.id, outcome: "DONE" }), "PHASE_INVALID_STATE");
     await sf.phases.chooseIterationOutcome({ ...base, iterationId: second.id, outcome: "CONTINUE_CD_FINAL" });
     assert.equal((await openIteration(cd.id)).name, "CD Final");
-  });
-
-  it("lets the person a task is assigned to tick it without being a PIC, but not anyone else", async () => {
-    const assignee = await seedUser("Assignee", [P.access, P.projectRead, P.phaseWork, P.taskManage]);
-    const bystander = await seedUser("Bystander", [P.access, P.projectRead, P.phaseWork, P.taskManage]);
-    const { projectId } = await newProject("Assigned tick");
-    const itemId = randomUUID();
-    await testDb.prisma.sfChecklistItem.create({ data: { id: itemId, project_id: projectId, label: "Send samples", assigned_to_id: assignee.id } });
-    const grants = [P.access, P.projectRead, P.phaseWork, P.taskManage];
-    await rejectsWith(sf.tasks.setItemChecked({ grants, actor: bystander.actor, projectId, itemId, checked: true }), "PERMISSION_DENIED");
-    await sf.tasks.setItemChecked({ grants, actor: assignee.actor, projectId, itemId, checked: true });
-    assert.equal((await testDb.prisma.sfChecklistItem.findUniqueOrThrow({ where: { id: itemId } })).is_checked, true);
   });
 
   it("lists projects by priority, then name A to Z", async () => {

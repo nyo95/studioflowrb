@@ -8,16 +8,11 @@ import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqua
 import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
 import { compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
-  applyChecklistFilter,
   buildTree,
   canTickChecklistItem,
   cascadeTargets,
-  countChecklistFilters,
-  fromChecklistFilterQuery,
   steppedSortOrders,
-  toChecklistFilterQuery,
 } from "./checklist";
-import { countOpen, groupFeed, nestFeed, sortFeed, type FeedTask } from "./feed";
 import {
   LEGACY_PHASE_DEFINITION_IDS,
   PHASE_STATUSES,
@@ -123,25 +118,6 @@ describe("checklist rules", () => {
     assert.equal(canTickChecklistItem({ parentId: null, phaseId: "p" }, { canManageTasks: false, canWork: false }), false);
   });
 
-  const tasks = [
-    { id: "a", isChecked: false, dueDate: "2026-09-10", priority: 1, assigneeId: "u1" },
-    { id: "b", isChecked: true, dueDate: "2026-09-10", priority: 1, assigneeId: null },
-    { id: "c", isChecked: false, dueDate: "2026-09-15", priority: 4, assigneeId: "u2" },
-    { id: "d", isChecked: false, dueDate: null, priority: 2, assigneeId: "u1" },
-  ];
-  it("applies built-in filters by calendar date", () => {
-    const today = "2026-09-15";
-    assert.deepEqual(applyChecklistFilter(tasks, "overdue", "u1", today).map((t) => t.id), ["a"]);
-    assert.deepEqual(applyChecklistFilter(tasks, "today", "u1", today).map((t) => t.id), ["a", "b", "c"]);
-    assert.deepEqual(applyChecklistFilter(tasks, "p1", "u1", today).map((t) => t.id), ["a"]);
-    assert.deepEqual(applyChecklistFilter(tasks, "mine", "u1", today).map((t) => t.id), ["a", "d"]);
-    assert.deepEqual(countChecklistFilters(tasks, "u1", today), { all: 4, today: 3, overdue: 1, p1: 1, mine: 2 });
-  });
-  it("round-trips saved filter queries", () => {
-    for (const filter of ["all", "today", "overdue", "p1", "mine"] as const) {
-      assert.deepEqual(fromChecklistFilterQuery(toChecklistFilterQuery(filter, true)), { filter, showCompleted: true });
-    }
-  });
   it("builds a one-level tree and promotes orphans", () => {
     const tree = buildTree([
       { id: "r1", parentId: null }, { id: "c1", parentId: "r1" }, { id: "c2", parentId: "missing" },
@@ -152,24 +128,6 @@ describe("checklist rules", () => {
     assert.deepEqual(steppedSortOrders(["x", "y"]), [{ id: "x", sortOrder: 10 }, { id: "y", sortOrder: 20 }]);
     assert.deepEqual(cascadeTargets({ id: "p", parentId: null }, ["c1", "c2"]), ["p", "c1", "c2"]);
     assert.deepEqual(cascadeTargets({ id: "c1", parentId: "p" }, []), ["c1"]);
-  });
-});
-
-describe("today feed", () => {
-  const base = { projectId: "p1", phaseId: null, phaseDefinitionId: null, phaseLabel: null, assigneeId: null, labels: [], templateId: null, children: [] };
-  const rows: FeedTask[] = [
-    { ...base, key: "checklist:c", id: "c", source: "checklist", label: "child", isChecked: false, priority: 4, dueDate: null, parentId: "r" },
-    { ...base, key: "checklist:r", id: "r", source: "checklist", label: "root", isChecked: false, priority: 2, dueDate: null, parentId: null },
-    { ...base, key: "checklist:a", id: "a", source: "checklist", label: "todo", isChecked: false, priority: 4, dueDate: "2026-09-01", parentId: null },
-    { ...base, key: "checklist:d", id: "d", source: "checklist", label: "done", isChecked: true, priority: 4, dueDate: "2026-08-01", parentId: null },
-  ];
-  it("nests, sorts, and keeps empty projects", () => {
-    const nested = nestFeed(rows);
-    assert.equal(nested.length, 3);
-    assert.equal(countOpen(nested), 3);
-    assert.deepEqual(sortFeed(nested).map((t) => t.id), ["a", "r", "d"]);
-    const groups = groupFeed([{ id: "p1", name: "One", isUrgent: false }, { id: "p2", name: "Two", isUrgent: true }], nested);
-    assert.deepEqual(groups.map((g) => [g.project.id, g.tasks.length]), [["p1", 3], ["p2", 0]]);
   });
 });
 
