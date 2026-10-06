@@ -3,7 +3,7 @@
 Plan ID: WO-UI-V2-03
 Scope: Finish adopting DESIGN v2 in Master Data and BQ — sibling page views become `PillTabs`, BQ project pages get the context capsule — and extend the Playwright screen-size checks to those screens. UI only.
 Target revisions: R8.366 (this plan, Lead), R8.367 (implementation, Executor), R8.368 (Lead review and polish).
-Status: READY
+Status: DONE — implemented in R8.367 (Executor); awaiting Lead review R8.368
 Priority: P2
 Owner: Product Owner.
 Last updated: 2026-10-06

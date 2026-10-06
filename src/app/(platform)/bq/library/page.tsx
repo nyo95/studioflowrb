@@ -11,7 +11,7 @@ import {
   Heading,
   PageHeader,
   SectionCard,
-  Tabs,
+  PillTabPanels,
   Text,
 } from "@/platform/ui_engine";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
@@ -59,7 +59,7 @@ export default async function BqLibraryPage() {
         divider
       />
 
-      <Tabs
+      <PillTabPanels
         fill
         defaultValue="items"
         label="BQ Library views"

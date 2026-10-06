@@ -101,9 +101,7 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 - [ ] [UNVERIFIED] Re-layout (R8.347–R8.348) on real data: send → client
   answered with notes → Revision (the next round shows the brief) → OK; CD Mall
   → CD Final; a supervision visit; ticking and dismissing requirements in the
-  aside; Everyone's scope as a manager with several designers; phone width. The
-  StudioFlow top navigation overlapping its icons and labels at phone width is
-  an older shell issue to fix in the next UI pass.
+  aside; Everyone's scope as a manager with several designers; phone width.
 - [ ] [UNVERIFIED] R8.318–R8.324 on real data: the manager completion override
   with a reason end to end and its "Complete anyway" entry in History, saving a
   multi-supplier grid with real suppliers, typing "By Request" in each price

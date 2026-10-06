@@ -8,7 +8,9 @@ Scope: shared visual language for StudioFlow, Master Data, BQ, and future apps.
 (§10.1–§10.2), the pill tab bar and context capsule (§10.3; StudioFlow project
 pages, Product Schedule and Home), stat cards (§6.1; StudioFlow Home, Master Data
 home), the counts on rail items, and the Playwright size checks (§12,
-`npm run test:e2e`). Master Data and BQ still use `Tabs` for their in-page views.
+`npm run test:e2e`). R8.367 finished the adoption in Master Data (Pricing,
+Settings) and BQ (Projects, Library; capsule on the project pages); `Tabs`
+remains only for sections inside panels, dialogs and drawers.
 
 ## 0. What changed from v1
 

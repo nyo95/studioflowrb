@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.367 | 2026-10-06 | feat(ui): DESIGN v2 adoption in Master Data and BQ — WO-UI-V2-03 (Executor)
+
+- `PillTabs` gains per-item `disabled`/`disabledReason` (`aria-disabled`, not clickable, reason as tooltip) and an `actions` slot at the bar's right end. New `PillTabPanels` (same file) adds in-place content switching for page views with no address of their own; one canonical wrapper instead of three private ones.
+- Adopted: BQ Projects (links to `?view=`, only the chosen view is rendered, pagination keeps the view), BQ Library, Master Data Pricing (New price action at the right, viewport-fill preserved, tab state still owned by the directory) and Master Data Settings (Deletion review and BQ approvals keep their permission rule, now with a reason tooltip). Counts show in the pill's mono count instead of "· n".
+- BQ project detail, edit and new pages use the context capsule (BQ / Projects / title; New project) instead of the eyebrow; there was no back link to remove.
+- Playwright: seed adds one BQ project; Master Data Pricing, BQ Library and the BQ project page join `ROUTES`. The sideways-scroll check now exempts a table's own scroller (DESIGN §12: tables scroll inside their own surface); `main` and every container around the table are still checked.
+- BACKLOG: removed the "top navigation overlaps at phone width" note — the 375px screenshot of the rail strip shows no overlap (icon chips scroll sideways inside the strip).
+- Contracts: UI_ENGINE.md (PillTabs/PillTabPanels row, PillTabs-vs-Tabs rule, consumers), DESIGN.md status line.
+
+**Checks.** `npm test` 842/842 (baseline 842; the new PillTabs assertions extend the existing UI Engine test); typecheck, lint (0 errors, 2 existing `<img>` warnings), boundaries, legacy-runtime clean; production build OK; whitespace check clean; `npm run test:e2e` 50/50 (baseline 35: three routes × five widths added). Browser acceptance left to the Lead (R8.368). `tabCountLabel` in `directory-findability.ts` is now unused by pricing but kept (it has its own test).
+
 ## R8.366 | 2026-10-06 | docs(plan): DESIGN v2 adoption in Master Data and BQ — Work Order WO-UI-V2-03
 
 - Lead review of R8.365 (WO-SF-BRAND-LOGO-01, Executor): PASS. The Library crawler now prefers JSON-LD Organization/Brand logos, then header/nav `logo` images (banners, heroes and product shots excluded), then touch icons, before social images; unsafe URLs are still refused. Full suite re-run by the Lead: 842/842. Brand images already cached in memory (24 h) refresh after the cache expires or the server restarts.

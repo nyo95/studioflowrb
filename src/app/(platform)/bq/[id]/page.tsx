@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission, hasAnyPermission } from "@platform/core/rbac";
-import { PageHeader, SectionCard, EmptyState, buttonClasses } from "@/platform/ui_engine";
+import { Breadcrumb, PageHeader, SectionCard, EmptyState, buttonClasses } from "@/platform/ui_engine";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead, masterDataRead } from "@/apps/bq/runtime";
 
@@ -35,7 +35,7 @@ export default async function BqProjectDetailPage({
   return (
     <div className="grid gap-6">
       <PageHeader
-        eyebrow="Bill of Quantity"
+        context={<Breadcrumb variant="capsule" appMark="BQ" entries={[{ label: "BQ", href: "/bq" }, { label: "Projects", href: "/bq" }, { label: project.title }]} />}
         title={project.title}
         description={`Client: ${project.clientName} · ${project.status}`}
         actions={

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { FileText } from "lucide-react";
 
@@ -22,7 +23,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Tabs,
+  PillTabs,
   FormattedInstant,
 } from "@/platform/ui_engine";
 import { createMoney, formatMoney } from "@platform/utilities/money";
@@ -89,18 +90,22 @@ export default async function BqProjectsPage({
     </DataTable></DirectoryShell>;
   };
 
-  const tabs = [
+  // The view is in the address, so each pill is a link and only the chosen view is rendered.
+  const tabs: Array<{ value: View; label: string; count: number; content: () => ReactNode }> = [
     ...(canRead ? [
-      { value: "active", label: `Active · ${active.length}`, content: directory(active, "active", { title: "No projects yet", description: "Create your first BQ project." }) },
-      { value: "archived", label: `Archived · ${archived.length}`, content: directory(archived, "archived", { title: "No archived projects", description: "Archived projects appear here and can be restored or submitted for deletion." }) },
+      { value: "active" as const, label: "Active", count: active.length, content: () => directory(active, "active", { title: "No projects yet", description: "Create your first BQ project." }) },
+      { value: "archived" as const, label: "Archived", count: archived.length, content: () => directory(archived, "archived", { title: "No archived projects", description: "Archived projects appear here and can be restored or submitted for deletion." }) },
     ] : []),
     ...(canApproveDeletion ? [
-      { value: "deletion", label: `Deletion review · ${deletionRequests.length}`, content: <ProjectDeletionReview requests={deletionRequests.map((row) => ({ id: row.id, projectTitle: row.project_title, requesterLabel: row.requester_label, requestedAt: row.requested_at.toISOString() }))} /> },
+      { value: "deletion" as const, label: "Deletion review", count: deletionRequests.length, content: () => <ProjectDeletionReview requests={deletionRequests.map((row) => ({ id: row.id, projectTitle: row.project_title, requesterLabel: row.requester_label, requestedAt: row.requested_at.toISOString() }))} /> },
     ] : []),
   ];
 
   return <>
     <PageHeader eyebrow="Bill of Quantity" title="Projects" description="Manage your BQ projects" actions={canManage ? <NewProjectButton templates={templates} /> : null} divider />
-    <Tabs label="Project lists" items={tabs} defaultValue={view} fill />
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
+      <PillTabs label="Project lists" items={tabs.map((tab) => ({ key: tab.value, label: tab.label, count: tab.count, href: listHref(tab.value, 1), active: tab.value === view }))} />
+      <div className="flex min-h-0 flex-1 flex-col">{tabs.find((tab) => tab.value === view)?.content()}</div>
+    </div>
   </>;
 }

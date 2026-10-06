@@ -101,6 +101,7 @@ describe("UI Engine foundation", () => {
       "GroupHeader",
       "PipelineStrip",
       "PillTabs",
+      "PillTabPanels",
       "StatCard",
       "StatGrid",
       // R8.72 — activated by the StudioFlow MOM print view (SF-R2).
@@ -205,6 +206,12 @@ describe("UI Engine foundation", () => {
     const activePill = tabs.match(/<a[^>]*aria-current="page"[^>]*>/)![0];
     assert.match(activePill, /text-action-ink/);
     assert.doesNotMatch(activePill, /text-ink-secondary/);
+    const gated = renderToStaticMarkup(createElement(ui.PillTabs, { items: [{ key: "one", label: "One", active: true, onSelect: () => undefined }, { key: "two", label: "Two", active: false, disabled: true, disabledReason: "No access" }], actions: createElement("button", null, "New") }));
+    assert.match(gated, /aria-disabled="true"[^>]*title="No access"|title="No access"[^>]*aria-disabled="true"/);
+    assert.match(gated, /<button[^>]*>New<\/button>/); // the actions slot renders beside the bar
+    const panels = renderToStaticMarkup(createElement(ui.PillTabPanels, { items: [{ value: "a", label: "A", content: "Panel A" }, { value: "b", label: "B", disabled: true, content: "Panel B" }] }));
+    assert.match(panels, /Panel A/);
+    assert.doesNotMatch(panels, /Panel B/); // inactive panels are not mounted
     const stats = renderToStaticMarkup(createElement(ui.StatGrid, null, createElement(ui.StatCard, { label: "Waiting", value: "2", caption: "Needs action" })));
     assert.match(stats, /min-\[840px\]:grid-cols-4/);
     assert.match(stats, /max-\[400px\]:grid-cols-1/);

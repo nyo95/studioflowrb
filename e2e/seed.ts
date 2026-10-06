@@ -13,6 +13,8 @@ import { createNotificationWriter } from "@platform/core/notifications/persisten
 import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { initializePermissionRegistry } from "@platform/core/rbac/registry";
 import { FakeObjectStorage } from "@platform/core/storage";
+import type { PrismaClient } from "@/generated/prisma/client";
+import { createBqService } from "@/apps/bq/service";
 import { createMasterDataPublicRead } from "@/apps/masterdata/public";
 import { LEGACY_PHASE_DEFINITION_IDS as LEGACY } from "@/apps/studioflow/domain/phase";
 import { createStudioFlowService } from "@/apps/studioflow/service";
@@ -20,7 +22,7 @@ import { APP_REGISTRATIONS } from "../src/app/app-registrations";
 
 /**
  * Seeds the disposable test database for the Playwright screen-size checks (DESIGN v2 §12): one owner with every
- * grant and one StudioFlow project with a long name. It refuses any database that is not the disposable test
+ * grant and one StudioFlow project and one BQ project, both with long names. It refuses any database that is not the disposable test
  * database (same guard as `npm test`). The generated test credentials go to `e2e/.tmp/owner.json`, which is
  * git-ignored; they are never real credentials.
  */
@@ -30,6 +32,7 @@ async function main() {
   const db = testDb.prisma;
   try {
     await testDb.pool.query(`TRUNCATE TABLE ${["sf_project", "sf_client", "sf_phase_definition", "sf_phase_template", "sf_settings", "sf_checklist_template", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix"].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
+    await testDb.pool.query('TRUNCATE TABLE "bq"."bq_project" RESTART IDENTITY CASCADE');
     await truncatePlatformTables(testDb);
 
     const registry = initializePermissionRegistry(APP_REGISTRATIONS);
@@ -69,8 +72,11 @@ async function main() {
       picDrafterId: owner.userId,
     });
 
+    const bq = createBqService(db, { auditWriter: createAuditEventWriter(), runTransaction: (work) => db.$transaction((tx) => work(tx as unknown as PrismaClient)) });
+    const bqProject = await bq.createProject({ grants: registry.permissions, actor, title: "E2E Long BQ Project Title For Phone Width Checks At The Breeze BSD Phase 2", clientName: "E2E Client" });
+
     mkdirSync("e2e/.tmp", { recursive: true });
-    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, projectId: project.projectId }));
+    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, projectId: project.projectId, bqProjectId: bqProject.id }));
   } finally {
     await closeTestDb(testDb);
   }

@@ -4,7 +4,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasAnyPermission, hasPermission } from "@platform/core/rbac";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead } from "@/apps/bq/runtime";
-import { PageHeader, SectionCard } from "@/platform/ui_engine";
+import { Breadcrumb, PageHeader, SectionCard } from "@/platform/ui_engine";
 import { ProjectForm } from "../project-form";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +22,7 @@ export default async function NewBqProjectPage() {
 
   return (
     <div className="grid max-w-3xl gap-6">
-      <PageHeader eyebrow="Bill of Quantity" title="Buat Project" description="Mulai BQ baru; struktur Section/Subsection dapat ditambahkan setelah project dibuat." divider />
+      <PageHeader context={<Breadcrumb variant="capsule" appMark="BQ" entries={[{ label: "BQ", href: "/bq" }, { label: "Projects", href: "/bq" }, { label: "New project" }]} />} title="Buat Project" description="Mulai BQ baru; struktur Section/Subsection dapat ditambahkan setelah project dibuat." divider />
       <SectionCard>
         <ProjectForm templates={templates} />
       </SectionCard>

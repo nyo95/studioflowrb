@@ -2,13 +2,13 @@
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
 import { FilterSummary, StatusFilterSelect } from "../directory-filters";
-import { compareAmounts, groupPriceRows, isPriceOnRequest, matchesDirectoryStatus, tabCountLabel, type DirectoryStatus } from "../directory-findability";
+import { compareAmounts, groupPriceRows, isPriceOnRequest, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
 import { PhoneLinks } from "../phone-links";
 import { getPaginationSlice } from "@platform/utilities/pagination";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
 
-import { Badge,Button,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,PrefixedInput,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Tabs,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
+import { Badge,Button,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,PrefixedInput,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,PillTabPanels,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
 import { blurDisplay, readTypedAmount, shouldShowAmountPrefix, storedAmountText } from "./amount-format";
 import { PriceMatrixDialog } from "./price-matrix-dialog";
@@ -208,18 +208,18 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
     {rowError ? <InlineError>{rowError}</InlineError> : null}
     {matrixKind && <PriceMatrixDialog key={matrixKind} kind={matrixKind} modes={(onChange) => entryModes({ kind: matrixKind, multiSupplier: true }, onChange)} onSwitch={openEntry} vendors={props.workVendors} categories={props.workCategories} units={props.units} onClose={() => setMatrixKind(null)} />}
     {editor && <PriceEditor key={`${editor.kind}-${editor.row?.id ?? "new"}`} modes={editor.row ? undefined : (onChange) => entryModes({ kind: editor.kind, multiSupplier: false }, onChange)} onSwitch={openEntry} pending={savePending} editor={editor} refs={{ ...props, vendors: editor.kind === "material" ? props.materialVendors : props.workVendors }} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
-    <Tabs
+    <PillTabPanels
       fill
+      label="Price views"
       value={tab}
       onValueChange={(value) => setTab(value as Kind)}
-      distribution="equal"
       actions={(props.canManageMaterial || props.canManageWork) ? (
         <Button variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => openEntry({ kind: newPriceKind, multiSupplier: false })}>New price</Button>
       ) : undefined}
       items={[
-      { value: "material", label: tabCountLabel("Material Prices", material.length), disabled: !props.canReadMaterial, content: materialTab },
-      { value: "material-labor", label: tabCountLabel("Material + Labor", materialLaborFiltered.length), disabled: !props.canReadWork, content: workTable(materialLaborFiltered, props.materialLaborPrices.length, "material-labor", props.canManageWork, "No material + labor prices") },
-      { value: "labor", label: tabCountLabel("Labor Only", laborFiltered.length), disabled: !props.canReadWork, content: workTable(laborFiltered, props.laborPrices.length, "labor", props.canManageWork, "No labor-only prices") },
+      { value: "material", label: "Material Prices", count: material.length, disabled: !props.canReadMaterial, disabledReason: "You do not have permission to view material prices.", content: materialTab },
+      { value: "material-labor", label: "Material + Labor", count: materialLaborFiltered.length, disabled: !props.canReadWork, disabledReason: "You do not have permission to view work prices.", content: workTable(materialLaborFiltered, props.materialLaborPrices.length, "material-labor", props.canManageWork, "No material + labor prices") },
+      { value: "labor", label: "Labor Only", count: laborFiltered.length, disabled: !props.canReadWork, disabledReason: "You do not have permission to view work prices.", content: workTable(laborFiltered, props.laborPrices.length, "labor", props.canManageWork, "No labor-only prices") },
     ]} />
     {archive && <ConfirmDialog error={rowError} pending={pendingId !== null} open onOpenChange={(open) => !open && setArchive(null)} title={`Archive ${archive.name}?`} description="It will be removed from active pricing and pickers." confirmLabel="Archive" tone="danger" onConfirm={() => { const value = archive;  run(value.id, () => archivePriceAction(value.kind, value.id), () => { setArchive(null); }); }} />}
     {restore && <ConfirmDialog error={rowError} pending={pendingId !== null} open onOpenChange={(open) => !open && setRestore(null)} title={`Restore ${restore.name}?`} description="Required references will be validated before restoring it." confirmLabel="Restore" onConfirm={() => { const value = restore;  run(value.id, () => restorePriceAction(value.kind, value.id), () => { setRestore(null); }); }} />}

@@ -4,7 +4,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasPermission } from "@platform/core/rbac";
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead } from "@/apps/bq/runtime";
-import { PageHeader, SectionCard } from "@/platform/ui_engine";
+import { Breadcrumb, PageHeader, SectionCard } from "@/platform/ui_engine";
 import { ProjectForm } from "../../project-form";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +20,7 @@ export default async function EditBqProjectPage({ params }: { params: Promise<{ 
 
   return (
     <div className="grid max-w-3xl gap-6">
-      <PageHeader eyebrow="Bill of Quantity" title="Edit Project" divider />
+      <PageHeader context={<Breadcrumb variant="capsule" appMark="BQ" entries={[{ label: "BQ", href: "/bq" }, { label: "Projects", href: "/bq" }, { label: project.title, href: `/bq/${id}` }]} />} title="Edit Project" divider />
       <SectionCard>
         <ProjectForm project={project} />
       </SectionCard>

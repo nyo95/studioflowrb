@@ -450,7 +450,7 @@ export function UiEngineShowcase() {
               />
               <Breadcrumb variant="capsule" appMark="SF" entries={[{ label: "StudioFlow", href: "#shell" }, { label: "Projects", href: "#directory" }, { label: "Kopi Kalyana Senopati" }]} />
 
-              <PillTabs items={[{ key: "one", label: "Overview", icon: <LayoutGrid />, active: true, href: "#context" }, { key: "two", label: "History", icon: <History />, active: false, href: "#states", count: 3 }]} />
+              <PillTabs items={[{ key: "one", label: "Overview", icon: <LayoutGrid />, active: true, href: "#context" }, { key: "two", label: "History", icon: <History />, active: false, href: "#states", count: 3 }, { key: "three", label: "Approvals", active: false, disabled: true, disabledReason: "You do not have permission to approve." }]} />
               <StatGrid><StatCard label="Waiting" value="3" caption="Needs a decision" icon={<CircleAlert />} /><StatCard label="Done" value="8 / 12" caption="This project" /></StatGrid>
 
               <MetaList
