@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.354 | 2026-10-06 | fix(studioflow,ui-engine): no sideways page scroll on a phone; DESIGN v2 draft
+
+- **Phone bug (owner, 2026-10-06), found in the sidebar/rail study.** At 375px the Home page was 660px wide: the project card, a grid item, grew to its phase strip's 640px, so the whole content scrolled sideways and the title was cut off. The card now has `min-w-0` and the strip scrolls inside it. The same study found the project pages 414px wide at 375px: `PageHeader`'s action row (the project section nav) sized itself to its content when the header stacked; it is now capped at the page width (`max-w-full`), which fixes every app that puts a wide action row in a page header. Browser-checked at 375 and 640px on StudioFlow Home, project, schedule, MOM, presentation, history, Projects, Timeline, Clients, Library, Master Data and BQ: no page-level sideways scroll (BQ's wide table still scrolls inside its own surface, as intended).
+- **Sidebar/rail study and owner decisions.** The ideas on branch `idea/sidebar-rail` (R8.335–R8.340 there; that branch's numbers predate this line and are not merged) were studied against `main`. Owner answers: account, Settings and Log out move into the rail, search and notifications stay in a thin top bar; the pill bar is for in-page tabs only; airy frame, dense tables; the active rail item is a full-width white block; Playwright is approved for screen-size regression. Recorded as one `[PLANNED]` entry in `docs/BACKLOG.md`.
+- **`docs/apps/platform/DESIGN-V2-DRAFT.md`**: the full design contract rewritten toward an Apple/Linear feel for owner review — lighter ground, hairline-edged planes, white rail with groups/icon chips/counts and the account block, thin top bar, pill tab bar and context capsule, stat cards, 16px card radius, airier frame spacing with unchanged table density, and the fixed-frame/no-sideways-scroll rule with the Playwright sizes. The root `DESIGN.md` stays in force until the owner approves the draft; it then replaces it in the same revision as the token and shell change.
+- `PLAN.md` (WO-SF-PHASE-MENU-01, still on hold) moves to R8.355 (Executor) and R8.356 (Lead).
+
+**Checks.** `tsc --noEmit`; `npm run lint` (0 errors, 2 existing `<img>` warnings); `check:boundaries`; `npm test` **831/831** (two new regression tests: the page header's action row and the Home card).
+
 ## R8.353 | 2026-10-06 | docs(plan): skip a started phase and a phase menu on Home — Work Order WO-SF-PHASE-MENU-01
 
 - Owner finding: when the client supplies the moodboard, the Moodboard phase cannot be skipped (it is active from project creation and skip accepted only a phase that had not started; the phase menu offered only rename/delete round). Wording mixed "iteration" and "round".

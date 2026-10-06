@@ -452,7 +452,9 @@ export function PageHeader({
         {description ? <Text as="p" tone="secondary">{description}</Text> : null}
         {meta ? <div className="mt-1">{meta}</div> : null}
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-[560px]:justify-start">{actions}</div> : null}
+      {/* max-w-full: when the header stacks on a phone, a wide action row (a scrolling section nav) stays
+          inside the page instead of widening it. */}
+      {actions ? <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2 max-[560px]:justify-start">{actions}</div> : null}
     </header>
   );
 }

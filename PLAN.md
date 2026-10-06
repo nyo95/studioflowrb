@@ -2,7 +2,7 @@
 
 Plan ID: WO-SF-PHASE-MENU-01
 Scope: Let a phase that has already started be skipped (e.g. a Moodboard the client supplied), make skip undoable, and give each phase on the Home card a ⋯ menu (client notes, new round, skip, open). Use one word — "round" — on every StudioFlow screen.
-Target revisions: R8.353 (this plan, Lead), R8.354 (implementation, Executor), R8.355 (Lead review and polish).
+Target revisions: R8.353 (this plan, Lead), R8.355 (implementation, Executor), R8.356 (Lead review and polish). R8.354 was taken by the phone-overflow fix and the DESIGN v2 draft.
 Status: READY
 Priority: P1
 Owner: Product Owner.
@@ -10,7 +10,7 @@ Last updated: 2026-10-06
 
 ## Lane note
 
-Same arrangement as WO-SF-RELAYOUT-01 and WO-SF-SCHED-RELAYOUT-01: the Executor builds backend and UI wiring; the Lead polishes in R8.355. If the plan contradicts the repository or a recorded owner decision, stop with `BLOCKED / CONFLICT` and send a prompt back to the Lead.
+Same arrangement as WO-SF-RELAYOUT-01 and WO-SF-SCHED-RELAYOUT-01: the Executor builds backend and UI wiring; the Lead polishes in R8.356. If the plan contradicts the repository or a recorded owner decision, stop with `BLOCKED / CONFLICT` and send a prompt back to the Lead.
 
 ## Problem (owner, 2026-10-06)
 
@@ -56,12 +56,12 @@ Same arrangement as WO-SF-RELAYOUT-01 and WO-SF-SCHED-RELAYOUT-01: the Executor 
 
 ## Verification
 
-`npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, full `npm test` (baseline 829). New integration tests: skip an `ACTIVE` phase with an empty unsent round (removed), with a sent round (kept), refuse on `DONE`, auto-advance after skip, undo of each, permission refusal. Report counts before/after.
+`npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, full `npm test` (baseline 831). New integration tests: skip an `ACTIVE` phase with an empty unsent round (removed), with a sent round (kept), refuse on `DONE`, auto-advance after skip, undo of each, permission refusal. Report counts before/after.
 
-## Reviewer Acceptance (Lead, R8.355)
+## Reviewer Acceptance (Lead, R8.356)
 
 Browser: skip Moodboard on a fresh test project and undo it; skip a phase with a sent round; Home ⋯ menu per phase state; wording sweep for "iteration".
 
 ## Executor Prompt
 
-You are the Backend Executor, assigned WO-SF-PHASE-MENU-01 by the owner (same rules as the previous two Work Orders). Location: kantor unless the owner says otherwise; load the matching .env file, set STUDIOFLOW_LOCATION, and verify the database target belongs only to studioflow-rebuild before any database command. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `UI_ENGINE.md` (§3.5, §11, §15–17), `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §5 and §7, and this `PLAN.md`, then implement the whole plan as revision R8.354 and nothing beyond it. If you find an inconsistency, need a schema change, or the plan contradicts the code, stop with BLOCKED / CONFLICT and send it back to the Lead. Do not polish visuals beyond the plan; the Lead does that in R8.355. Run the checks in `## Verification` (baseline 829 pass), update the contract and `CHANGELOG.md`, commit locally once, and reply with a Planner/Reviewer prompt containing outcome, commit, checks (test counts before/after), limitations and dirty files.
+You are the Backend Executor, assigned WO-SF-PHASE-MENU-01 by the owner (same rules as the previous two Work Orders). Location: kantor unless the owner says otherwise; load the matching .env file, set STUDIOFLOW_LOCATION, and verify the database target belongs only to studioflow-rebuild before any database command. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `UI_ENGINE.md` (§3.5, §11, §15–17), `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §5 and §7, and this `PLAN.md`, then implement the whole plan as revision R8.355 and nothing beyond it. If you find an inconsistency, need a schema change, or the plan contradicts the code, stop with BLOCKED / CONFLICT and send it back to the Lead. Do not polish visuals beyond the plan; the Lead does that in R8.356. Run the checks in `## Verification` (baseline 831 pass), update the contract and `CHANGELOG.md`, commit locally once, and reply with a Planner/Reviewer prompt containing outcome, commit, checks (test counts before/after), limitations and dirty files.

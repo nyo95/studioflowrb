@@ -82,7 +82,9 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
   });
 
   return (
-    <article aria-label={card.name}>
+    /* min-w-0: as a grid item the card would otherwise grow to the phase strip's full width (640px on a
+       375px phone) and push the whole page sideways; the strip scrolls inside the card instead. */
+    <article aria-label={card.name} className="min-w-0">
       <SectionCard padded={false}>
         <header className="flex flex-wrap items-start justify-between gap-3 px-(--ui-section-px) py-3">
           <div className="flex min-w-0 items-start gap-2">

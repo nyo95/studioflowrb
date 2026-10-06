@@ -48,6 +48,17 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## UI Engine and Shared Utilities
 
+- [ ] [PLANNED][P2] **Apple/Linear redesign: rail, thin top bar, pill tabs, airy frame (owner, 2026-10-06).**
+  Ideas and reference screenshots were collected on branch `idea/sidebar-rail` (structure adopted, colours not).
+  Owner decisions: (1) account, Settings and Log out move into the rail; search, notifications and messages stay
+  in a thin top bar; (2) the rounded pill bar is for in-page tabs and context only; (3) the frame and the space
+  between sections get airier, tables and the schedule stay dense; (4) the active rail item is a full-width white
+  block; (5) add Playwright for screen-size regression (375 px, ~640 px, 839/840/841 px). The rail stays icon-only by
+  default and expands on press. Draft contract: `apps/platform/DESIGN-V2-DRAFT.md` (awaiting owner approval; it
+  replaces `DESIGN.md` together with the token and shell change). Suggested slices after approval: tokens and
+  showcase; rail and top bar; per-app rail counts (Executor, read-only); pill tab bar and context capsule; stat
+  cards; Playwright geometry checks.
+
 - [ ] [PLANNED][P2] One `EntryGrid` pattern for the three Master Data entry
   grids (work-price table, material-price table, compare-suppliers grid) and an
   `Input textCase` admission with showcase and test (Lead, 2026-10-01). Needs

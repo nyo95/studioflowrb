@@ -335,6 +335,12 @@ describe("UI Engine foundation", () => {
     assert.match(shells, /: "grid-cols-1"/);
   });
 
+  it("keeps a page header's action row inside the page on a phone", () => {
+    // A stacked header used to size its actions to their content, so a scrolling section nav made the page 414px wide at 375px.
+    const markup = renderToStaticMarkup(createElement(ui.PageHeader, { title: "Project", actions: createElement("nav", null, "Phases MOM Schedule") }));
+    assert.match(markup, /class="flex max-w-full shrink-0[^"]*"><nav>/);
+  });
+
   it("bounds long content and rail menus inside the viewport at every screen width", () => {
     for (const state of [{ railVisible: true, collapsed: true }, { railVisible: true, collapsed: false }, { railVisible: false }]) {
       const props = {
