@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.369 | 2026-10-06 | docs(plan): StudioFlow production-safety closure — WO-SF-SAFE-01/02/03 (Lead)
+
+- Verified three reported findings against c6f1cb7: round deletion can cascade-delete activities and detach deliverables (confirmed, P0, plus `bypassPhase` ignoring activities); `setProjectStatus` can reopen/complete outside the explicit lifecycle (confirmed, P1); bare `storage.remove` paths bypass the cleanup failure ledger (confirmed, P1). Lifecycle timers are acceptable for the always-on PC runtime.
+- `PLAN.md` replaced with the three Work Orders, locked decisions, tests, and a DRAFT Settings rework (WO-SETTINGS-01) awaiting owner answers. No code changed. WO-UI-V2-03 Lead acceptance remains owed.
+
+**Checks.** Documentation only.
+
 ## R8.368 | 2026-10-06 | fix(studioflow): one name for the client's round notes
 
 - Owner (2026-10-06, Lead and Executor combined): the "Brief from Round N" box and the "Client notes" dialog showed the same text (each round has one note; the next round displays the previous one). Wording only, no data or behaviour change: the box is now "Client notes from Round N", and both notes dialogs (project page and project card) say "The client's notes for this round. They carry over to the next round."
