@@ -2,6 +2,13 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.341 | 2026-10-06 | docs(plan): notes replace to-dos — Work Order WO-SF-NOTES-ONLY-01
+
+- Owner decision (2026-10-06): StudioFlow has no personal to-do or My Tasks. Projects have two views (My projects, All projects); a project holds Requirements (one general checklist), MOM, Project Schedule and the Phase system; phase notes replace Todoist/task/to-do. The owner chose to remove both the screens and the data.
+- `PLAN.md` replaced (the earlier WO-REPAIR batch is fully landed) with the Work Order for the destructive backend/data removal (R8.342, Executor) and the UI follow-up (R8.343, Lead). No code or schema changed in this revision.
+
+**Checks.** Documentation only; none run.
+
 ## R8.340 | 2026-10-06 | fix(studioflow,platform): add-to-do only where allowed; one shared currency prefix
 
 - Re-check of the merged local + GitHub work. My Today lists a project for someone who only has a to-do assigned there, but the add-to-do field and Quick add were offered for it and then refused by the server. Today now says per project whether the viewer may add (`canAdd`: a PIC or an override holder, the server's own rule); the inline add row and Quick add follow it.
@@ -239,8 +246,8 @@ Logic, backend and flow review of the StudioFlow phase, task and Today code afte
 ## Revision state
 
 - Published baseline: **R8** — published to GitHub by the release commit below
-- Current revision after this entry is committed: **R8.340**
-- Next local revision: **R8.341**
+- Current revision after this entry is committed: **R8.341**
+- Next local revision: **R8.342**
 - Revision collision: **R8.164 was issued twice** — `b2421de` (local, docs/backlog) and `5acc67d`
   (remote, fix sf/ui-engine). Both commits are kept as-is and both entries are below, told apart
   by hash. R8.167 is the merge that joins them; no number is reused.
