@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.364 | 2026-10-06 | docs(plan): WO-UI-V2-02 closed; tree clean for WO-SF-BRAND-LOGO-01
+
+- WO-UI-V2-02 is finished (R8.358–R8.363); `PLAN.md` no longer shows it as READY. The Executor's BLOCKED report on WO-SF-BRAND-LOGO-01 (untracked `e2e/` files from the unfinished Playwright slice) is resolved: those files were committed in R8.362 and the tree is clean. The logo Work Order can start at R8.365.
+
+**Checks.** Documentation only; none run.
+
 ## R8.363 | 2026-10-06 | chore(lint): ignore the e2e build folder
 
 - After the first `npm run test:e2e`, `npm run lint` scanned the generated `.next-e2e/` build output and reported 282 warnings. ESLint now ignores `.next-e2e/**` and `e2e/.tmp/**` like it ignores `.next/**`.
