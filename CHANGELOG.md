@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.371 | 2026-10-06 | fix(studioflow): completion and reopening have one owner each — WO-SF-SAFE-02
+
+- `projects.setProjectStatus` now owns only `ACTIVE ↔ ON_HOLD` (new `PROJECT_HOLD_STATUSES`/`ProjectHoldStatus`). A COMPLETED target is refused (`PROJECT_STATUS_USE_COMPLETION_FLOW`) and a COMPLETED project is refused (`PROJECT_COMPLETED`, it no longer loads with `allowCompleted`). Before, any `projectManage` holder could complete or un-complete a project through it without the PIC check, readiness owner, or `completed`/`reopened` audit actions.
+- `setProjectStatusAction` accepts only `ACTIVE`/`ON_HOLD` and drops its unused `overrideReason` argument. The edit dialog already sent only those two.
+- No data change: stored statuses and older `status-changed` history rows stay as they are.
+- Tests: Active/On hold both ways; generic COMPLETED refused; completed project refused to Active and On hold; completion and reopen through their own commands with their audit actions; the readiness/override test now drives `markProjectCompleted`.
+
+**Checks.** `npm run typecheck`, eslint on changed files, `service.integration.test.ts` 127/127.
+
 ## R8.370 | 2026-10-06 | fix(studioflow): a round holding work can no longer be deleted — WO-SF-SAFE-01
 
 - Owner (2026-10-06): Lead executes as Planner + Executor. `deleteNeverSentIteration` now refuses (`ITERATION_HAS_ATTACHED_WORK`, conflict) a never-sent round that has any activity or deliverable attached. Before, the delete cascade-removed its activities and detached its files (`onDelete: SetNull`), and undo recreated only the round row. The undo snapshot now holds only the round.

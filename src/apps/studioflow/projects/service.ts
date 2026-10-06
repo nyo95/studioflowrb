@@ -36,10 +36,12 @@ import {
 } from "../shared";
 import { seedScheduleFromTemplates } from "../schedule/sync";
 import { seedChecklistFromTemplates } from "../tasks/sync";
-import { assertProjectCompletionReady } from "./completion";
 
 export const PROJECT_STATUSES = ["ACTIVE", "ON_HOLD", "COMPLETED"] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
+/** The statuses the generic status command may set; completion has its own commands. */
+export const PROJECT_HOLD_STATUSES = ["ACTIVE", "ON_HOLD"] as const;
+export type ProjectHoldStatus = (typeof PROJECT_HOLD_STATUSES)[number];
 export const PROJECT_PRIORITIES = ["URGENT", "NORMAL", "LOW"] as const;
 export type ProjectPriority = (typeof PROJECT_PRIORITIES)[number];
 
@@ -532,18 +534,21 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
-    /** ACTIVE ↔ ON_HOLD, or COMPLETED (legacy `executeCompleteProject`), or reactivate. */
-    async setProjectStatus(input: CommandContext & { projectId: string; status: ProjectStatus; overrideReason?: string | null }) {
+    /**
+     * ACTIVE ↔ ON_HOLD only. Completion is `phases.markProjectCompleted` and reopening is `phases.reopenProject`
+     * (PIC-only, readiness-gated, own audit actions); this generic command never produces or leaves COMPLETED.
+     */
+    async setProjectStatus(input: CommandContext & { projectId: string; status: ProjectHoldStatus }) {
       const userId = requireCommand(input, P.projectManage);
+      if (!(PROJECT_HOLD_STATUSES as readonly string[]).includes(input.status)) {
+        throw invalid("PROJECT_STATUS_USE_COMPLETION_FLOW", "Use Complete project or Reopen project to change completion.");
+      }
       return runTransaction(async (tx) => {
-        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project", allowCompleted: true });
-        const project = await loadWritableProject(tx, input.projectId, { allowCompleted: true });
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
+        const project = await loadWritableProject(tx, input.projectId);
         if (project.status === input.status) return { projectId: project.id };
-        const completion = input.status === "COMPLETED"
-          ? await assertProjectCompletionReady(tx, input)
-          : { overrideReason: null };
         await tx.sfProject.update({ where: { id: project.id }, data: { status: input.status } });
-        await writeAudit(ports, tx, { action: "studioflow.project.status-changed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: input.status } }, metadata: { projectId: project.id, ...(completion.overrideReason ? { completionOverrideReason: completion.overrideReason } : {}) } });
+        await writeAudit(ports, tx, { action: "studioflow.project.status-changed", entityType: "project", entityId: project.id, actor: input.actor, changes: { status: { from: project.status, to: input.status } }, metadata: { projectId: project.id } });
         return { projectId: project.id };
       });
     },

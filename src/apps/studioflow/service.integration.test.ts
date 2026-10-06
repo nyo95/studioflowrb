@@ -177,10 +177,36 @@ describe("WO-SF-ITER-01 phase 2 iteration commands", () => {
     assert.equal(notReady.openReminders, 1);
     assert.equal(notReady.ready, false);
     await rejectsWith(sf.phases.markProjectCompleted({ ...as(designer, ALL.filter((grant) => grant !== P.projectManage)), projectId }), "PROJECT_COMPLETION_NOT_READY");
-    await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED" }), "PROJECT_COMPLETION_OVERRIDE_REASON_REQUIRED");
-    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED", overrideReason: "Client accepted the remaining close-out item." });
-    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.project.status-changed", entity_id: projectId } });
+    await rejectsWith(sf.phases.markProjectCompleted({ ...as(designer), projectId }), "PROJECT_COMPLETION_OVERRIDE_REASON_REQUIRED");
+    await sf.phases.markProjectCompleted({ ...as(designer), projectId, overrideReason: "Client accepted the remaining close-out item." });
+    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.project.completed", entity_id: projectId } });
     assert.equal((audit.metadata as { completionOverrideReason?: string }).completionOverrideReason, "Client accepted the remaining close-out item.");
+  });
+
+  it("keeps completion and reopening out of the generic status command", async () => {
+    const { projectId } = await newProject("Generic status boundary");
+    const status = async () => (await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } })).status;
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
+    assert.equal(await status(), "ON_HOLD");
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ACTIVE" });
+    assert.equal(await status(), "ACTIVE");
+    // A caller outside the typed surface (API, AI, another UI) still cannot complete through it.
+    await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "COMPLETED" as "ACTIVE" }), "PROJECT_STATUS_USE_COMPLETION_FLOW");
+    assert.equal(await status(), "ACTIVE");
+
+    await testDb.prisma.sfPhase.updateMany({ where: { project_id: projectId }, data: { status: "DONE", is_locked: true } });
+    await sf.phases.markProjectCompleted({ ...as(designer), projectId });
+    assert.equal(await status(), "COMPLETED");
+    await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ACTIVE" }), "PROJECT_COMPLETED");
+    await rejectsWith(sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" }), "PROJECT_COMPLETED");
+    assert.equal(await status(), "COMPLETED");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.project.status-changed", entity_id: projectId, changes: { path: ["status", "to"], equals: "COMPLETED" } } }), 0);
+
+    await sf.phases.reopenProject({ ...as(designer), projectId });
+    assert.equal(await status(), "ACTIVE");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.project.reopened", entity_id: projectId } }), 1);
+    await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
+    assert.equal(await status(), "ON_HOLD");
   });
 
   it("lets open requirements stay as reminders: only unfinished phases block completion", async () => {
