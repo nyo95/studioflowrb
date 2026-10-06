@@ -243,6 +243,17 @@ describe("WO-SF-PHASE-MENU-01 skip lifecycle", () => {
     assert.deepEqual(kept.sent_at, sentAt);
   });
 
+  it("lets an active phase whose only unsent round was deleted take a new round", async () => {
+    const { projectId } = await newProject("Active phase without a round");
+    const phase = await phaseOf(projectId, "moodboard");
+    const open = await openIteration(phase.id);
+    await sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id });
+    assert.equal((await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((card) => card.id === projectId)!.phases[0]!.can_add_round, true);
+    await sf.phases.addIteration({ ...as(designer), projectId, phaseId: phase.id });
+    assert.equal((await openIteration(phase.id)).status, "NOT_SENT");
+    await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: phase.id }), "PHASE_INVALID_STATE");
+  });
+
   it("refuses to skip a phase that is already done", async () => {
     const { projectId } = await newProject("Skip done refusal");
     const phase = await phaseOf(projectId, "moodboard");

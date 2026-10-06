@@ -2,6 +2,16 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.356 | 2026-10-06 | fix(studioflow): Lead review of the phase menu and skip; stuck active phase can take a round
+
+- Lead review of R8.355 (WO-SF-PHASE-MENU-01): PASS with corrections. Read the service, read-model and UI diff: skip accepts pending and active phases, keeps populated rounds, removes an empty never-sent round, auto-advances, writes an undoable event (undo of a skip needs `phase.review`, as the skip does), and exposes the reason; Home has the per-phase ⋯ menu and the screens say "round". The Executor also let a supervision phase drop an empty auto-opened round when the first visit is added (needed after a skip auto-advances into Supervision); accepted.
+- **Fix — a stuck phase.** The owner's Moodboard was active with no round at all (its only unsent round had been deleted). An active phase could not take a round (only new or finished ones could), and its old "+ iteration" button failed on the server. An active, non-supervision phase with no open round may now take one; a phase that already has an open round still cannot. The Home card offers it as "+ New round" in the ⋯ menu. New integration test.
+- **Fix — a skip is not an approval.** A sent round closed by a skip showed "Approved" under Earlier rounds; it now reads "Closed by skip". Both skip dialogs suggest a reason ("e.g. Moodboard supplied by the client").
+- Browser (owner's session, read-only): Home ⋯ menus render per phase; the Moodboard menu showed Open phase and Skip phase only, which exposed the stuck phase above. No command was clicked. The queued R8.355 click-through stays on the browser backlog.
+- Contract §5.2, §5.3 and §7 updated.
+
+**Checks.** `tsc --noEmit`; `npm run lint` (0 errors, 2 existing warnings); `check:boundaries`; `npm test` **838/838**.
+
 ## R8.355 | 2026-10-06 | feat(studioflow): add phase menus and undoable active-phase skip
 
 - **Skip lifecycle.** `phase.review` may now skip a pending or active phase with a reason. A sent/populated round is closed and kept; an empty never-sent round without client notes or files is removed. The phase is locked as done, the next eligible phase opens by the existing rule, and the existing five-minute/same-actor undo restores the exact phase, round and auto-advanced state. The reason remains in the audit/event record; no schema, migration, service boundary, action shape or permission vocabulary changed.

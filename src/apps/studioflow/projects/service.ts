@@ -620,7 +620,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           const visits = phase.revisions.filter((iteration) => iteration.visit_date);
           const lastVisit = visits.sort((a, b) => (b.visit_date?.getTime() ?? 0) - (a.visit_date?.getTime() ?? 0))[0]?.visit_date ?? null;
           const kinds = iterationKinds(phase.definition.default_iteration_kinds);
-          const choices = !current ? (phase.status === "DONE" ? ["add_iteration"] : []) : iterationChoices({ state: current.status, phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision });
+          const choices = !current ? (phase.status === "DONE" || (phase.status === "ACTIVE" && !isSupervision) ? ["add_iteration"] : []) : iterationChoices({ state: current.status, phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision });
           return {
             id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,
             current_iteration: current ? { id: current.id, name: current.name, state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices, answer_choices: iterationChoices({ state: "ANSWERED", phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision }), note: current.note } : null,

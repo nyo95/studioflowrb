@@ -290,7 +290,10 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async addIteration(input: PhaseCommandInput) {
       return runTransaction(async (tx) => {
         const { phase } = await writableIteration(tx, input);
-        if (phase.status !== "PENDING" && phase.status !== "DONE") throw invalidState("A round can only be added to a new or finished phase.");
+        // An active phase may take a round only when it has none open (its only unsent round was deleted); it would otherwise be stuck.
+        if (phase.status === "ACTIVE") {
+          if (isLegacySupervisionDefinition(phase.definition_id) || await activeRevision(tx, phase.id)) throw invalidState("Finish the current round before adding another.");
+        } else if (phase.status !== "PENDING" && phase.status !== "DONE") throw invalidState("A round can only be added to a new or finished phase.");
         if (phase.status === "PENDING") await assertCanStart(tx, phase);
         const iteration = await createIteration(tx, phase, await defaultFirstKind(tx, phase));
         await setPhase(tx, phase, { status: "ACTIVE", is_locked: false });

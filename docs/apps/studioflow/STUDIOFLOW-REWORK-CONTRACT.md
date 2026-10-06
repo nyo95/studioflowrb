@@ -207,7 +207,9 @@ Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
 - **Supervision** runs on dated site visits: New visit, then **Next visit** or
   **Done (handover)**.
 - A done phase can take **+ New round** (reopen by adding a round); history is
-  kept and other phases keep running.
+  kept and other phases keep running. An active phase with no open round (its
+  only unsent round was deleted) can take one too (R8.356); a phase that
+  already has an open round cannot.
 - Screens take their buttons from `iterationChoices`
   (`domain/iteration-kinds.ts`), the same rule the commands enforce.
 - Commands: `addIteration`, `sendIteration`, `recordClientAnswer`,
@@ -225,7 +227,8 @@ Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
 
 - **Skip** (`bypass`, `phase.review`): a pending or active phase is marked done
   and locked; a reason is required and audited. A sent or otherwise populated
-  open round is closed and kept in history. A never-sent round is removed only
+  open round is closed and kept in history, labelled "Closed by skip" (never
+  "Approved", which would claim a client approval). A never-sent round is removed only
   when it has no client notes or files; skipping a pending phase
   still records its closed round 1. The next eligible phase opens by the normal
   auto-advance rule. Home and the phase strip say **Skipped**, and the phase
@@ -302,7 +305,7 @@ menu). Deleting a template detaches generated rows.
   with each phase's round, state and its next action. Only a decision after
   the client answered is a primary button there. Each phase also has a ⋯ menu:
   **Open phase**; **Client notes…** for an editable open round (hidden while it
-  is with the client); **+ New round** for a finished phase; and **Skip phase…**
+  is with the client); **+ New round** for a finished phase or an active one with no open round; and **Skip phase…**
   for an eligible pending/active phase when the viewer can act and holds
   `phase.review`.
 
