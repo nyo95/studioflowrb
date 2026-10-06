@@ -2,6 +2,13 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.346 | 2026-10-06 | docs(plan,studioflow): no project code in the re-layout; contract naming drift fixed
+
+- Executor BLOCKED report on WO-SF-RELAYOUT-01 (before any code change; baseline 826 pass): the plan asked for the project code as the header eyebrow, but projects have no code since R8.213. Lead verdict: option A — the header and the Home card show the free-text name as stored, with no eyebrow and no code line; option B (a fixed "Project" eyebrow) was rejected as a repeated, low-information label. `PLAN.md` carries the correction; implementation moves to R8.347 and polish to R8.348.
+- `STUDIOFLOW-REWORK-CONTRACT.md` §4.1–4.2 still described the dropped `project_code`, `project_type` and the auto-naming policy; they now state the R8.213 free-text rule. The legacy-disposition row for auto naming is PURGE and the app-owned domain row no longer lists a naming policy.
+
+**Checks.** Documentation only; none run.
+
 ## R8.345 | 2026-10-06 | docs(plan): StudioFlow re-layout — Work Order WO-SF-RELAYOUT-01
 
 - Owner review of Home and the phase page as a designer: the same facts appeared several times (phase list in the rail and the strip, the round name four times, client notes in two places, requirements in three places, "Active" under every phase, a red "No deliverable" on a phase that just started). The owner approved a de-duplicated layout (mockup), decided that the project rail, its Phases menu and the Requirements page go, and assigned the UI build to the Executor with Lead polish afterwards.

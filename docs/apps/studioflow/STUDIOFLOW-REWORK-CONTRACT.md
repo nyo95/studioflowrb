@@ -69,7 +69,7 @@ except where §9 below overrides them.
 | Legacy capability (pinned paths) | Disposition | Rebuild destination |
 |---|---|---|
 | Project list, create dialog, edit, priority, complete (`projects/page.tsx`, `project-list-client.tsx`, `create-project-dialog.tsx`, `project-service.ts`) | KEEP | `/studioflow/projects`; §4 |
-| Auto project naming `[Year]-[Number] [Name]`, toggle in settings (`core/domain-shared/project-naming.ts`, `SystemConfig.is_auto_naming_enabled`) | KEEP | app-owned naming policy; §4.2 |
+| Auto project naming `[Year]-[Number] [Name]`, toggle in settings (`core/domain-shared/project-naming.ts`, `SystemConfig.is_auto_naming_enabled`) | PURGE (R8.213) | names are free text; §4.2 |
 | Hard project delete + deletion impact (`executeDeleteProject`) | FIX | archive/restore with reason + audit (no hard delete) |
 | Client by name, address, logo (`Client`, `client-management-table.tsx`, `client-branding.tsx`) | KEEP | `/studioflow/clients`; logo via platform `ObjectStorage` |
 | PIC designer/drafter + role eligibility (`assertPicAssignable`, `DESIGNER_ROLES`) | FIX | plain user references; eligibility = holds the relevant grant (§3) |
@@ -153,12 +153,10 @@ Project (legacy shape, rebuild conventions):
 
 | Field | Rule |
 |---|---|
-| `project_code` | unique; derived from the naming policy (`YYYY-NNN`) |
-| `name` | unique; full formatted name |
+| `name` | unique (duplicate gives `PROJECT_NAME_TAKEN`); free text, typed by the user |
 | `client_id?` | StudioFlow client; create-in-context allowed |
 | `pic_designer_id`, `pic_drafter_id` | required plain references to platform `User` (no cross-schema FK) |
 | `opening_date?` | date-only |
-| `project_type` | legacy `core_project_type`, default `RETAIL`; free text with suggestions |
 | `status` | `ACTIVE`, `ON_HOLD`, `COMPLETED` |
 | `priority` | `URGENT`, `NORMAL`, `LOW` |
 | `client_contact?`, `address?`, `area?` (decimal m²) | as legacy |
@@ -166,10 +164,12 @@ Project (legacy shape, rebuild conventions):
 
 ### 4.2 Naming
 
-Port legacy `projectNamingPolicy` exactly: auto mode formats
-`[Year]-[Number] [Name]` (space, not dash, after the number), with a
-concurrency-safe sequence; manual mode validates that format. `project_code` is
-the `YYYY-NNN` part. Toggle lives in StudioFlow settings.
+Owner decision R8.213 (KB-062): project names are free text on create and
+edit; there is no naming convention, auto-numbering, settings toggle or
+separate project code (`project_code`, `project_type` and the sequence table
+were dropped by migration `20260930100000_sf_free_text_project_name`). A
+studio habit such as `2026-536 Sociolla …` is simply part of the name, and
+screens show the name as stored without parsing a code out of it.
 
 ### 4.3 Bootstrap (one transaction)
 
@@ -913,7 +913,7 @@ declined to add for this.
 | Secondary context rail (project workspace nav) | EXTEND (R8.71) | UI Engine `SettingsShell` + new `ContextNavLink`/`ContextNavHeading`, shared with Platform settings navigation |
 | Assignee / PIC people lookup | ADD (R8.71) | `platform/core/rbac/people` (`peopleDirectory`) |
 | Phase strip / stepper | REUSE | UI Engine `PipelineStrip` (already existed) |
-| Phase state machine, revision numbering, naming policy, blocker projection, schedule codes | APP-OWNED | `src/apps/studioflow/domain/*` |
+| Phase state machine, revision numbering, blocker projection, schedule codes | APP-OWNED | `src/apps/studioflow/domain/*` |
 
 `src/apps/studioflow` is modular (one folder per module: `projects`,
 `phases`, `tasks`, `today`, later `mom`, `schedule`) plus pure `domain/`

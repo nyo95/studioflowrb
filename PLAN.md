@@ -2,15 +2,19 @@
 
 Plan ID: WO-SF-RELAYOUT-01
 Scope: Re-layout of StudioFlow Home (project cards) and the project page (phase view) to remove duplicated information, using UI Engine components. No change to phase/iteration rules, commands, permissions or data.
-Target revisions: R8.345 (this plan, Lead), R8.346 (implementation, Executor), R8.347 (Lead review and visual polish).
+Target revisions: R8.345 (this plan, Lead), R8.346 (correction: no project code, Lead), R8.347 (implementation, Executor), R8.348 (Lead review and visual polish).
 Status: READY
 Priority: P1
 Owner: Product Owner.
 Last updated: 2026-10-06
 
+## Correction 2026-10-06 (Lead verdict on the Executor's BLOCKED report): option A
+
+Projects have no code since R8.213: the name is free text and a studio habit such as `2026-536 Sociolla …` is part of the name. The project header and the Home card show the name as stored, with **no eyebrow and no separate code line** (an eyebrow such as "Project" would add exactly the kind of repeated, low-information label this Work Order removes). Do not parse a code out of the name. The stale contract §4.1–4.2 was corrected in R8.346. Implementation is now R8.347; the Lead's polish is R8.348.
+
 ## Lane note (owner, 2026-10-06)
 
-The owner assigned this UI work to the Executor ("biar codex yg kerjakan aja, nanti km polished aja"). The Executor builds the structure and wiring below with UI Engine components; the Lead does the visual polish in R8.347. Do not spend effort on fine visual tuning (spacing tweaks, colours, copy polish) beyond what is stated here.
+The owner assigned this UI work to the Executor ("biar codex yg kerjakan aja, nanti km polished aja"). The Executor builds the structure and wiring below with UI Engine components; the Lead does the visual polish in R8.348. Do not spend effort on fine visual tuning (spacing tweaks, colours, copy polish) beyond what is stated here.
 
 ## Outcome
 
@@ -35,7 +39,7 @@ Reference mockup (approved direction, not a pixel spec): https://claude.ai/artif
 
 ## Locked Decisions
 
-1. **Project rail removed.** The secondary rail in `projects/[projectId]/layout.tsx` (identity, Overview, Requirements, Phases, Documents) is deleted. The layout instead renders, above every project sub-page, one project header: `PageHeader` with the project code as `eyebrow`, the name as `title`, client and PIC designer/drafter as `meta` (`MetaList`), and as `actions` a compact horizontal nav: **Phases** (the overview), **MOM**, **Schedule**, **Presentation**, **History**, each with its count where one exists today, the current one marked `aria-current="page"`, plus the existing project actions menu if one exists. Archived/completed notices stay as they are. At phone width the nav wraps or scrolls horizontally inside itself.
+1. **Project rail removed.** The secondary rail in `projects/[projectId]/layout.tsx` (identity, Overview, Requirements, Phases, Documents) is deleted. The layout instead renders, above every project sub-page, one project header: `PageHeader` with no `eyebrow`, the project name exactly as stored as `title`, client and PIC designer/drafter as `meta` (`MetaList`), and as `actions` a compact horizontal nav: **Phases** (the overview), **MOM**, **Schedule**, **Presentation**, **History**, each with its count where one exists today, the current one marked `aria-current="page"`, plus the existing project actions menu if one exists. Archived/completed notices stay as they are. At phone width the nav wraps or scrolls horizontally inside itself.
 2. **Requirements page removed** (`/projects/[projectId]/requirements`, its nav link and `STUDIOFLOW_ROUTES.projectRequirements`). Its behaviour moves into the phase aside (decision 6). The same permissions apply (tick/dismiss for anyone who works on the project, rename/subtask need `studioflow.task.manage`; read-only when completed/archived). Reuse `RequirementList`; move it to `_components/` if needed.
 3. **`/projects/[projectId]/phases/[phaseId]` redirects** to `/projects/[projectId]?phase=<phaseId>` so old links keep working; nothing links to it any more. `STUDIOFLOW_ROUTES.projectPhase` returns the `?phase=` form, or is removed if it has no remaining consumer.
 4. **One stepper for both screens: EXTEND `PipelineStrip`** (UI Engine Pattern, `components/sections.tsx`) — do not build a private StudioFlow stepper.
@@ -46,7 +50,7 @@ Reference mockup (approved direction, not a pixel spec): https://claude.ai/artif
    - `accentClass` is no longer passed by StudioFlow (the per-phase coloured dots and orange titles go); keep the prop for other consumers.
    - Update `src/app/ui-engine/ui-engine-showcase.tsx` with a track example and add a test in `ui-engine.test.ts` (track renders markers, `aria-current` on current/attention, action slot rendered). At narrow widths the strip scrolls horizontally inside itself (min step width about 8rem).
 5. **Home card** (`_components/project-card.tsx`, `page.tsx`):
-   - Card is a `SectionCard`-like surface (UI Engine surface; no left-border phase columns). Header: project code (small, mono or `Text meta`), name as the link to the project, client underneath; on the right the pinned-notes icon (keep its dot) and the actions menu. Remove "N/5 phases done" and the "N requirements waiting" text. Keep the On hold / Completed / Check later phases badges.
+   - Card is a `SectionCard`-like surface (UI Engine surface; no left-border phase columns). Header: the project name exactly as stored as the link to the project, client underneath (no separate code line); on the right the pinned-notes icon (keep its dot) and the actions menu. Remove "N/5 phases done" and the "N requirements waiting" text. Keep the On hold / Completed / Check later phases badges.
    - Body: `PipelineStrip variant="track"` with one step per phase. Step label = phase name; note and state per the table in decision 7; `action` = `IterationButtons` for that phase (unchanged permission logic, `canAct` as today).
    - Keep the collapse chevron and `defaultExpanded` behaviour; keep `UndoBar`, errors, `VisitDialog`, `PhaseNotesDialog`, completion dialog.
    - Filters: keep the two `FilterChip` groups but make them read as two separate questions: the scope group first labelled by its options **Mine / Everyone's** (same `scope` query values), then the status group **Running (n) / Completed (n)**, with visible separation between groups (gap and a thin divider, not one continuous row). Drop `divider` on `PageHeader` so there is no double rule above the first card.
@@ -101,7 +105,7 @@ Reference mockup (approved direction, not a pixel spec): https://claude.ai/artif
 
 `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, full `npm test`. New tests: `PipelineStrip` track variant (UI Engine test) and the round-name/step-note helper (unit). Update or delete tests that asserted removed UI (requirements page, rail). Report the test count before and after.
 
-## Reviewer Acceptance (Lead, R8.347)
+## Reviewer Acceptance (Lead, R8.348)
 
 Browser pass of Home and of one project through: send → client answered with notes → Revision (next round shows the brief) → OK; CD Mall → CD Final; a supervision visit; requirements tick in the aside; MOM/Schedule pages without the rail; phone width. Then visual polish.
 
@@ -113,4 +117,4 @@ Browser pass of Home and of one project through: send → client answered with n
 
 ## Executor Prompt
 
-You are the Backend Executor, assigned this UI Work Order by the owner. Location: ask the owner "rumah atau kantor?" if not stated, load the matching `.env` file, set `STUDIOFLOW_LOCATION`, and verify the test database target belongs only to studioflow-rebuild before running `npm test`. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `UI_ENGINE.md` (§3.1, §3.5, §15–17), `DESIGN.md` and this `PLAN.md` (WO-SF-RELAYOUT-01), then implement the whole plan as revision R8.346 and nothing beyond it: remove the project rail and the Requirements page, add the shared project header, extend `PipelineStrip` with the track variant, rebuild the Home card and the phase view as specified, keep every command and permission unchanged. Reuse UI Engine components; if a generic piece is missing, stop with BLOCKED / CONFLICT instead of building it privately. Do not polish visuals beyond the plan; the Lead does that in R8.347. Run the checks in `## Verification`, update the contract docs and `CHANGELOG.md`, commit locally once, and reply with a Planner/Reviewer prompt containing outcome, commit, checks (test counts before/after), limitations and dirty files.
+You are the Backend Executor, assigned this UI Work Order by the owner. Location: ask the owner "rumah atau kantor?" if not stated, load the matching `.env` file, set `STUDIOFLOW_LOCATION`, and verify the test database target belongs only to studioflow-rebuild before running `npm test`. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `UI_ENGINE.md` (§3.1, §3.5, §15–17), `DESIGN.md` and this `PLAN.md` (WO-SF-RELAYOUT-01), then implement the whole plan, including the "Correction 2026-10-06" section (no project code), as revision R8.347 and nothing beyond it: remove the project rail and the Requirements page, add the shared project header, extend `PipelineStrip` with the track variant, rebuild the Home card and the phase view as specified, keep every command and permission unchanged. Reuse UI Engine components; if a generic piece is missing, stop with BLOCKED / CONFLICT instead of building it privately. Do not polish visuals beyond the plan; the Lead does that in R8.348. Run the checks in `## Verification`, update the contract docs and `CHANGELOG.md`, commit locally once, and reply with a Planner/Reviewer prompt containing outcome, commit, checks (test counts before/after), limitations and dirty files.
