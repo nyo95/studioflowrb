@@ -2,9 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.359 | 2026-10-06 | docs(plan): WO-UI-V2-02 plan file (missing from R8.358)
+
+- R8.358 recorded WO-UI-V2-02 in this ledger but its `PLAN.md` write had failed, so that commit still carried the previous (finished) WO-SF-PHASE-MENU-01 plan. This revision adds the actual Work Order. Because R8.359 is taken here, the Executor's parts move to R8.360 (Part A) and R8.361 (Part B), and the Lead review to R8.362.
+
+**Checks.** Documentation only; none run.
+
 ## R8.358 | 2026-10-06 | docs(plan): remaining DESIGN v2 slices — Work Order WO-UI-V2-02
 
-- Owner (2026-10-06): hand the remaining DESIGN v2 work to the Executor; the Lead reviews. `PLAN.md` replaced with WO-UI-V2-02: Part A (R8.359) adds the `PillTabs` pattern, a capsule variant of `Breadcrumb` with a `PageHeader` `context` slot, `StatCard`/`StatGrid`, adopts them in StudioFlow (project header, Product Schedule, Home) and Master Data's dashboard, and adds read-only counts on the StudioFlow Home and Master Data Sample requests rail items; Part B (R8.360) adds Playwright screen-size checks at 375/640/839/840/841 px against the disposable test database only. Lead review and polish is R8.361.
+- Owner (2026-10-06): hand the remaining DESIGN v2 work to the Executor; the Lead reviews. `PLAN.md` replaced with WO-UI-V2-02: Part A adds the `PillTabs` pattern, a capsule variant of `Breadcrumb` with a `PageHeader` `context` slot, `StatCard`/`StatGrid`, adopts them in StudioFlow (project header, Product Schedule, Home) and Master Data's dashboard, and adds read-only counts on the StudioFlow Home and Master Data Sample requests rail items; Part B adds Playwright screen-size checks at 375/640/839/840/841 px against the disposable test database only.
 
 **Checks.** Documentation only; none run.
 

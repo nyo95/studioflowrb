@@ -1,67 +1,69 @@
 # Active Plan
 
-Plan ID: WO-SF-PHASE-MENU-01
-Scope: Let a phase that has already started be skipped (e.g. a Moodboard the client supplied), make skip undoable, and give each phase on the Home card a ⋯ menu (client notes, new round, skip, open). Use one word — "round" — on every StudioFlow screen.
-Target revisions: R8.353 (this plan, Lead), R8.355 (implementation, Executor), R8.356 (Lead review and polish). R8.354 was taken by the phone-overflow fix and the DESIGN v2 draft.
+Plan ID: WO-UI-V2-02
+Scope: The remaining DESIGN v2 slices: pill tab bar and context capsule, stat cards, counts on rail items, and Playwright screen-size checks. `DESIGN.md` v2 is the authority (§5, §6.1, §10.1–§10.3, §12).
+Target revisions: R8.358 (plan entry; the file itself landed in R8.359), R8.360 (part A — patterns, adoption, counts; Executor), R8.361 (part B — Playwright; Executor), R8.362 (Lead review and polish).
 Status: READY
 Priority: P1
 Owner: Product Owner.
 Last updated: 2026-10-06
 
-## Lane note
+## Lane note (owner, 2026-10-06)
 
-Same arrangement as WO-SF-RELAYOUT-01 and WO-SF-SCHED-RELAYOUT-01: the Executor builds backend and UI wiring; the Lead polishes in R8.356. If the plan contradicts the repository or a recorded owner decision, stop with `BLOCKED / CONFLICT` and send a prompt back to the Lead.
+"Sisanya kamu oper saja ke Codex, kamu cek saja": the Executor builds every slice below, including UI Engine patterns and their adoption; the Lead reviews and polishes in R8.362. Stop with `BLOCKED / CONFLICT` and send a prompt back to the Lead if anything contradicts `DESIGN.md`, `UI_ENGINE.md` or the code.
 
-## Problem (owner, 2026-10-06)
+## Locked Decisions
 
-- The studio's phases start at Moodboard, but on some projects the client supplies the moodboard. Moodboard is `ACTIVE` from project creation (bootstrap opens round 1), and `bypassPhase` only accepts a `PENDING` phase, so it can never be skipped. The phase page's More menu then offers only "Rename round" and "Delete (never sent)".
-- Wording is mixed: buttons say "+ iteration", menus say "round", the admin reset says "iterations".
-- On Home, the extra phase actions (client notes, a new round, skip) are only reachable by opening the phase.
+### Part A (R8.360)
 
-## Locked Decisions (owner answers, 2026-10-06)
+1. **`PillTabs` — ADD to UI Engine (Pattern), DESIGN §10.3.** For sibling views inside a page only.
+   - Items: `{ key, label, icon?, count?, active, href? | onSelect? }`. Link items render as a `<nav aria-label>` with `aria-current="page"` on the active one; button items as a `role="group"` with `aria-pressed`.
+   - Look: a floating rounded bar (`bg-surface`, `shadow-float`, `rounded-pill`, small inner padding); items are icon + label; the active item has the graphite fill (`bg-action text-action-ink`) and semibold label; an optional count is a small mono number.
+   - Narrow: below 560px inactive items that have an icon show the icon only (label stays as accessible name and `title`); the active item always shows icon + label. The bar scrolls horizontally inside itself (`max-w-full min-w-0 overflow-x-auto`, hidden scrollbar) and never widens the page.
+   - Showcase entry in `src/app/ui-engine/ui-engine-showcase.tsx`, a UI Engine test, and a `UI_ENGINE.md` §3.5 row with its consumers.
+2. **Adopt `PillTabs`** (replace the current chip rows; same routes/state):
+   - StudioFlow project header nav — Phases, MOM, Schedule, Presentation, History, with icons and the existing counts (`project-nav-links.tsx`).
+   - Product Schedule — Material / Fixture and Board / List (`schedule-board.tsx`). The decision filters (All, Needs a decision, …) stay `FilterChip`s: they filter, they are not sibling views.
+   - StudioFlow Home — Mine / Everyone's and Running / Completed (`studioflow/page.tsx`), as two separate bars.
+   - Master Data and BQ keep their current `Tabs` in this slice (record them as later consumers in BACKLOG).
+3. **Context capsule — EXTEND `Breadcrumb`** with `variant="capsule"` (DESIGN §10.3): a small rounded floating capsule (surface, hairline, `shadow-float`), optional leading app mark (a small round chip with the app's short name or icon), entries separated by "/", the last one semibold and not a link, truncating within the page width. Add a `context` slot to `PageHeader`, rendered above the title.
+   - StudioFlow project layout: remove the sticky breadcrumb strip; the project header shows the capsule "StudioFlow / Projects / <name>" in `context`.
+   - `studioflow/clients/[clientId]/page.tsx`: switch its breadcrumb to the capsule in `context`.
+   - Remaining default-variant consumers (if any) stay as they are.
+4. **`StatCard` and `StatGrid` — ADD to UI Engine**, DESIGN §6.1: label, optional icon in a round chip, value in `MetricValue`, one caption, optional `href`; `StatGrid` lays out up to four cards, two-up below 840px and one-up below 400px. Showcase, test, `UI_ENGINE.md` row.
+   - **MERGE:** Master Data's dashboard cards on `/masterdata` (`masterdata/page.tsx`) move onto `StatCard`, keeping their content and links.
+   - **StudioFlow Home** gets one `StatGrid` above the cards, computed for the viewer's current scope (Mine / Everyone's) over running projects: *Waiting on you* — phases whose open round is `ANSWERED` where the viewer may act; *With client* — rounds `SENT`, caption "longest N days"; *Phases done* — done / total; *Samples waiting* — schedule options with a `REQUESTED` sample in those projects. Hide the grid when there are no running projects; never duplicate a number the page already shows.
+5. **Counts on rail items** (DESIGN §10.1; `NavItem` `badge` already exists):
+   - StudioFlow **Home**: the *Waiting on you* number (same rule as 4).
+   - Master Data **Sample requests**: open requests, only for viewers who can manage them.
+   - Counts come from small **read-only** service reads in the owning app, exposed through its public boundary and computed in the layout/server component that renders the nav; nothing is computed inside the UI Engine; zero shows no badge. No schema change.
 
-1. **Skip any time ("Kapan saja").** `bypassPhase` accepts a phase that is `PENDING` or `ACTIVE` (still refused when `DONE`, and when the project is not `ACTIVE`). A reason is required (placeholder: "e.g. Moodboard supplied by the client"). Permission stays `studioflow.phase.review` plus the phase assignment gate.
-   - **Round history is kept**: every round that was sent stays exactly as recorded (state, dates, client notes, files).
-   - The open round, **if it was never sent and holds nothing** (no client notes, no files), is removed; any other round is left as it is.
-   - The phase becomes `DONE` and locked, the same way an OK on the last round finishes a phase — including the existing next-phase auto-advance.
-   - A `PENDING` phase skip keeps today's behaviour (a closed round 1 is recorded).
-2. **Skip is undoable** like every phase command: it writes an `SfPhaseEvent` whose undo restores the phase status, lock, any removed empty round and any auto-advanced next phase, within the existing five-minute, same-person rule. The audit event keeps the reason.
-3. **Skipped is visible.** The phase read models used by Home and the project page expose that the phase was finished by a skip and its reason (derived from the latest finishing event or audit; no new column unless the Executor proves one is needed — then stop and report). Home and the phase strip show "Skipped" instead of "Done", with the reason as a tooltip/secondary line on the phase page.
-4. **⋯ menu per phase on the Home card**, beside the phase's main action (`PipelineStrip` `action` slot), only for people who can act on that phase. Items, each shown only when the server allows it:
-   - **Client notes…** — opens the existing notes editor for the phase's current round (`setIterationNote`); hidden while the round is `SENT` (the main button "Client answered" already records notes).
-   - **+ New round** — `addIteration`, when the server's choices allow it (finished phase) — same rule as today's "+ iteration".
-   - **Skip phase…** — the skip dialog with the reason (decision 1), when the phase is `PENDING` or `ACTIVE` and the viewer holds `phase.review`.
-   - **Open phase** — the project page with `?phase=`.
-   The phase page's More menu offers the same Skip phase… for an `ACTIVE` phase.
-5. **One word: "round".** Every StudioFlow screen, toast and dialog says round: "+ New round", "New round added", "Rename round", "Delete round (never sent)", "Admin: reset rounds…", "Reset rounds (admin)" and its description. Code identifiers and commands keep their names.
+### Part B (R8.361)
+
+6. **Playwright** (owner-approved dev dependency `@playwright/test`, Chromium only):
+   - A separate script `npm run test:e2e` (not part of `npm test`); `playwright.config.ts`; specs under `e2e/`.
+   - It runs the app against the **disposable test database only** (`.env.test.local` / `PLATFORM_TEST_DATABASE_URL`, verified rebuild-only), on its own port, never the owner's dev database or the running :3001 server. It seeds what it needs (a user with StudioFlow, Master Data and BQ access and one project with phases) through the existing test-support helpers, and signs in with test credentials generated or stored in the e2e fixture (never real credentials).
+   - Checks at 375, 640, 839, 840 and 841 px on StudioFlow Home, a project page, its schedule, Master Data home, BQ projects and Settings: no page-level horizontal overflow (`main` and the project scroll container `scrollWidth <= clientWidth`); at ≥840px the mark cell and the rail share one width, collapsed and expanded; the rail expands only on the toggle (hover does not change its width); below 840px the rail is a strip and the account menu is in the top bar.
+   - Document how to run it (one paragraph in `docs/agent/README.md` or the operations docs). If browser download or the test server cannot run in this environment, stop and report rather than skipping silently.
 
 ## Boundaries and Non-goals
 
-- No schema migration unless decision 3 truly needs one (then stop and report first).
-- No change to send / client answered / outcome / CD Mall / supervision visit rules, completion, or permissions beyond decision 1.
-- Pinned note stays on the project-level notes icon; it is not added to the phase menu.
-- No browser acceptance by the Executor.
+- No schema or migration. No change to business rules, permissions or commands.
+- No new tokens or global spacing changes beyond `DESIGN.md` v2.
+- Master Data / BQ `Tabs` adoption and any other app restyling are out of scope.
 
-## Contract update (same commit)
+## Contract updates
 
-`STUDIOFLOW-REWORK-CONTRACT.md` §5.3 (skip: any time, history kept, empty unsent round removed, undoable, shown as Skipped) and §7 (the per-phase ⋯ menu on Home). Note "round" as the screen word in §5.2.
-
-## Acceptance Criteria
-
-- On a new project, Moodboard (active, empty round 1) can be skipped with a reason; round 1 disappears, Moodboard shows Skipped, Layout/Design/CD behave as after a normal finish; Undo restores everything.
-- A phase with a sent round can be skipped; the sent round and its notes remain in Earlier rounds.
-- A `DONE` phase cannot be skipped; a viewer without `phase.review` never sees Skip.
-- The Home card ⋯ menu shows only the allowed items per phase and each works.
-- No screen says "iteration".
+`UI_ENGINE.md` (§3.5 rows for `PillTabs`, `StatCard`/`StatGrid`, `Breadcrumb` capsule, `PageHeader` `context`), `DESIGN.md` header "Built so far" line, `STUDIOFLOW-REWORK-CONTRACT.md` §7 (Home stats and rail count) and §8 (project header capsule and pill tabs), `docs/BACKLOG.md` (close the DESIGN v2 entry or leave only what remains).
 
 ## Verification
 
-`npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, full `npm test` (baseline 831). New integration tests: skip an `ACTIVE` phase with an empty unsent round (removed), with a sent round (kept), refuse on `DONE`, auto-advance after skip, undo of each, permission refusal. Report counts before/after.
+Part A: `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, full `npm test` (baseline 839), plus integration tests for the new count reads (permission and scope). Part B: `npm run test:e2e` passing locally, plus the Part A checks still green. Report counts before/after for both.
 
-## Reviewer Acceptance (Lead, R8.356)
+## Reviewer Acceptance (Lead, R8.362)
 
-Browser: skip Moodboard on a fresh test project and undo it; skip a phase with a sent round; Home ⋯ menu per phase state; wording sweep for "iteration".
+Browser pass of every adopted screen at desktop and 375px, light and dark; the counts against real data; Playwright run reproduced by the Lead.
 
 ## Executor Prompt
 
-You are the Backend Executor, assigned WO-SF-PHASE-MENU-01 by the owner (same rules as the previous two Work Orders). Location: kantor unless the owner says otherwise; load the matching .env file, set STUDIOFLOW_LOCATION, and verify the database target belongs only to studioflow-rebuild before any database command. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `UI_ENGINE.md` (§3.5, §11, §15–17), `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §5 and §7, and this `PLAN.md`, then implement the whole plan as revision R8.355 and nothing beyond it. If you find an inconsistency, need a schema change, or the plan contradicts the code, stop with BLOCKED / CONFLICT and send it back to the Lead. Do not polish visuals beyond the plan; the Lead does that in R8.356. Run the checks in `## Verification` (baseline 831 pass), update the contract and `CHANGELOG.md`, commit locally once, and reply with a Planner/Reviewer prompt containing outcome, commit, checks (test counts before/after), limitations and dirty files.
+You are the Backend Executor, assigned WO-UI-V2-02 by the owner (UI Engine and UI work included; same reporting rules as the previous Work Orders). Location: kantor unless the owner says otherwise; load the matching .env file, set STUDIOFLOW_LOCATION, and verify every database target belongs only to studioflow-rebuild before any database command; Playwright must use the disposable test database only. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `DESIGN.md` (v2), `UI_ENGINE.md` (§3, §15–17), `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` §7–§8 and this `PLAN.md`, then implement Part A as revision R8.360 and Part B as revision R8.361, one local commit each, nothing beyond the plan. If anything contradicts the documents or the code, or the e2e environment cannot run, stop with BLOCKED / CONFLICT and send it back to the Lead. Run the checks in `## Verification` (baseline 839 pass), update the contracts and `CHANGELOG.md`, and reply with a Planner/Reviewer prompt containing outcome, both commits, checks (test counts before/after, e2e result), limitations and dirty files.
