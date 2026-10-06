@@ -217,6 +217,33 @@ describe("WO-SF-ITER-01 phase 3 card reads", () => {
   });
 });
 
+describe("WO-UI-V2-02 Home stats and rail counts", () => {
+  it("counts a client answer as waiting only for someone who may act on that phase", async () => {
+    const { projectId } = await newProject("Waiting on you");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const round = await openIteration(moodboard.id);
+    await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: round.id });
+    await sf.phases.recordClientAnswer({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: round.id, note: "Warmer" });
+    const forDesigner = await sf.projects.getHomeStats({ grants: ALL, filter: "mine", actorId: designer.id });
+    const forDrafter = await sf.projects.getHomeStats({ grants: DRAFTER_GRANTS, filter: "mine", actorId: drafter.id });
+    assert.equal(forDesigner.waitingOnYou, 1);
+    assert.equal(forDrafter.waitingOnYou, 0); // Moodboard is the designer's seat
+    assert.equal(forDrafter.runningProjects, 1);
+  });
+
+  it("counts samples still waiting in running, unarchived projects", async () => {
+    const { projectId } = await newProject("Samples waiting");
+    const { entryId } = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Sample paint" } });
+    const entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entryId)!;
+    await sf.schedule.requestSample({ ...as(designer), projectId, optionId: entry.options[0].id });
+    const read = createStudioFlowSampleRequestRead(testDb.prisma as unknown as PrismaClient);
+    assert.equal((await sf.projects.getHomeStats({ grants: ALL, filter: "mine", actorId: designer.id })).samplesWaiting, 1);
+    assert.equal(await read.countPendingSampleRequests(), 1);
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date(), archive_reason: "test" } });
+    assert.equal(await read.countPendingSampleRequests(), 0);
+  });
+});
+
 describe("WO-SF-PHASE-MENU-01 skip lifecycle", () => {
   const latestPhaseEvent = (projectId: string) => testDb.prisma.sfPhaseEvent.findFirstOrThrow({ where: { project_id: projectId }, orderBy: { occurred_at: "desc" } });
 

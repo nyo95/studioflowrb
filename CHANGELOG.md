@@ -1,5 +1,17 @@
 # Changelog
 
+## R8.361 | 2026-10-06 | fix(ui-engine,studioflow): Lead correction and polish of WO-UI-V2-02 Part A
+
+- Owner (2026-10-06): the Lead continues WO-UI-V2-02 after the Executor's correction report on R8.360. Review of R8.360: `PillTabs`, `Breadcrumb` capsule with `PageHeader` `context`, `StatCard`/`StatGrid`, the viewer-scoped Home stats and rail counts (`getHomeStats`, `countPendingSampleRequests`) and the Master Data dashboard merge are accepted, with these corrections.
+- **Failing test.** `schedule.regression.test.ts` still expected `FilterChip` for Board/List; it now pins the two `PillTabs` bars (section and view).
+- **Missing tests.** The plan required tests for the count reads; added: *Waiting on you* counts a client answer only for someone who may act on that phase (designer yes, drafter no on Moodboard), and *Samples waiting* / the Master Data rail count count open requests and drop them once the project is archived.
+- **Unreadable active tab.** The active pill carried two text colours (`text-ink-secondary` and `text-action-ink`), so its label disappeared on the graphite fill; one colour per state now, with a test.
+- **Crowded project header.** The pill tab bar sat in the header's action corner and pushed the capsule and title; it now sits on its own row below the header, as DESIGN §6 places it.
+- **Phone overflow (again).** At 375px the project pages were 486px wide: a stacked `PageHeader`'s title column took the width of the long capsule. The column is capped (`max-w-full`, UI Engine, all apps) and the project header wrapper may shrink. Checked at 375 and 640px on StudioFlow Home, project, schedule, MOM, Clients, Master Data and BQ: no sideways scroll.
+- Small: Product Schedule's two pill bars sit side by side; the *With client* caption says "all sent today" / "nothing sent" instead of "longest 0 days". `DESIGN.md`'s status line (left garbled) and contract §8 updated.
+
+**Checks.** `tsc --noEmit`; `npm run lint` (0 errors, 2 existing warnings); `check:boundaries`; `check:legacy-runtime`; `npm test` **842/842** (R8.360 left one failing assertion).
+
 ## R8.360 | 2026-10-06 | feat(ui): add v2 navigation and dashboard patterns
 
 - Added shared PillTabs, StatCard/StatGrid, and contextual capsule breadcrumb support; adopted the approved patterns in StudioFlow and Master Data.

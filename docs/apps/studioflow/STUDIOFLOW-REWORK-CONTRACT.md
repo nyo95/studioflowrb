@@ -341,12 +341,12 @@ Search filters client-side by name, category, vendor or hashtag.
 
 **Project header (R8.347).** There is no project side rail. Every project
 sub-page shares one header: the project name as stored, client and assigned
-designer/drafter (read-only `MetaList`), and a compact nav — Phases, MOM,
-Schedule, Presentation, History — with counts, the current one marked. The
-layout renders the frame and breadcrumb at once; the header and the counts
-stream in their own `Suspense` boundaries with real links in the fallback.
-The context is a `StudioFlow / Projects / Project` capsule above the title and
-the sibling views use the shared pill tabs.
+designer/drafter (read-only `MetaList`), a `StudioFlow / Projects / <name>`
+context capsule above the title, and below the header a pill tab bar — Phases,
+MOM, Schedule, Presentation, History — with counts, the current one marked
+(R8.360–R8.361). The layout renders the frame at once; the header and the
+counts stream in their own `Suspense` boundaries with real links in the
+fallback.
 
 **Open phase (R8.347).** Under the phase strip, two columns: the main column
 holds the current round card (round name, state, next step, its buttons and a

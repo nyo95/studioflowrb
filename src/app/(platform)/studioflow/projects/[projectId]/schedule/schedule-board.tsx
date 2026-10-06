@@ -499,7 +499,7 @@ export function ScheduleBoard({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle px-(--ui-section-px) py-2.5">
         {/* changeSection reads the draft ref only when this browser event fires; passing it through the shared tab contract keeps the existing discard guard intact. */}
         {/* eslint-disable-next-line react-hooks/refs */}
-        <div className="grid min-w-0 gap-2"><PillTabs label="Schedule section" items={(["MATERIAL", "FIXTURE"] as const).map((key) => ({ key, label: SECTION_LABEL[key], active: section === key, count: counts[key], onSelect: changeSection.bind(null, key) }))} /><PillTabs label="Schedule view" items={[{ key: "board", label: "Board", active: viewMode === "board", onSelect: () => setViewMode("board") }, { key: "list", label: "List", active: viewMode === "list", onSelect: () => setViewMode("list") }]} /></div>
+        <div className="flex min-w-0 flex-wrap items-center gap-2"><PillTabs label="Schedule section" items={(["MATERIAL", "FIXTURE"] as const).map((key) => ({ key, label: SECTION_LABEL[key], active: section === key, count: counts[key], onSelect: changeSection.bind(null, key) }))} /><PillTabs label="Schedule view" items={[{ key: "board", label: "Board", active: viewMode === "board", onSelect: () => setViewMode("board") }, { key: "list", label: "List", active: viewMode === "list", onSelect: () => setViewMode("list") }]} /></div>
         <div className="flex flex-wrap gap-2">
           <Link
             prefetch={false}

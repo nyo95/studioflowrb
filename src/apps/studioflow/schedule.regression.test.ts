@@ -13,9 +13,11 @@ describe("WO-SF-SCHED-RELAYOUT-01 board structure", () => {
     assert.equal((scheduleBoard.match(/viewMode === "board" \? \(/g) ?? []).length, 1);
     assert.equal((scheduleBoard.match(/<BoardView/g) ?? []).length, 1);
   });
-  it("uses FilterChip for section and view controls", () => {
-    assert.match(scheduleBoard, /selected=\{viewMode === "board"\}/);
-    assert.match(scheduleBoard, /selected=\{viewMode === "list"\}/);
+  it("uses PillTabs for the section and view (sibling views, DESIGN v2 §10.3)", () => {
+    assert.match(scheduleBoard, /<PillTabs label="Schedule section"/);
+    assert.match(scheduleBoard, /<PillTabs label="Schedule view"/);
+    assert.match(scheduleBoard, /active: viewMode === "board"/);
+    assert.match(scheduleBoard, /active: viewMode === "list"/);
   });
   it("puts setup actions in one ButtonMenu", () => {
     assert.match(scheduleBoard, /<ButtonMenu label="Set up"/);

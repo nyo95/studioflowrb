@@ -51,7 +51,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         )}
       />
 
-      {stats.runningProjects > 0 ? <StatGrid><StatCard label="Waiting on you" value={stats.waitingOnYou} caption="Client answered" /><StatCard label="With client" value={stats.withClient} caption={`longest ${stats.longestClientDays} days`} /><StatCard label="Phases done" value={`${stats.phasesDone} / ${stats.phasesTotal}`} caption="across running projects" /><StatCard label="Samples waiting" value={stats.samplesWaiting} caption="Requested samples" /></StatGrid> : null}
+      {stats.runningProjects > 0 ? <StatGrid><StatCard label="Waiting on you" value={stats.waitingOnYou} caption="Client answered" /><StatCard label="With client" value={stats.withClient} caption={stats.withClient === 0 ? "nothing sent" : stats.longestClientDays > 0 ? `longest ${stats.longestClientDays} day${stats.longestClientDays === 1 ? "" : "s"}` : "all sent today"} /><StatCard label="Phases done" value={`${stats.phasesDone} / ${stats.phasesTotal}`} caption="across running projects" /><StatCard label="Samples waiting" value={stats.samplesWaiting} caption="Requested samples" /></StatGrid> : null}
 
       {shown.length === 0 ? (
         <EmptyState

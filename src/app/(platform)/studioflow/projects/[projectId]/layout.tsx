@@ -54,14 +54,17 @@ async function ProjectBreadcrumb({ grants, projectId }: { grants: PermissionGran
 
 async function ProjectHeader({ grants, projectId }: { grants: PermissionGrants; projectId: string }) {
   const project = await projectOr404(grants, projectId);
+  // DESIGN v2 §6: the pill tab bar sits below the header (sibling views of the page), not in its action
+  // corner, where it crowded the capsule and the title.
   return (
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
     <PageHeader
       context={<Suspense fallback={<Breadcrumb variant="capsule" appMark="SF" entries={[{ label: "StudioFlow", href: STUDIOFLOW_ROUTES.root }, { label: "Projects", href: STUDIOFLOW_ROUTES.projects }, { label: "Project" }]} />}><ProjectBreadcrumb grants={grants} projectId={projectId} /></Suspense>}
       title={project.name}
       meta={<MetaList items={[project.client?.name ?? "No client", `Designer: ${project.designer.displayName}`, `Drafter: ${project.drafter.displayName}`]} />}
-      actions={<Suspense fallback={<ProjectNavLinks items={navigation(projectId)} />}><ProjectNavigation grants={grants} projectId={projectId} /></Suspense>}
-      divider
     />
+    <Suspense fallback={<ProjectNavLinks items={navigation(projectId)} />}><ProjectNavigation grants={grants} projectId={projectId} /></Suspense>
+    </div>
   );
 }
 

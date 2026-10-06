@@ -20,7 +20,8 @@ export function PillTabs({ items, label = "Page views", className }: { items: re
   const links = items.every((item) => item.href);
   const content = items.map((item) => {
     const body = <>{item.icon ? <span aria-hidden="true" className="shrink-0 [&_svg]:h-4 [&_svg]:w-4">{item.icon}</span> : null}<span className={cx("whitespace-nowrap", !item.active && Boolean(item.icon) && "max-[560px]:sr-only")}>{item.label}</span>{item.count !== undefined ? <span className="font-ui-mono text-[11px] tabular-nums opacity-80">{item.count}</span> : null}</>;
-    const className = cx("inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-pill px-3 text-sm font-medium text-ink-secondary transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus", item.active && "bg-action font-semibold text-action-ink hover:text-action-ink");
+    // One colour class per state: two text colours on one element resolve by stylesheet order, not class order.
+    const className = cx("inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-pill px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus", item.active ? "bg-action font-semibold text-action-ink" : "font-medium text-ink-secondary hover:bg-surface-muted hover:text-ink");
     return item.href ? <Link key={item.key} href={item.href} prefetch={false} aria-current={item.active ? "page" : undefined} title={!item.active && item.icon ? item.label : undefined} className={className}>{body}</Link> : <button key={item.key} type="button" onClick={item.onSelect} aria-pressed={item.active} title={!item.active && item.icon ? item.label : undefined} className={className}>{body}</button>;
   });
   const inner = <div className={cx("flex min-w-0 max-w-full gap-1 overflow-x-auto p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}>{content}</div>;

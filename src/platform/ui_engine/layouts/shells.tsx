@@ -501,8 +501,10 @@ export function PageHeader({
       data-divider={divider || undefined}
       {...props}
     >
-      <div className="grid min-w-0 gap-1">
-        {context ? <div className="mb-1">{context}</div> : null}
+      {/* max-w-full: stacked on a phone (items-start), the title column would otherwise take the width of its
+          widest child (a long capsule) and push the page sideways. */}
+      <div className="grid min-w-0 max-w-full gap-1">
+        {context ? <div className="mb-1 min-w-0">{context}</div> : null}
         {eyebrow ? <Text meta>{eyebrow}</Text> : null}
         <Heading level={1}>{title}</Heading>
         {description ? <Text as="p" tone="secondary">{description}</Text> : null}

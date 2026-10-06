@@ -201,6 +201,10 @@ describe("UI Engine foundation", () => {
     const tabs = renderToStaticMarkup(createElement(ui.PillTabs, { items: [{ key: "one", label: "One", href: "/one", active: true }, { key: "two", label: "Two", href: "/two", active: false }] }));
     assert.match(tabs, /aria-current="page"/);
     assert.match(tabs, /rounded-pill/);
+    // The active pill carries one text colour; a second one (text-ink-secondary) made the label unreadable on graphite.
+    const activePill = tabs.match(/<a[^>]*aria-current="page"[^>]*>/)![0];
+    assert.match(activePill, /text-action-ink/);
+    assert.doesNotMatch(activePill, /text-ink-secondary/);
     const stats = renderToStaticMarkup(createElement(ui.StatGrid, null, createElement(ui.StatCard, { label: "Waiting", value: "2", caption: "Needs action" })));
     assert.match(stats, /min-\[840px\]:grid-cols-4/);
     assert.match(stats, /max-\[400px\]:grid-cols-1/);
@@ -365,6 +369,8 @@ describe("UI Engine foundation", () => {
     // A stacked header used to size its actions to their content, so a scrolling section nav made the page 414px wide at 375px.
     const markup = renderToStaticMarkup(createElement(ui.PageHeader, { title: "Project", actions: createElement("nav", null, "Phases MOM Schedule") }));
     assert.match(markup, /class="flex max-w-full shrink-0[^"]*"><nav>/);
+    // The title column is capped too, so a long context capsule cannot widen a stacked header.
+    assert.match(markup, /class="grid min-w-0 max-w-full gap-1"/);
   });
 
   it("bounds long content and rail menus inside the viewport at every screen width", () => {
