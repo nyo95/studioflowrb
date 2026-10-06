@@ -37,7 +37,7 @@ export type AppShellProps = {
   utility?: ReactNode;
   /** Top bar content to the right of the mark. */
   topbar: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   navigationLabel?: string;
   className?: string;
   /** Show the rail collapse control. Off by default so existing shells are unchanged. */
@@ -271,7 +271,7 @@ function NavIconChip({ active, dot = false, children }: { active: boolean; dot?:
  * A rail entry that runs a command instead of navigating (e.g. Log out). Same look as `NavItem`, so the
  * General group at the foot of the rail reads as one list.
  */
-export function NavAction({ icon, children, className, ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & { icon?: ReactNode; children: ReactNode }) {
+export function NavAction({ icon, children, className, ...props }: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & { icon?: ReactNode; children?: ReactNode }) {
   const { collapsed } = useContext(RailContext);
   const item = (
     <button
@@ -471,6 +471,7 @@ export function PageShell({
 }
 
 export type PageHeaderProps = HTMLAttributes<HTMLElement> & {
+  context?: ReactNode;
   eyebrow?: ReactNode;
   title: ReactNode;
   description?: ReactNode;
@@ -480,6 +481,7 @@ export type PageHeaderProps = HTMLAttributes<HTMLElement> & {
 };
 
 export function PageHeader({
+  context,
   eyebrow,
   title,
   description,
@@ -500,6 +502,7 @@ export function PageHeader({
       {...props}
     >
       <div className="grid min-w-0 gap-1">
+        {context ? <div className="mb-1">{context}</div> : null}
         {eyebrow ? <Text meta>{eyebrow}</Text> : null}
         <Heading level={1}>{title}</Heading>
         {description ? <Text as="p" tone="secondary">{description}</Text> : null}
@@ -541,21 +544,26 @@ export function Breadcrumb({
   entries,
   action,
   label = "Breadcrumb",
+  variant = "default",
+  appMark,
   className,
   ...props
 }: Omit<HTMLAttributes<HTMLElement>, "children"> & {
   entries: BreadcrumbEntry[];
   action?: ReactNode;
   label?: string;
+  variant?: "default" | "capsule";
+  appMark?: ReactNode;
 }) {
   if (entries.length === 0) return null;
   return (
-    <nav aria-label={label} className={cx("flex items-center gap-2 text-xs text-ink-tertiary", className)} {...props}>
-      <ol className="m-0 flex min-w-0 list-none flex-wrap items-center gap-2 p-0">
+    <nav aria-label={label} className={cx("flex min-w-0 items-center gap-2 text-xs text-ink-tertiary", variant === "capsule" && "w-fit max-w-full rounded-pill border border-line-subtle bg-surface px-2.5 py-1.5 shadow-float", className)} {...props}>
+      {variant === "capsule" && appMark ? <span className="grid h-5 w-5 shrink-0 place-items-center rounded-pill bg-surface-muted text-[9px] font-semibold text-ink" aria-hidden="true">{appMark}</span> : null}
+      <ol className={cx("m-0 flex min-w-0 list-none items-center gap-2 p-0", variant === "capsule" ? "flex-nowrap overflow-hidden" : "flex-wrap")}>
         {entries.map((entry, index) => {
           const last = index === entries.length - 1;
           return (
-            <li key={index} className="flex min-w-0 items-center gap-2">
+            <li key={index} className={cx("flex min-w-0 items-center gap-2", variant === "capsule" && index === entries.length - 1 && "flex-1")}>
               {index > 0 ? <span aria-hidden="true">/</span> : null}
               {entry.href && !last ? (
                 <Link href={entry.href} className="truncate no-underline hover:text-ink">

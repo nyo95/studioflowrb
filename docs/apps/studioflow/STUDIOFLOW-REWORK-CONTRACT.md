@@ -296,6 +296,11 @@ menu). Deleting a template detaches generated rows.
 
 `/studioflow` is Home: one card per project.
 
+Home also shows the current-scope running-project figures: work waiting for the
+viewer, rounds with the client, phases done, and requested physical samples.
+The waiting count includes only an active phase whose answered round that viewer
+may act on; the same read supplies the Home rail badge.
+
 - **Mine** = running projects where I am PIC designer or drafter.
   **Everyone's** is available to holders of `studioflow.project.manage`.
   A Running / Completed switch sits beside it.
@@ -340,6 +345,8 @@ designer/drafter (read-only `MetaList`), and a compact nav — Phases, MOM,
 Schedule, Presentation, History — with counts, the current one marked. The
 layout renders the frame and breadcrumb at once; the header and the counts
 stream in their own `Suspense` boundaries with real links in the fallback.
+The context is a `StudioFlow / Projects / Project` capsule above the title and
+the sibling views use the shared pill tabs.
 
 **Open phase (R8.347).** Under the phase strip, two columns: the main column
 holds the current round card (round name, state, next step, its buttons and a

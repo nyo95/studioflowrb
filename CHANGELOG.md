@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.360 | 2026-10-06 | feat(ui): add v2 navigation and dashboard patterns
+
+- Added shared PillTabs, StatCard/StatGrid, and contextual capsule breadcrumb support; adopted the approved patterns in StudioFlow and Master Data.
+- Added one read-only StudioFlow Home-stat read for the scoped dashboard and Home rail badge, plus the pending-sample count for Master Data staff.
+- Added the Playwright dependency for the following R8.361 browser slice. No schema change.
+
+**Checks.** Typecheck passed; lint passed with two pre-existing image warnings; boundaries and legacy-runtime checks passed; production build started successfully. Full test run remains in progress at commit time.
+
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
 ## R8.359 | 2026-10-06 | docs(plan): WO-UI-V2-02 plan file (missing from R8.358)

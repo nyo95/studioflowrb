@@ -29,11 +29,6 @@ export default async function ProjectLayout({ children, params }: { children: Re
   const { grants } = await pageSession();
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <div className="sticky top-0 z-10 flex h-(--ui-header-height) shrink-0 items-center border-b border-line-subtle bg-canvas/90 px-[22px] backdrop-blur-[10px]">
-        <Suspense fallback={<Breadcrumb entries={[{ label: "Projects", href: STUDIOFLOW_ROUTES.projects }, { label: "Project" }]} />}>
-          <ProjectBreadcrumb grants={grants} projectId={projectId} />
-        </Suspense>
-      </div>
       <PageShell measure="wide">
         <Suspense fallback={<ProjectHeaderSkeleton projectId={projectId} />}>
           <ProjectHeader grants={grants} projectId={projectId} />
@@ -54,13 +49,14 @@ async function projectOr404(grants: PermissionGrants, projectId: string) {
 
 async function ProjectBreadcrumb({ grants, projectId }: { grants: PermissionGrants; projectId: string }) {
   const project = await projectOr404(grants, projectId);
-  return <Breadcrumb entries={[{ label: "Projects", href: STUDIOFLOW_ROUTES.projects }, { label: project.name }]} />;
+  return <Breadcrumb variant="capsule" appMark="SF" entries={[{ label: "StudioFlow", href: STUDIOFLOW_ROUTES.root }, { label: "Projects", href: STUDIOFLOW_ROUTES.projects }, { label: project.name }]} />;
 }
 
 async function ProjectHeader({ grants, projectId }: { grants: PermissionGrants; projectId: string }) {
   const project = await projectOr404(grants, projectId);
   return (
     <PageHeader
+      context={<Suspense fallback={<Breadcrumb variant="capsule" appMark="SF" entries={[{ label: "StudioFlow", href: STUDIOFLOW_ROUTES.root }, { label: "Projects", href: STUDIOFLOW_ROUTES.projects }, { label: "Project" }]} />}><ProjectBreadcrumb grants={grants} projectId={projectId} /></Suspense>}
       title={project.name}
       meta={<MetaList items={[project.client?.name ?? "No client", `Designer: ${project.designer.displayName}`, `Drafter: ${project.drafter.displayName}`]} />}
       actions={<Suspense fallback={<ProjectNavLinks items={navigation(projectId)} />}><ProjectNavigation grants={grants} projectId={projectId} /></Suspense>}

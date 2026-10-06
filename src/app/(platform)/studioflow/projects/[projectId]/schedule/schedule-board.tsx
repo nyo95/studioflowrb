@@ -42,6 +42,7 @@ import {
   InlineError,
   Input,
   ProgressBar,
+  PillTabs,
   RowActionMenu,
   Select,
   SimpleTextEditor,
@@ -496,16 +497,9 @@ export function ScheduleBoard({
   return (
     <div className="grid">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle px-(--ui-section-px) py-2.5">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Schedule section">
-          {(["MATERIAL", "FIXTURE"] as const).map((key) => (
-            <FilterChip key={key} selected={section === key} count={counts[key]} onClick={() => void changeSection(key)}>
-              {SECTION_LABEL[key]}
-            </FilterChip>
-          ))}
-          <span className="mx-1 h-5 w-px bg-line-subtle" aria-hidden="true" />
-          <FilterChip selected={viewMode === "board"} onClick={() => setViewMode("board")}>Board</FilterChip>
-          <FilterChip selected={viewMode === "list"} onClick={() => setViewMode("list")}>List</FilterChip>
-        </div>
+        {/* changeSection reads the draft ref only when this browser event fires; passing it through the shared tab contract keeps the existing discard guard intact. */}
+        {/* eslint-disable-next-line react-hooks/refs */}
+        <div className="grid min-w-0 gap-2"><PillTabs label="Schedule section" items={(["MATERIAL", "FIXTURE"] as const).map((key) => ({ key, label: SECTION_LABEL[key], active: section === key, count: counts[key], onSelect: changeSection.bind(null, key) }))} /><PillTabs label="Schedule view" items={[{ key: "board", label: "Board", active: viewMode === "board", onSelect: () => setViewMode("board") }, { key: "list", label: "List", active: viewMode === "list", onSelect: () => setViewMode("list") }]} /></div>
         <div className="flex flex-wrap gap-2">
           <Link
             prefetch={false}

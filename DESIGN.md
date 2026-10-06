@@ -4,7 +4,7 @@ Status: **LOCKED — v2, owner-approved 2026-10-06 (R8.357)**, after review of t
 interactive mockup. Replaces v1 (R8.202 foundations, R8.148 headings).
 Scope: shared visual language for StudioFlow, Master Data, BQ, and future apps.
 
-**Built so far (R8.357):** tokens (§3–§5) and the rail and thin top bar
+**Built so far (R8.360):** tokens (§3–§5), the rail and thin top bar,
 (§10.1–§10.2). **Not built yet**, tracked in `docs/BACKLOG.md`: the pill tab bar
 and context capsule (§10.3), stat cards (§6.1), the per-app counts on rail items,
 and the Playwright size checks (§12). Until a pattern is built, screens keep the

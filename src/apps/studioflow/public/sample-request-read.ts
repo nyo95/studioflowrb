@@ -90,6 +90,10 @@ function toRead(row: Row): SampleRequestRead {
 /** Read-only StudioFlow contract for sample requests. Callers authorize; this port carries no user context. */
 export function createStudioFlowSampleRequestRead(db: PrismaClient) {
   return {
+    /** Number of requests still waiting for their physical sample. */
+    async countPendingSampleRequests(): Promise<number> {
+      return db.sfScheduleSampleRequest.count({ where: { status: "REQUESTED", option: { entry: { project: { archived_at: null } } } } });
+    },
     /** Requests still waiting for the physical sample, oldest first, excluding archived projects. */
     async listPendingSampleRequests(input: { limit?: number } = {}): Promise<SampleRequestRead[]> {
       // A missing or unusable limit falls back to the default; a usable one is capped.

@@ -23,8 +23,7 @@ export default async function ClientPage({ params }: { params: Promise<{ clientI
   return (
     <PageShell measure="wide">
       <div className="grid gap-4">
-      <Breadcrumb entries={[{ label: "Clients", href: STUDIOFLOW_ROUTES.clients }, { label: client.name }]} />
-      <PageHeader title={client.name} meta={client.archived_at ? <Badge>Archived</Badge> : undefined} actions={hasPermission(grants, P.projectManage) ? <ClientEditButton client={{ id: client.id, name: client.name, address: client.address }} /> : undefined} divider />
+      <PageHeader context={<Breadcrumb variant="capsule" appMark="SF" entries={[{ label: "StudioFlow", href: STUDIOFLOW_ROUTES.root }, { label: "Clients", href: STUDIOFLOW_ROUTES.clients }, { label: client.name }]} />} title={client.name} meta={client.archived_at ? <Badge>Archived</Badge> : undefined} actions={hasPermission(grants, P.projectManage) ? <ClientEditButton client={{ id: client.id, name: client.name, address: client.address }} /> : undefined} divider />
       <SectionCard title="Details">
         <DescriptionList><DescriptionItem label="Address">{client.address ?? "—"}</DescriptionItem></DescriptionList>
       </SectionCard>

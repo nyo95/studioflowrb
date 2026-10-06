@@ -1,9 +1,7 @@
-import Link from "next/link";
-
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { EmptyState, filterChipClasses, PageHeader, PageShell } from "@/platform/ui_engine";
+import { EmptyState, PageHeader, PageShell, PillTabs, StatCard, StatGrid } from "@/platform/ui_engine";
 
 import { pageSession } from "./_components/session";
 import { ProjectCard } from "./_components/project-card";
@@ -21,7 +19,10 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const canSeeAll = hasPermission(grants, P.projectManage);
   const scope = canSeeAll && rawScope === "all" ? "all" : "mine";
   const statusView: StatusView = rawStatus === "completed" ? "completed" : "running";
-  const cards = await studioFlow.projects.listProjectCards({ grants, filter: scope, actorId: userId });
+  const [cards, stats] = await Promise.all([
+    studioFlow.projects.listProjectCards({ grants, filter: scope, actorId: userId }),
+    studioFlow.projects.getHomeStats({ grants, filter: scope, actorId: userId }),
+  ]);
   const firstName = displayName.split(" ")[0] ?? displayName;
 
   const running = cards.filter((card) => card.status !== "COMPLETED");
@@ -41,21 +42,16 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         title="Home"
         description={scope === "mine" ? `${firstName}, these are your projects` : "Every running project in the studio"}
         actions={(
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="grid min-w-0 gap-2">
             {canSeeAll ? (
-              <div className="flex gap-1.5" role="group" aria-label="Scope">
-                <Link href={link({ scope: "mine", status: rawStatus })} prefetch={false} className={filterChipClasses(scope === "mine")} aria-current={scope === "mine" ? "page" : undefined}>Mine</Link>
-                <Link href={link({ scope: "all", status: rawStatus })} prefetch={false} className={filterChipClasses(scope === "all")} aria-current={scope === "all" ? "page" : undefined}>Everyone&apos;s</Link>
-              </div>
+              <PillTabs label="Project scope" items={[{ key: "mine", label: "Mine", href: link({ scope: "mine", status: rawStatus }), active: scope === "mine" }, { key: "all", label: "Everyone's", href: link({ scope: "all", status: rawStatus }), active: scope === "all" }]} />
             ) : null}
-            {canSeeAll ? <span aria-hidden="true" className="h-6 w-px bg-line-subtle" /> : null}
-            <div className="flex gap-1.5" role="group" aria-label="Status">
-              <Link href={link({ scope, status: "running" })} prefetch={false} className={filterChipClasses(statusView === "running")} aria-current={statusView === "running" ? "page" : undefined}>Running ({running.length})</Link>
-              <Link href={link({ scope, status: "completed" })} prefetch={false} className={filterChipClasses(statusView === "completed")} aria-current={statusView === "completed" ? "page" : undefined}>Completed ({completed.length})</Link>
-            </div>
+            <PillTabs label="Project status" items={[{ key: "running", label: "Running", href: link({ scope, status: "running" }), active: statusView === "running", count: running.length }, { key: "completed", label: "Completed", href: link({ scope, status: "completed" }), active: statusView === "completed", count: completed.length }]} />
           </div>
         )}
       />
+
+      {stats.runningProjects > 0 ? <StatGrid><StatCard label="Waiting on you" value={stats.waitingOnYou} caption="Client answered" /><StatCard label="With client" value={stats.withClient} caption={`longest ${stats.longestClientDays} days`} /><StatCard label="Phases done" value={`${stats.phasesDone} / ${stats.phasesTotal}`} caption="across running projects" /><StatCard label="Samples waiting" value={stats.samplesWaiting} caption="Requested samples" /></StatGrid> : null}
 
       {shown.length === 0 ? (
         <EmptyState

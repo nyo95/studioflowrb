@@ -7,7 +7,7 @@ import { hasPermission } from "@platform/core/rbac";
 import { formatInstant } from "@platform/utilities/date";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 import { masterDataService } from "@/apps/masterdata/runtime";
-import { PageHeader, PageShell, SectionCard, MetricValue, Text, Heading, Badge, buttonClasses } from "@/platform/ui_engine";
+import { PageHeader, PageShell, SectionCard, MetricValue, Text, Heading, Badge, buttonClasses, StatCard, StatGrid } from "@/platform/ui_engine";
 
 export const dynamic = "force-dynamic";
 
@@ -75,32 +75,11 @@ export default async function MasterDataPage() {
       />
 
       {/* ── Count tiles ──────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <StatGrid>
         {tiles.map(({ key, label, count, delta, href, Icon }) => (
-          <Link key={key} href={href} className="rounded-card text-inherit no-underline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus">
-            <SectionCard className="group h-full transition-colors hover:bg-surface-muted">
-              <div className="flex items-center justify-between">
-                <span className="flex h-8 w-8 items-center justify-center rounded-action bg-surface-muted text-ink-secondary">
-                  <Icon size={16} aria-hidden="true" />
-                </span>
-                {delta > 0 && (
-                  <Badge tone="neutral">
-                    <Plus size={12} aria-hidden="true" />
-                    <span>{delta}</span>
-                  </Badge>
-                )}
-              </div>
-              <div className="mt-3">
-                <MetricValue size="lg">{formatCount(count)}</MetricValue>
-                <Text as="p" tone="secondary" size="sm" className="mt-1 flex items-center gap-1">
-                  {label}
-                  <ArrowUpRight size={14} aria-hidden="true" className="text-ink-tertiary transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                </Text>
-              </div>
-            </SectionCard>
-          </Link>
+          <StatCard key={key} label={label} value={formatCount(count)} caption={delta > 0 ? `${delta} added this month` : "No additions this month"} icon={<Icon />} href={href} />
         ))}
-      </div>
+      </StatGrid>
 
       {/* ── Main grid ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">

@@ -650,6 +650,41 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
+    /** Small, read-only Home projection shared by the page and the app rail. */
+    async getHomeStats(input: ReadContext & { filter: "all" | "mine"; actorId: string }) {
+      requireRead(input.grants);
+      const canOverride = hasPermission(input.grants, P.projectOverride);
+      const canWork = hasPermission(input.grants, P.phaseWork);
+      const projects = await db.sfProject.findMany({
+        where: {
+          archived_at: null,
+          status: { not: "COMPLETED" },
+          ...(input.filter === "mine" ? { OR: [{ pic_designer_id: input.actorId }, { pic_drafter_id: input.actorId }] } : {}),
+        },
+        select: {
+          id: true,
+          status: true,
+          pic_designer_id: true,
+          pic_drafter_id: true,
+          phases: { select: { status: true, seat_snapshot: true, revisions: { where: { status: { in: ["SENT", "ANSWERED"] } }, orderBy: { major: "desc" }, take: 1, select: { status: true, sent_at: true } } } },
+        },
+      });
+      const phaseRows = projects.flatMap((project) => project.phases.map((phase) => ({ project, phase })));
+      const withClient = phaseRows.filter(({ phase }) => phase.revisions[0]?.status === "SENT");
+      const now = nowOf(ports);
+      const projectIds = projects.map((project) => project.id);
+      const samplesWaiting = projectIds.length === 0 ? 0 : await db.sfScheduleSampleRequest.count({ where: { status: "REQUESTED", option: { entry: { project_id: { in: projectIds } } } } });
+      return {
+        runningProjects: projects.length,
+        waitingOnYou: canWork ? phaseRows.filter(({ project, phase }) => phase.revisions[0]?.status === "ANSWERED" && project.status === "ACTIVE" && (canOverride || input.actorId === (phase.seat_snapshot === "drafter" ? project.pic_drafter_id : project.pic_designer_id))).length : 0,
+        withClient: withClient.length,
+        longestClientDays: Math.max(0, ...withClient.map(({ phase }) => waitingDays(phase.revisions[0]?.sent_at ?? now, now) ?? 0)),
+        phasesDone: phaseRows.filter(({ phase }) => phase.status === "DONE").length,
+        phasesTotal: phaseRows.length,
+        samplesWaiting,
+      };
+    },
+
     canManageProjects(grants: ReadContext["grants"]) {
       return hasPermission(grants, P.projectManage);
     },

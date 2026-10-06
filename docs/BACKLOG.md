@@ -48,11 +48,6 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## UI Engine and Shared Utilities
 
-- [ ] [PLANNED][P2] **DESIGN v2 (Apple/Linear), remaining slices.** `DESIGN.md` v2 is approved and in force (R8.357);
-  built: tokens, the rail (account block, groups, icon chips, white current block, General with Settings and Log out)
-  and the thin top bar. Still to build, in order: the pill tab bar and context capsule (DESIGN §10.3), stat cards
-  (§6.1), per-app counts on rail items (read-only data from each app, Executor), and Playwright screen-size checks
-  at 375 px, ~640 px and 839/840/841 px (§12; dependency approved by the owner).
 
 - [ ] [PLANNED][P2] One `EntryGrid` pattern for the three Master Data entry
   grids (work-price table, material-price table, compare-suppliers grid) and an

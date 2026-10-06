@@ -28,7 +28,7 @@ const iconMap: Record<string, typeof LayoutGrid> = {
  *
  * `canOpenSettings` shows the one "Settings" entry that leads to Master Data's group in the shared settings area.
  */
-export function MasterDataNav({ canManageSampleRequests = false, canUseWorkbook = false, canOpenSettings = false }: { canManageSampleRequests?: boolean; canUseWorkbook?: boolean; canOpenSettings?: boolean }) {
+export function MasterDataNav({ canManageSampleRequests = false, canUseWorkbook = false, canOpenSettings = false, openSampleRequests = 0 }: { canManageSampleRequests?: boolean; canUseWorkbook?: boolean; canOpenSettings?: boolean; openSampleRequests?: number }) {
   const pathname = usePathname();
 
   if (!pathname.startsWith("/masterdata")) return null;
@@ -45,6 +45,7 @@ export function MasterDataNav({ canManageSampleRequests = false, canUseWorkbook 
             key={href}
             icon={<Icon size={16} />}
             active={isActive}
+            badge={href === "/masterdata/sample-requests" && openSampleRequests > 0 ? openSampleRequests : undefined}
             href={href}
             prefetch={false}
           >

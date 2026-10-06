@@ -12,6 +12,25 @@ Last updated: 2026-10-06
 
 "Sisanya kamu oper saja ke Codex, kamu cek saja": the Executor builds every slice below, including UI Engine patterns and their adoption; the Lead reviews and polishes in R8.362. Stop with `BLOCKED / CONFLICT` and send a prompt back to the Lead if anything contradicts `DESIGN.md`, `UI_ENGINE.md` or the code.
 
+## Correction 2026-10-06 (Lead verdict on the Executor's BLOCKED report): continue on the partial tree
+
+The first run stopped with an uncommitted partial Part A (PillTabs, StatCard/StatGrid, Breadcrumb capsule and
+`PageHeader` `context`, first adoptions, `@playwright/test` installed). **Keep that work; do not discard it.** Resume
+from the dirty tree and finish. Required fixes to the partial work:
+
+- *Waiting on you* (Home stat and the rail count) must count only phases the viewer may act on (seat owner or
+  override, project active), not every `ANSWERED` round in scope. One shared read decides it for both.
+- *Samples waiting* shows "—": replace the placeholder with the real read-only count (decision 4). No placeholder
+  values anywhere.
+- `StatCard` draws both a `border` and `shadow-raise` (two hairlines): use one resting hairline (`shadow-plane`)
+  and lift only when it is a link under hover/focus.
+- The capsule `Breadcrumb` wraps long names onto several lines (`flex-wrap`): in the capsule variant it stays one
+  line and truncates the last entry.
+
+Order and commits: finish Part A, run its checks, **commit Part A (R8.360) with this `PLAN.md`** before starting
+Part B. Run the full `npm test` (about 90 s here; ~840 tests) in the background or with a long timeout rather than
+inside a short window. If Part B cannot finish, stop after the Part A commit and report BLOCKED with what remains.
+
 ## Locked Decisions
 
 ### Part A (R8.360)

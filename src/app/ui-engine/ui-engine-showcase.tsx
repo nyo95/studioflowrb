@@ -2,7 +2,7 @@
 import { CurateShowcase } from "./curate-showcase";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, CircleAlert, Filter, LayoutGrid, LifeBuoy, Pencil, Settings2, Sparkles, Trash2 } from "lucide-react";
+import { ArrowRight, CircleAlert, Filter, History, LayoutGrid, LifeBuoy, Pencil, Settings2, Sparkles, Trash2 } from "lucide-react";
 
 import {
   AppShell,
@@ -39,6 +39,7 @@ import {
   PageShell,
   Pagination,
   PipelineStrip,
+  PillTabs,
   ProgressBar,
   RadioGroup,
   SearchField,
@@ -48,6 +49,8 @@ import {
   Skeleton,
   Spinner,
   StatusBadge,
+  StatCard,
+  StatGrid,
   Surface,
   TableBody,
   TableCell,
@@ -445,6 +448,10 @@ export function UiEngineShowcase() {
               <Breadcrumb
                 entries={[{ label: "Projects", href: "#context" }, { label: "Kopi Kalyana Senopati" }]}
               />
+              <Breadcrumb variant="capsule" appMark="SF" entries={[{ label: "StudioFlow", href: "#shell" }, { label: "Projects", href: "#directory" }, { label: "Kopi Kalyana Senopati" }]} />
+
+              <PillTabs items={[{ key: "one", label: "Overview", icon: <LayoutGrid />, active: true, href: "#context" }, { key: "two", label: "History", icon: <History />, active: false, href: "#states", count: 3 }]} />
+              <StatGrid><StatCard label="Waiting" value="3" caption="Needs a decision" icon={<CircleAlert />} /><StatCard label="Done" value="8 / 12" caption="This project" /></StatGrid>
 
               <MetaList
                 items={[

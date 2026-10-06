@@ -140,6 +140,9 @@ inline markup in more than one app.
 | `SegmentBar` | Primitive | Compact ordered stage bar for a table cell; decorative, so `label` is required. |
 | `GroupHeader` | Pattern | Worklist bucket head: uppercase label, count, rule to the end of the measure. |
 | `PipelineStrip` | Pattern | Ordered stages as the default hairline-separated `band` or the marker-and-connector `track`. Track supports `done`, `current`, `waiting`, `attention`, `upcoming`, and `blocked`, plus a bottom-aligned per-step action. Current and attention use `aria-current="step"`; note text carries state so colour is never the only channel. |
+| `PillTabs` | Pattern | Sibling views use one responsive, accessible pill bar rather than application-specific chips. |
+| `StatCard` / `StatGrid` | Component | Decision-driving dashboard figures keep one compact card and responsive grid treatment. |
+| `Breadcrumb` capsule / `PageHeader` context | Pattern / Layout | Record context stays above the title in one compact, truncating capsule. |
 
 `Pagination` takes either `onPageChange` (client directories holding page state
 locally) or `getHref` (server-rendered directories, where paging must survive a

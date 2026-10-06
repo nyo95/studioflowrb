@@ -13,3 +13,4 @@ export * from "./simple-text-editor";
 export * from "./print-button";
 export * from "./print-format";
 export * from "./print-format-values";
+export * from "./pill-tabs";

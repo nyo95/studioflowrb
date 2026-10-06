@@ -20,7 +20,7 @@ function isActive(pathname: string, href: string, exact = false): boolean {
 }
 
 /** StudioFlow entries in the shared rail; shown only inside the app. */
-export function StudioFlowNav() {
+export function StudioFlowNav({ waitingOnYou = 0 }: { waitingOnYou?: number }) {
   const pathname = usePathname();
   if (!pathname.startsWith("/studioflow")) return null;
   return (
@@ -28,7 +28,7 @@ export function StudioFlowNav() {
       {STUDIOFLOW_NAV_LINKS.workspace.map(({ href, label, exact }) => {
         const Icon = ICONS[href] ?? ListChecks;
         return (
-          <NavItem key={href} href={href} icon={<Icon size={16} />} active={isActive(pathname, href, exact)} prefetch={false}>
+          <NavItem key={href} href={href} icon={<Icon size={16} />} active={isActive(pathname, href, exact)} badge={href === "/studioflow" && waitingOnYou > 0 ? waitingOnYou : undefined} prefetch={false}>
             {label}
           </NavItem>
         );
