@@ -437,6 +437,14 @@ Implementation notes (R8.72, SF-R2; content merge R8.117):
 
 ## 11. Product Schedule (port `extensions/schedule` + `CatalogBoard`)
 
+The working screen has Material/Fixture and Board/List controls, a compact
+Set up menu, Print/PDF, and the primary Add item action. Per section it shows
+final progress plus All, Needs a decision, Sample waiting and No product yet
+filters. Categories use `GroupHeader`; in All, each category ends with a
+quick-add field that can create a typed product or reserve the next code.
+Board cards expose photo and body as sibling buttons, carry at most two status
+badges, and keep sample actions inside the editor.
+
 ### 11.1 Entry
 
 `project_id`, `section` (`material` | `fixture`), `category`, `prefix`,
@@ -660,79 +668,36 @@ case-insensitively. Values join `search_key`, so an extra line is searchable
 in "From past project". Extras travel with reuse, "Save as template item" and
 "Apply templates", exactly like the typed columns.
 
-### 11.10 The entry editor (R8.112, owner review 2026-09-23)
+### 11.10 The entry editor (R8.351, owner review 2026-10-06)
 
-The entry panel is one `Dialog` (`size="lg"`), on both desktop and mobile —
-not a 22rem sidebar squeezed beside the board on desktop with a separate
-`Drawer` on mobile. Same dialog pattern as every other schedule dialog in
-this file (Add item, Import CSV, …).
+The board and list open one right-side UI Engine `Drawer` (`size="lg"`). It
+keeps the schedule visible and handles an existing item, a new item, a new
+option, the photo workspace, a sample request and reuse from a past project.
+Photo, sample and reuse flows swap inline inside the drawer; only small
+confirmations and Move to category may layer a dialog over it. On narrow
+screens the same drawer fills the width.
 
-**Item details and card fields share one checklist**, row per field
-(`ChecklistRow`): a checkbox, and — only once ticked — the input(s) that fill
-that field in, in the same row. Location and Qty(+Unit) write to the entry;
-Brand, Color, Pattern, Finishing, Size and Notes write to the option the card
-speaks for (§11.3's "the final option, else the first"). Unticking a field
-only stops it captioning the card; it never discards what was typed. Row
-order (R8.113, owner-specified): **Brand, Type, Color, Pattern, Finishing,
-Location, Qty (Fixture only, §11.1), Size, Notes**, then any extra spec lines
-(§11.9).
+The header shows code, category, section and state, with previous/next item
+navigation and the item menu. The options row selects A/B/C, identifies Final
+and Not used, creates the next unsaved option, or opens past-project search.
+The selected option form keeps Type, Brand, Color, Pattern, Finishing, Size,
+Location, Fixture Qty/Unit, extra specification lines and Notes editable at
+all times. An eye control changes only whether that field captions the card;
+it never clears or disables the value. Type and photo always show, and "Use
+default" restores `card_fields = null`.
 
-**Reversed, R8.136 (owner, 2026-09-24): explicit Save/Discard, not per-field
-auto-save-on-blur.** R8.112 shipped this checklist auto-saving each field the
-instant it lost focus. Owner: *"mending disave aja dari pada di react live
-sync gitu... kaya di masterdata tuh, kalau ga fokus ntar ada discard / keep
-editing"* — every edit in this checklist (item fields, product details, and
-which fields are ticked) is now a local draft; nothing is written until
-**Save** is pressed. Closing the dialog with an unsaved draft prompts
-"Discard changes? / Keep editing", the same pattern Master Data's edit
-dialogs use. A **Discard** button next to Save resets the draft without
-closing. This does not touch the separate "Add option" / "Edit option"
-dialog (`OptionDialog`), which already saved this way.
+Every edit is a local draft. Nothing in the item/spec/card-field draft writes
+until **Save**; **Discard** restores the saved values. Closing the drawer,
+moving to the previous/next item, or switching section with unsaved work asks
+"Discard changes? / Keep editing". An item with no options creates its first
+option on Save when product details were entered. A completely blank product
+keeps the item as a reserved code; product fields without Type are rejected.
 
-**Type sits in the checklist too, right after Brand, with no checkbox**
-(R8.113) — it edits `product_name` directly, but since Type always shows
-(this section, above) it is never optional, so there is nothing to tick.
-
-**Brand is one `CreatableSearch` combobox, not a select-plus-fallback-input
-pair** (R8.113, owner: *"knp brand perlu 2? kasi aja pakai creatable
-search?"*). Search Master Data brands, pick one, or type a name that is not
-in it — both live in the same control, and no Master Data write happens
-either way: an unmatched typed name becomes `brand_name` on the option with
-`brand_id` left null, exactly the "not required, stays searchable by its
-Type" rule already in §11.3. Nothing is created in Master Data from a
-Schedule option; the combobox's own "create" affordance is repurposed to mean
-"use this typed text", never a real insert (verified: no `masterData.create`/
-`insert`/`upsert` call is reachable from the schedule app).
-
-**Notes uses `SimpleTextEditor`** (R8.113, owner: *"pakai wysiwyg seperti
-pada notes pada masterdata"*) — the same bold/italic/bullet-list toolbar over
-a plain-text field already used for Notes on Brand, Vendor and Pricing in
-Master Data, so schedule notes look and behave the same way elsewhere in the
-app. It stores plain marked-up text (`**bold**`, `- bullet`), not HTML.
-
-**Ticking is never refused for a field being empty.** An earlier pass greyed
-out and disabled the checkbox for a field with nothing to show, reasoning
-that ticking it would not visibly change the card — but that made "I don't
-know the brand yet, tick it anyway so I remember to fill it in" impossible,
-which is the normal state of an unfinalized spec. Owner: *"kalau brandnya
-masih belum tau gmn? better legacy sih sebenernya ya?"* — legacy never
-conflated "show this field" with "this field has a value" in the first
-place. Extra spec lines keep a plain checkbox with no reveal, since one
-cannot exist with a blank label or value (§11.9).
-
-**Reversed, R8.136 (owner, 2026-09-24): no row is disabled for lack of an
-option.** R8.112 disabled the option-backed rows (Brand, Color, Pattern,
-Finishing, Size, Notes) whenever the entry had zero options yet, on the
-theory that there was no option row to attach a value to. Owner: *"opsi mah
-hal berbeda... naturalnya di buat dulu card berisi informasi (produk) - kalau
-ga yakin baru tambah opsi. ga ada aturannya harus punya 2 opsi atau lebih
-dulu"* — an Option (A, B, C…) exists to compare multiple candidates; a single
-product's own info should never require creating one first. Every checklist
-row now disables only for edit permission or an in-flight save. Pressing
-**Save** with no option yet creates the first one (via the same `createOption`
-path as OptionDialog's "Add option") from whatever was filled in; if an
-option already exists, Save updates it instead — the same create-or-update
-branch already used by `OptionDialog`.
+Brand remains one `CreatableSearch`: choosing Master Data stores its id,
+typing an unmatched brand stores free text, and Schedule never writes Master
+Data. Notes remains `SimpleTextEditor` and stores marked-up plain text rather
+than HTML. Qty/Unit stays Fixture-only. The field order is Type, Brand, Color,
+Pattern, Finishing, Size, Location, Fixture Qty/Unit, extra lines, Notes.
 
 ### 11.11 Print / export (R8.132, owner-scoped 2026-09-24)
 

@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.351] StudioFlow Product Schedule re-layout
+- Surface: StudioFlow project → Schedule, Board and List views
+- Fixture: editable project with Material and Fixture categories, reserved and multi-option items, final choices, photos, and requested/received samples; designer PIC and read-only staff
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Check section counts, final progress and all four filters in Board and List. 2. Quick-add once with Type and once reserved; add a new category through Add item. 3. Edit a hidden field, toggle its eye, add option B, Save, set B final, then Discard another edit. 4. Request and receive a sample inline; reuse from a past project; open photo from the card. 5. Try previous/next, close and section switch with unsaved edits. 6. Repeat at phone width and as read-only staff.
+- Acceptance: counts and filters match; quick-add uses the right category/code; cards have no nested controls or sample links; the one drawer preserves every action and asks before discarding; hidden values remain saved; List opens the same drawer; all actions remain permission-gated; the narrow board has two columns and the drawer is full width.
+- Status: PENDING
+
 ### [R8.347] StudioFlow Home and project phase re-layout
 - Surface: `/studioflow` and `/studioflow/projects/[projectId]`, plus MOM, Schedule, Presentation and History project pages
 - Fixture: signed-in designer PIC; a project with requirements, a pinned note, a deliverable, CD and Supervision phases, and at least two rounds

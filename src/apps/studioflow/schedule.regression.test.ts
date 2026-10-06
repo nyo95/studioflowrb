@@ -2,187 +2,131 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-const scheduleBoard = readFileSync(
-  "src/app/(platform)/studioflow/projects/[projectId]/schedule/schedule-board.tsx",
-  "utf8",
-);
+const scheduleBoard = readFileSync("src/app/(platform)/studioflow/projects/[projectId]/schedule/schedule-board.tsx", "utf8");
 const serviceTs = readFileSync("src/apps/studioflow/schedule/service.ts", "utf8");
 const actionsTs = readFileSync("src/app/(platform)/studioflow/actions.ts", "utf8");
-const settingsView = readFileSync(
-  "src/app/(platform)/studioflow/schedule-templates/schedule-templates-view.tsx",
-  "utf8",
-);
+const settingsView = readFileSync("src/app/(platform)/studioflow/schedule-templates/schedule-templates-view.tsx", "utf8");
 const scheduleDomain = readFileSync("src/apps/studioflow/domain/schedule.ts", "utf8");
 
-describe("Schedule Board/List outer branching and pattern form preservation", () => {
-  it("renders BoardView exactly once at the outer view-mode conditional", () => {
-    const branch = (scheduleBoard.match(/viewMode === "board" \? \(/g) ?? []).length;
-    const boardUsage = (scheduleBoard.match(/<BoardView/g) ?? []).length;
-    assert.equal(branch, 1, "the Board/List render branch must exist exactly once (outer level)");
-    assert.equal(boardUsage, 1, "BoardView must be rendered exactly once (no nested duplicate)");
+describe("WO-SF-SCHED-RELAYOUT-01 board structure", () => {
+  it("keeps one outer Board/List branch", () => {
+    assert.equal((scheduleBoard.match(/viewMode === "board" \? \(/g) ?? []).length, 1);
+    assert.equal((scheduleBoard.match(/<BoardView/g) ?? []).length, 1);
   });
-
-  it("keeps the board branch outside and before the list rows", () => {
-    const toggle = scheduleBoard.indexOf('viewMode === "board" ? (');
-    const listUl = scheduleBoard.indexOf('<ul className="m-0 list-none divide-y');
-    const listGrid = scheduleBoard.indexOf('<div className="grid">', toggle);
-    assert.ok(toggle > -1, "Board/List render branch exists");
-    assert.ok(listGrid > -1, "List view is the else branch of the toggle");
-    assert.ok(listUl > -1 && listUl > toggle, "list rows render only inside the else branch, not before the board branch");
+  it("uses FilterChip for section and view controls", () => {
+    assert.match(scheduleBoard, /selected=\{viewMode === "board"\}/);
+    assert.match(scheduleBoard, /selected=\{viewMode === "list"\}/);
   });
-
-  it("opens a single shared editor dialog for both views (R8.112: no separate desktop-panel/mobile-drawer split)", () => {
-    const boardOpen = scheduleBoard.indexOf("onOpen={(id) => openEntry(id)}", scheduleBoard.indexOf("<BoardView"));
-    const dialogUsage = (scheduleBoard.match(/<EntryDialog/g) ?? []).length;
-    assert.ok(boardOpen > -1, "BoardView opens the shared editor");
-    assert.equal(dialogUsage, 1, "EntryDialog is rendered exactly once, as a sibling of the view pane, not once per breakpoint");
-    assert.doesNotMatch(scheduleBoard, /useIsDesktop\(\)|<EntryDrawer|md:grid-cols-\[1fr_22rem\]/, "the split desktop-sidebar/mobile-drawer layout must not come back");
+  it("puts setup actions in one ButtonMenu", () => {
+    assert.match(scheduleBoard, /<ButtonMenu label="Set up"/);
+    for (const label of ["Apply studio templates", "Import CSV", "Schedule templates"]) assert.match(scheduleBoard, new RegExp(label));
   });
-
-  it("routes both card-body and card-photo clicks through the same entry dialog (R8.141: one modal, not a separate photo dialog)", () => {
-    assert.doesNotMatch(scheduleBoard, /<Dialog[\s\S]{0,80}Photo — /, "photo capture must not open its own Dialog anymore");
-    assert.match(scheduleBoard, /onOpenPhoto={\(entry, option\) => openEntry\(entry\.id, option\.id\)}/, "the board card's photo click opens the shared entry dialog with an auto-photo target, not a separate dialog");
-    assert.match(scheduleBoard, /photoFor && entry\.options\.some\(\(option\) => option\.id === photoFor\)/, "the entry dialog swaps the hand of options for the photo editor inline");
+  it("shows progress and all four filters", () => {
+    assert.match(scheduleBoard, /<ProgressBar/);
+    for (const label of ["All", "Needs a decision", "Sample waiting", "No product yet"]) assert.match(scheduleBoard, new RegExp(`>${label}<`));
   });
-
-  it("has the List button and Board button in the toolbar", () => {
-    assert.match(scheduleBoard, /onClick=\{\(\) => setViewMode\("list"\)\}/);
-    assert.match(scheduleBoard, /onClick=\{\(\) => setViewMode\("board"\)\}/);
-    assert.match(scheduleBoard, /aria-pressed=\{viewMode === "list"\}/);
-    assert.match(scheduleBoard, /aria-pressed=\{viewMode === "board"\}/);
+  it("counts filters from the current section", () => {
+    assert.match(scheduleBoard, /function scheduleFilterCounts/);
+    assert.match(scheduleBoard, /entryMatchesFilter/);
   });
-
-  it("preserves pattern in ProductDraft type", () => {
-    assert.match(scheduleBoard, /pattern:\s*string;/);
+  it("defines decision, sample, empty and final counts from option facts", () => {
+    const helper = scheduleBoard.slice(scheduleBoard.indexOf("function scheduleFilterCounts"), scheduleBoard.indexOf("function entryMatchesFilter"));
+    assert.match(helper, /entry\.options\.length > 0 && !finalOf\(entry\)/);
+    assert.match(helper, /sampleRequest\?\.status === "REQUESTED"/);
+    assert.match(helper, /entry\.options\.length === 0/);
+    assert.match(helper, /filter\(\(entry\) => finalOf\(entry\)\)/);
   });
-
-  it("includes pattern in EMPTY_PRODUCT and productFromOption", () => {
-    assert.match(scheduleBoard, /EMPTY_PRODUCT:\s*ProductDraft\s*=\s*\{[^}]*pattern:\s*""/s);
-    assert.match(scheduleBoard, /pattern:\s*option\.pattern\s*\?\?\s*""/);
+  it("uses GroupHeader instead of the vertical category rail", () => {
+    assert.match(scheduleBoard, /<GroupHeader/);
+    assert.doesNotMatch(scheduleBoard, /writing-mode:vertical-rl/);
   });
-
-  it("includes pattern in toSnapshot and specLine", () => {
-    assert.match(scheduleBoard, /pattern:\s*text\(draft\.pattern\)/);
-    assert.match(scheduleDomain, /Pick<ScheduleOptionView, "color" \| "pattern" \| "finishing" \| "dimension">/);
+  it("offers quick add only in All", () => {
+    assert.match(scheduleBoard, /function QuickAddTile/);
+    assert.match(scheduleBoard, /canEdit && filter === "all"/);
   });
-
-  it("has a Pattern field in ProductFields", () => {
-    const productFieldsIndex = scheduleBoard.indexOf("function ProductFields");
-    const patternField = scheduleBoard.indexOf('<Field label="Pattern">', productFieldsIndex);
-    assert.ok(patternField > -1, "Pattern field exists in ProductFields");
-    assert.ok(patternField > scheduleBoard.indexOf('<Field label="Color">', productFieldsIndex), "Pattern sits after Color");
-    assert.ok(patternField < scheduleBoard.indexOf('<Field label="Finishing"', productFieldsIndex), "Pattern sits before Finishing");
+  it("quick add can create a product or reserve the code", () => {
+    assert.match(scheduleBoard, /snapshot: value \? \{ productName: value \} : null/);
   });
-
-  it("accepts pattern in the ScheduleSnapshot action schema", () => {
-    assert.match(actionsTs, /const ScheduleSnapshot\s*=\s*z\.strictObject\(\{[^}]*pattern:\s*z\.string\(\)\.max\(160\)\.nullish\(\)/s);
+  it("board cards use sibling photo and body buttons", () => {
+    const board = scheduleBoard.slice(scheduleBoard.indexOf("function BoardView"), scheduleBoard.indexOf("export function ScheduleBoard"));
+    assert.match(board, /<article[\s\S]*?<button type="button"[\s\S]*?<\/button>[\s\S]*?<button type="button"/);
+    assert.doesNotMatch(board, /role="button"/);
   });
-
-  it("preserves pattern through the template item editor", () => {
-    assert.match(settingsView, /pattern:\s*string\s*\| null;/);
-    assert.match(settingsView, /pattern:\s*text\(item\?\.pattern\)/);
-    assert.match(settingsView, /pattern:\s*nullable\(draft\.pattern\)/);
-    assert.match(settingsView, /<Field label="Pattern">/);
+  it("removes sample actions from board cards", () => {
+    const board = scheduleBoard.slice(scheduleBoard.indexOf("function BoardView"), scheduleBoard.indexOf("export function ScheduleBoard"));
+    assert.doesNotMatch(board, />Request sample</);
+    assert.doesNotMatch(board, />Mark received</);
   });
-
-  it("preserves pattern in service templateItemData", () => {
-    assert.match(serviceTs, /pattern:\s*snapshot\.pattern/);
+  it("shows the same status badges in board and list", () => {
+    assert.match(scheduleBoard, /function entryBadges/);
+    assert.ok((scheduleBoard.match(/entryBadges\(entry\)/g) ?? []).length >= 2);
   });
-
-  it("handles pattern/motif/catalog_motif CSV import aliases", () => {
-    assert.match(serviceTs, /pattern:\s*row\.pattern\s*\|\|\s*row\.motif\s*\|\|\s*row\.catalog_motif/);
+  it("keeps drag reorder bounded to All", () => {
+    assert.match(scheduleBoard, /const reorderEnabled = canEdit && filter === "all"/);
   });
 });
 
-describe("R8.112: card-field checkboxes grey out when there is nothing to show", () => {
-  it("cardFieldValuesOf renders the board card, unchanged since R8.112 (moved to domain/schedule.ts so the print catalogue can share it)", () => {
-    assert.match(scheduleDomain, /export function cardFieldValuesOf\(entry: ScheduleEntryView\)/);
-    assert.match(scheduleBoard, /\bcardFieldValuesOf,/, "schedule-board.tsx imports the shared function rather than redefining it");
-    const boardViewIndex = scheduleBoard.indexOf("function BoardView");
-    const panelIndex = scheduleBoard.indexOf("function EntryPanelContent");
-    assert.match(scheduleBoard.slice(boardViewIndex, panelIndex), /const fieldValue = cardFieldValuesOf\(entry\);/);
+describe("WO-SF-SCHED-RELAYOUT-01 one drawer editor", () => {
+  it("uses Drawer for existing and new items", () => {
+    assert.match(scheduleBoard, /function EntryDrawer/);
+    assert.match(scheduleBoard, /function AddItemDrawer/);
+    assert.ok((scheduleBoard.match(/<Drawer/g) ?? []).length >= 2);
   });
-
-  it("still hides the empty row on the card itself (does not start rendering blanks)", () => {
-    assert.match(scheduleBoard, /details\.map\(\(\[label, value\]\) => value \? \(/);
+  it("removes the three old editor dialogs", () => {
+    assert.doesNotMatch(scheduleBoard, /OptionDialog|AddItemDialog|EntryDialog/);
   });
-});
-
-describe("R8.113: Item details and card fields merged into one tick-to-fill-in checklist", () => {
-  it("the empty-value gate from R8.112 is gone from the panel — ticking a field is never blocked by it being blank", () => {
-    assert.doesNotMatch(scheduleBoard, /!hasValue\(/, "an empty-field checkbox gate must not come back");
-    const panelIndex = scheduleBoard.indexOf("function EntryPanelContent");
-    assert.doesNotMatch(scheduleBoard.slice(panelIndex), /cardFieldValuesOf\(entry\)/, "the panel no longer reads field values just to grey out a checkbox");
+  it("keeps photo editing inline", () => {
+    assert.match(scheduleBoard, /<InlinePhotoEditor/);
+    assert.doesNotMatch(scheduleBoard, /<Dialog[\s\S]{0,80}Photo — /);
   });
-
-  it("R8.135: every Card content row disables only for permission or a pending save — no row requires a shown option to be tickable", () => {
-    // Owner reversal, 2026-09-24: PT-01-style items (no option yet) can now
-    // have their product info filled in directly; a checkbox is never gated
-    // on `shown` existing, only on edit permission / an in-flight save.
-    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"), scheduleBoard.indexOf("function EntryDialog"));
-    assert.doesNotMatch(panelBody, /\|\| !shown\}/, "no Card content row may disable itself for lack of a shown option");
-    assert.match(panelBody, /const disabled = !canEdit \|\| savePending;/, "one shared gate: edit permission or a pending save");
-    const rowCount = (panelBody.match(/disabled=\{disabled\}/g) ?? []).length;
-    assert.ok(rowCount >= 8, `expected every card slot and field to use the shared gate, found ${rowCount}`);
+  it("keeps sample request inline", () => {
+    assert.match(scheduleBoard, /function InlineSampleRequest/);
+    assert.doesNotMatch(scheduleBoard, /SampleRequestDialog/);
   });
-
-  it("shows a field on the card only while its slot is on (the slot list is the old checklist)", () => {
-    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"), scheduleBoard.indexOf("function EntryDialog"));
-    assert.match(panelBody, /aria-pressed=\{on\}/, "each slot is a real toggle button");
-    for (const key of ["brand", "dimension", "location", "notes"]) assert.match(panelBody, new RegExp(`displayCardFields\\.includes\\("${key}"\\)`), `${key} renders only while its slot is on`);
+  it("keeps past-project reuse inline", () => {
+    assert.match(scheduleBoard, /function InlineReuse/);
+    assert.doesNotMatch(scheduleBoard, /ReuseDialog/);
   });
-
-  it("R8.135: Card content is a draft with an explicit Save/Discard pair — per-field auto-save-on-blur is gone", () => {
-    // Owner reversal, 2026-09-24: "jangan langsung update reactive tapi harus
-    // di save dulu baru di update" — batched Save, matching Master Data's
-    // draft/discard pattern, replaces R8.113's per-row onBlur auto-save.
-    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"), scheduleBoard.indexOf("function EntryDialog"));
-    assert.doesNotMatch(panelBody, /onBlur=/, "no Card content field may auto-save on blur anymore");
-    assert.match(panelBody, /onClick=\{\(\) => void saveAll\(\)/, "an explicit Save action exists");
-    assert.match(panelBody, /onClick=\{discardDraft\}/, "an explicit Discard action exists");
+  it("keeps option drafts under the new key", () => {
+    assert.match(scheduleBoard, /draftKey = selectedId === "new" \? "new"/);
   });
-
-  it("Brand is one row in the checklist, not a floating select+input pair", () => {
-    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
-    assert.match(panelBody, /label="Brand"/);
+  it("keeps explicit Save and Discard without blur writes", () => {
+    assert.match(scheduleBoard, /onClick=\{discardDraft\}/);
+    assert.match(scheduleBoard, /onClick=\{\(\) => void saveAll\(\)/);
+    const panel = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"), scheduleBoard.indexOf("function EntryDrawer"));
+    assert.doesNotMatch(panel, /onBlur=/);
+  });
+  it("prompts before close, navigation and section changes", () => {
+    assert.match(scheduleBoard, /const askDiscard = async/);
+    assert.match(scheduleBoard, /const navigateEntry = async/);
+    assert.match(scheduleBoard, /const changeSection = async/);
   });
 });
 
-describe("R8.113: Brand as one creatable search, Type in the checklist, Qty fixture-only, WYSIWYG Notes", () => {
-  it("Brand is a single CreatableSearch — the old two-control select+input pair is gone", () => {
-    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
-    assert.match(panelBody, /<CreatableSearch\b/);
-    assert.match(panelBody, /onCreate=\{\(text\) => text\}/, "typing an unlisted brand must not create a Master Data record — it is free text, same as before");
-    assert.doesNotMatch(panelBody, /Other \(type the name\)/, "the old dropdown-plus-fallback-input pair must not come back");
+describe("Schedule field rules survive the relayout", () => {
+  it("Type is always shown and never a card-field toggle", () => {
+    assert.match(scheduleBoard, /aria-label="Type"/);
+    assert.doesNotMatch(scheduleBoard, /visibilityAction\("type"/i);
   });
-
-  it("never writes Master Data from the schedule side (no create/insert call reachable from the brand row)", () => {
+  it("Qty remains Fixture-only", () => {
+    assert.match(scheduleBoard, /entry\.section === "FIXTURE" \?/);
+    assert.match(scheduleBoard, /visibilityAction\("qty", "Qty"\)/);
+  });
+  it("Brand remains one CreatableSearch with no Master Data write", () => {
+    assert.match(scheduleBoard, /<CreatableSearch/);
+    assert.match(scheduleBoard, /onCreate=\{\(text\) => text\}/);
     assert.doesNotMatch(scheduleBoard, /masterData\.(create|insert|upsert)/i);
   });
-
-  it("Type is the card's title: always shown, with no slot to turn off", () => {
-    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
-    assert.match(panelBody, /aria-label="Type"/);
-    assert.match(panelBody, /value=\{draft\.productName\}/);
-    const slotLine = panelBody.slice(panelBody.indexOf("const slotKeys = ["), panelBody.indexOf("const slotLabel"));
-    assert.doesNotMatch(slotLine, /productName|"type"/i, "Type is not one of the slots");
+  it("Notes still uses SimpleTextEditor", () => {
+    assert.match(scheduleBoard, /<SimpleTextEditor value=\{draft\.notes\}/);
   });
-
-  it("Qty only renders for Fixture entries", () => {
-    assert.match(scheduleBoard, /entry\.section === "FIXTURE" && displayCardFields\.includes\("qty"\)/);
-    assert.match(scheduleBoard, /\.\.\.\(entry\.section === "FIXTURE" \? \["qty"\] : \[\]\)/, "the Qty slot itself is Fixture-only too");
-  });
-
-  it("card order is Type, Brand, Color, Pattern, Finishing, Size, Location, [Qty], Notes", () => {
-    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
-    const order = ['aria-label="Type"', '<CardPlate label="Brand">', '(["color", "pattern", "finishing"] as const)', '<CardPlate label="Size">', '<CardPlate label="Location">', '<CardPlate label="Qty">', "<SimpleTextEditor"]
-      .map((needle) => panelBody.indexOf(needle));
-    assert.ok(order.every((index) => index > -1), "every row is present");
-    assert.ok(order.every((index, position) => position === 0 || index > order[position - 1]), "rows appear in the requested order");
-  });
-
-  it("Notes uses the shared SimpleTextEditor (masterdata's WYSIWYG-lite), not a plain Textarea", () => {
-    const panelBody = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"));
-    assert.match(panelBody, /<SimpleTextEditor value=\{draft\.notes\}/);
+  it("Pattern stays in drafts, snapshots, templates, service and CSV", () => {
+    assert.match(scheduleBoard, /pattern:\s*string;/);
+    assert.match(scheduleBoard, /pattern:\s*text\(draft\.pattern\)/);
+    assert.match(actionsTs, /pattern:\s*z\.string\(\)\.max\(160\)\.nullish\(\)/);
+    assert.match(settingsView, /<Field label="Pattern">/);
+    assert.match(serviceTs, /pattern:\s*snapshot\.pattern/);
+    assert.match(serviceTs, /row\.pattern\s*\|\|\s*row\.motif\s*\|\|\s*row\.catalog_motif/);
+    assert.match(scheduleDomain, /Pick<ScheduleOptionView, "color" \| "pattern" \| "finishing" \| "dimension">/);
   });
 });

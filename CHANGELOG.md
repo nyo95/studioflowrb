@@ -2,6 +2,15 @@
 
 This file is the authoritative revision ledger. Revision/commit rules are in `AGENTS.md`.
 
+## R8.351 | 2026-10-06 | feat(studioflow): consolidate Product Schedule workspace
+
+- Reworked the Schedule toolbar around section/view chips, Print/PDF, a compact Set up menu and one primary Add item action. Added per-section final progress plus decision, sample and empty-product filters shared by Board and List.
+- Replaced vertical category rails with `GroupHeader`, added per-category quick add and a new-category path, and rebuilt board cards with sibling photo/body buttons, consistent status badges and no card-level sample actions.
+- Consolidated new/edit item, options, photo, sample request and past-project reuse into the right-side UI Engine drawer. Product fields stay editable independently of eye visibility, drafts still require explicit Save/Discard, and close/item/section navigation protects unsaved changes. Existing actions, permissions and domain rules are unchanged.
+- Updated the Schedule contract and source-check regressions; queued the Reviewer browser/phone pass for R8.352. No schema, service, server-action, permission or dependency change.
+
+**Checks.** Baseline `npm test`: 829 pass. Final `npm test`: 829 pass, 0 fail/skipped/cancelled. `npm run typecheck`; `npm run lint` (0 errors; two existing `no-img-element` warnings); `npm run check:boundaries`; `npm run check:legacy-runtime`; `npm run build`; focused Schedule source checks 26 pass; staged and unstaged whitespace checks. Browser acceptance and final visual polish remain for the Lead in R8.352.
+
 ## R8.350 | 2026-10-06 | docs(plan): Product Schedule re-layout — Work Order WO-SF-SCHED-RELAYOUT-01
 
 - Owner review of the Product Schedule as a designer: the flow felt complicated. Findings: nine mixed toolbar controls, no view of what still needs a decision or a sample, a vertical category label with its count glued on, sample links on every card nested inside the card button, a three-column item dialog (card slots, card, fanned "hand") where a field cannot be filled until its slot is on, three editors for the same data and stacked dialogs. The owner approved the mockup and assigned the build to the Executor with Lead polish, same rules as WO-SF-RELAYOUT-01.
