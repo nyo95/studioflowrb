@@ -4,11 +4,11 @@ Status: **LOCKED — v2, owner-approved 2026-10-06 (R8.357)**, after review of t
 interactive mockup. Replaces v1 (R8.202 foundations, R8.148 headings).
 Scope: shared visual language for StudioFlow, Master Data, BQ, and future apps.
 
-**Built (R8.357–R8.361):** tokens (§3–§5), the rail and thin top bar
+**Built (R8.357–R8.362):** tokens (§3–§5), the rail and thin top bar
 (§10.1–§10.2), the pill tab bar and context capsule (§10.3; StudioFlow project
 pages, Product Schedule and Home), stat cards (§6.1; StudioFlow Home, Master Data
-home) and the counts on rail items. **In progress:** the Playwright size checks
-(§12). Master Data and BQ still use `Tabs` for their in-page views.
+home), the counts on rail items, and the Playwright size checks (§12,
+`npm run test:e2e`). Master Data and BQ still use `Tabs` for their in-page views.
 
 ## 0. What changed from v1
 

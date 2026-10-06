@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // `npm run test:e2e` runs its own dev server next to the owner's; a separate build folder keeps the two apart.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // The office Wi-Fi address is used only for local development access.
   // Next.js otherwise blocks its development assets/endpoints as cross-origin.
   allowedDevOrigins: ["172.16.1.163"],

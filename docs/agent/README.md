@@ -115,6 +115,17 @@ the Prisma client and restart `next dev` afterward so the running server picks
 up both the new client and the new columns. This applies to any agent/model
 running this harness, not just the one that authored the migration.
 
+## Screen-size checks (Playwright)
+
+`npm run test:e2e` runs the DESIGN v2 §12 checks: no sideways scroll on StudioFlow Home, a project page, its
+schedule, Master Data, BQ and Settings at 375, 640, 839, 840 and 841 px, and the rail/account placement on both
+sides of 840 px. It starts its own Next dev server on port 3101 with a separate build folder (`.next-e2e`) and
+uses only the disposable test database from `.env.test.local` (the same rebuild-only guard as `npm test`), so it
+never touches the dev server on :3001 or the dev database. `e2e/seed.ts` truncates and reseeds that test database
+with one owner (generated test credentials in the git-ignored `e2e/.tmp/`) and one project; Chromium must be
+installed once (`npx playwright install chromium`). It is separate from `npm test`; run it after any shell,
+layout or token change. The run restores `next-env.d.ts` when it ends.
+
 ## Revision and commit protocol
 
 The published baseline is `R<N>`. Each local change increments its ordinal as
