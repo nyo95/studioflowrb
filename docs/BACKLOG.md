@@ -27,7 +27,9 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   unknown vendors/units/categories rejected rather than created.
 - Sample requests (owner delegated to the Lead, 2026-09-29): Master Data's
   "priced" never flips StudioFlow's `RECEIVED`; version one records the quote
-  and links ids but does not create the SKU or price.
+  and links ids but does not create the SKU or price. **Changed by the owner
+  2026-10-07:** putting a requested sample on the shelf in Master Data does mark
+  the StudioFlow request received (WO-MD-SAMPLE-01); "priced" still does not.
 
 ## Platform Foundation
 
@@ -76,6 +78,11 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   should get one generic toast in the UI Engine instead of a copy.
 
 ## Master Data
+
+- [ ] [PLANNED][P1] Physical sample shelf (legacy `/masterdata/samples` parity
+  plus a holder project and visible history) and "put on shelf" from a sample
+  request: WO-MD-SAMPLE-01 in `PLAN.md`, READY for the Executor (R8.386), then
+  the Lead's UI revision including a quick "New SKU".
 
 - [ ] [UNVERIFIED] Text price labels (R8.298): typing and pasting quoted text
   in the compare-suppliers grid (needs two labor suppliers) and the material

@@ -1,170 +1,243 @@
 # Active Plan
 
-Plan ID: WO-SF-PLAN-01 (working-time planning from Fit Out Start; Supervision becomes Construction)
-Scope: StudioFlow backend — a working-day calculator, studio planning defaults, a holiday list, a Fit Out Start date per project, a plan that fills phase dates backward and forward from it, and the rename of the Supervision phase to Construction. The Timeline/Gantt drawing is a separate Lead work order (WO-SF-GANTT-01) after this commit.
-Target revisions: R8.378 (this plan), R8.379 (WO-SF-PLAN-01), then WO-SF-GANTT-01.
-Status: DONE — implemented R8.379, finished by the Lead at R8.380 (plan read, atomic reset, settings, Timeline wiring, tests); the Gantt (WO-SF-GANTT-01) shipped at R8.381. Open: owner browser acceptance of the Gantt pages and Planning settings (BACKLOG [UNVERIFIED]).
+Plan ID: WO-MD-SAMPLE-01 (physical sample shelf in Master Data; a requested sample goes onto the shelf and StudioFlow learns it arrived)
+Scope: Master Data backend for the office sample shelf (rack/box, quantity, status, holder, movement history), the "put on shelf" step from a sample request, and the StudioFlow public command that marks that request received. Minimal UI wiring only; the Lead designs the screens in the next revision.
+Target revisions: R8.385 (this plan), R8.386 (Executor: backend + minimal wiring), then the Lead's UI revision.
+Status: READY
 Priority: P1
-Owner: Product Owner. Decisions confirmed by the owner in chat on 2026-10-07.
-Last updated: 2026-10-07 (closed)
+Owner: Product Owner. Decisions confirmed by the owner in chat on 2026-10-07 (kantor).
+Last updated: 2026-10-07
 
 ## Outcome
 
-Given a project's Fit Out Start date, StudioFlow computes the planned dates of the
-design side backward and of the construction side forward, using Monday–Friday
-working days minus a hand-entered holiday list, and writes them into the
-existing per-phase planned dates. Anyone can override any computed date or any
-interval for one project and the plan never silently overwrites that override.
-The plan also tells the user when the result does not fit the opening date.
+Master Data staff can answer "where is that sample, and who has it": every
+physical sample sits on a named rack and box, hangs off one SKU, and has a
+status (on the shelf, borrowed, sent to a client, lost, discarded) with the
+holder's name and, optionally, the StudioFlow project it went out for. Every
+change leaves a movement row. When a sample a designer asked for arrives, staff
+put it on the shelf straight from the sample request, and the designer's
+Schedule shows "Sample received" without the designer touching it.
 
-## Business model (owner, 2026-10-07)
+## Legacy evidence (read-only)
 
-Two chains meet at **Fit Out Start** (RAD starts working from the CD / CD Final drawings):
+Checkout `D:\Misc\ProjectsHUB\studioflow` (kantor), `main` at
+`c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27`, tracked tree clean, 17 untracked
+files (uploads, `foldering/`, two `tmp/*.dump`; not read). Only committed files
+were read, through `git show`. No legacy database was touched.
 
-```text
-Start ─ (free) ─ Design Final ─ CD Mall ─ CD Final ─ END ─ gap ─┐
-                                                                 ▼
-                          Opening ◄─ 2 weeks ─ Handover ◄─ 2 months ─ FIT OUT START
-```
+Live at that commit: `/masterdata/samples` (`src/app/masterdata/samples/page.tsx`,
+`subapps/master-data/components/SampleLibraryClient.tsx`,
+`subapps/master-data/actions/sample-actions.ts`,
+`subapps/master-data/services/catalog-sample-service.ts`,
+`subapps/master-data/lib/sample-location.ts`, `types/sample.ts`; models
+`master_data.Sample`, `SampleMovement`, enums `SampleStatus`, `SampleAction`).
+Not reachable from any screen at that commit: the request panel
+(`SampleRequestPanel`, removed from the nav 2026-08-11), `ProductRequestTable`,
+`SampleInventoryTable`, the schedule's `sku_product_requests` read, and
+`createProjectProductRequestAction` (no caller).
 
-- Design can run ahead; construction can be far away. So the design side is
-  counted **backward** from Fit Out Start and the construction side **forward**.
-- **END** is a Timeline word only: the date the CD phase was completed. It is
-  derived (planned: computed; actual: the CD phase's done date). It is **not** a
-  new project status and **no phase or project completion rule changes**. Project
-  completion keeps its current meaning.
-- **Handover** is RAD handing over to the client. **Opening** is the client's
-  planned opening, entered by hand (existing `opening_date`).
-- The span from Start to Design Final has no standard length; it fills what remains.
+| Legacy behavior | Verdict | Rebuild destination |
+|---|---|---|
+| Sample = one row per SKU on a rack/box with location note, quantity, notes; brand/category/price only through the SKU | **KEEP** | `master_data.Sample` |
+| Rack/box normalised: trim, collapse spaces, upper case (`normaliseLocation`) | **KEEP** | Sample service |
+| Five statuses AVAILABLE / BORROWED / SENT_TO_CLIENT / LOST / DISCARDED, shown as stored (no mapping) | **KEEP** | `SampleStatus` |
+| Holder name required for BORROWED and SENT_TO_CLIENT only; LOST/DISCARDED need none | **KEEP** | `setSampleStatus` |
+| Holder is free text | **FIX** (owner 2026-10-07: name **plus an optional StudioFlow project**) | `holder_project_id` + `holder_project_name` snapshot |
+| Movement log on every change, never shown on screen | **KEEP** log, **FIX** show it (per-sample history read) | `SampleMovement`, `getSampleHistory` |
+| Soft delete refused while the sample is out | **KEEP** | `deleteSample` |
+| Delete logged as an `OUT` movement and audited as actor "system" | **FIX** | `REMOVED` movement, real actor |
+| A status change to the same status still wrote a movement | **FIX** | no-op when nothing changes |
+| Rack/box move logged as ADJUST with "from → to" text | **KEEP** as kind `MOVED` with from/to | `updateSampleLocation` |
+| Header counts: total, available, borrowed, sent to client, lost+discarded, rack count | **KEEP** | `getSampleSummary` |
+| Two different receive-sample paths (`library-service.receiveProjectProductRequest` only trims rack/box; `sample-request-actions.receiveSampleAction` normalises) | **MERGE** into one path | coordinator `shelve` → Master Data `shelveSampleFromIntake` |
+| Receiving created a DRAFT SKU from a typed code + name | **FIX** (owner: SKU required): staff pick an existing SKU; the Lead adds a quick "New SKU" in the UI through the existing `createSku` | not in this backend |
+| Receiving set the request RECEIVED | **KEEP** (owner 2026-10-07) through a StudioFlow public command | `markSampleReceivedFromShelf` |
+| `due_at` column (never written) | **PURGE** | — |
+| `ProjectProductRequest`, its vendor-follow-up/UNAVAILABLE/reopen states | **PURGE** here; already replaced by `SfScheduleSampleRequest` + `SampleRequestIntake` (R8.183) | — |
+| Status applies to the whole row (cannot lend 1 of 3 pieces) | **KEEP** as known limit | — |
 
 ## Locked Decisions
 
-1. **Working days** are Monday–Friday excluding the holiday list. Counting
-   starts the day after the base date; a result is always a working day.
-2. **Studio defaults** (working days, editable in StudioFlow settings, one row,
-   same `SfSettings` singleton): CD Mall 5, CD Final 5, gap from END to Fit Out
-   Start 5, Fit Out Start to Handover 40, Handover to Opening 10. A project may
-   override any of the five in `plan_overrides` (nullable JSON, keys fixed, whole
-   numbers 1–260).
-3. **Computation** from `F = fit_out_start_date`:
-   - `END = back(F, gap)`; `CD Final start = back(END, cdFinal)`;
-     `CD Mall start = back(END, cdMall + cdFinal)`; **Design Final = CD Mall start**.
-   - `Handover = fwd(F, fitOutToHandover)`; `Opening forecast = fwd(Handover, handoverToOpening)`.
-   - Phase dates written: Design 3D `planned_end = Design Final`; Construction
-     Drawing `planned_start = CD Mall start`, `planned_end = END`; Construction
-     (formerly Supervision) `planned_start = F`, `planned_end = Handover`. Moodboard,
-     Layout Plan and any other design phase are **not** computed (free span).
-   - Phases are located by their legacy definition ids (`domain/phase.ts`
-     `LEGACY_PHASE_DEFINITION_IDS`), never by display name.
-4. **Overrides.** `SfPhase.planned_dates_manual` (boolean, default false) becomes
-   true whenever a person sets planned dates through the existing
-   `setPhasePlannedDates`. Applying the plan writes only phases that are not
-   manual; a manual phase is reported as "kept your dates". A new
-   "reset to computed" clears the flag and recomputes that phase.
-5. **Warnings** (returned, never blocking): opening forecast later than
-   `opening_date` (days late); `opening_date − Handover` shorter than the
-   handover-to-opening interval ("tight"); `timeline_start_date` later than
-   Design Final; a computed date in the past.
-6. **Suggestion, not automation.** When the CD phase is DONE and
-   `fit_out_start_date` is empty, the read model offers
-   `fwd(END actual, gap)` as a suggested Fit Out Start; it is never written
-   without a person saving it. END actual = the CD phase's done date
-   (`status_changed_at` when `status = DONE`).
-7. **Holidays** are rows `SfHoliday { date, label }` entered by hand under
-   StudioFlow settings (`settingsManage`). The calculator takes a plain set of
-   dates so a later import (e.g. from a public calendar) swaps only the source.
-8. **Rename.** The default definition `LEGACY_PHASE_DEFINITION_IDS.supervision`
-   is renamed `Supervision` → `Construction`, and `name_snapshot` of every phase
-   with that definition is updated in the same migration. Code identifiers,
-   `isSupervision`, the visit commands and their behaviour are unchanged.
-9. No new dependency. Date math is pure, date-only (no time zones), in
-   `src/apps/studioflow/domain/working-time.ts`. It stays app-owned until a
-   second app needs working-day math, then it moves to Utilities (record that
-   in the changelog).
+1. **Scope (owner):** the physical sample shelf in Master Data. The existing
+   request flow (take, quote, priced, declined, price sync) is unchanged except
+   for the new "put on shelf" step.
+2. **SKU required (owner):** every Sample has `sku_id` (FK to `Sku`,
+   `onDelete: Restrict`). Creating or shelving onto an archived SKU
+   (`deleted_at` set) is refused (`SAMPLE_SKU_NOT_FOUND`). Archiving a SKU later
+   does not touch its samples (masterdata.md §2: Sample relations stay
+   independent); reads still show them, with the SKU marked archived.
+3. **Holder (owner):** `holder_name` (free text, required for BORROWED and
+   SENT_TO_CLIENT, cleared otherwise) and optional `holder_project_id` +
+   `holder_project_name` (plain id and a name snapshot, **no** foreign key into
+   StudioFlow). The project picker lists StudioFlow projects that are not
+   archived, read through a new StudioFlow public read; Master Data never imports
+   StudioFlow. A project may only be set together with a held status.
+4. **Out since:** `out_since` is set when a sample enters a held status from a
+   non-held one, kept when moving between BORROWED and SENT_TO_CLIENT or
+   changing the holder, and cleared otherwise.
+5. **Statuses and movements.** Movement kinds: `IN` (racked: created or
+   shelved), `OUT` (to BORROWED or SENT_TO_CLIENT, or a holder change while
+   out), `RETURN` (back to AVAILABLE from a held status), `STATUS` (to LOST or
+   DISCARDED, or back to AVAILABLE from them), `MOVED` (rack or box changed;
+   stores from/to), `REMOVED` (soft delete). Each movement stores the status
+   after it, holder name and project name (snapshots), a note, and the actor id
+   and label. A change that alters nothing (same status, holder and project; or
+   same rack, box, note, quantity and notes) writes nothing and returns the row.
+6. **Delete:** soft delete (`deleted_at`), refused while BORROWED or
+   SENT_TO_CLIENT (`SAMPLE_OUT`). Deleted samples leave every list and count;
+   their history stays.
+7. **Shelving a requested sample (owner):** staff choose "put on shelf" on a
+   sample request row that is NEW, IN_PROGRESS or PRICED (not DECLINED). A NEW
+   row is taken first with the existing `take` rules (so a request the designer
+   already marked received, or one in an archived project, is refused there and
+   can still be racked by hand from the Samples page). One request gives at most
+   one sample: `Sample.source_intake_id` is unique; a second attempt is
+   `SAMPLE_ALREADY_SHELVED`. Shelving fills `intake.sku_id` when it is empty and
+   never changes the intake's status (shelved and priced stay two facts).
+8. **StudioFlow learns the arrival (owner; replaces the 2026-09-29 Lead default
+   that Master Data never writes back).** After the sample is committed, the
+   coordinator calls a new StudioFlow public command
+   `markSampleReceivedFromShelf({ actor, requestId, rack, box })`: REQUESTED →
+   RECEIVED with `received_by` = the Master Data staff member and
+   `received_note` = "On the shelf: <RACK> / <BOX> (Master Data)"; audit
+   `studioflow.schedule.sample-received` with `metadata.via = "masterdata"`.
+   Already RECEIVED, a cancelled (deleted) request, or an archived project:
+   no write, returns `{ updated: false, reason }`. It is a trusted command
+   without a StudioFlow permission check; the coordinator authorizes it with
+   Master Data permissions (decision 9). "Priced" still never flips RECEIVED.
+9. **Permissions:** new `masterdata.sample.read` (lists, counts, history, rack
+   list) and `masterdata.sample.manage` (create, edit location, status, delete),
+   registered and labelled like the existing Master Data pairs. Shelving needs
+   `masterdata.sample-request.manage` **and** `masterdata.sample.manage`. The
+   project picker read needs `masterdata.sample.manage`.
+10. **No cross-app transaction.** Order: Master Data commit first, then the
+    StudioFlow command. If the second step fails, the sample stays on the shelf
+    and the coordinator returns `studioFlowUpdated: false`; a separate
+    coordinator command `retryStudioFlowReceived(sourceRequestId)` (only for an
+    intake that has a shelved sample) repeats it. The queue row exposes the
+    shelved sample (id, rack, box) so the screen can offer that retry when the
+    source is still REQUESTED.
+11. **Requester notification:** shelving notifies the requester through the
+    existing Master Data notifier ("Your sample is on the shelf" with product,
+    project, rack and box), the same way priced/declined do.
+12. **Limits:** rack and box 1–40 characters after normalising; location note
+    ≤ 200; notes ≤ 1000; holder name ≤ 120; quantity integer 1–999. Only rack
+    and box are upper-cased; the holder name is trimmed and keeps its case.
 
 ## Backend Contract
 
-- **Schema/migration.** `sf_project.fit_out_start_date date null`,
-  `sf_project.plan_overrides jsonb null`; `sf_phase.planned_dates_manual boolean
-  not null default false` (existing rows with planned dates set → `true`, so
-  nothing already entered is ever overwritten); `sf_settings` five integer
-  columns with the defaults above and CHECK 1–260; table `sf_holiday`
-  (`date` unique, `label`, audit columns as elsewhere); rename migration from
-  decision 8.
-- **Domain** `working-time.ts`: `isWorkingDay`, `fwd(date, n, holidays)`,
-  `back(date, n, holidays)`, `workingDaysBetween`. `plan.ts`:
-  `computeProjectPlan({ fitOutStart, intervals, holidays, openingDate,
-  timelineStart, cdDoneDate, today })` → milestones + warnings. Pure; no database.
-- **Commands** (project service, `projectManage`, audited):
-  `setFitOutStart`, `setPlanOverrides`, `applyProjectPlan` (writes non-manual
-  phases, returns what it wrote, kept, and the warnings),
-  `resetPhasePlannedDates`. `setPhasePlannedDates` sets the manual flag.
-  Settings: `setPlanningDefaults`, `addHoliday`, `removeHoliday` (`settingsManage`).
-- **Read.** The project and timeline reads expose `fitOutStartDate`,
-  the resolved intervals, the computed milestones, END actual/planned, the
-  suggested Fit Out Start, and the warnings. The Timeline page keeps using
-  `listAccess` (R8.376); do not reintroduce per-project access reads.
+Master Data (additive migration in `master_data`; apply to the rebuild dev and
+test databases only):
+
+- `Sample` and `SampleMovement` per the decisions above, enums `SampleStatus`
+  and `SampleMovementKind`, indexes for `(rack, box)`, `status`, `sku_id`,
+  `deleted_at`, `(sample_id, created_at)`; `source_intake_id` unique nullable.
+- Service: `listSamples({ grants, search?, status?, rack? })` ordered by rack,
+  box, SKU name, each row with SKU id/code/name/brand name/archived flag;
+  `getSampleSummary`; `listSampleRacks` (distinct racks for the rack picker);
+  `getSampleHistory({ sampleId })` newest first; `createSample`,
+  `updateSampleLocation`, `setSampleStatus`, `deleteSample`;
+  `shelveSampleFromIntake({ intakeId, skuId, rack, box, quantity?, locationNote? })`.
+  Every write audits (`masterdata.sample.*`) and writes its movement in the
+  same transaction.
+- `listSampleRequestIntakes` / the intake read expose the shelved sample
+  (`{ id, rack, box } | null`).
+- Public commands for the coordinator: the shelve command and the intake read
+  changes, exported the same way as the existing sample-request commands.
+
+StudioFlow public contract:
+
+- `listProjectChoices()` (id, name; not archived; name order) in the public
+  read surface.
+- `markSampleReceivedFromShelf({ actor, requestId, rack, box })` per decision 8.
+
+Coordinator (`src/application/sample-request-coordinator.ts`, shell wiring in
+`src/app/sample-request-runtime.ts`): `shelve`, `retryStudioFlowReceived`,
+`listProjectChoices` (authorized per decision 9), and the shelved sample on
+each queue row.
 
 ## UI Contract (minimal wiring only; the Lead owns the design)
 
-A "Fit Out Start" date field in the existing project edit dialog; a planning
-defaults and holiday list section in StudioFlow settings; an "Apply plan"
-action with its result and warnings shown as plain text. No Gantt change here.
+- A plain `/masterdata/samples` page (nav entry "Samples", shown with
+  `masterdata.sample.read`) that lists samples and offers create, edit location,
+  change status (with holder and optional project) and delete, enough to
+  exercise every command. No visual design work.
+- On the Sample requests screen, a plain "Put on shelf" form per eligible row
+  (SKU picker from the existing SKU choices, rack, box, quantity, note) and the
+  retry action when StudioFlow was not updated.
+- Server actions validate input with the existing action helpers and return
+  safe errors.
 
 ## Boundaries and Non-goals
 
-- No change to phase transitions, iteration rules, completion/reopen, or access rules.
-- No Gantt drawing, drag-to-edit, or CD sub-bars (WO-SF-GANTT-01).
-- No automatic holiday import, no per-phase lead times, no calendar-day mode.
-- Do not rename database identifiers, route names, or the visit commands.
+- No SKU creation in this work order (the Lead adds quick "New SKU" in the UI
+  through the existing `createSku`).
+- No partial lending of a multi-piece row, no due dates, no reminders.
+- StudioFlow screens are unchanged; the designer only sees the existing
+  "Sample received" state and note.
+- No cross-schema foreign keys; Master Data does not import StudioFlow and
+  StudioFlow does not import Master Data.
+- No change to the request lifecycle beyond decisions 7, 8, 10 and 11.
 
 ## Acceptance Criteria (Executor)
 
-- Calculator tests: forward and backward over weekends; over a holiday; from a
-  base date that is itself a weekend or holiday; `n = 0`; symmetric pairs
-  (`back(fwd(d, n), n)` equals `d` for a working `d`).
-- Plan tests: a worked example with a known `F` and holidays reproduces every
-  milestone; each warning fires and does not fire in its neighbouring case;
-  overrides of one interval change only the dates that depend on it.
-- Integration: applying the plan writes the three phases' dates; a phase
-  edited by hand is kept and reported; reset-to-computed restores it; running
-  the plan twice changes nothing; the migration keeps every existing planned
-  date (flag true) and renames Supervision → Construction in definition and snapshots.
-- Existing tests stay green (baseline `npm test` 866/866 at R8.377).
+1. Create, edit location (rack/box normalised; a move writes `MOVED` with from
+   and to), status changes and delete behave per decisions 4–6 and 12, with the
+   exact movement kinds; no-op changes write nothing.
+2. BORROWED or SENT_TO_CLIENT without a holder is refused; LOST/DISCARDED
+   clear holder and project; a project without a held status is refused.
+3. Delete is refused while out; a deleted sample leaves lists and counts and
+   keeps its history.
+4. Archived SKU: refused for create and shelving; existing samples still listed
+   with the archived flag.
+5. Shelving: works from NEW (takes first), IN_PROGRESS and PRICED; refused for
+   DECLINED and for a second time on the same request; fills an empty
+   `intake.sku_id`; leaves the intake status as it was; notifies the requester;
+   marks the StudioFlow request RECEIVED with the note and actor; a request
+   already RECEIVED or in an archived project is left untouched.
+6. A failing StudioFlow step leaves the sample on the shelf, returns
+   `studioFlowUpdated: false`, and `retryStudioFlowReceived` then succeeds.
+7. Permissions per decision 9, including refusals for read-only staff.
+8. Summary counts each status separately (LOST + DISCARDED together as
+   off-shelf) and counts racks.
 
 ## Verification
 
-`npm run typecheck`, `npm run lint -- --quiet`, `npm run check:boundaries`,
-`npm run check:legacy-runtime`, `npm test` on the disposable rebuild-only test
-database (report the count; a skip or cancel is not a pass), `npm run build`.
-Apply the migration to the dev and test databases only after verifying both
-targets are rebuild-only. Changelog entry and one local commit `R8.379`.
+`npx tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`,
+`npm run check:legacy-runtime`, `npm test` (all, nothing skipped), and
+`npm run build` if no other dev server is using the checkout (otherwise say so).
+New integration tests in the Master Data and StudioFlow suites and coordinator
+unit tests for the criteria above. Migration applied to the rebuild dev and
+test databases only, after confirming both targets.
 
 ## Reviewer Acceptance
 
-Lead, after the commit: set a Fit Out Start on a project, apply the plan, read
-the dates back against the worked example, edit one phase's dates by hand, apply
-again (kept), reset it; check the Construction name on an existing project.
+The Lead, after the UI revision: walk the Samples page (add, move, lend with a
+project, send to client, mark lost, return, delete refusal while out, history),
+then put a requested sample on the shelf and see "Sample received" with the
+shelf note in that project's Schedule and the requester's notification.
 
 ## Regression Risks and Recovery
 
-Risk: overwriting dates people already typed (mitigated by the migration flag
-and the "manual is kept" rule); a holiday list that is empty (plans still work,
-weekends only); renaming breaking code that matches the name (all matching is by
-definition id; grep for `"Supervision"` string comparisons first). Recovery:
-revert R8.379 and run the down-steps recorded in the migration note; nothing
-else depends on the new columns.
+Risk: the Master Data → StudioFlow write reopens the coupling the request flow
+avoided; mitigated by a single trusted public command with idempotent
+semantics and no cross-schema keys. Risk: permissions not granted to existing
+roles hide the page; the migration or role defaults must give Master Data staff
+roles the new pair the same way `masterdata.sample-request.manage` was granted.
+Recovery: revert R8.386; the migration is additive (drop the two tables and two
+enums).
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md` (WO-SF-PLAN-01), then implement the
-entire READY backend outcome and nothing beyond it. Start from a clean tree on
-`main`; confirm the next unused revision in `CHANGELOG.md` (expected R8.379).
-Verify both database targets are the rebuild-only dev and test databases before
-any database command. Keep the minimal UI wiring described in the plan; do not
-design the Gantt. Run the checks listed, update `CHANGELOG.md`, and create one
-local commit. Do not push. Stop with the BLOCKED / CONFLICT report only for a
-locked-decision conflict or an unsafe boundary; otherwise finish and return one
-Planner/Reviewer prompt with the outcome, commit, checks and test count,
-limitations, and dirty files.
+`docs/agent/EXECUTOR.md`, and this `PLAN.md` (WO-MD-SAMPLE-01), then implement
+the entire READY backend outcome and nothing beyond it. Start from a clean tree
+on `main`; confirm the next unused revision in `CHANGELOG.md` (expected
+R8.386). Verify both database targets are the rebuild-only dev and test
+databases before any database command. Do not read or touch the legacy
+checkout; the plan already records the legacy evidence. Keep the UI to the
+minimal wiring described; the Lead designs the screens next. Run the checks
+listed, update `CHANGELOG.md`, and create one local commit. Do not push. Stop
+with the BLOCKED / CONFLICT report only for a locked-decision conflict or an
+unsafe boundary; otherwise finish and return one Planner/Reviewer prompt with
+the outcome, commit, checks and test count, limitations, and dirty files.

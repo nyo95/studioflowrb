@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.385 | 2026-10-07 | docs(plan): WO-MD-SAMPLE-01 physical sample shelf and put-on-shelf from a request (Lead)
+
+- Legacy read-only audit of physical samples (kantor checkout `D:\Misc\ProjectsHUB\studioflow`, `main` at `c4b0c466`, tracked tree clean; committed files only, no legacy database). At that commit only the shelf (`/masterdata/samples`) was live; the request panel, the Library request/inventory tables and the schedule's request read had no screen. KEEP/FIX/MERGE/PURGE table in `PLAN.md`.
+- Owner decisions (2026-10-07): build the shelf; staff put a requested sample on the shelf from the request, which marks the StudioFlow request received (changes the 2026-09-29 default that Master Data never writes back; "priced" still does not); holder = name plus an optional StudioFlow project; every sample needs a SKU.
+- `PLAN.md` READY for the Executor (R8.386). `masterdata.md` §3 activates Samples; BACKLOG standing decision updated and a [PLANNED] entry added.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.384 | 2026-10-07 | feat(studioflow): plan settings move into the Timeline "Dates & plan" dialog; project Timeline read-only; dated today label (Lead)
 
 - **Owner:** "settingan ini bisa ga dibuat modals popup di timeline aja ... di project detail full hanya read-only timeline". The studio Timeline's per-project "Dates" dialog becomes **"Dates & plan"**: start, Fit Out Start, opening, the five per-project lead times (empty = studio default; only values that differ are stored, as before), the plan's warnings, the suggested Fit Out Start (now fills the field instead of saving at once), "Back to the plan" for hand-set dates, and one Save / Save and apply plan. Its data loads when it opens (new read action `getProjectPlanEditorAction`: plan, studio lead times, phases with the hand-set flag).

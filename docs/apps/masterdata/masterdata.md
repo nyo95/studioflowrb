@@ -122,10 +122,16 @@ for that entity remains authoritative.
 Master Data also owns media, physical Samples, import/export, and its public read
 contracts. Those slices remain outside the active implementation work order.
 
+**Physical samples are activated (owner, 2026-10-07; WO-MD-SAMPLE-01 in
+`PLAN.md`):** the office sample shelf (SKU-bound samples on a rack and box,
+five statuses, holder name plus an optional StudioFlow project snapshot,
+movement history) and putting a requested sample on the shelf, which marks the
+StudioFlow request received through StudioFlow's public command. The locked
+rules live in that plan until they are folded into this contract.
+
 The following remain deferred and must not be inferred during implementation:
 
 - media/file storage mechanics;
-- Samples behavior;
 - workbook/import/export policy;
 - the final BQ snapshot schema.
 
