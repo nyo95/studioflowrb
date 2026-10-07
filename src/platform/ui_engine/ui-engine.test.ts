@@ -84,6 +84,7 @@ describe("UI Engine foundation", () => {
       "CopyButton",
       "SimpleTextEditor",
       "FormattedText",
+      "shrinkImageFile",
       // R7.52 — activated by the project MOM image consumer.
       "ImageWorkspace",
       "useDebouncedValue",

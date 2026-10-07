@@ -79,6 +79,13 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## Master Data
 
+- [ ] [BUG][P2] Flaky test: "round-trips SKU material prices through the
+  workbook and rejects all invalid rows before apply"
+  (`src/apps/masterdata/service.integration.test.ts`) failed once in a full
+  `npm test` run on 2026-10-07 (920/921) and passed in every other run (alone
+  3/3, its file 2/2, full suite 2/2). The failure message was not captured;
+  next time keep the full log and look for order- or time-dependent data.
+
 - [ ] [UNVERIFIED] Sample shelf R8.386–R8.390 in the browser (WO-MD-SAMPLE-01
   "Reviewer Acceptance"): add, move, lend with a project, send to a client,
   mark lost, return, the remove refusal while out, history, right-click menu;
@@ -128,6 +135,16 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 - [ ] [PLANNED] A unit-conversion helper for `purchase_to_base_factor`.
 
 ## StudioFlow
+
+- [ ] [UNVERIFIED] Client-note images R8.394–R8.395 in the browser: drop,
+  paste a screenshot (Ctrl+V) and pick several images in the answer dialog and
+  both client-notes dialogs; a large phone photo is shrunk and accepted; the
+  13th image and a PDF are refused with a message; thumbnails in the next
+  iteration's brief, the answered note and earlier iterations; large view with
+  previous/next; remove with confirmation.
+- [ ] [CLEANUP][P3] Home cards sign the current iteration's images one at a
+  time (`projects/service.ts`, R8.394); sign them in parallel (or only when a
+  card shows them) before many projects carry images.
 
 - [ ] [UNVERIFIED] Formatted notes R8.392 in the browser: bold, italic, bullets,
   numbering and Enter-continues-the-list in client notes, pinned notes, visit

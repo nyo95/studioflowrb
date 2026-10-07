@@ -49,8 +49,8 @@ export async function PhaseCanvas({ projectId, phaseId, people, archived }: { pr
       <PhasePanel
         projectId={projectId}
         phase={{ id: phase.id, name: phase.label, status: phase.status, isSupervision: phase.isSupervision, canStart: phase.canStart }}
-        current={current ? { id: current.id, name: current.name, state: current.state, waitingDays: current.waitingDays, choices: current.choices, answerChoices: current.answerChoices, note: current.note } : null}
-        previous={phase.previousIteration ? { name: phase.previousIteration.name, note: phase.previousIteration.note } : null}
+        current={current ? { id: current.id, name: current.name, state: current.state, waitingDays: current.waitingDays, choices: current.choices, answerChoices: current.answerChoices, note: current.note, images: current.images } : null}
+        previous={phase.previousIteration ? { id: phase.previousIteration.id, name: phase.previousIteration.name, note: phase.previousIteration.note, images: phase.previousIteration.images } : null}
         iterations={phase.iterations}
         note={phase.note}
         skippedReason={phase.skippedReason}

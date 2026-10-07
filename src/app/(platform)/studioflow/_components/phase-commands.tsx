@@ -7,6 +7,7 @@ import { useDisplaySettings } from "@/platform/authenticated-shell/display-setti
 import { Button, Dialog, Field, FormActions, InlineError, Input, SimpleTextEditor } from "@/platform/ui_engine";
 
 import { phaseCommandAction, undoPhaseEventAction, type PhaseCommandInput, type PhaseCommandOutcome } from "../actions";
+import { IterationImageArea, type IterationImage } from "./iteration-images";
 import { useCommand } from "./use-command";
 
 /** The commands a person can give a phase from a card or from the phase page (everything except `projectId`). */
@@ -38,7 +39,7 @@ export function usePhaseCommands(projectId: string) {
     return command.run("undo", () => undoPhaseEventAction({ projectId, eventId: undo.eventId }), () => setUndo(null));
   };
 
-  return { exec, undo, undoNow, dismissUndo: () => setUndo(null), pending: command.pending, isPending: command.isPending, error: command.error, clearError: command.clearError };
+  return { projectId, exec, undo, undoNow, dismissUndo: () => setUndo(null), pending: command.pending, isPending: command.isPending, error: command.error, clearError: command.clearError };
 }
 
 export type PhaseCommands = ReturnType<typeof usePhaseCommands>;
@@ -80,6 +81,8 @@ export type IterationView = {
   answerChoices?: readonly string[];
   /** What the client said about this iteration. */
   note?: string | null;
+  /** Images attached to those notes (WO-SF-NOTE-IMG-01). */
+  images?: readonly IterationImage[];
 };
 
 export type PhaseView = { id: string; name: string; status: "PENDING" | "ACTIVE" | "DONE"; isSupervision: boolean; canStart: boolean };
@@ -193,9 +196,11 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
       }
     >
       <div className="grid gap-3">
+        <IterationImageArea projectId={commands.projectId} phaseId={phase.id} iterationId={iteration.id} images={iteration.images ?? []} disabled={Boolean(busyKey)}>
         <Field label="Client notes" description="One point per line is easiest to read later. Use the buttons for bold, bullets or numbering.">
           <SimpleTextEditor rows={6} maxLength={4000} value={note} onChange={(event) => setNote(event.target.value)} placeholder={"e.g.\n- Warmer palette for the lounge\n- Keep the marble at reception"} autoFocus />
         </Field>
+        </IterationImageArea>
         {commands.error ? <InlineError>{commands.error}</InlineError> : null}
       </div>
     </Dialog>

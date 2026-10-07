@@ -10,6 +10,7 @@ import { Badge, Button, Dialog, Field, FormActions, IconButton, InlineError, Pip
 
 import { projectCompletionAction } from "../actions";
 import { IterationButtons, UndoBar, usePhaseCommands, VisitDialog, type IterationView, type PhaseView } from "./phase-commands";
+import { IterationImageArea, type IterationImage } from "./iteration-images";
 import { PhaseNotesDialog } from "./phase-notes-dialog";
 import { ProjectCompletionDialog } from "./project-completion";
 import { useCommand } from "./use-command";
@@ -26,7 +27,7 @@ export type ProjectCardPhase = {
   skipped_reason: string | null;
   can_add_round: boolean;
   last_visit_days_ago: number | null;
-  current_iteration: { id: string; name: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[]; note: string | null } | null;
+  current_iteration: { id: string; name: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[]; note: string | null; images?: readonly IterationImage[] } | null;
 };
 
 export type ProjectCardData = {
@@ -50,6 +51,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [notesFor, setNotesFor] = useState<{ phaseId: string; phaseName: string; iterationId: string; iterationName: string; note: string | null } | null>(null);
+  const notesImages = notesFor ? card.phases.find((p) => p.id === notesFor.phaseId)?.current_iteration?.images ?? [] : [];
   const [notesDraft, setNotesDraft] = useState("");
   const [skipPhase, setSkipPhase] = useState<{ id: string; name: string } | null>(null);
   const [skipReason, setSkipReason] = useState("");
@@ -67,7 +69,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
   const steps = card.phases.map((phase, index) => {
     const current = phase.current_iteration;
     const view: PhaseView = { id: phase.id, name: phase.name, status: phase.status, isSupervision: phase.is_supervision, canStart: phase.can_start };
-    const iteration: IterationView | null = current ? { id: current.id, name: current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices, note: current.note } : null;
+    const iteration: IterationView | null = current ? { id: current.id, name: current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices, note: current.note, images: current.images ?? [] } : null;
     const canAct = !completed && projectActive && viewer.canWork && seatOwner(phase);
     const display = phaseStepPresentation({
       phaseName: phase.name,
@@ -131,7 +133,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
       <VisitDialog open={visitPhaseId !== null} onOpenChange={(open) => { if (!open) setVisitPhaseId(null); }} pending={visitPhaseId !== null && commands.isPending(`${visitPhaseId}:visit`)} error={commands.error} onSave={(visitDate, note) => commands.exec(`${visitPhaseId}:visit`, { command: "createVisit", phaseId: visitPhaseId!, visitDate, note }, "Site visit added")} />
       <PhaseNotesDialog projectId={card.id} open={notesOpen} onOpenChange={setNotesOpen} canEdit={canManage || card.phases.some(seatOwner)} />
       <ProjectCompletionDialog projectId={card.id} projectName={card.name} open={confirmComplete} onOpenChange={setConfirmComplete} />
-      {notesFor ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("card-notes")) setNotesFor(null); }} title={`${notesFor.phaseName}: client notes`} description="The client's notes for this iteration. They carry over to the next iteration."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("card-notes", { command: "setIterationNote", phaseId: notesFor.phaseId, iterationId: notesFor.iterationId, note: notesDraft.trim() || null }, `${notesFor.iterationName}: notes saved`)) setNotesFor(null); }}><Field label="Client notes"><SimpleTextEditor rows={6} maxLength={4000} value={notesDraft} autoFocus onChange={(event) => setNotesDraft(event.target.value)} /></Field>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setNotesFor(null)} disabled={commands.isPending("card-notes")}>Cancel</Button><Button type="submit" variant="primary" pending={commands.isPending("card-notes")}>Save notes</Button></FormActions></form></Dialog> : null}
+      {notesFor ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("card-notes")) setNotesFor(null); }} title={`${notesFor.phaseName}: client notes`} description="The client's notes for this iteration. They carry over to the next iteration."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("card-notes", { command: "setIterationNote", phaseId: notesFor.phaseId, iterationId: notesFor.iterationId, note: notesDraft.trim() || null }, `${notesFor.iterationName}: notes saved`)) setNotesFor(null); }}><IterationImageArea projectId={card.id} phaseId={notesFor.phaseId} iterationId={notesFor.iterationId} images={notesImages}><Field label="Client notes"><SimpleTextEditor rows={6} maxLength={4000} value={notesDraft} autoFocus onChange={(event) => setNotesDraft(event.target.value)} /></Field></IterationImageArea>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setNotesFor(null)} disabled={commands.isPending("card-notes")}>Cancel</Button><Button type="submit" variant="primary" pending={commands.isPending("card-notes")}>Save notes</Button></FormActions></form></Dialog> : null}
       {skipPhase ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("card-skip")) setSkipPhase(null); }} title="Skip this phase" description="The phase is marked done without work. A reason is recorded."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("card-skip", { command: "bypass", phaseId: skipPhase.id, reason: skipReason }, `${skipPhase.name} skipped`)) setSkipPhase(null); }}><Field label="Reason" required><Textarea rows={2} value={skipReason} maxLength={500} placeholder="e.g. Moodboard supplied by the client" onChange={(event) => setSkipReason(event.target.value)} /></Field>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setSkipPhase(null)} disabled={commands.isPending("card-skip")}>Cancel</Button><Button type="submit" variant="primary" pending={commands.isPending("card-skip")} disabled={!skipReason.trim()}>Skip phase</Button></FormActions></form></Dialog> : null}
     </article>
   );

@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.395 | 2026-10-07 | feat(studioflow,ui-engine): client-note images on screen; review of R8.394 PASS (Lead)
+
+- **Review of R8.394 (`7ff75b6`): PASS.** Storage, add/remove, signed reads and every delete path match WO-SF-NOTE-IMG-01; the extra attached-work checks (skip, Supervision auto-start, undo of a creation) are accepted. Gates re-run by the Lead; one full `npm test` run failed a Master Data workbook test once (passes alone and in every other run): recorded as a flaky-test [BUG], not caused by R8.394.
+- **Screens (owner: drag, paste or pick).** New `IterationImageArea` wraps the client-notes editor in the answer dialog, the project card's and the phase page's client-notes dialogs: drop images anywhere on it, paste a screenshot (Ctrl+V; pasted text still goes into the notes), or "Add images" (several at once). Uploads start at once, one by one in the chosen order; type and count limits are checked first with a plain message; removing asks for confirmation. New `IterationImageList` shows thumbnails that open large with previous/next, in the brief from the previous iteration, under an answered note and in earlier iterations.
+- **UI Engine:** `shrinkImageFile` keeps an image that already fits untouched (screenshots stay PNG) and re-encodes a larger photo as JPEG with the same `compressionSteps` as `ImageWorkspace` until it fits 3 MB.
+- `usePhaseCommands` exposes its `projectId`; the phase page's notes dialog reads its images from the live iteration rows so new uploads appear without closing it.
+- PLAN.md: BUILT. BACKLOG: browser walk [UNVERIFIED], flaky workbook test [BUG], home cards signing images one at a time [CLEANUP].
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet` (no warnings in the touched files), `check:boundaries`, `check:legacy-runtime`, `npm test` 923/923 (none failed, skipped or cancelled; 2 new `shrinkImageFile` tests), `npm run build` passes. Browser not opened.
+
 ## R8.394 | 2026-10-07 | feat(studioflow): images on an iteration's client notes - WO-SF-NOTE-IMG-01 backend (Executor)
 
 - **Storage:** new table `sf_iteration_image` (additive migration `20261007100000_sf_iteration_image`, applied to the rebuild dev and test databases only): iteration (cascade), unique private storage key under `studioflow/iterations/<projectId>/`, type, size, order, uploader id and name snapshot.

@@ -2,8 +2,8 @@
 
 Plan ID: WO-SF-NOTE-IMG-01 (images on an iteration's client notes)
 Scope: StudioFlow backend for images attached to one iteration's client notes: storage, add/remove commands, reads with signed URLs, cleanup on every delete path, and the history labels. The Lead builds the drag/paste/pick UI and the thumbnails in the next revision.
-Target revisions: R8.393 (this plan), R8.394 (Executor: backend + minimal wiring), then the Lead's UI revision.
-Status: READY
+Target revisions: R8.393 (this plan), R8.394 (Executor: backend), R8.395 (Lead review PASS + UI).
+Status: BUILT — backend R8.394 (review PASS), UI R8.395; open: owner browser acceptance (BACKLOG [UNVERIFIED]).
 Priority: P1
 Owner: Product Owner. Decisions confirmed by the owner in chat on 2026-10-07 (kantor).
 Last updated: 2026-10-07
@@ -109,7 +109,28 @@ its tests. Risk: slow phase pages from signing many URLs; images are signed
 only for the iterations a page shows. Recovery: revert R8.394; the migration
 is additive (drop the table).
 
+## Review of R8.394 (Lead, 2026-10-07) — PASS
+
+Commit `7ff75b6`. Decisions 1–6 are in the code; the extra attached-work checks
+(skip, Supervision auto-start, undo of a creation) close real orphan paths and
+are accepted. Gates re-run by the Lead: tsc, lint, boundaries, legacy-runtime,
+build pass; `npm test` passed 921/921 twice, but one full run failed the Master
+Data workbook round-trip test once (it passes alone, 3/3, and its file passes
+2/2) — flaky, not caused by R8.394 (BACKLOG [BUG]). The home page signs card
+images one at a time (BACKLOG [CLEANUP]).
+
+**UI built at R8.395:** `IterationImageArea` (drop anywhere on the notes, paste
+a screenshot, or "Add images"; uploads at once, one by one, large photos
+shrunk with the new UI Engine `shrinkImageFile`; remove with confirmation) in
+the client-answer dialog, the card's and the phase page's client-notes
+dialogs; `IterationImageList` (thumbnails, large view with previous/next) in
+the brief, the answered note and earlier iterations.
+
 ## Executor Prompt
+
+None: the work order is built.
+
+## Former Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this `PLAN.md` (WO-SF-NOTE-IMG-01), then implement
