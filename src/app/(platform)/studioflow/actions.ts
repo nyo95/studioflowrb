@@ -165,7 +165,6 @@ const ProjectFields = {
   picDrafterId: Id,
   openingDate: DateOnly,
   timelineStartDate: DateOnly,
-  fitOutStartDate: DateOnly,
   clientContact: z.string().max(200).nullish(),
   address: OptionalText,
   area: z.string().max(20).nullish(),
@@ -206,6 +205,25 @@ export async function setProjectDatesAction(input: z.infer<typeof ProjectDates>)
 const FitOutStart = z.strictObject({ projectId: Id, fitOutStartDate: DateOnly });
 export async function setFitOutStartAction(input: z.infer<typeof FitOutStart>): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const ctx = await context(); const data = parse(FitOutStart, input); const result = await studioFlow.projects.setFitOutStart({ ...ctx, projectId: data.projectId, fitOutStartDate: data.fitOutStartDate || null }); refresh(data.projectId); return result; }); }
 export async function applyProjectPlanAction(projectId: string): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const ctx = await context(); const id = parse(Id, projectId); const result = await studioFlow.projects.applyProjectPlan({ ...ctx, projectId: id }); refresh(id); return result; }); }
+const PlanDays = z.number().int().min(1).max(260);
+const PlanIntervalsInput = z.strictObject({ cdMall: PlanDays, cdFinal: PlanDays, gap: PlanDays, fitOutToHandover: PlanDays, handoverToOpening: PlanDays });
+export async function setPlanningDefaultsAction(input: z.infer<typeof PlanIntervalsInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { const ctx = await context(); const result = await studioFlow.projects.setPlanningDefaults({ ...ctx, ...parse(PlanIntervalsInput, input) }); refresh(); return result; });
+}
+const PlanOverridesInput = z.strictObject({ projectId: Id, overrides: PlanIntervalsInput.partial().nullable() });
+export async function setPlanOverridesAction(input: z.infer<typeof PlanOverridesInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { const ctx = await context(); const data = parse(PlanOverridesInput, input); const result = await studioFlow.projects.setPlanOverrides({ ...ctx, projectId: data.projectId, overrides: data.overrides }); refresh(data.projectId); return result; });
+}
+export async function resetPhasePlannedDatesAction(projectId: string, phaseId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { const ctx = await context(); const result = await studioFlow.projects.resetPhasePlannedDates({ ...ctx, projectId: parse(Id, projectId), phaseId: parse(Id, phaseId) }); refresh(projectId); return result; });
+}
+const HolidayInput = z.strictObject({ date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), label: z.string().trim().min(1).max(120) });
+export async function addHolidayAction(input: z.infer<typeof HolidayInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { const ctx = await context(); const result = await studioFlow.projects.addHoliday({ ...ctx, ...parse(HolidayInput, input) }); refresh(); return result; });
+}
+export async function removeHolidayAction(holidayId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { const ctx = await context(); const result = await studioFlow.projects.removeHoliday({ ...ctx, holidayId: parse(Id, holidayId) }); refresh(); return result; });
+}
 
 export async function setProjectPriorityAction(projectId: string, priority: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {

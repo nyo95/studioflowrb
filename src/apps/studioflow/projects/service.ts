@@ -9,7 +9,8 @@ import { toDecimalString } from "@platform/utilities/decimal";
 import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
-import { computeProjectPlan, DEFAULT_PLAN_INTERVALS, type PlanIntervals } from "../domain/plan";
+import { computeProjectPlan, type PlanIntervals } from "../domain/plan";
+import { fwd } from "../domain/working-time";
 import { LEGACY_PHASE_DEFINITION_IDS } from "../domain/phase";
 import { iterationChoices, iterationKinds } from "../domain/iteration-kinds";
 import { phaseSkipReason } from "../domain/phase-display";
@@ -58,7 +59,6 @@ export type ProjectInput = {
   openingDate?: string | null;
   /** Gantt/timeline start override; null clears it back to the `createdAt`-date fallback. */
   timelineStartDate?: string | null;
-  fitOutStartDate?: string | null;
   priority?: ProjectPriority;
   clientContact?: string | null;
   address?: string | null;
@@ -101,6 +101,68 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
   async function readSettings(client: Db | TxClient) {
     const row = await client.sfSettings.findUnique({ where: { id: SETTINGS_ID } });
     return { archiveRetentionDays: row?.archive_retention_days ?? 90, cdMall: row?.cd_mall_days ?? 5, cdFinal: row?.cd_final_days ?? 5, gap: row?.fit_out_gap_days ?? 5, fitOutToHandover: row?.fit_out_to_handover_days ?? 40, handoverToOpening: row?.handover_to_opening_days ?? 10 };
+  }
+
+  const PLAN_PHASE_DEFINITIONS: ReadonlySet<string> = new Set([LEGACY_PHASE_DEFINITION_IDS.design3d, LEGACY_PHASE_DEFINITION_IDS.cd, LEGACY_PHASE_DEFINITION_IDS.supervision]);
+
+  type PlanProject = { id: string; fit_out_start_date: Date | null; plan_overrides: unknown; opening_date: Date | null; timeline_start_date: Date | null };
+
+  /** Studio defaults, then the project's own overrides. Only the five interval keys are ever read. */
+  async function resolveIntervals(client: Db | TxClient, project: PlanProject): Promise<PlanIntervals> {
+    const settings = await readSettings(client);
+    const overrides = (project.plan_overrides ?? {}) as Partial<PlanIntervals>;
+    const pick = (key: keyof PlanIntervals) => overrides[key] ?? settings[key];
+    return { cdMall: pick("cdMall"), cdFinal: pick("cdFinal"), gap: pick("gap"), fitOutToHandover: pick("fitOutToHandover"), handoverToOpening: pick("handoverToOpening") };
+  }
+
+  async function resolvePlan(client: Db | TxClient, project: PlanProject) {
+    const intervals = await resolveIntervals(client, project);
+    const holidays = new Set((await client.sfHoliday.findMany({ select: { date: true } })).map((holiday) => dateToDateOnly(holiday.date)!));
+    const cd = await client.sfPhase.findFirst({ where: { project_id: project.id, definition_id: LEGACY_PHASE_DEFINITION_IDS.cd }, select: { status: true, status_changed_at: true } });
+    const endActual = cd?.status === "DONE" ? dateToDateOnly(cd.status_changed_at) : null;
+    const fitOutStartDate = dateToDateOnly(project.fit_out_start_date);
+    const plan = fitOutStartDate
+      ? computeProjectPlan({ fitOutStart: fitOutStartDate, intervals, holidays, openingDate: dateToDateOnly(project.opening_date), timelineStart: dateToDateOnly(project.timeline_start_date), cdDoneDate: endActual, today: dateToDateOnly(nowOf(ports))! })
+      : null;
+    return {
+      fitOutStartDate,
+      intervals,
+      overrides: (project.plan_overrides ?? null) as Partial<PlanIntervals> | null,
+      milestones: plan?.milestones ?? null,
+      endPlanned: plan?.milestones.end ?? null,
+      endActual,
+      // A suggestion only: the person saves it (or not); the plan never writes a Fit Out Start itself.
+      suggestedFitOutStart: fitOutStartDate || !endActual ? null : fwd(endActual, intervals.gap, holidays),
+      warnings: plan?.warnings ?? [],
+    };
+  }
+
+  /** Writes the computed dates of every phase whose dates are not manual (or only `onlyPhaseId`, whose manual flag is cleared first). */
+  async function applyPlanIn(tx: TxClient, project: PlanProject, actor: CommandContext["actor"], onlyPhaseId: string | null) {
+    if (!project.fit_out_start_date) throw invalid("FIT_OUT_START_REQUIRED", "Set Fit Out Start before applying the plan.");
+    if (onlyPhaseId) await tx.sfPhase.update({ where: { id: onlyPhaseId }, data: { planned_dates_manual: false } });
+    const resolved = await resolvePlan(tx, project);
+    const m = resolved.milestones!;
+    const targets: Record<string, { start?: string; end?: string }> = {
+      [LEGACY_PHASE_DEFINITION_IDS.design3d]: { end: m.designFinal },
+      [LEGACY_PHASE_DEFINITION_IDS.cd]: { start: m.cdMallStart, end: m.end },
+      [LEGACY_PHASE_DEFINITION_IDS.supervision]: { start: m.fitOutStart, end: m.handover },
+    };
+    const phases = await tx.sfPhase.findMany({ where: { project_id: project.id }, select: { id: true, definition_id: true, planned_dates_manual: true, planned_start_date: true, planned_end_date: true } });
+    const written: string[] = [], unchanged: string[] = [], kept: string[] = [];
+    for (const phase of phases) {
+      const target = phase.definition_id ? targets[phase.definition_id] : undefined;
+      if (!target || (onlyPhaseId && phase.id !== onlyPhaseId)) continue;
+      if (phase.planned_dates_manual) { kept.push(phase.id); continue; }
+      const data: { planned_start_date?: Date; planned_end_date?: Date } = {};
+      if (target.start && dateToDateOnly(phase.planned_start_date) !== target.start) data.planned_start_date = dateOnlyToDate(target.start);
+      if (target.end && dateToDateOnly(phase.planned_end_date) !== target.end) data.planned_end_date = dateOnlyToDate(target.end);
+      if (Object.keys(data).length === 0) { unchanged.push(phase.id); continue; }
+      await tx.sfPhase.update({ where: { id: phase.id }, data });
+      written.push(phase.id);
+    }
+    if (written.length > 0) await writeAudit(ports, tx, { action: "studioflow.project.plan-applied", entityType: "project", entityId: project.id, actor, metadata: { projectId: project.id, written, kept, scope: onlyPhaseId ? "phase" : "project" } });
+    return { written, unchanged, kept, warnings: resolved.warnings, milestones: m };
   }
 
   async function assertPic(userId: string, seat: "designer" | "drafter"): Promise<void> {
@@ -188,7 +250,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       return runTransaction(async (tx) => { await tx.sfSettings.upsert({ where: { id: SETTINGS_ID }, create: { id: SETTINGS_ID, updated_by_id: userId, cd_mall_days: input.cdMall, cd_final_days: input.cdFinal, fit_out_gap_days: input.gap, fit_out_to_handover_days: input.fitOutToHandover, handover_to_opening_days: input.handoverToOpening }, update: { updated_by_id: userId, cd_mall_days: input.cdMall, cd_final_days: input.cdFinal, fit_out_gap_days: input.gap, fit_out_to_handover_days: input.fitOutToHandover, handover_to_opening_days: input.handoverToOpening } }); await writeAudit(ports, tx, { action: "studioflow.settings.planning-updated", entityType: "settings", entityId: SETTINGS_ID, actor: input.actor }); return readSettings(tx); });
     },
     async listHolidays(input: ReadContext) { requireRead(input.grants); return (await db.sfHoliday.findMany({ orderBy: { date: "asc" } })).map((h) => ({ id: h.id, date: dateToDateOnly(h.date)!, label: h.label })); },
-    async addHoliday(input: CommandContext & { date: string; label: string }) { const userId = requireCommand(input, P.settingsManage); const date = parseOpeningDate(input.date); const label = requiredText(input.label, "HOLIDAY_LABEL_REQUIRED", "Holiday label", 200); return runTransaction(async (tx) => { const holiday = await tx.sfHoliday.create({ data: { date: date!, label, created_by_id: userId, updated_by_id: userId } }); await writeAudit(ports, tx, { action: "studioflow.holiday.added", entityType: "holiday", entityId: holiday.id, actor: input.actor }); return { holidayId: holiday.id }; }); },
+    async addHoliday(input: CommandContext & { date: string; label: string }) { const userId = requireCommand(input, P.settingsManage); const date = parseOpeningDate(input.date); const label = requiredText(input.label, "HOLIDAY_LABEL_REQUIRED", "Holiday label", 200); return runTransaction(async (tx) => { if (await tx.sfHoliday.findUnique({ where: { date: date! }, select: { id: true } })) throw conflict("HOLIDAY_EXISTS", "That date is already in the holiday list."); const holiday = await tx.sfHoliday.create({ data: { date: date!, label, created_by_id: userId, updated_by_id: userId } }); await writeAudit(ports, tx, { action: "studioflow.holiday.added", entityType: "holiday", entityId: holiday.id, actor: input.actor }); return { holidayId: holiday.id }; }); },
     async removeHoliday(input: CommandContext & { holidayId: string }) { requireCommand(input, P.settingsManage); return runTransaction(async (tx) => { const holiday = await tx.sfHoliday.findUnique({ where: { id: input.holidayId } }); if (!holiday) throw notFound("holiday"); await tx.sfHoliday.delete({ where: { id: holiday.id } }); await writeAudit(ports, tx, { action: "studioflow.holiday.removed", entityType: "holiday", entityId: holiday.id, actor: input.actor }); return { holidayId: holiday.id }; }); },
 
     // ── People ─────────────────────────────────────────────────────────────
@@ -492,7 +554,6 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const area = input.area === undefined ? undefined : parseArea(input.area);
       const openingDate = input.openingDate === undefined ? undefined : parseOpeningDate(input.openingDate);
       const timelineStartDate = input.timelineStartDate === undefined ? undefined : parseOpeningDate(input.timelineStartDate);
-      const fitOutStartDate = input.fitOutStartDate === undefined ? undefined : parseOpeningDate(input.fitOutStartDate);
       return runTransaction(async (tx) => {
         await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await loadWritableProject(tx, input.projectId);
@@ -520,7 +581,6 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         }
         track("openingDate", project.opening_date, openingDate, () => { data.opening_date = openingDate; });
         track("timelineStartDate", project.timeline_start_date, timelineStartDate, () => { data.timeline_start_date = timelineStartDate; });
-        track("fitOutStartDate", project.fit_out_start_date, fitOutStartDate, () => { data.fit_out_start_date = fitOutStartDate; });
         if (input.clientContact !== undefined) {
           const value = optionalText(input.clientContact, 200);
           track("clientContact", project.client_contact, value, () => { data.client_contact = value; });
@@ -548,12 +608,32 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       if (overrides && Object.values(overrides).some((n) => n !== undefined && (!Number.isInteger(n) || n < 1 || n > 260))) throw invalid("PLAN_OVERRIDES_INVALID", "Plan overrides must be whole working days from 1 to 260.");
       return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); await tx.sfProject.update({ where: { id: project.id }, data: { plan_overrides: overrides ?? Prisma.DbNull } }); await writeAudit(ports, tx, { action: "studioflow.project.plan-overrides-set", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id } }); return { projectId: project.id }; });
     },
+    /** Read-only plan: resolved intervals, computed milestones, END (actual/planned), a suggested Fit Out Start, and warnings. Writes nothing. */
+    async getProjectPlan(input: ReadContext & { projectId: string }) {
+      requireRead(input.grants);
+      const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, fit_out_start_date: true, plan_overrides: true, opening_date: true, timeline_start_date: true } });
+      if (!project) throw notFound("project");
+      return resolvePlan(db, project);
+    },
     async applyProjectPlan(input: CommandContext & { projectId: string }) {
       const userId = requireCommand(input, P.projectManage);
-      return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); if (!project.fit_out_start_date) throw invalid("FIT_OUT_START_REQUIRED", "Set Fit Out Start before applying the plan."); const defaults = await readSettings(tx); const overrides = (project.plan_overrides as Partial<PlanIntervals> | null) ?? {}; const intervals = { ...DEFAULT_PLAN_INTERVALS, ...defaults, ...overrides }; const holidays = new Set((await tx.sfHoliday.findMany({ select: { date: true } })).map((h) => dateToDateOnly(h.date)!)); const phases = await tx.sfPhase.findMany({ where: { project_id: project.id }, select: { id: true, definition_id: true, planned_dates_manual: true } }); const cd = phases.find((p) => p.definition_id === LEGACY_PHASE_DEFINITION_IDS.cd); const cdDone = cd ? await tx.sfPhase.findUnique({ where: { id: cd.id }, select: { status: true, status_changed_at: true } }) : null; const plan = computeProjectPlan({ fitOutStart: dateToDateOnly(project.fit_out_start_date)!, intervals, holidays, openingDate: dateToDateOnly(project.opening_date), timelineStart: dateToDateOnly(project.timeline_start_date), cdDoneDate: cdDone?.status === "DONE" ? dateToDateOnly(cdDone.status_changed_at) : null, today: dateToDateOnly(nowOf(ports))! }); const dates: Record<string, { start?: string; end?: string }> = { [LEGACY_PHASE_DEFINITION_IDS.design3d]: { end: plan.milestones.designFinal }, [LEGACY_PHASE_DEFINITION_IDS.cd]: { start: plan.milestones.cdMallStart, end: plan.milestones.end }, [LEGACY_PHASE_DEFINITION_IDS.supervision]: { start: plan.milestones.fitOutStart, end: plan.milestones.handover } }; const written: string[] = [], kept: string[] = []; for (const phase of phases) { const next = dates[phase.definition_id]; if (!next) continue; if (phase.planned_dates_manual) { kept.push(phase.id); continue; } await tx.sfPhase.update({ where: { id: phase.id }, data: { ...(next.start ? { planned_start_date: dateOnlyToDate(next.start) } : {}), ...(next.end ? { planned_end_date: dateOnlyToDate(next.end) } : {}) } }); written.push(phase.id); } await writeAudit(ports, tx, { action: "studioflow.project.plan-applied", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, written, kept } }); return { written, kept, warnings: plan.warnings, milestones: plan.milestones }; });
+      return runTransaction(async (tx) => {
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
+        const project = await loadWritableProject(tx, input.projectId);
+        return applyPlanIn(tx, project, input.actor, null);
+      });
     },
+    /** Clears the manual flag of one computed phase and recomputes, atomically. Only the three phases the plan computes qualify. */
     async resetPhasePlannedDates(input: CommandContext & { projectId: string; phaseId: string }) {
-      const userId = requireCommand(input, P.projectManage); await requireProjectAccess(db, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "content", phaseId: input.phaseId }); await db.sfPhase.update({ where: { id: input.phaseId }, data: { planned_dates_manual: false } }); return this.applyProjectPlan(input);
+      const userId = requireCommand(input, P.projectManage);
+      return runTransaction(async (tx) => {
+        await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
+        const project = await loadWritableProject(tx, input.projectId);
+        const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { id: true, project_id: true, definition_id: true } });
+        if (!phase || phase.project_id !== project.id) throw notFound("phase");
+        if (!phase.definition_id || !PLAN_PHASE_DEFINITIONS.has(phase.definition_id)) throw invalid("PHASE_NOT_PLANNED", "Only Design 3D, Construction Drawing and Construction get computed dates.");
+        return applyPlanIn(tx, project, input.actor, phase.id);
+      });
     },
 
     async setProjectPriority(input: CommandContext & { projectId: string; priority: ProjectPriority }) {

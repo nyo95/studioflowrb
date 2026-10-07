@@ -18,6 +18,12 @@ export function studioFlowSettingsGroups(grants: PermissionGrants): SettingsSect
       ],
     },
     {
+      heading: "Planning",
+      items: [
+        { key: "planning", href: "/studioflow/settings/planning", label: "Planning and holidays", visible: settings },
+      ],
+    },
+    {
       heading: "Storage",
       items: [
         { key: "archived-files", href: "/studioflow/settings/archived-files", label: "Archived files", visible: settings || hasPermission(grants, P.projectManage) },

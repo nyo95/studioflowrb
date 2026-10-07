@@ -81,7 +81,7 @@ async function reset() {
     "sf_deliverable", "sf_asset_cleanup_failure",
     "sf_activity", "sf_revision", "sf_phase",
     "sf_phase_definition", "sf_phase_template",
-    "sf_project", "sf_client", "sf_settings",
+    "sf_project", "sf_client", "sf_settings", "sf_holiday",
   ].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
   await truncatePlatformTables(testDb);
   await testDb.prisma.notification.deleteMany();
@@ -611,7 +611,7 @@ describe("WO-BE-02 archived asset retention", () => {
     assert.equal((await retention().runAssetCleanup({ ...as(designer), limit: 1 })).projectsPurged, 1);
     assert.ok((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: older.projectId } })).assets_purged_at);
     assert.equal((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: newer.projectId } })).assets_purged_at, null);
-    assert.deepEqual(await sf.projects.getStudioSettings({ grants: ALL }), { archiveRetentionDays: 7 });
+    assert.deepEqual(await sf.projects.getStudioSettings({ grants: ALL }), { archiveRetentionDays: 7, cdMall: 5, cdFinal: 5, gap: 5, fitOutToHandover: 40, handoverToOpening: 10 });
     await sf.projects.setArchiveRetention({ ...as(designer), archiveRetentionDays: 730 });
     assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
   });
@@ -2667,4 +2667,111 @@ describe("R8.332 logic review fixes", () => {
     const found = await sf.projects.quickSearch({ grants: ALL, search: "house" });
     assert.deepEqual(found.projects.map((project) => project.name), ["Alpha house", "Beta house"]);
   });
+});
+
+describe("WO-SF-PLAN-01 working-time planning from Fit Out Start", () => {
+  const day = (value: Date | null) => value?.toISOString().slice(0, 10) ?? null;
+  const planned = async (projectId: string, legacy: keyof typeof LEGACY) => {
+    const phase = await phaseOf(projectId, legacy);
+    return { id: phase.id, start: day(phase.planned_start_date), end: day(phase.planned_end_date), manual: phase.planned_dates_manual };
+  };
+  const withFitOut = async (name: string, fitOutStartDate = "2026-11-02") => {
+    const { projectId } = await newProject(name);
+    await sf.projects.setFitOutStart({ ...as(designer), projectId, fitOutStartDate });
+    return projectId;
+  };
+
+  it("fills Design 3D, Construction Drawing and Construction from Fit Out Start, and a second apply changes nothing", async () => {
+    const projectId = await withFitOut("Plan basic");
+    const first = await sf.projects.applyProjectPlan({ ...as(designer), projectId });
+    assert.equal(first.written.length, 3);
+    assert.deepEqual(first.milestones, { designFinal: "2026-10-12", cdMallStart: "2026-10-12", cdFinalStart: "2026-10-19", end: "2026-10-26", fitOutStart: "2026-11-02", handover: "2026-12-28", openingForecast: "2027-01-11" });
+    assert.deepEqual(await planned(projectId, "design3d"), { id: (await phaseOf(projectId, "design3d")).id, start: null, end: "2026-10-12", manual: false });
+    assert.deepEqual(await planned(projectId, "cd").then(({ start, end }) => [start, end]), ["2026-10-12", "2026-10-26"]);
+    assert.deepEqual(await planned(projectId, "supervision").then(({ start, end }) => [start, end]), ["2026-11-02", "2026-12-28"]);
+    assert.equal((await planned(projectId, "moodboard")).start, null);
+    const again = await sf.projects.applyProjectPlan({ ...as(designer), projectId });
+    assert.deepEqual([again.written.length, again.unchanged.length, again.kept.length], [0, 3, 0]);
+    const read = await sf.projects.getProjectPlan({ grants: ALL, projectId });
+    assert.deepEqual(read.milestones, first.milestones);
+    assert.equal(read.endPlanned, "2026-10-26");
+  });
+
+  it("keeps hand-set dates, reports them as kept, and reset brings the computed dates back", async () => {
+    const projectId = await withFitOut("Plan manual");
+    const cd = await phaseOf(projectId, "cd");
+    await sf.phases.setPhasePlannedDates({ ...as(designer), projectId, phaseId: cd.id, plannedStartDate: "2026-10-01", plannedEndDate: "2026-10-05" });
+    assert.equal((await planned(projectId, "cd")).manual, true);
+    const result = await sf.projects.applyProjectPlan({ ...as(designer), projectId });
+    assert.deepEqual(result.kept, [cd.id]);
+    assert.equal(result.written.length, 2);
+    assert.deepEqual(await planned(projectId, "cd").then(({ start, end }) => [start, end]), ["2026-10-01", "2026-10-05"]);
+    const reset = await sf.projects.resetPhasePlannedDates({ ...as(designer), projectId, phaseId: cd.id });
+    assert.deepEqual(reset.written, [cd.id]);
+    assert.deepEqual(await planned(projectId, "cd"), { id: cd.id, start: "2026-10-12", end: "2026-10-26", manual: false });
+    await rejectsWith(sf.projects.resetPhasePlannedDates({ ...as(designer), projectId, phaseId: (await phaseOf(projectId, "moodboard")).id }), "PHASE_NOT_PLANNED");
+  });
+
+  it("needs a Fit Out Start and the project-manage permission", async () => {
+    const { projectId } = await newProject("Plan guards");
+    await rejectsWith(sf.projects.applyProjectPlan({ ...as(designer), projectId }), "FIT_OUT_START_REQUIRED");
+    await sf.projects.setFitOutStart({ ...as(designer), projectId, fitOutStartDate: "2026-11-02" });
+    await rejectsWith(sf.projects.applyProjectPlan({ ...as(drafter, DRAFTER_GRANTS), projectId }), "PERMISSION_DENIED");
+    await rejectsWith(sf.projects.setPlanOverrides({ ...as(drafter, DRAFTER_GRANTS), projectId, overrides: { gap: 3 } }), "PERMISSION_DENIED");
+    await rejectsWith(sf.projects.setPlanOverrides({ ...as(designer), projectId, overrides: { gap: 0 } }), "PLAN_OVERRIDES_INVALID");
+  });
+
+  it("a project override moves only the dates that depend on that interval", async () => {
+    const projectId = await withFitOut("Plan override");
+    const before = (await sf.projects.getProjectPlan({ grants: ALL, projectId })).milestones!;
+    await sf.projects.setPlanOverrides({ ...as(designer), projectId, overrides: { cdFinal: 10 } });
+    const after = await sf.projects.getProjectPlan({ grants: ALL, projectId });
+    assert.equal(after.intervals.cdFinal, 10);
+    assert.equal(after.intervals.cdMall, 5);
+    assert.deepEqual([after.milestones!.end, after.milestones!.handover, after.milestones!.openingForecast], [before.end, before.handover, before.openingForecast]);
+    assert.equal(after.milestones!.cdFinalStart, "2026-10-12");
+    assert.equal(after.milestones!.designFinal, "2026-10-05");
+    await sf.projects.setPlanOverrides({ ...as(designer), projectId, overrides: null });
+    assert.deepEqual((await sf.projects.getProjectPlan({ grants: ALL, projectId })).milestones, before);
+  });
+
+  it("studio defaults and the holiday list change the result, and a duplicate holiday is refused", async () => {
+    const projectId = await withFitOut("Plan holidays");
+    await sf.projects.addHoliday({ ...as(designer), date: "2026-10-22", label: "Cuti" });
+    await rejectsWith(sf.projects.addHoliday({ ...as(designer), date: "2026-10-22", label: "Again" }), "HOLIDAY_EXISTS");
+    await rejectsWith(sf.projects.addHoliday({ ...as(drafter, DRAFTER_GRANTS), date: "2026-10-23", label: "No" }), "PERMISSION_DENIED");
+    const held = (await sf.projects.getProjectPlan({ grants: ALL, projectId })).milestones!;
+    assert.deepEqual([held.cdFinalStart, held.cdMallStart], ["2026-10-16", "2026-10-09"]);
+    const [holiday] = await sf.projects.listHolidays({ grants: ALL });
+    await sf.projects.removeHoliday({ ...as(designer), holidayId: holiday!.id });
+    assert.equal((await sf.projects.getProjectPlan({ grants: ALL, projectId })).milestones!.cdFinalStart, "2026-10-19");
+    await sf.projects.setPlanningDefaults({ ...as(designer), cdMall: 5, cdFinal: 5, gap: 5, fitOutToHandover: 20, handoverToOpening: 10 });
+    assert.equal((await sf.projects.getProjectPlan({ grants: ALL, projectId })).milestones!.handover, "2026-11-30");
+    await rejectsWith(sf.projects.setPlanningDefaults({ ...as(designer), cdMall: 5, cdFinal: 5, gap: 5, fitOutToHandover: 0, handoverToOpening: 10 }), "PLANNING_DEFAULTS_INVALID");
+  });
+
+  it("warns about a late or tight opening and does not warn when it fits", async () => {
+    const projectId = await withFitOut("Plan warnings");
+    const warningsFor = async (opening: string | null) => {
+      await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { opening_date: opening ? new Date(`${opening}T00:00:00.000Z`) : null } });
+      return (await sf.projects.getProjectPlan({ grants: ALL, projectId })).warnings;
+    };
+    assert.deepEqual(await warningsFor("2027-02-01"), []);
+    assert.equal((await warningsFor("2027-01-04")).some((w) => w.includes("late")), true);
+    assert.equal((await warningsFor("2026-12-31")).some((w) => w.includes("tight")), true);
+    assert.equal((await warningsFor("2027-01-11")).length, 0);
+    assert.deepEqual(await warningsFor(null), []);
+  });
+
+  it("suggests a Fit Out Start from the real END of Construction Drawing without writing it", async () => {
+    const { projectId } = await newProject("Plan suggestion");
+    const cd = await phaseOf(projectId, "cd");
+    assert.equal((await sf.projects.getProjectPlan({ grants: ALL, projectId })).suggestedFitOutStart, null);
+    await testDb.prisma.sfPhase.update({ where: { id: cd.id }, data: { status: "DONE", status_changed_at: new Date("2026-10-20T04:00:00Z") } });
+    const read = await sf.projects.getProjectPlan({ grants: ALL, projectId });
+    assert.equal(read.endActual, "2026-10-20");
+    assert.equal(read.suggestedFitOutStart, "2026-10-27");
+    assert.equal((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } })).fit_out_start_date, null);
+  });
+
 });

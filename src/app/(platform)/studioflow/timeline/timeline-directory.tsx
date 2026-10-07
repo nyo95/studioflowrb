@@ -19,6 +19,7 @@ export type TimelineProject = {
   client: { id: string; name: string } | null;
   openingDate: string | null;
   timelineStartDate: string;
+  fitOutStartDate: string | null;
   phases: TimelinePhase[];
 };
 

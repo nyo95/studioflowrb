@@ -31,7 +31,7 @@ describe("settings ownership (owner, 2026-10-06)", () => {
     assert.equal(firstSettingsHref(studioFlowSettingsGroups(worker)), null);
     assert.deepEqual(visibleHrefs(studioFlowSettingsGroups([SF.access, SF.projectRead, SF.projectManage])), ["/studioflow/settings/archived-files"]);
     const admin = studioFlowSettingsGroups([SF.access, SF.projectRead, SF.settingsManage]);
-    assert.deepEqual(visibleHrefs(admin), ["/studioflow/settings/phases", "/studioflow/settings/checklists", "/studioflow/settings/schedule", "/studioflow/settings/archived-files"]);
+    assert.deepEqual(visibleHrefs(admin), ["/studioflow/settings/phases", "/studioflow/settings/checklists", "/studioflow/settings/schedule", "/studioflow/settings/planning", "/studioflow/settings/archived-files"]);
     assert.equal(canOpenSettingsSection(studioFlowSettingsGroups(worker), "schedule"), false);
   });
 

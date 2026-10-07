@@ -1,5 +1,17 @@
 # Changelog
 
+## R8.380 | 2026-10-07 | fix(studioflow): finish WO-SF-PLAN-01 - plan read, atomic reset, settings, timeline wiring, tests (Lead takeover)
+
+- Lead review of R8.379 returned CORRECTION REQUIRED (two failing tests, stray `next-env.d.ts`, no integration tests, missing wiring, non-atomic reset); the owner asked the Lead to take over, so this revision is the Lead's, done directly.
+- **Plan logic.** One in-transaction `applyPlanIn` shared by `applyProjectPlan` and `resetPhasePlannedDates` (clear the manual flag and recompute in the same transaction; only Design 3D, Construction Drawing and Construction qualify, else `PHASE_NOT_PLANNED`). Intervals come from the five studio defaults plus the project's own overrides only. Applying twice writes nothing (`unchanged`), and the audit row is written only when something changed.
+- **Read.** New `getProjectPlan`: resolved intervals, overrides, milestones, END planned/actual (CD phase done date), a suggested Fit Out Start (only a suggestion), warnings. Writes nothing.
+- **Wiring.** Fit Out Start moved to the Timeline dates dialog (owner, 2026-09-30: the Timeline is the one place project dates are set) with "Save and apply plan" and a plain-text result; the project edit dialog and `updateProject` no longer take it (`setFitOutStart` is the single path). New Settings page "Planning and holidays" (five lead times, holiday list). Server actions for planning defaults, holidays, project overrides and phase reset (the override/reset screens belong to WO-SF-GANTT-01). Duplicate holiday: `HOLIDAY_EXISTS`.
+- **Tests.** Fixed the wrong plan expectation (END 26 Jan minus 5 working days is 19 Jan) and the settings shape; new integration tests: apply, idempotence, manual kept and reset, guards and permissions, overrides move only dependent dates, holidays and defaults, warnings fire and stay quiet, suggestion not written. Settings-menu test knows the new page. `next-env.d.ts` restored.
+- Migration verified on the dev database: Construction in the definition and in existing phase snapshots.
+- Design Final is a milestone from `getProjectPlan` (Design 3D keeps only an end date, so it is not drawn as a bar); the Gantt will draw it as a marker.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 875/875 (none failed, skipped or cancelled), `npm run build`.
+
 ## R8.379 | 2026-10-07 | feat(studioflow): plan working dates from Fit Out Start
 
 - Added StudioFlow working-day planning, office defaults, holiday rows, Fit Out Start, per-project interval overrides, milestones/warnings, and protected manual phase dates.
