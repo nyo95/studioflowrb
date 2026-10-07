@@ -1337,7 +1337,7 @@ describe("SF-R2 MOM", () => {
 });
 
 describe("SF-R3 Product Schedule", () => {
-  it("creates entries with gapless codes, options, final approval, and promotion on delete", async () => {
+  it("creates entries as proposals with stable codes; only Set as final decides, and deciding can be undone", async () => {
     const { projectId } = await newProject();
     await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
     const first = await sf.schedule.createEntry({
@@ -1352,22 +1352,52 @@ describe("SF-R3 Product Schedule", () => {
     });
     const second = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Jotun Majestic", brandName: "Jotun" } });
     assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => [e.code, e.category, e.options[0]?.label, e.options[0]?.isFinal]), [
-      ["PT-01", "Paint", "A", true],
-      ["PT-02", "Paint", "A", true],
-    ]);
+      ["PT-01", "Paint", "A", false],
+      ["PT-02", "Paint", "A", false],
+    ], "a product typed while adding is a proposal, not a decision");
 
     const option = await sf.schedule.createOption({ ...as(designer), projectId, entryId: first.entryId, snapshot: { productName: "Nippon Spotless", brandName: "Nippon", color: "Bone" } });
     await sf.schedule.markFinal({ ...as(designer), projectId, optionId: option.optionId });
-    let entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.id === first.entryId)!;
-    assert.deepEqual(entry.options.map((o) => [o.label, o.status, o.isFinal]), [["A", "NOT_USED", false], ["B", "APPROVED", true]]);
+    const optionsOf = async () => (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.id === first.entryId)!.options.map((o) => [o.label, o.status, o.isFinal]);
+    assert.deepEqual(await optionsOf(), [["A", "NOT_USED", false], ["B", "APPROVED", true]]);
 
+    await sf.schedule.unmarkFinal({ ...as(designer), projectId, optionId: option.optionId });
+    assert.deepEqual(await optionsOf(), [["A", "DRAFT", false], ["B", "DRAFT", false]], "unset final: undecided again, nothing reads as not used");
+    assert.equal((await testDb.prisma.auditEvent.count({ where: { entity_id: option.optionId, action: "studioflow.schedule.option-unfinalized" } })), 1);
+
+    await sf.schedule.markFinal({ ...as(designer), projectId, optionId: option.optionId });
     await sf.schedule.deleteOption({ ...as(designer), projectId, optionId: option.optionId });
-    entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.id === first.entryId)!;
-    assert.deepEqual(entry.options.map((o) => [o.label, o.status, o.isFinal]), [["A", "APPROVED", true]]);
+    assert.deepEqual(await optionsOf(), [["A", "DRAFT", false]], "deleting the final option never promotes another one");
 
     await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: first.entryId });
-    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["PT-01"]);
-    assert.equal(second.entryId.length > 0, true);
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => [e.id, e.code]), [[second.entryId, "PT-02"]], "later codes keep their number after a delete");
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["PT-02", "PT-03"], "a new row takes one past the highest number");
+  });
+
+  it("reorders by handing the group's own numbers out again, so a deleted code stays empty", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    const one = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    const two = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    const three = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: two.entryId });
+    await sf.schedule.reorderEntries({ ...as(designer), projectId, section: "MATERIAL", prefix: "PT", orderedIds: [three.entryId, one.entryId] });
+    const codes = Object.fromEntries((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((row) => [row.id, row.code]));
+    assert.deepEqual([codes[three.entryId], codes[one.entryId]], ["PT-01", "PT-03"], "the two rows swap PT-01 and PT-03; PT-02 stays empty");
+    await sf.schedule.moveEntry({ ...as(designer), projectId, entryId: one.entryId, direction: "up" });
+    const moved = Object.fromEntries((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((row) => [row.id, row.code]));
+    assert.deepEqual([moved[one.entryId], moved[three.entryId]], ["PT-01", "PT-03"]);
+  });
+
+  it("orders categories by the studio template order, unknown categories after, A to Z", async () => {
+    await sf.schedule.createTemplateItem({ ...as(designer), section: "MATERIAL", category: "Wallpaper", snapshot: { productName: "" } });
+    await sf.schedule.createTemplateItem({ ...as(designer), section: "MATERIAL", category: "Paint", snapshot: { productName: "" } });
+    const { projectId } = await newProject();
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Brick" });
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Acrylic" });
+    const categories = [...new Set((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((row) => row.category))];
+    assert.deepEqual(categories, ["Wallpaper", "Paint", "Acrylic", "Brick"]);
   });
 
   it("keeps quantity and unit for Fixture only", async () => {
@@ -1493,7 +1523,9 @@ describe("SF-R3 Product Schedule", () => {
     });
     assert.equal(imported.created, 1);
     // An article-code column is appended to Type rather than stored twice (R8.111).
-    assert.ok((await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId, section: "MATERIAL" })).some((row) => row.options[0].productName === "Granitio - GR-1"));
+    const tile = (await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId, section: "MATERIAL" })).find((row) => row.options[0]?.productName === "Granitio - GR-1");
+    assert.ok(tile);
+    assert.deepEqual([tile.qty, tile.unit, tile.location], [null, null, "Lobby"], "a Material line never keeps qty or unit, imported or not");
     assert.notEqual(sourceEntry.entryId, targetEntry.entryId);
   });
 
@@ -1680,7 +1712,7 @@ describe("SF-R3 Product Schedule", () => {
 
     const moved = await sf.schedule.moveEntryToCategory({ ...as(designer), projectId, entryId: a.entryId, category: "wallpaper" });
     assert.equal(moved.code, "WP-01");
-    assert.deepEqual((await list()).map((row) => [row.code, row.category]), [["PT-01", "Paint"], ["PT-02", "Paint"], ["WP-01", "Wallpaper"]]);
+    assert.deepEqual((await list()).map((row) => [row.code, row.category]), [["PT-02", "Paint"], ["PT-03", "Paint"], ["WP-01", "Wallpaper"]], "the moved row's old code PT-01 is left empty");
   });
 
   it("imports the legacy Google Sheets export and updates existing codes", async () => {
@@ -1708,6 +1740,45 @@ describe("SF-R3 Product Schedule", () => {
     await testDb.prisma.sfSchedulePrefix.create({ data: { section: "MATERIAL", category: "Tile Wall", category_key: "TILE WALL", prefix: "FL" } });
     await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: "Code,Product Category,Ex,Type\nFL-09,,Brand,Thing" }), "SCHEDULE_CSV_CATEGORY");
     assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).length, 3, "a failed import writes nothing");
+  });
+
+  it("re-imports a sheet without wiping specs, photo or decision, and keeps the sheet's own codes", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    const existing = await sf.schedule.createEntry({
+      ...as(designer), projectId, section: "MATERIAL", category: "Paint",
+      snapshot: { productName: "Old paint", brandName: "Dulux", color: "Pink", finishing: "Matt", dimension: "5 L", extra: [{ label: "Coverage", value: "12 m²/L" }] },
+    });
+    const optionId = (await sf.schedule.listSchedule({ grants: ALL, projectId }))[0].options[0].id;
+    await sf.schedule.setOptionImage({ ...as(designer), projectId, optionId, file: png() });
+    await sf.schedule.markFinal({ ...as(designer), projectId, optionId });
+    const photoKey = (await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: optionId } })).image_key;
+    assert.ok(photoKey);
+
+    // Rows out of order and with a gap (FL-02 was deleted in the sheet).
+    const sheet = [
+      "Code,Product Category,Ex,Type,Initials Type,Image,Location,Contact,Qty,Unit",
+      "FL-03,Floor Tile,Roman,Granitio,,,Lobby,,,",
+      "FL-01,Floor Tile,Roman,dBasic,,,Toilet,,,",
+      "PT-01,,Dulux,Easy Clean,,,Bedroom,,,",
+    ].join("\n");
+    assert.deepEqual(await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: sheet }), { created: 2, updated: 1 });
+    const rows = await sf.schedule.listSchedule({ grants: ALL, projectId, section: "MATERIAL" });
+    const pt = rows.find((row) => row.id === existing.entryId)!.options[0];
+    assert.deepEqual(
+      [pt.productName, pt.brandName, pt.color, pt.finishing, pt.dimension, pt.extra, pt.isFinal],
+      ["Easy Clean", "Dulux", "Pink", "Matt", "5 L", [{ label: "Coverage", value: "12 m²/L" }], true],
+      "only brand, type and notes come from the sheet; specs and the decision stay",
+    );
+    assert.equal((await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: optionId } })).image_key, photoKey, "the photo stays");
+    assert.equal(storage.objects.size, 1);
+    assert.deepEqual(rows.filter((row) => row.category === "Floor Tile").map((row) => [row.code, row.options[0].productName, row.options[0].isFinal]), [["FL-01", "dBasic", false], ["FL-03", "Granitio", false]], "sheet codes are kept, gap and all; imported rows are proposals");
+
+    assert.deepEqual(await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: sheet }), { created: 0, updated: 3 }, "importing the same sheet again finds the same rows");
+    assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).length, 3, "no duplicates");
+    // The photo test after this one expects an empty store.
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: existing.entryId });
+    assert.equal(storage.objects.size, 0);
   });
 
   it("manages template items and skips inactive ones", async () => {

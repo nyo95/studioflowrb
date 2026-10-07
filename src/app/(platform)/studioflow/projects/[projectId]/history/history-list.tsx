@@ -74,6 +74,7 @@ const PHRASES: Record<string, string> = {
   "studioflow.schedule.option-created": "added a schedule option",
   "studioflow.schedule.option-updated": "edited a schedule option",
   "studioflow.schedule.option-finalized": "set a final schedule option",
+  "studioflow.schedule.option-unfinalized": "unset a final schedule option",
   "studioflow.schedule.option-deleted": "deleted a schedule option",
   "studioflow.schedule.option-reused": "copied a product from a past project",
   "studioflow.schedule.templates-applied": "applied schedule templates",

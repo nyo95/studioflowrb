@@ -320,8 +320,12 @@ export function scheduleSearchKey(input: ScheduleSnapshotInput): string {
     .join(" | ");
 }
 
-export function nextGapless(entries: Array<{ increment: number }>): number {
-  return entries.length + 1;
+/**
+ * Next number in a code group: one past the highest. Codes are stable (owner, 2026-10-07): a deleted
+ * row leaves its number empty and later codes never shift, because a code may already sit on a drawing.
+ */
+export function nextIncrement(entries: Array<{ increment: number }>): number {
+  return entries.reduce((max, entry) => Math.max(max, entry.increment), 0) + 1;
 }
 
 export function isPermutation(current: readonly string[], next: readonly string[]): boolean {

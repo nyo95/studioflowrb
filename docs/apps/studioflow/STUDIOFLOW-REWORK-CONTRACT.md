@@ -496,10 +496,19 @@ offers the Qty row when `section = FIXTURE`.
 
 ### 11.2 Numbering
 
-Legacy renumbering via negative temporary values is replaced by one
-transactional renumber that uses a deferrable unique constraint or a
-two-phase update inside the service (Executor chooses; behavior must match:
-codes stay gapless per `(project, section, prefix)` after add/delete/reorder).
+**Codes are stable (owner, 2026-10-07; replaces the earlier gapless rule).** A
+code may already be on a drawing or a document sent out, so it never shifts
+by itself: deleting a row or moving it to another category leaves its number
+empty, and a new row takes one past the highest number in its group (so only
+the highest number can come back after its row is deleted). Reorder (drag,
+up/down) hands the group's existing numbers out again in the new order inside
+one transaction (two-phase update): only the rows that moved get another
+code, and a gap stays a gap. A Google Sheets import keeps the sheet's own
+code when its prefix is the category's and the number is free (§11.6).
+
+**Category order.** Categories follow the studio template category order;
+categories the templates do not know come after, A to Z. There is no
+per-project category order yet.
 
 **One prefix per category (2026-10-04).** Because numbering, reorder and
 move are per prefix, two categories must never share one inside a project
@@ -519,7 +528,11 @@ other category keeps its code slots.
 **typed columns** (brand id/name via Master Data public Brand port, `product_name`,
 color, pattern, finishing, dimension, notes, image key?) plus an `extra` JSON
 array (§11.9) and derived `search_key`. Marking final approves it and sets
-siblings NOT_USED; deleting the final option promotes the next sibling.
+siblings NOT_USED. **Only "Set as final" decides (owner, 2026-10-07):** every
+new option starts DRAFT and not final, however the row was added (quick add,
+Add item, template, import). "Unset final" and deleting the final option both
+return the row to "needs a decision" (every option DRAFT, none final); no
+other option is promoted by itself.
 
 **Vocabulary (owner decision 2026-09-23).** Three things were previously all
 called "metadata"; they are now named separately everywhere — UI, code and
@@ -600,12 +613,18 @@ live option always names a real product.
 - New projects receive every active template item once (same routine as
   "Apply templates"); a template item with Type left blank seeds a reserved row.
 - Moving a row to another category gives it the next code of that category's
-  prefix and renumbers the old group; one category spelling per project.
+  prefix and leaves its old code empty; one category spelling per project.
 - CSV import accepts the legacy Google Sheets export (header row starting with
   `Code`; Material needs `Product Category`, both need `Ex` and `Type`; `Qty`
-  is ignored on Material like legacy). Existing codes update the final option
-  (brand text, product, notes from initials/contact/image) and
-  qty/unit/location; new codes add rows. Category: sheet value, else the
+  is ignored on Material like legacy, and so is `Unit`). Existing codes update
+  the option the card shows (the final one, else the first) with only what the
+  sheet carries: brand text (the Master Data brand link is dropped only when
+  the brand text changes), Type and notes from initials/contact/image, each
+  only when the cell is filled. Colour, pattern, finishing, size, extra specs,
+  photo and the final decision are kept (R8.382: the earlier full overwrite
+  wiped them). Qty/unit/location update as before. New codes add rows under
+  the sheet's own code when free, so importing the same sheet again matches
+  the same rows whatever the row order or gaps. Category: sheet value, else the
   prefix dictionary (must be unique). A category seen for the first time
   registers the sheet prefix. Any row error rolls back the whole import.
   Legacy duplicate-product checks are not ported; image URLs from the sheet

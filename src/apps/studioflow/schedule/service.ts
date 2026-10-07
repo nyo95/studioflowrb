@@ -11,7 +11,7 @@ import {
   compareOptionLabels,
   fallbackPrefix,
   isPermutation,
-  nextGapless,
+  nextIncrement,
   nextOptionLabel,
   isScheduleCardFieldKey,
   normalizeExtraFields,
@@ -215,10 +215,6 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     });
   }
 
-  async function entryIds(tx: TxClient, projectId: string, section: ScheduleSection, prefix: string) {
-    return (await codeGroup(tx, projectId, section, prefix)).map((row) => row.id);
-  }
-
   /**
    * The full code-group order after reordering one category inside it. New categories never share a
    * prefix (`categoryPrefix`), but projects created before that rule may hold two categories under one
@@ -235,14 +231,20 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     return group.map((row) => (row.category_key === key ? orderedIds[next++] : row.id));
   }
 
-  async function renumber(tx: TxClient, projectId: string, section: ScheduleSection, prefix: string, orderedIds?: readonly string[]) {
-    const ids = orderedIds ? [...orderedIds] : await entryIds(tx, projectId, section, prefix);
-    const temporaryBase = ids.length + 1_000;
-    for (const [index, id] of ids.entries()) {
-      await tx.sfScheduleEntry.update({ where: { id }, data: { increment: temporaryBase + index, sort_order: index + 1 } });
+  /**
+   * Reorder a code group by handing its existing numbers out again in the new order. The set of numbers
+   * never changes (owner, 2026-10-07: codes are stable): a gap left by a deleted row stays a gap, and only
+   * the rows that actually moved get a different code.
+   */
+  async function reassignCodes(tx: TxClient, projectId: string, section: ScheduleSection, prefix: string, orderedIds: readonly string[]) {
+    const rows = await tx.sfScheduleEntry.findMany({ where: { project_id: projectId, section, prefix }, select: { id: true, increment: true } });
+    const slots = rows.map((row) => row.increment).sort((a, b) => a - b);
+    const temporaryBase = (slots.at(-1) ?? 0) + 1_000;
+    for (const [index, id] of orderedIds.entries()) {
+      await tx.sfScheduleEntry.update({ where: { id }, data: { increment: temporaryBase + index } });
     }
-    for (const [index, id] of ids.entries()) {
-      await tx.sfScheduleEntry.update({ where: { id }, data: { increment: index + 1, sort_order: index + 1 } });
+    for (const [index, id] of orderedIds.entries()) {
+      await tx.sfScheduleEntry.update({ where: { id }, data: { increment: slots[index], sort_order: slots[index] } });
     }
   }
 
@@ -284,10 +286,10 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     await tx.sfScheduleEntry.update({ where: { id: entryId }, data: { active_index: Math.max(index, 0) } });
   }
 
-  async function promoteFirstOption(tx: TxClient, entryId: string) {
-    const [next] = await orderedOptions(tx, entryId);
-    if (!next) return;
-    await tx.sfScheduleOption.update({ where: { id: next.id }, data: { is_final: true, status: "APPROVED" } });
+  /** No final any more: the row is undecided again, so no option reads as "Not used" (owner, 2026-10-07). */
+  async function clearDecision(tx: TxClient, entryId: string) {
+    await tx.sfScheduleOption.updateMany({ where: { entry_id: entryId }, data: { is_final: false, status: "DRAFT" } });
+    await syncActiveIndex(tx, entryId);
   }
 
   return {
@@ -298,11 +300,19 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     async listSchedule(input: ReadContext & { projectId: string; section?: string }) {
       requireRead(input.grants);
       const section = input.section ? sectionOf(input.section) : undefined;
-      const rows = await db.sfScheduleEntry.findMany({
-        where: { project_id: input.projectId, ...(section ? { section } : {}) },
-        orderBy: [{ section: "asc" }, { category_key: "asc" }, { increment: "asc" }],
-        include: { options: { include: { sample_requests: { orderBy: { created_at: "desc" }, take: 1 } } } },
-      });
+      const [unordered, templateCategories] = await Promise.all([
+        db.sfScheduleEntry.findMany({
+          where: { project_id: input.projectId, ...(section ? { section } : {}) },
+          orderBy: [{ section: "asc" }, { category_key: "asc" }, { increment: "asc" }],
+          include: { options: { include: { sample_requests: { orderBy: { created_at: "desc" }, take: 1 } } } },
+        }),
+        db.sfScheduleTemplateCategory.findMany({ select: { section: true, category_key: true, sort_order: true } }),
+      ]);
+      // Categories follow the studio template order; categories the templates do not know come after, A to Z.
+      const templateOrder = new Map(templateCategories.map((row) => [`${row.section}:${row.category_key}`, row.sort_order]));
+      const rankOf = (entry: { section: string; category_key: string }) => templateOrder.get(`${entry.section}:${entry.category_key}`) ?? Number.MAX_SAFE_INTEGER;
+      const sectionRank = (value: string) => (SCHEDULE_SECTIONS as readonly string[]).indexOf(value);
+      const rows = [...unordered].sort((a, b) => sectionRank(a.section) - sectionRank(b.section) || rankOf(a) - rankOf(b) || a.category_key.localeCompare(b.category_key) || a.increment - b.increment);
       const keys = [...new Set(rows.flatMap((entry) => entry.options.map((option) => option.image_key)).filter((key): key is string => !!key))];
       const urls = new Map(await Promise.all(keys.map(async (key) => [key, await signedUrl(key)] as const)));
       return rows.map((entry) => ({
@@ -602,8 +612,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       const result = await runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
         const images = await tx.sfScheduleOption.findMany({ where: { entry_id: entry.id }, select: { image_key: true } });
+        // Later codes keep their number: the deleted code is left empty, never shifted into.
         await tx.sfScheduleEntry.delete({ where: { id: entry.id } });
-        await renumber(tx, input.projectId, entry.section, entry.prefix);
         await writeAudit(ports, tx, { action: "studioflow.schedule.entry-deleted", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) } });
         return { entryId: entry.id, imageKeys: images.map((row) => row.image_key) };
       });
@@ -619,7 +629,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         await loadWritableProject(tx, input.projectId);
         const merged = mergeCategoryOrder(await codeGroup(tx, input.projectId, section, prefix), input.orderedIds);
         if (!merged) throw invalid("SCHEDULE_REORDER_INVALID", "The schedule changed. Refresh and try again.");
-        await renumber(tx, input.projectId, section, prefix, merged);
+        await reassignCodes(tx, input.projectId, section, prefix, merged);
         await writeAudit(ports, tx, { action: "studioflow.schedule.entries-reordered", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { section, prefix, count: input.orderedIds.length } });
         return { count: input.orderedIds.length };
       });
@@ -638,7 +648,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         if (index < 0 || target < 0 || target >= own.length) return { entryId: entry.id };
         [own[index], own[target]] = [own[target], own[index]];
         const ids = mergeCategoryOrder(group, own)!;
-        await renumber(tx, input.projectId, entry.section, entry.prefix, ids);
+        await reassignCodes(tx, input.projectId, entry.section, entry.prefix, ids);
         await writeAudit(ports, tx, { action: "studioflow.schedule.entries-reordered", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { projectId: input.projectId, section: entry.section, prefix: entry.prefix, count: ids.length } });
         return { entryId: entry.id };
       });
@@ -664,9 +674,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key } });
         } else {
           const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: input.projectId, section: entry.section, prefix }, select: { increment: true }, orderBy: { increment: "asc" } });
-          const increment = nextGapless(siblings);
+          const increment = nextIncrement(siblings);
+          // The old code is left empty in its group; nothing there shifts.
           await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key, prefix, increment, sort_order: increment } });
-          await renumber(tx, input.projectId, entry.section, entry.prefix);
         }
         const moved = await tx.sfScheduleEntry.findUniqueOrThrow({ where: { id: entry.id } });
         await writeAudit(ports, tx, { action: "studioflow.schedule.entry-moved", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, changes: { category: { from: entry.category, to: category.label }, code: { from: fromCode, to: scheduleCode(moved.prefix, moved.increment) } }, metadata: { projectId: input.projectId } });
@@ -724,14 +734,27 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       });
     },
 
+    /** Undo a decision: the client changed their mind and the row needs a decision again. */
+    async unmarkFinal(input: CommandContext & { projectId: string; optionId: string }) {
+      await requireScheduleCommand(input);
+      return runTransaction(async (tx) => {
+        const option = await loadOption(tx, input.projectId, input.optionId, true);
+        if (!option.is_final) return { optionId: option.id };
+        await clearDecision(tx, option.entry_id);
+        await writeAudit(ports, tx, { action: "studioflow.schedule.option-unfinalized", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id } });
+        return { optionId: option.id };
+      });
+    },
+
     async deleteOption(input: CommandContext & { projectId: string; optionId: string }) {
       await requireScheduleCommand(input);
       const result = await runTransaction(async (tx) => {
         const option = await loadOption(tx, input.projectId, input.optionId, true);
         const wasFinal = option.is_final;
         await tx.sfScheduleOption.delete({ where: { id: option.id } });
-        if (wasFinal) await promoteFirstOption(tx, option.entry_id);
-        await syncActiveIndex(tx, option.entry_id);
+        // Deleting the final option never picks a replacement the client did not choose.
+        if (wasFinal) await clearDecision(tx, option.entry_id);
+        else await syncActiveIndex(tx, option.entry_id);
         await writeAudit(ports, tx, { action: "studioflow.schedule.option-deleted", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id, wasFinal } });
         return { optionId: option.id, imageKey: option.image_key };
       });
@@ -906,8 +929,10 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     /**
      * CSV import. The legacy Google Sheets export (header row starting with
      * `code`, columns `product category` / `ex` / `type` …) is the primary
-     * format: a code that already exists updates that row's final option and
-     * quantities; a new code adds a row (numbering stays gapless). A simple
+     * format: a code that already exists updates the brand, type and notes of
+     * the option the card shows (its other specs, photo and decision stay) and
+     * the quantities; a new code adds a row under that same code when it is
+     * free, so importing the sheet again finds the same rows. A simple
      * `category,brand,product,…` sheet is accepted as a fallback.
      */
     async importCsv(input: CommandContext & { projectId: string; section: string; csv?: string; file?: { name: string; data: Buffer } }) {
@@ -929,9 +954,10 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
               row.imageUrl ? `Image: ${row.imageUrl}` : null,
             ].filter(Boolean).join("\n") || null;
             const snapshot: SnapshotInput = { brandName: row.brand, productName: row.product || "Imported", notes };
+            // Qty and unit belong to Fixture only, as everywhere else.
             const quantities = {
-              ...(row.qty !== null ? { qty: decimalText(row.qty.replace(",", ".")) } : {}),
-              ...(row.unit !== null ? { unit: optionalText(row.unit, 40) } : {}),
+              ...(section === "FIXTURE" && row.qty !== null ? { qty: decimalText(row.qty.replace(",", ".")) } : {}),
+              ...(section === "FIXTURE" && row.unit !== null ? { unit: optionalText(row.unit, 40) } : {}),
               ...(row.location !== null ? { location: optionalText(row.location, 160) } : {}),
             };
             const existing = code
@@ -940,15 +966,27 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
             if (existing) {
               const options = await orderedOptions(tx, existing.id);
               const target = options.find((option) => option.is_final) ?? options[0];
-              const data = optionData(cleanSnapshot(snapshot));
               if (target) {
-                await tx.sfScheduleOption.updateMany({ where: { entry_id: existing.id, id: { not: target.id }, is_final: true }, data: { is_final: false, status: "NOT_USED" } });
-                await tx.sfScheduleOption.update({ where: { id: target.id }, data: { ...data, brand_id: null, is_final: true, status: "APPROVED" } });
+                // The sheet only carries brand, type and notes: those are updated, everything the sheet has no
+                // column for (colour, pattern, finishing, size, extra specs, photo) is kept, and so is the decision.
+                const brandChanged = row.brand !== null && row.brand !== target.brand_name;
+                const merged = cleanSnapshot({
+                  brandId: brandChanged ? null : target.brand_id,
+                  brandName: row.brand ?? target.brand_name,
+                  productName: row.product ?? target.product_name,
+                  color: target.color,
+                  pattern: target.pattern,
+                  finishing: target.finishing,
+                  dimension: target.dimension,
+                  extra: normalizeExtraFields(target.extra),
+                  notes: notes ?? target.notes,
+                  imageKey: target.image_key,
+                });
+                await tx.sfScheduleOption.update({ where: { id: target.id }, data: optionData(merged) });
               } else {
-                await tx.sfScheduleOption.create({ data: { entry_id: existing.id, label: "A", is_final: true, status: "APPROVED", ...data } });
+                await tx.sfScheduleOption.create({ data: { entry_id: existing.id, label: "A", ...optionData(cleanSnapshot(snapshot)) } });
               }
               if (Object.keys(quantities).length > 0) await tx.sfScheduleEntry.update({ where: { id: existing.id }, data: quantities });
-              await syncActiveIndex(tx, existing.id);
               updated += 1;
               continue;
             }
@@ -978,6 +1016,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
               unit: quantities.unit ?? null,
               location: quantities.location ?? null,
               snapshot,
+              // Keep the sheet's own code, so the next import of the same sheet finds this row again.
+              code,
             });
             created += 1;
           }
@@ -1001,8 +1041,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
             section,
             category: category.label,
             categoryKey: category.key,
-            qty: decimalText(row.qty || row.quantity || null),
-            unit: optionalText(row.unit || null, 40),
+            qty: section === "FIXTURE" ? decimalText(row.qty || row.quantity || null) : null,
+            unit: section === "FIXTURE" ? optionalText(row.unit || null, 40) : null,
             location: optionalText(row.location || row.area || null, 160),
             snapshot: {
               brandName,

@@ -1,5 +1,17 @@
 # Changelog
 
+## R8.382 | 2026-10-07 | fix(studioflow): Product Schedule logic and flow review - stable codes, decisions only by Set as final, safe re-import (Lead)
+
+- **Owner review, all recommendations applied (owner, 2026-10-07: "ikut rekomendasi kamu semua").**
+- **Only "Set as final" decides.** A product typed while adding a row (quick add, Add item), a template seed and an import used to create option A already Final, so "X of Y final" counted decisions nobody made; every new option now starts DRAFT. New "Unset final" (`unmarkFinal`, audit `option-unfinalized`, History label) and deleting the final option both put the row back to "needs a decision" (all options DRAFT); no other option is promoted by itself.
+- **Codes are stable.** Delete and move-to-category no longer renumber: the old code is left empty and a new row takes highest + 1 (`nextIncrement` replaces `nextGapless`). Reorder (drag, up/down) hands out the group's existing numbers in the new order (`reassignCodes`), so a gap stays a gap. Quick-add tile and dialog texts follow.
+- **Google Sheets re-import no longer destroys data.** Proven against the old code first (same test, old service): re-importing wiped colour/finishing/size/extra specs (and the photo pointer), and a sheet with a gap or rows out of order overwrote the wrong row (FL-03 became FL-01, then the FL-01 row replaced it). Now an existing code updates only brand text, Type and notes when the cell is filled; specs, photo and decision stay; the brand link is dropped only when the brand text changes. New rows keep the sheet's own code when free, so the same sheet re-imports onto the same rows. Material imports (both layouts) no longer store Qty/Unit.
+- **Category order** follows the studio template category order, then A to Z (was always A to Z).
+- **Screen.** Right-click a board card → Open / Delete (new UI Engine `ContextActionMenu`, same items and look as `RowActionMenu`). "New category" is an inline one-line field instead of the full Add item drawer, warns when the name already exists, and also shows in an empty section. After saving a new option the panel shows that option instead of an empty form. "Apply studio templates" asks first and says how many items were added.
+- Contract §11.2, §11.3, §11.6 updated. BACKLOG: browser walk [UNVERIFIED], old automatic Finals [BLOCKED] (owner decision on a data fix), per-project category order and never-reused top code [PLANNED].
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 877/877 (none failed, skipped or cancelled; 3 new schedule tests, 2 updated for the new rules). `npm run build` not run: another session's dev server is using this checkout. Browser not opened (owner tests in the browser).
+
 ## R8.381 | 2026-10-07 | feat(studioflow): real calendar Gantt on the Timeline and a per-project Timeline tab - WO-SF-GANTT-01 (Lead)
 
 - **Gantt.** One shared calendar axis (Week/Month zoom, weekend shading, today line; opens with today a third in). Bars sit at their real dates, a phase with one date is a marker, a phase with none is not drawn (the row says "N phases without dates") - the old equal-width slots implied dates nobody set. Geometry is pure and tested (`domain/gantt.ts`). The chart is app-owned for now (`_components/gantt-chart.tsx`); it moves to the UI Engine when a second app needs a Gantt.

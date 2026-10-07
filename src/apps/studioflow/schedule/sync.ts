@@ -1,7 +1,7 @@
 import {
   fallbackPrefix,
   normalizeSchedulePrefix,
-  nextGapless,
+  nextIncrement,
   normalizeExtraFields,
   orderCardFields,
   scheduleSearchKey,
@@ -131,10 +131,13 @@ export async function createEntryWithOptionalOption(tx: TxClient, input: {
   cardFields?: readonly string[] | null;
   templateItemId?: string | null;
   snapshot?: SnapshotInput | null;
+  /** An imported sheet's own code: kept when its prefix is the category's and the number is free. */
+  code?: { prefix: string; increment: number } | null;
 }) {
   const { label: categoryLabel, prefix } = await categoryPrefix(tx, { projectId: input.projectId, section: input.section, category: input.category, categoryKey: input.categoryKey });
   const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: input.projectId, section: input.section, prefix }, orderBy: { increment: "asc" }, select: { increment: true } });
-  const increment = nextGapless(siblings);
+  const keepCode = input.code && input.code.prefix === prefix && !siblings.some((row) => row.increment === input.code!.increment);
+  const increment = keepCode ? input.code!.increment : nextIncrement(siblings);
   const entry = await tx.sfScheduleEntry.create({
     data: {
       project_id: input.projectId,
@@ -151,10 +154,12 @@ export async function createEntryWithOptionalOption(tx: TxClient, input: {
       template_item_id: input.templateItemId ?? null,
     },
   });
+  // The first product is a proposal, not a decision (owner, 2026-10-07): only "Set as final" makes it final,
+  // however the row was added (quick add, Add item, template, import).
   if (input.snapshot) {
     const snapshot = cleanSnapshot(input.snapshot);
     await tx.sfScheduleOption.create({
-      data: { entry_id: entry.id, label: "A", is_final: true, status: "APPROVED", ...optionData(snapshot) },
+      data: { entry_id: entry.id, label: "A", ...optionData(snapshot) },
     });
   }
   return entry;

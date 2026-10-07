@@ -70,6 +70,7 @@ describe("UI Engine foundation", () => {
       "ErrorState",
       "InlineError",
       "RowActionMenu",
+      "ContextActionMenu",
       "useRowAction",
       "FilterBar",
       "SelectionBar",

@@ -782,6 +782,16 @@ export async function markScheduleFinalAction(input: z.infer<typeof ScheduleOpti
   });
 }
 
+export async function unmarkScheduleFinalAction(input: z.infer<typeof ScheduleOptionRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleOptionRef, input);
+    const result = await studioFlow.schedule.unmarkFinal({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
 export async function deleteScheduleOptionAction(input: z.infer<typeof ScheduleOptionRef>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const ctx = await context();

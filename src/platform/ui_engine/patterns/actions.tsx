@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronDown,Filter,MoreHorizontal,X } from "lucide-react";
-import { DropdownMenu } from "radix-ui";
+import { ContextMenu,DropdownMenu } from "radix-ui";
 import { Fragment,type HTMLAttributes,type ReactNode,useState,useTransition } from "react";
 
 import { cx } from "../internal/cx";
@@ -99,6 +99,43 @@ export function RowActionMenu({
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+  );
+}
+
+/**
+ * Right-click menu around any element; same items and look as `RowActionMenu`.
+ * Renders children untouched when there are no items.
+ */
+export function ContextActionMenu({
+  items,
+  children,
+}: {
+  items: readonly RowActionItem[];
+  children: ReactNode;
+}) {
+  if (items.length === 0) return <>{children}</>;
+  return (
+    <ContextMenu.Root>
+      <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
+      <ContextMenu.Portal>
+        <ContextMenu.Content className="z-[65] min-w-[190px] overflow-hidden rounded-control bg-surface-raised shadow-elevated p-[5px]">
+          {items.map((item) => (
+            <Fragment key={item.label}>
+              {item.separatorBefore ? <ContextMenu.Separator className="-mx-px my-1 h-px bg-line" /> : null}
+              <ContextMenu.Item
+                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-action px-2 py-1.5 text-sm text-ink outline-0 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-ink-tertiary data-[danger=true]:text-danger data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted"
+                data-danger={item.danger || undefined}
+                disabled={item.disabled}
+                onSelect={item.onSelect}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </ContextMenu.Item>
+            </Fragment>
+          ))}
+        </ContextMenu.Content>
+      </ContextMenu.Portal>
+    </ContextMenu.Root>
   );
 }
 

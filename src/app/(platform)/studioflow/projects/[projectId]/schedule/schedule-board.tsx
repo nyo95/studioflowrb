@@ -43,6 +43,7 @@ import {
   Input,
   ProgressBar,
   PillTabs,
+  ContextActionMenu,
   RowActionMenu,
   Select,
   SimpleTextEditor,
@@ -74,6 +75,7 @@ import {
   setScheduleOptionImageAction,
   updateScheduleEntryAction,
   updateScheduleEntryCardFieldsAction,
+  unmarkScheduleFinalAction,
   updateScheduleOptionAction,
 } from "../../../actions";
 import { ExtraFieldsEditor } from "../../../_components/extra-fields-editor";
@@ -256,7 +258,9 @@ function entryBadges(entry: ScheduleEntryView): Array<{ label: string; tone: "su
 function QuickAddTile({ group, command, projectId, section }: { group: { category: string; rows: ScheduleEntryView[] }; command: Command; projectId: string; section: Section }) {
   const [productName, setProductName] = useState("");
   const prefix = group.rows[0]?.code.split("-")[0] ?? "";
-  const nextCode = `${prefix}-${String(group.rows.length + 1).padStart(2, "0")}`;
+  // One past the highest number, as the server numbers it: a deleted code is left empty, never reused in between.
+  const highest = group.rows.reduce((max, row) => Math.max(max, Number(row.code.split("-")[1]) || 0), 0);
+  const nextCode = `${prefix}-${String(highest + 1).padStart(2, "0")}`;
   const key = `quick-add-${section}-${group.category}`;
   const submit = async () => {
     const value = productName.trim();
@@ -267,6 +271,32 @@ function QuickAddTile({ group, command, projectId, section }: { group: { categor
     <form className="grid min-h-36 content-center gap-2 border border-dashed border-line px-3 py-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
       <Input aria-label={`Quick add to ${group.category}`} value={productName} onChange={(event) => setProductName(event.target.value)} maxLength={200} placeholder="Type, or leave empty to reserve" density="compact" />
       <Button type="submit" size="sm" variant="secondary" pending={command.isPending(key)}>{`Add ${nextCode}`}</Button>
+    </form>
+  );
+}
+
+/** One-line "New category": type a name, and it reserves the category's first code (the backend assigns the code letters). */
+function NewCategoryInline({ command, projectId, section, categories, className = "justify-self-start" }: { command: Command; projectId: string; section: Section; categories: readonly string[]; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const key = `new-category-${section}`;
+  // Same comparison as the server's category key: trimmed, single-spaced, case-insensitive.
+  const keyOf = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase("id-ID");
+  const existing = name.trim() ? categories.find((category) => keyOf(category) === keyOf(name)) ?? null : null;
+  const submit = async () => {
+    const value = name.trim();
+    if (!value || existing) return;
+    const ok = await command.run(key, () => createScheduleEntryAction({ projectId, section, category: value, qty: null, unit: null, location: null, snapshot: null }));
+    if (ok) { setName(""); setOpen(false); }
+  };
+  if (!open) return <Button size="sm" variant="ghost" leadingIcon={<Plus className="h-3.5 w-3.5" />} className={className} onClick={() => setOpen(true)}>New category</Button>;
+  return (
+    <form className={`grid max-w-md gap-1 ${className}`} onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+      <div className="flex items-center gap-2">
+        <Input aria-label="New category name" autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") { setName(""); setOpen(false); } }} maxLength={80} placeholder="Category name, e.g. Paint" density="compact" />
+        <Button type="submit" size="sm" variant="secondary" pending={command.isPending(key)} disabled={!name.trim() || Boolean(existing)}>Add</Button>
+      </div>
+      {existing ? <Text size="sm" tone="tertiary">{`${existing} already exists. Add to it with its own add tile.`}</Text> : null}
     </form>
   );
 }
@@ -282,7 +312,7 @@ function BoardView({
   filter,
   section,
   onReorder,
-  onNewCategory,
+  onDelete,
 }: {
   projectId: string;
   groups: Array<{ category: string; rows: ScheduleEntryView[] }>;
@@ -292,7 +322,7 @@ function BoardView({
   filter: ScheduleFilter;
   section: Section;
   onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
-  onNewCategory: () => void;
+  onDelete: (entry: ScheduleEntryView) => void;
 }) {
   const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
   const reorderEnabled = canEdit && filter === "all";
@@ -310,8 +340,14 @@ function BoardView({
                 .map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as [string, string | null | undefined]);
               const badges = entryBadges(entry);
               return (
-                <article
+                <ContextActionMenu
                   key={entry.id}
+                  items={canEdit ? [
+                    { label: "Open", onSelect: () => onOpen(entry.id) },
+                    { label: "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(entry) },
+                  ] : []}
+                >
+                <article
                   draggable={reorderEnabled}
                   onDragStart={start(entry.id)}
                   onDragEnd={end}
@@ -350,13 +386,14 @@ function BoardView({
                   </span>
                   </button>
                 </article>
+                </ContextActionMenu>
               );
             })}
             {canEdit && filter === "all" ? <QuickAddTile group={group} command={command} projectId={projectId} section={section} /> : null}
           </div>
         </section>
       ))}
-      {canEdit && filter === "all" ? <Button size="sm" variant="ghost" leadingIcon={<Plus className="h-3.5 w-3.5" />} className="justify-self-start" onClick={onNewCategory}>New category</Button> : null}
+      {canEdit && filter === "all" ? <NewCategoryInline command={command} projectId={projectId} section={section} categories={groups.map((group) => group.category)} /> : null}
     </div>
   );
 }
@@ -387,6 +424,7 @@ export function ScheduleBoard({
   const [openId, setOpenId] = useState<string | null>(null);
   const [autoPhotoOptionId, setAutoPhotoOptionId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const editorDirtyRef = useRef(false);
   const listDrag = useRowDrag();
 
@@ -456,12 +494,26 @@ export function ScheduleBoard({
   const removeEntry = async (entry: ScheduleEntryView) => {
     const ok = await confirm.confirm({
       title: `Delete ${entry.code}?`,
-      description: "The item and all its options are removed. Later codes in this group move up to close the gap.",
+      description: `The item and all its options are removed. Other codes stay as they are; ${entry.code} is left empty.`,
       confirmLabel: "Delete item",
       tone: "danger",
     });
     if (!ok) return;
     if (await run(`${entry.id}-delete`, () => deleteScheduleEntryAction({ projectId, entryId: entry.id }))) setOpenId(null);
+  };
+
+  const applyTemplates = async () => {
+    setNotice(null);
+    const ok = await confirm.confirm({
+      title: "Apply studio templates?",
+      description: "Every active studio template item this project does not have yet is added, as a proposal (not final). Items already here are not changed.",
+      confirmLabel: "Apply templates",
+    });
+    if (!ok) return;
+    await run("templates", () => applyScheduleTemplatesAction({ projectId }), (data) => {
+      const created = data && typeof data === "object" && "created" in data && typeof data.created === "number" ? data.created : 0;
+      setNotice(created === 0 ? "Nothing to add: this project already has every studio template item." : `${created} template item${created === 1 ? "" : "s"} added.`);
+    });
   };
 
   /** Reorder within one category group (one code prefix); drag targets never span groups. */
@@ -499,7 +551,7 @@ export function ScheduleBoard({
           </Link>
           {canEdit || canManageTemplates ? <ButtonMenu label="Set up" variant="secondary" items={[
             ...(canEdit ? [
-              { label: "Apply studio templates", onSelect: () => { void run("templates", () => applyScheduleTemplatesAction({ projectId })); } },
+              { label: "Apply studio templates", onSelect: () => void applyTemplates() },
               { label: "Import CSV", onSelect: () => setDialog("import") },
             ] : []),
             ...(canManageTemplates ? [{ label: "Schedule templates", onSelect: () => router.push(templatesHref) }] : []),
@@ -524,13 +576,17 @@ export function ScheduleBoard({
       </div>
 
       {error && !open && !dialog ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
+      {notice ? <Text size="sm" tone="secondary" role="status" className="px-(--ui-section-px) pt-2">{notice}</Text> : null}
 
       {groups.length === 0 ? (
-        <EmptyState
-          title={progress.all === 0 ? `No ${SECTION_LABEL[section].toLowerCase()} items yet` : "No items match this filter"}
-          description={progress.all === 0 && canEdit ? "Add an item, apply the studio templates, or import the Google Sheets schedule." : progress.all === 0 ? "This project has no schedule items in this section." : "Choose another progress filter to see more items."}
-          className="py-10"
-        />
+        <div className="grid">
+          <EmptyState
+            title={progress.all === 0 ? `No ${SECTION_LABEL[section].toLowerCase()} items yet` : "No items match this filter"}
+            description={progress.all === 0 && canEdit ? "Start a category below, add an item, apply the studio templates, or import the Google Sheets schedule." : progress.all === 0 ? "This project has no schedule items in this section." : "Choose another progress filter to see more items."}
+            className="py-10"
+          />
+          {progress.all === 0 && canEdit ? <NewCategoryInline command={command} projectId={projectId} section={section} categories={[]} className="mb-8 justify-self-center" /> : null}
+        </div>
       ) : (
         <div className="grid">
           <div className="min-w-0">
@@ -544,7 +600,7 @@ export function ScheduleBoard({
                 filter={filter}
                 section={section}
                 onReorder={reorderGroup}
-                onNewCategory={() => setDialog("add")}
+                onDelete={(entry) => void removeEntry(entry)}
               />
             ) : (
               <div className="grid">
@@ -972,6 +1028,8 @@ function EntryPanelContent({
       }
       setOptionBaseline((current) => ({ ...current, [key]: drafts[key] }));
       setDrafts((current) => { const next = { ...current }; delete next[key]; return next; });
+      // Show the option just added, not an empty "new option" form that reads as if it vanished.
+      if (key === "new" && createdOptionId) setSelectedId(createdOptionId);
     }
     if (fieldsChanged) {
       const ok = await run(entryFieldsKey, () => updateScheduleEntryAction({
@@ -1041,7 +1099,7 @@ function EntryPanelContent({
   const removeOption = async (option: ScheduleOptionView) => {
     const ok = await confirm({
       title: `Delete option ${option.label}?`,
-      description: option.isFinal ? "This is the final option; the next option becomes final." : "The option is removed from this item.",
+      description: option.isFinal ? "This is the final option. The item goes back to needing a decision; no other option becomes final by itself." : "The option is removed from this item.",
       confirmLabel: "Delete option",
       tone: "danger",
     });
@@ -1084,6 +1142,7 @@ function EntryPanelContent({
         items={[
           { label: selected.imageUrl ? "Change photo" : "Add photo", onSelect: () => setPhotoFor(selected.id) },
           ...(selected.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(selected) }] : []),
+          ...(selected.isFinal ? [{ label: "Unset final", separatorBefore: true, onSelect: () => void run(busyKey, () => unmarkScheduleFinalAction({ projectId, optionId: selected.id })) }] : []),
           ...(selected.sampleRequest?.status === "REQUESTED" ? [{ label: "Cancel sample request", danger: true, separatorBefore: true, onSelect: () => void cancelSample(selected) }] : []),
           { label: "Delete option", danger: true, separatorBefore: true, onSelect: () => void removeOption(selected) },
         ]}
@@ -1353,7 +1412,7 @@ function MoveDialog({ projectId, entry, categories, command, onClose }: { projec
       open
       onOpenChange={(value) => { if (!value) onClose(); }}
       title={`Move ${entry.code} to another category`}
-      description="The item gets the next code in the target category; codes in the old category close the gap."
+      description="The item gets the next code in the target category. Its old code is left empty; other codes do not change."
       size="sm"
       dismissible={!pending}
       footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button><Button variant="primary" pending={pending} disabled={!category.trim() || category.trim() === entry.category} onClick={save}>Move</Button></Footer>}
@@ -1409,7 +1468,7 @@ function ImportDialog({ projectId, section, command, onClose }: { projectId: str
       open
       onOpenChange={(value) => { if (!value) onClose(); }}
       title="Import schedule"
-      description="Use an Excel (.xlsx) or CSV file: the Google Sheets export, or the plain template. Rows whose code already exists update that item; new codes are added."
+      description="Use an Excel (.xlsx) or CSV file: the Google Sheets export, or the plain template. Rows whose code already exists update that item's brand, type and notes (its photo, other specs and final choice stay). New codes are added under the same code."
       size="lg"
       dismissible={!pending}
       footer={<Footer><Button variant="ghost" onClick={onClose} disabled={pending}>{result ? "Close" : "Cancel"}</Button><Button variant="primary" pending={pending} disabled={!file && !csv.trim()} onClick={submit}>Import</Button></Footer>}

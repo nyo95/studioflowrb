@@ -116,6 +116,24 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## StudioFlow
 
+- [ ] [UNVERIFIED] Product Schedule R8.382 in the browser: right-click Open/Delete
+  on a board card, inline "New category" (also in an empty section, and the
+  "already exists" hint), "Unset final" in the option menu, "Apply studio
+  templates" confirm and its count, a new option staying selected after Save,
+  and a re-import of a real Google Sheets export.
+- [ ] [BLOCKED] Rows made Final automatically before R8.382 (typed product on
+  add, template seeding, import) are still Final in existing projects. They can
+  be told apart: a real decision has a `studioflow.schedule.option-finalized`
+  audit event, an automatic one has none. Owner to decide whether a one-off
+  data fix should return those rows to "needs a decision".
+- [ ] [PLANNED][P3] Product Schedule: a per-project category order (drag a
+  category). Today categories follow the studio template order, then A to Z;
+  a project order needs its own stored field.
+- [ ] [PLANNED][P3] Product Schedule: codes are stable since R8.382, but the
+  highest number in a group can come back after its row is deleted (next =
+  highest + 1). Never reusing it needs a stored per-group high-water mark;
+  owner to say whether that matters in practice.
+
 - [ ] [UNVERIFIED] Re-layout (R8.347–R8.348) on real data: send → client
   answered with notes → Revision (the next round shows the brief) → OK; CD Mall
   → CD Final; a supervision visit; ticking and dismissing requirements in the
