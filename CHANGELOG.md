@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.389 | 2026-10-07 | docs(plan): review of R8.388 (WO-MD-SAMPLE-01) - PASS (Lead)
+
+- **Verdict: PASS** for `09e78f2`. All six corrections from R8.387 are in the code: the receipt command is out of the client-imported StudioFlow barrel, 26 tests cover Acceptance Criteria 1–8, shelving notifies the requester in the same transaction, the holder project name is resolved from StudioFlow (never the browser), `listSamples` returns a mapped read with `skuArchived` and a wider search, app clock and required coordinator dependencies. The extra criterion-2 fix (project with a non-held status refused) is correct.
+- `PLAN.md`: backend accepted; the next step is the Lead's UI revision (R8.390): Samples page and "Put on shelf" on the sample requests screen. No Executor work remains.
+
+**Checks (re-run by the Lead).** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 904/904 (none failed, skipped or cancelled), `npm run build` passes. The build's `next-env.d.ts` change was reverted.
+
 ## R8.388 | 2026-10-07 | fix(masterdata): correct R8.386 sample shelf (build, tests, notification, project snapshot, mapped read)
 
 - **Build fixed.** The StudioFlow receipt command is no longer exported from `@/apps/studioflow/public` (client components import that barrel, which dragged the generated Prisma client into a browser chunk and broke `npm run build`); the runtime imports the file directly. The R8.386 changelog line calling the build failure "pre-existing unrelated" was wrong: R8.386 caused it. R8.382–R8.384 build cleanly.

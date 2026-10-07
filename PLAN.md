@@ -2,8 +2,8 @@
 
 Plan ID: WO-MD-SAMPLE-01 (physical sample shelf in Master Data; a requested sample goes onto the shelf and StudioFlow learns it arrived)
 Scope: Master Data backend for the office sample shelf (rack/box, quantity, status, holder, movement history), the "put on shelf" step from a sample request, and the StudioFlow public command that marks that request received. Minimal UI wiring only; the Lead designs the screens in the next revision.
-Target revisions: R8.385 (this plan), R8.386 (Executor: backend + minimal wiring), R8.387 (Lead review), R8.388 (Executor correction pass), then the Lead's UI revision.
-Status: READY — correction pass (review of R8.386: CORRECTION REQUIRED, see "Review of R8.386")
+Target revisions: R8.385 (this plan), R8.386 (Executor: backend + minimal wiring), R8.387 (Lead review), R8.388 (Executor correction pass), R8.389 (Lead review: PASS), R8.390 (Lead UI revision).
+Status: READY — Lead UI revision (backend accepted at R8.388, see "Review of R8.388"). No Executor work remains.
 Priority: P1
 Owner: Product Owner. Decisions confirmed by the owner in chat on 2026-10-07 (kantor).
 Last updated: 2026-10-07
@@ -277,17 +277,38 @@ Waived: the minimal Samples and "Put on shelf" screen wiring (decision: the
 Lead builds those screens in the next revision, so throw-away forms are not
 needed). Leave the current minimal page as is.
 
+## Review of R8.388 (Lead, 2026-10-07) — PASS
+
+Commit `09e78f2`. All six corrections are in the code. The Lead re-ran every
+gate independently: `tsc --noEmit`, lint, `check:boundaries`,
+`check:legacy-runtime`, `npm test` 904/904 (none failed, skipped or
+cancelled; 26 new: Master Data shelf suite 10, StudioFlow receipt command 5,
+coordinator 11, covering Acceptance Criteria 1–8), and `npm run build` passes.
+The extra fix (a project sent with a non-held status is now refused instead of
+dropped) matches criterion 2. A failed shelving notice rolls the shelving back,
+the same transaction rule as the priced/declined notices. Reviewer browser
+acceptance waits for the UI revision below.
+
+## Next: Lead UI revision (R8.390)
+
+UI-only, no Executor. Built on the accepted backend; legacy
+`SampleLibraryClient` is the parity floor.
+
+- **Samples page** (`/masterdata/samples`): header counts; "By rack" (one card
+  per rack, boxes in order) and "List" views; search and status filter; add a
+  sample (SKU picker with a quick "New SKU" through the existing `createSku`,
+  rack combobox from `listSampleRacks`, box, quantity, location note, notes);
+  edit location; change status with holder name and an optional project picker
+  (`listProjectChoices`); per-sample history (`getSampleHistory`); delete
+  (refusal shown when out); archived SKUs flagged. Read-only staff see no
+  write controls; staff without `masterdata.sample.read` get a proper
+  no-access state instead of an error.
+- **Sample requests screen:** "Put on shelf" on NEW, IN_PROGRESS and PRICED
+  rows (same SKU picker and rack combobox), the shelved location on the row,
+  and "Tell StudioFlow again" when the source is still REQUESTED after
+  shelving.
+- Browser acceptance per "Reviewer Acceptance" above, then close this plan.
+
 ## Executor Prompt
 
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md` (WO-MD-SAMPLE-01), then implement
-the **"Review of R8.386" correction pass** (items 1–6) and nothing beyond it.
-Start from a clean tree on `main`; confirm the next unused revision in
-`CHANGELOG.md` (expected R8.388). Verify both database targets are the rebuild-only dev and test
-databases before any database command. Do not read or touch the legacy
-checkout; the plan already records the legacy evidence. Do not build screens;
-the Lead designs them next. Run the checks listed, including `npm run build`
-(it must pass), update `CHANGELOG.md`, and create one local commit. Do not push. Stop
-with the BLOCKED / CONFLICT report only for a locked-decision conflict or an
-unsafe boundary; otherwise finish and return one Planner/Reviewer prompt with
-the outcome, commit, checks and test count, limitations, and dirty files.
+None: the remaining work is the Lead's UI revision.
