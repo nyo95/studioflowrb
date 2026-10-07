@@ -79,7 +79,7 @@ async function reset() {
     "sf_schedule_option", "sf_schedule_entry", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix",
     "sf_mom_image", "sf_mom_item", "sf_mom_document",
     "sf_checklist_item", "sf_checklist_template",
-    "sf_deliverable", "sf_asset_cleanup_failure",
+    "sf_deliverable", "sf_iteration_image", "sf_asset_cleanup_failure",
     "sf_activity", "sf_revision", "sf_phase",
     "sf_phase_definition", "sf_phase_template",
     "sf_project", "sf_client", "sf_settings", "sf_holiday",
@@ -478,9 +478,10 @@ describe("WO-BE-02 archived asset retention", () => {
     const db = testDb.prisma;
     const { projectId } = await newProject(name);
     const phase = await phaseOf(projectId, "moodboard");
-    const keys = { deliverable: `${projectId}/deliverable`, mom: `${projectId}/mom`, oldMom: `${projectId}/old-mom`, option: `${projectId}/option` };
+    const keys = { deliverable: `${projectId}/deliverable`, iteration: `${projectId}/iteration`, mom: `${projectId}/mom`, oldMom: `${projectId}/old-mom`, option: `${projectId}/option` };
     for (const key of Object.values(keys)) await storage.put({ key, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
     await db.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, name: "Private file", storage_key: keys.deliverable } });
+    await db.sfIterationImage.create({ data: { iteration_id: (await openIteration(phase.id)).id, storage_key: keys.iteration, content_type: "image/png", bytes: 1, sort_order: 1, uploaded_by_id: designer.id, uploaded_by_name: "Designer" } });
     const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Retain this text" });
     const item = await db.sfMomItem.findFirstOrThrow({ where: { document_id: documentId } });
     await db.sfMomImage.create({ data: { item_id: item.id, slot: 0, storage_key: keys.mom, content_type: "image/png", bytes: 1 } });
@@ -507,7 +508,7 @@ describe("WO-BE-02 archived asset retention", () => {
     await db.sfClient.update({ where: { id: client.id }, data: { logo_storage_key: "client-logo" } });
     await db.sfScheduleTemplateItem.create({ data: { section: "MATERIAL", category: "Floor", category_key: "floor", product_name: "Template", image_key: "template-photo" } });
     const result = await retention().purgeExpiredArchivedAssets();
-    assert.deepEqual(result, { projectsPurged: 1, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, presentationSlides: 0, blobsRemoved: 4, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0, previousFailuresResolved: 0, previousFailuresStillFailing: 0 });
+    assert.deepEqual(result, { projectsPurged: 1, deliverables: 1, iterationImages: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, presentationSlides: 0, blobsRemoved: 5, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0, previousFailuresResolved: 0, previousFailuresStillFailing: 0 });
     for (const key of Object.values(expired.keys)) assert.equal(storage.objects.has(key), false);
     for (const kept of [inside, boundary, live]) {
       for (const key of Object.values(kept.keys)) assert.ok(storage.objects.has(key));
@@ -515,6 +516,7 @@ describe("WO-BE-02 archived asset retention", () => {
     }
     assert.ok(storage.objects.has("client-logo")); assert.ok(storage.objects.has("template-photo"));
     assert.equal(await db.sfDeliverable.count({ where: { project_id: expired.projectId } }), 0);
+    assert.equal(await db.sfIterationImage.count({ where: { iteration: { phase: { project_id: expired.projectId } } } }), 0);
     assert.equal(await db.sfMomImage.count({ where: { item: { document_id: expired.documentId } } }), 0);
     assert.equal((await db.sfScheduleOption.findFirstOrThrow({ where: { entry_id: expired.entryId } })).image_key, null);
     const revision = await db.sfMomRevision.findUniqueOrThrow({ where: { id: expired.revision.id } });
@@ -523,8 +525,8 @@ describe("WO-BE-02 archived asset retention", () => {
     const events = await db.auditEvent.findMany({ where: { entity_id: expired.projectId, action: { startsWith: "studioflow.project.assets_" } }, orderBy: { occurred_at: "asc" } });
     assert.deepEqual(events.map((event) => event.action), ["studioflow.project.assets_purged", "studioflow.project.assets_purge_completed"]);
     assert.ok(events.every((event) => event.actor_kind === "SYSTEM"));
-    assert.deepEqual(events[0].metadata, { projectId: expired.projectId, deliverables: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, presentationSlides: 0, unparseableRevisions: 0, keysCollected: 4 });
-    assert.deepEqual(events[1].metadata, { projectId: expired.projectId, blobsRemoved: 4, blobsKeptShared: 0, blobFailures: 0 });
+    assert.deepEqual(events[0].metadata, { projectId: expired.projectId, deliverables: 1, iterationImages: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, presentationSlides: 0, unparseableRevisions: 0, keysCollected: 5 });
+    assert.deepEqual(events[1].metadata, { projectId: expired.projectId, blobsRemoved: 5, blobsKeptShared: 0, blobFailures: 0 });
     assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
     await sf.projects.restoreProject({ ...as(designer), projectId: inside.projectId });
     for (const key of Object.values(inside.keys)) assert.ok(storage.objects.has(key));
@@ -594,7 +596,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const legacy = { topic: "Legacy", meetingDate: "2026-09-01", venue: null, attendees: null, preparedByName: "Designer", items: [{ isTextOnly: true, listStyle: "DASH", points: [{ text: "Exact text", style: "DEFAULT" }], images: [] }] };
     const legacyRow = await db.sfMomRevision.create({ data: { document_id: expired.documentId, number: 3, snapshot: legacy, created_by_id: designer.id, created_by_name: "Designer" } });
     const result = await retention().purgeExpiredArchivedAssets();
-    assert.equal(result.blobsKeptShared, 3); assert.equal(result.blobsRemoved, 1); assert.equal(result.unparseableRevisions, 1);
+    assert.equal(result.blobsKeptShared, 3); assert.equal(result.blobsRemoved, 2); assert.equal(result.unparseableRevisions, 1);
     for (const key of [expired.keys.option, expired.keys.deliverable, expired.keys.mom]) assert.ok(storage.objects.has(key));
     assert.deepEqual((await db.sfMomRevision.findFirstOrThrow({ where: { document_id: expired.documentId, number: 2 } })).snapshot, malformed);
     assert.deepEqual((await db.sfMomRevision.findUniqueOrThrow({ where: { id: legacyRow.id } })).snapshot, legacy);
@@ -621,7 +623,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const expired = await fixture("Concurrent purge", 91);
     const results = await Promise.all([retention().purgeExpiredArchivedAssets(), retention().purgeExpiredArchivedAssets()]);
     assert.equal(results.reduce((n, result) => n + result.projectsPurged, 0), 1);
-    assert.equal(results.reduce((n, result) => n + result.blobsRemoved, 0), 4);
+    assert.equal(results.reduce((n, result) => n + result.blobsRemoved, 0), 5);
     assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purged" } }), 1);
     assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purge_completed" } }), 1);
   });
@@ -664,7 +666,7 @@ describe("WO-BE-02 archived asset retention", () => {
         } },
         auditWriter: { write: async (event, tx) => { if (event.action.endsWith("assets_purge_completed")) throw Error("secret audit details"); await writer.write(event, tx); } },
       }).purgeExpiredArchivedAssets();
-      assert.equal(result.projectsPurged, 1); assert.equal(result.blobFailures, 1); assert.equal(result.blobsRemoved, 3);
+      assert.equal(result.projectsPurged, 1); assert.equal(result.blobFailures, 1); assert.equal(result.blobsRemoved, 4);
       assert.deepEqual(logs, [["StudioFlow asset cleanup completion audit failed."]]);
       assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purged" } }), 1);
       assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
@@ -822,7 +824,7 @@ describe("WO-BE-01 backend regressions", () => {
     const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
     assert.equal(detail.currentIteration?.note, "- Live remark");
     assert.deepEqual(detail.currentIteration?.answerChoices, ["revision", "done"]);
-    assert.deepEqual(detail.previousIteration, { id: closed.id, name: "Moodboard 2", state: "REVISED", note: "- Warmer palette\n- Keep the marble" });
+    assert.deepEqual(detail.previousIteration, { id: closed.id, name: "Moodboard 2", state: "REVISED", note: "- Warmer palette\n- Keep the marble", images: [] });
     assert.deepEqual(detail.history.map((r) => [r.name, r.note]), [["Moodboard 2", "- Warmer palette\n- Keep the marble"], ["Moodboard 1", null]]);
   });
 });
@@ -2944,4 +2946,166 @@ describe("WO-SF-PLAN-01 working-time planning from Fit Out Start", () => {
     assert.equal((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: projectId } })).fit_out_start_date, null);
   });
 
+});
+
+describe("WO-SF-NOTE-IMG-01 images on an iteration's client notes", () => {
+  afterEach(() => storage.objects.clear());
+
+  async function setup() {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "moodboard");
+    const iteration = await openIteration(phase.id);
+    return { projectId, phase, iteration, base: { ...as(designer), projectId, phaseId: phase.id } };
+  }
+  const jpeg = () => ({ body: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]), contentType: "image/jpeg" });
+  const imageKeys = async (iterationId: string) => (await testDb.prisma.sfIterationImage.findMany({ where: { iteration_id: iterationId }, orderBy: { sort_order: "asc" } })).map((row) => row.storage_key);
+
+  it("adds in order, stores the object under the project's private prefix and writes the audit", async () => {
+    const { projectId, iteration, base } = await setup();
+    const first = await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    const second = await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: jpeg() });
+    const rows = await testDb.prisma.sfIterationImage.findMany({ where: { iteration_id: iteration.id }, orderBy: { sort_order: "asc" } });
+    assert.deepEqual(rows.map((row) => [row.id, row.sort_order, row.content_type, row.uploaded_by_id, row.uploaded_by_name]), [
+      [first.imageId, 1, "image/png", designer.id, "Dina Designer"], [second.imageId, 2, "image/jpeg", designer.id, "Dina Designer"],
+    ]);
+    for (const row of rows) {
+      assert.ok(row.storage_key.startsWith(`studioflow/iterations/${projectId}/`));
+      assert.ok(storage.objects.has(row.storage_key));
+    }
+    const events = await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.phase.iteration-image-added" } });
+    assert.equal(events.length, 2);
+  });
+
+  it("refuses a bad type, a fake image, an oversize file and a 13th image, leaving no stored object behind", async () => {
+    const { iteration, base } = await setup();
+    await rejectsWith(sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: { body: new Uint8Array([0x25, 0x50, 0x44, 0x46, 1, 2, 3, 4, 5]), contentType: "application/pdf" } }), "ITERATION_IMAGE_TYPE");
+    await rejectsWith(sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: { body: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), contentType: "image/png" } }), "ITERATION_IMAGE_TYPE");
+    await rejectsWith(sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: { body: new Uint8Array(0), contentType: "image/png" } }), "ITERATION_IMAGE_SIZE");
+    const big = new Uint8Array(3 * 1024 * 1024 + 1); big.set(PNG);
+    await rejectsWith(sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: { body: big, contentType: "image/png" } }), "ITERATION_IMAGE_SIZE");
+    assert.equal(storage.objects.size, 0);
+    for (let i = 0; i < 12; i++) await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    await rejectsWith(sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() }), "ITERATION_IMAGE_LIMIT");
+    assert.equal(storage.objects.size, 12);
+    assert.equal(await testDb.prisma.sfIterationImage.count({ where: { iteration_id: iteration.id } }), 12);
+  });
+
+  it("holds the limit under concurrent adds and discards the object of a failed write", async () => {
+    const { iteration, base } = await setup();
+    for (let i = 0; i < 10; i++) await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    const results = await Promise.allSettled(Array.from({ length: 4 }, () => sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() })));
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 2);
+    assert.equal(await testDb.prisma.sfIterationImage.count({ where: { iteration_id: iteration.id } }), 12);
+    assert.equal(storage.objects.size, 12, "a refused add leaves no object behind");
+  });
+
+  it("removes the row and releases the object after commit, and keeps one something else still references", async () => {
+    const { iteration, base } = await setup();
+    const a = await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    const b = await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    const [keyA, keyB] = await imageKeys(iteration.id);
+    await sf.phases.removeIterationImage({ ...base, imageId: a.imageId });
+    assert.equal(storage.objects.has(keyA!), false);
+    assert.equal(await testDb.prisma.sfIterationImage.count({ where: { id: a.imageId } }), 0);
+    // Another row points at the same object: it must survive the removal.
+    const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: base.projectId, section: "MATERIAL", category: "Floor", category_key: "floor", prefix: "FL", increment: 1, sort_order: 0 } });
+    await testDb.prisma.sfScheduleOption.create({ data: { entry_id: entry.id, label: "A", product_name: "Floor", search_key: "floor", image_key: keyB! } });
+    await sf.phases.removeIterationImage({ ...base, imageId: b.imageId });
+    assert.ok(storage.objects.has(keyB!));
+    await rejectsWith(sf.phases.removeIterationImage({ ...base, imageId: b.imageId }), "ITERATION_IMAGE_NOT_FOUND");
+    const events = await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.phase.iteration-image-removed" } });
+    assert.equal(events.length, 2);
+  });
+
+  it("follows the client-notes rules: viewer, archived project, another project's iteration and another phase's image", async () => {
+    const { projectId, phase, iteration, base } = await setup();
+    const added = await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    const viewer = await seedUser("Vera Viewer", [P.access, P.projectRead]);
+    await rejectsWith(sf.phases.addIterationImage({ ...as(viewer, [P.access, P.projectRead]), projectId, phaseId: phase.id, iterationId: iteration.id, file: png() }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.removeIterationImage({ ...as(viewer, [P.access, P.projectRead]), projectId, phaseId: phase.id, imageId: added.imageId }), "PERMISSION_DENIED");
+    // The drafter has no seat on the Moodboard phase.
+    await rejectsWith(sf.phases.addIterationImage({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: phase.id, iterationId: iteration.id, file: png() }), "PERMISSION_DENIED");
+    const other = await newProject("Other project");
+    const otherPhase = await phaseOf(other.projectId, "moodboard");
+    const otherIteration = await openIteration(otherPhase.id);
+    await rejectsWith(sf.phases.addIterationImage({ ...base, iterationId: otherIteration.id, file: png() }), "ITERATION_NOT_FOUND");
+    await rejectsWith(sf.phases.removeIterationImage({ ...as(designer), projectId: other.projectId, phaseId: otherPhase.id, imageId: added.imageId }), "ITERATION_IMAGE_NOT_FOUND");
+    assert.equal(storage.objects.size, 1, "a refused add stored nothing");
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Paused" });
+    await rejectsWith(sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() }), "PROJECT_ARCHIVED");
+    await rejectsWith(sf.phases.removeIterationImage({ ...base, imageId: added.imageId }), "PROJECT_ARCHIVED");
+    assert.equal(storage.objects.size, 1);
+  });
+
+  it("accepts images on a closed iteration, like notes", async () => {
+    const { iteration, base } = await setup();
+    await clientRound(base, "REVISION");
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: iteration.id } })).status, "REVISED");
+    await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    assert.equal(await testDb.prisma.sfIterationImage.count({ where: { iteration_id: iteration.id } }), 1);
+  });
+
+  it("reads ordered images with signed links for current, previous and earlier iterations and the card, never a storage key", async () => {
+    const { projectId, phase, iteration: first, base } = await setup();
+    const one = await sf.phases.addIterationImage({ ...base, iterationId: first.id, file: png() });
+    const two = await sf.phases.addIterationImage({ ...base, iterationId: first.id, file: jpeg() });
+    await clientRound(base, "REVISION");
+    const second = await openIteration(phase.id);
+    const three = await sf.phases.addIterationImage({ ...base, iterationId: second.id, file: png() });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
+    const shape = (images: Array<{ id: string; url: string | null; contentType: string; bytes: number }>) => images.map((image) => [image.id, image.contentType, image.bytes, image.url?.startsWith("https://storage.invalid/")]);
+    assert.deepEqual(shape(detail.previousIteration!.images), [[one.imageId, "image/png", PNG.byteLength, true], [two.imageId, "image/jpeg", 8, true]]);
+    assert.deepEqual(shape(detail.currentIteration!.images), [[three.imageId, "image/png", PNG.byteLength, true]]);
+    assert.deepEqual(detail.iterations.map((iteration) => iteration.images.length), [1, 2]);
+    assert.equal(detail.activeRevision!.images.length, 1);
+    assert.equal(detail.history[0]!.images.length, 2);
+    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((c) => c.id === projectId)!;
+    assert.deepEqual(shape(card.phases.find((p) => p.id === phase.id)!.current_iteration!.images), shape(detail.currentIteration!.images));
+    const leaked = JSON.stringify([detail, card]);
+    for (const key of storage.objects.keys()) assert.equal(leaked.includes(key), false, "a storage key leaked into a read");
+    assert.equal(leaked.includes("storage_key"), false);
+  });
+
+  it("counts images as attached work: a never-sent iteration with images cannot be deleted or silently dropped", async () => {
+    const { phase, iteration, base } = await setup();
+    const added = await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    await rejectsWith(sf.phases.deleteNeverSentIteration({ ...base, iterationId: iteration.id }), "ITERATION_HAS_ATTACHED_WORK");
+    // Skipping the phase keeps an iteration that holds images as closed history instead of deleting it.
+    await sf.phases.bypassPhase({ ...base, reason: "Client supplied the concept" });
+    assert.equal(await testDb.prisma.sfIterationImage.count({ where: { id: added.imageId } }), 1);
+    assert.equal(await testDb.prisma.sfRevision.count({ where: { phase_id: phase.id } }), 1);
+    await sf.phases.removeIterationImage({ ...base, imageId: added.imageId });
+    assert.equal(storage.objects.size, 0);
+  });
+
+  it("releases every image object when an admin resets the phase's iterations", async () => {
+    const { phase, iteration, base } = await setup();
+    await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: jpeg() });
+    assert.equal(storage.objects.size, 2);
+    await sf.phases.overrideRevision({ ...base, mode: "HARD_RESET_ACTIVE", major: 3, note: "Align with client numbering" });
+    assert.equal(storage.objects.size, 0);
+    assert.equal(await testDb.prisma.sfIterationImage.count(), 0);
+    assert.equal((await testDb.prisma.sfRevision.findMany({ where: { phase_id: phase.id } })).length, 1);
+  });
+
+  it("is not undoable: adding or removing an image records no phase event to undo", async () => {
+    const { projectId, iteration, base } = await setup();
+    const before = await testDb.prisma.sfPhaseEvent.count({ where: { project_id: projectId } });
+    const added = await sf.phases.addIterationImage({ ...base, iterationId: iteration.id, file: png() });
+    await sf.phases.removeIterationImage({ ...base, imageId: added.imageId });
+    assert.equal(await testDb.prisma.sfPhaseEvent.count({ where: { project_id: projectId } }), before);
+  });
+
+  it("keeps an image row's object when the undo of an iteration creation would drop it", async () => {
+    const { phase, base } = await setup();
+    await clientRound(base, "REVISION");
+    const next = await openIteration(phase.id);
+    await sf.phases.addIterationImage({ ...base, iterationId: next.id, file: png() });
+    // The newest phase event is the revision that created `next`; undoing it would cascade-delete the image.
+    const latest = await sf.phases.latestUndoableEvent({ grants: ALL, actor: designer.actor, projectId: base.projectId });
+    assert.ok(latest);
+    await rejectsWith(sf.phases.undoPhaseEvent({ ...as(designer), projectId: base.projectId, eventId: latest!.id }), "UNDO_HAS_NEWER_DATA");
+    assert.equal(storage.objects.size, 1);
+  });
 });

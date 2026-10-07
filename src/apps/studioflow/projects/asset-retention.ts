@@ -24,7 +24,7 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
     const retry = await retryFailedAssetCleanup(db, ports.storage);
     const projects = await db.sfProject.findMany({ where: eligible, orderBy: { archived_at: "asc" }, take: limit, select: { id: true } });
     const summary = {
-      projectsPurged: 0, deliverables: 0, momImages: 0, momSnapshotImages: 0, optionPhotos: 0, presentationSlides: 0,
+      projectsPurged: 0, deliverables: 0, iterationImages: 0, momImages: 0, momSnapshotImages: 0, optionPhotos: 0, presentationSlides: 0,
       blobsRemoved: 0, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0,
       previousFailuresResolved: retry.resolved, previousFailuresStillFailing: retry.stillFailing,
     };
@@ -34,14 +34,15 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
         // Re-check archive eligibility in the claim, including a concurrent restore.
         const claim = await tx.sfProject.updateMany({ where: { id: project.id, ...eligible }, data: { assets_purged_at: now } });
         if (claim.count === 0) return null;
-        const [deliverables, images, options, revisions, slides] = await Promise.all([
+        const [deliverables, iterationImages, images, options, revisions, slides] = await Promise.all([
           tx.sfDeliverable.findMany({ where: { project_id: project.id }, select: { storage_key: true } }),
+          tx.sfIterationImage.findMany({ where: { iteration: { phase: { project_id: project.id } } }, select: { storage_key: true } }),
           tx.sfMomImage.findMany({ where: { item: { document: { project_id: project.id } } }, select: { storage_key: true } }),
           tx.sfScheduleOption.findMany({ where: { entry: { project_id: project.id }, image_key: { not: null } }, select: { image_key: true } }),
           tx.sfMomRevision.findMany({ where: { document: { project_id: project.id } }, select: { id: true, snapshot: true } }),
           tx.sfPresentationSlide.findMany({ where: { board: { project_id: project.id } }, select: { image_key: true } }),
         ]);
-        const keys = new Set([...deliverables.map((row) => row.storage_key), ...images.map((row) => row.storage_key), ...options.map((row) => row.image_key!), ...slides.map((row) => row.image_key)]);
+        const keys = new Set([...deliverables.map((row) => row.storage_key), ...iterationImages.map((row) => row.storage_key), ...images.map((row) => row.storage_key), ...options.map((row) => row.image_key!), ...slides.map((row) => row.image_key)]);
         let momSnapshotImages = 0;
         let unparseableRevisions = 0;
         const unreadableSnapshots: string[] = [];
@@ -63,10 +64,11 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
           } });
         }
         await tx.sfDeliverable.deleteMany({ where: { project_id: project.id } });
+        await tx.sfIterationImage.deleteMany({ where: { iteration: { phase: { project_id: project.id } } } });
         await tx.sfMomImage.deleteMany({ where: { item: { document: { project_id: project.id } } } });
         await tx.sfScheduleOption.updateMany({ where: { entry: { project_id: project.id }, image_key: { not: null } }, data: { image_key: null } });
         await tx.sfPresentationSlide.deleteMany({ where: { board: { project_id: project.id } } });
-        const counts = { deliverables: deliverables.length, momImages: images.length, momSnapshotImages, optionPhotos: options.length, presentationSlides: slides.length, unparseableRevisions };
+        const counts = { deliverables: deliverables.length, iterationImages: iterationImages.length, momImages: images.length, momSnapshotImages, optionPhotos: options.length, presentationSlides: slides.length, unparseableRevisions };
         await writeAudit(ports, tx, { action: "studioflow.project.assets_purged", entityType: "project", entityId: project.id, actor, metadata: { projectId: project.id, ...counts, keysCollected: keys.size } });
         // An unreadable retained snapshot may still contain a known candidate key.
         // Preserve that object rather than leave its untouched reference dangling.

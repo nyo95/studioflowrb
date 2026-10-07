@@ -10,7 +10,7 @@ type FailureRow = { id: string; storage_key: string; attempts: number; resolved_
 
 /** Every owner table reports unreferenced, so removeUnreferenced always attempts the delete. */
 function unreferencedDb(failures: Map<string, FailureRow>) {
-  const owners = ["sfDeliverable", "sfMomImage", "sfScheduleOption", "sfScheduleTemplateItem", "sfClient"];
+  const owners = ["sfDeliverable", "sfMomImage", "sfIterationImage", "sfScheduleOption", "sfScheduleTemplateItem", "sfClient"];
   return {
     ...Object.fromEntries(owners.map((name) => [name, { count: async () => 0 }])),
     sfAssetCleanupFailure: {
@@ -66,7 +66,7 @@ it("records a delete failure so it survives the DB row that referenced it, and c
 
 it("a bookkeeping failure never masks the real delete outcome", async () => {
   // sfAssetCleanupFailure is entirely absent, so upsert/updateMany throw — the delete result must still be reported.
-  const bareDb = Object.fromEntries(["sfDeliverable", "sfMomImage", "sfScheduleOption", "sfScheduleTemplateItem", "sfClient"].map((name) => [name, { count: async () => 0 }])) as unknown as Db;
+  const bareDb = Object.fromEntries(["sfDeliverable", "sfMomImage", "sfIterationImage", "sfScheduleOption", "sfScheduleTemplateItem", "sfClient"].map((name) => [name, { count: async () => 0 }])) as unknown as Db;
   assert.deepEqual(await removeUnreferenced(bareDb, storageThatFails(new Set(["x"])), ["x"]), { blobsRemoved: 0, blobsKeptShared: 0, blobFailures: 1 });
   assert.deepEqual(await removeUnreferenced(bareDb, storageThatFails(new Set()), ["y"]), { blobsRemoved: 1, blobsKeptShared: 0, blobFailures: 0 });
 });

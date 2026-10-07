@@ -366,6 +366,31 @@ export async function phaseCommandAction(input: PhaseCommandInput): Promise<Acti
   });
 }
 
+// Images on an iteration's client notes (WO-SF-NOTE-IMG-01). Not undoable, so no undo outcome is returned.
+const IterationImageForm = z.strictObject({ projectId: Id, phaseId: Id, iterationId: Id });
+export async function addIterationImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(IterationImageForm, { projectId: formData.get("projectId"), phaseId: formData.get("phaseId"), iterationId: formData.get("iterationId") });
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new AppError("VALIDATION", "ITERATION_IMAGE_REQUIRED", "Choose an image.");
+    const result = await studioFlow.phases.addIterationImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
+    refresh(data.projectId);
+    return { imageId: result.imageId };
+  });
+}
+
+const IterationImageRemove = z.strictObject({ projectId: Id, phaseId: Id, imageId: Id });
+export async function removeIterationImageAction(input: z.infer<typeof IterationImageRemove>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(IterationImageRemove, input);
+    const result = await studioFlow.phases.removeIterationImage({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
 const UndoInput = z.strictObject({ projectId: Id, eventId: Id });
 export async function undoPhaseEventAction(input: z.infer<typeof UndoInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {

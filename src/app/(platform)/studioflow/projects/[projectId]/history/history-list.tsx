@@ -38,6 +38,8 @@ const PHRASES: Record<string, string> = {
   "studioflow.phase.iteration-renamed": "renamed an iteration",
   "studioflow.phase.iteration-deleted": "deleted an unsent iteration",
   "studioflow.phase.iteration-note-set": "edited client notes",
+  "studioflow.phase.iteration-image-added": "added an image to client notes",
+  "studioflow.phase.iteration-image-removed": "removed an image from client notes",
   "studioflow.phase.note-set": "edited the pinned note",
   "studioflow.phase.requirement-dismissed": "dismissed a requirement",
   "studioflow.phase-event.undone": "undid a change",

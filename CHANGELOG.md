@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.394 | 2026-10-07 | feat(studioflow): images on an iteration's client notes - WO-SF-NOTE-IMG-01 backend (Executor)
+
+- **Storage:** new table `sf_iteration_image` (additive migration `20261007100000_sf_iteration_image`, applied to the rebuild dev and test databases only): iteration (cascade), unique private storage key under `studioflow/iterations/<projectId>/`, type, size, order, uploader id and name snapshot.
+- **Commands** (`phases`): `addIterationImage` (PNG/JPEG/WebP, sniffed, 3 MB, 12 per iteration; own codes `ITERATION_IMAGE_TYPE` / `_SIZE` / `_LIMIT`; checks run before any object is written; object written before the row and discarded if the write fails; the iteration row is locked so concurrent adds cannot pass the limit) and `removeIterationImage` (row deleted, object released after commit unless another row still points at it). Same permission, project-active and phase-seat rules as `setIterationNote`, closed iterations included. Audited as `studioflow.phase.iteration-image-added` / `-removed` (History labels added); no phase event is recorded, so neither is undoable.
+- **Reads:** `getPhaseDetail` (current, previous brief, every earlier iteration, active revision, history) and the project cards' current iteration return `images: { id, url, contentType, bytes }[]` in order with 15-minute signed links; storage keys never leave the server. A failed signature gives `url: null` for that image, not a failed page.
+- **Every delete path:** a never-sent iteration with images is `ITERATION_HAS_ATTACHED_WORK`; skipping a phase and the Supervision auto-start no longer treat an iteration holding images as empty; undoing an iteration's creation is refused (`UNDO_HAS_NEWER_DATA`) once it holds images; the admin iteration reset and the archived-project purge release the objects (purge summary and audit gain `iterationImages`); the shared "still referenced" check counts the new table.
+- **Wiring:** `addIterationImageAction` (multipart) and `removeIterationImageAction`; no screens (the Lead builds them next).
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 921/921 (none failed, skipped or cancelled; 10 new integration tests for the six acceptance criteria plus concurrency and undo; existing purge, reference-owner and read-shape tests updated for the new table), `npm run build` passes. Browser not opened.
+
 ## R8.393 | 2026-10-07 | docs(plan): WO-SF-NOTE-IMG-01 images on an iteration's client notes (Lead)
 
 - Owner (2026-10-07): images in client notes by drag, paste or pick; shown under the notes, in the next iteration's brief and in history.

@@ -231,10 +231,31 @@ model SfRevision {
   activities   SfActivity[]
   deliverables SfDeliverable[]
   events       SfPhaseEvent[]
+  images       SfIterationImage[]
 
   @@unique([phase_id, major])
   @@index([phase_id, status])
   @@map("sf_revision")
+  @@schema("studioflow")
+}
+
+/// Screenshots and marked-up photos attached to one iteration's client notes (WO-SF-NOTE-IMG-01).
+model SfIterationImage {
+  id               String   @id @default(uuid())
+  iteration_id     String
+  storage_key      String   @unique
+  content_type     String
+  bytes            Int
+  sort_order       Int
+  uploaded_by_id   String
+  /// Snapshot, so the name survives the person being renamed or removed.
+  uploaded_by_name String
+  created_at       DateTime @default(now())
+
+  iteration SfRevision @relation(fields: [iteration_id], references: [id], onDelete: Cascade)
+
+  @@index([iteration_id, sort_order])
+  @@map("sf_iteration_image")
   @@schema("studioflow")
 }
 

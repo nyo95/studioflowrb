@@ -32,8 +32,8 @@ it("sweep defaults off outside production, unrefs both timers, and catches run e
   }
 });
 
-it("shared cleanup protects all five live key owners and deduplicates removal candidates", async () => {
-  const owners = ["sfDeliverable", "sfMomImage", "sfScheduleOption", "sfScheduleTemplateItem", "sfClient"];
+it("shared cleanup protects all six live key owners and deduplicates removal candidates", async () => {
+  const owners = ["sfDeliverable", "sfMomImage", "sfIterationImage", "sfScheduleOption", "sfScheduleTemplateItem", "sfClient"];
   for (const owner of owners) {
     const db = Object.fromEntries(owners.map((name) => [name, { count: async () => name === owner ? 1 : 0 }])) as unknown as Db;
     const storage = new FakeObjectStorage();
