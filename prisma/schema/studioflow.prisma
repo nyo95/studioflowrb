@@ -70,6 +70,11 @@ enum SfCdItemStatus {
 model SfSettings {
   id                  String   @id @default("studio")
   archive_retention_days Int   @default(90)
+  cd_mall_days        Int      @default(5)
+  cd_final_days       Int      @default(5)
+  fit_out_gap_days    Int      @default(5)
+  fit_out_to_handover_days Int @default(40)
+  handover_to_opening_days Int @default(10)
   updated_at          DateTime @updatedAt
   updated_by_id       String?
 
@@ -121,6 +126,8 @@ model SfProject {
   opening_date    DateTime?         @db.Date
   /// Gantt/timeline start; overridable, falls back to `created_at`'s date when unset (owner, 2026-09-23).
   timeline_start_date DateTime?     @db.Date
+  fit_out_start_date DateTime?      @db.Date
+  plan_overrides     Json?
   status          SfProjectStatus   @default(ACTIVE)
   priority        SfProjectPriority @default(NORMAL)
   client_contact  String?
@@ -174,6 +181,7 @@ model SfPhase {
   /// Portfolio Timeline (owner, 2026-09-23): overridable planned start/end; unset falls back to the equal-width sequence split.
   planned_start_date DateTime?    @db.Date
   planned_end_date   DateTime?    @db.Date
+  planned_dates_manual Boolean    @default(false)
   created_at        DateTime      @default(now())
   updated_at        DateTime      @updatedAt
 
@@ -188,6 +196,19 @@ model SfPhase {
 
   @@unique([project_id, order_index])
   @@map("sf_phase")
+  @@schema("studioflow")
+}
+
+model SfHoliday {
+  id            String   @id @default(uuid())
+  date          DateTime @unique @db.Date
+  label         String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  created_by_id String?
+  updated_by_id String?
+
+  @@map("sf_holiday")
   @@schema("studioflow")
 }
 

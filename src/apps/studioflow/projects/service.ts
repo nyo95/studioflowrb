@@ -9,6 +9,8 @@ import { toDecimalString } from "@platform/utilities/decimal";
 import { normalizeText } from "@platform/utilities/normalization";
 
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
+import { computeProjectPlan, DEFAULT_PLAN_INTERVALS, type PlanIntervals } from "../domain/plan";
+import { LEGACY_PHASE_DEFINITION_IDS } from "../domain/phase";
 import { iterationChoices, iterationKinds } from "../domain/iteration-kinds";
 import { phaseSkipReason } from "../domain/phase-display";
 import { waitingDays, type PhaseStatus } from "../domain/phase";
@@ -56,6 +58,7 @@ export type ProjectInput = {
   openingDate?: string | null;
   /** Gantt/timeline start override; null clears it back to the `createdAt`-date fallback. */
   timelineStartDate?: string | null;
+  fitOutStartDate?: string | null;
   priority?: ProjectPriority;
   clientContact?: string | null;
   address?: string | null;
@@ -97,7 +100,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
   async function readSettings(client: Db | TxClient) {
     const row = await client.sfSettings.findUnique({ where: { id: SETTINGS_ID } });
-    return { archiveRetentionDays: row?.archive_retention_days ?? 90 };
+    return { archiveRetentionDays: row?.archive_retention_days ?? 90, cdMall: row?.cd_mall_days ?? 5, cdFinal: row?.cd_final_days ?? 5, gap: row?.fit_out_gap_days ?? 5, fitOutToHandover: row?.fit_out_to_handover_days ?? 40, handoverToOpening: row?.handover_to_opening_days ?? 10 };
   }
 
   async function assertPic(userId: string, seat: "designer" | "drafter"): Promise<void> {
@@ -178,6 +181,15 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         return { archiveRetentionDays };
       });
     },
+
+    async setPlanningDefaults(input: CommandContext & PlanIntervals) {
+      const userId = requireCommand(input, P.settingsManage);
+      if (Object.values({ cdMall: input.cdMall, cdFinal: input.cdFinal, gap: input.gap, fitOutToHandover: input.fitOutToHandover, handoverToOpening: input.handoverToOpening }).some((n) => !Number.isInteger(n) || n < 1 || n > 260)) throw invalid("PLANNING_DEFAULTS_INVALID", "Planning defaults must be whole working days from 1 to 260.");
+      return runTransaction(async (tx) => { await tx.sfSettings.upsert({ where: { id: SETTINGS_ID }, create: { id: SETTINGS_ID, updated_by_id: userId, cd_mall_days: input.cdMall, cd_final_days: input.cdFinal, fit_out_gap_days: input.gap, fit_out_to_handover_days: input.fitOutToHandover, handover_to_opening_days: input.handoverToOpening }, update: { updated_by_id: userId, cd_mall_days: input.cdMall, cd_final_days: input.cdFinal, fit_out_gap_days: input.gap, fit_out_to_handover_days: input.fitOutToHandover, handover_to_opening_days: input.handoverToOpening } }); await writeAudit(ports, tx, { action: "studioflow.settings.planning-updated", entityType: "settings", entityId: SETTINGS_ID, actor: input.actor }); return readSettings(tx); });
+    },
+    async listHolidays(input: ReadContext) { requireRead(input.grants); return (await db.sfHoliday.findMany({ orderBy: { date: "asc" } })).map((h) => ({ id: h.id, date: dateToDateOnly(h.date)!, label: h.label })); },
+    async addHoliday(input: CommandContext & { date: string; label: string }) { const userId = requireCommand(input, P.settingsManage); const date = parseOpeningDate(input.date); const label = requiredText(input.label, "HOLIDAY_LABEL_REQUIRED", "Holiday label", 200); return runTransaction(async (tx) => { const holiday = await tx.sfHoliday.create({ data: { date: date!, label, created_by_id: userId, updated_by_id: userId } }); await writeAudit(ports, tx, { action: "studioflow.holiday.added", entityType: "holiday", entityId: holiday.id, actor: input.actor }); return { holidayId: holiday.id }; }); },
+    async removeHoliday(input: CommandContext & { holidayId: string }) { requireCommand(input, P.settingsManage); return runTransaction(async (tx) => { const holiday = await tx.sfHoliday.findUnique({ where: { id: input.holidayId } }); if (!holiday) throw notFound("holiday"); await tx.sfHoliday.delete({ where: { id: holiday.id } }); await writeAudit(ports, tx, { action: "studioflow.holiday.removed", entityType: "holiday", entityId: holiday.id, actor: input.actor }); return { holidayId: holiday.id }; }); },
 
     // ── People ─────────────────────────────────────────────────────────────
     /** PIC candidates are defined by their requested seat; task assignees keep phase-work eligibility. */
@@ -363,6 +375,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         status: row.status as ProjectStatus,
         priority: row.priority as ProjectPriority,
         openingDate: dateToDateOnly(row.opening_date),
+        fitOutStartDate: dateToDateOnly(row.fit_out_start_date),
         /** Gantt/timeline start; falls back to `createdAt`'s date when the owner hasn't overridden it. */
         timelineStartDate: dateToDateOnly(row.timeline_start_date) ?? dateToDateOnly(row.created_at)!,
         clientContact: row.client_contact,
@@ -390,6 +403,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         status: row.status as ProjectStatus,
         priority: row.priority as ProjectPriority,
         openingDate: dateToDateOnly(row.opening_date),
+        fitOutStartDate: dateToDateOnly(row.fit_out_start_date),
         /** Gantt/timeline start; falls back to `createdAt`'s date when the owner hasn't overridden it. */
         timelineStartDate: dateToDateOnly(row.timeline_start_date) ?? dateToDateOnly(row.created_at)!,
         clientContact: row.client_contact,
@@ -478,6 +492,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const area = input.area === undefined ? undefined : parseArea(input.area);
       const openingDate = input.openingDate === undefined ? undefined : parseOpeningDate(input.openingDate);
       const timelineStartDate = input.timelineStartDate === undefined ? undefined : parseOpeningDate(input.timelineStartDate);
+      const fitOutStartDate = input.fitOutStartDate === undefined ? undefined : parseOpeningDate(input.fitOutStartDate);
       return runTransaction(async (tx) => {
         await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await loadWritableProject(tx, input.projectId);
@@ -505,6 +520,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         }
         track("openingDate", project.opening_date, openingDate, () => { data.opening_date = openingDate; });
         track("timelineStartDate", project.timeline_start_date, timelineStartDate, () => { data.timeline_start_date = timelineStartDate; });
+        track("fitOutStartDate", project.fit_out_start_date, fitOutStartDate, () => { data.fit_out_start_date = fitOutStartDate; });
         if (input.clientContact !== undefined) {
           const value = optionalText(input.clientContact, 200);
           track("clientContact", project.client_contact, value, () => { data.client_contact = value; });
@@ -521,6 +537,23 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         await writeAudit(ports, tx, { action: "studioflow.project.updated", entityType: "project", entityId: project.id, actor: input.actor, changes, metadata: { projectId: project.id } });
         return { projectId: project.id };
       });
+    },
+
+    async setFitOutStart(input: CommandContext & { projectId: string; fitOutStartDate: string | null }) {
+      const userId = requireCommand(input, P.projectManage); const value = parseOpeningDate(input.fitOutStartDate);
+      return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); await tx.sfProject.update({ where: { id: project.id }, data: { fit_out_start_date: value } }); await writeAudit(ports, tx, { action: "studioflow.project.fit-out-start-set", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, fitOutStartDate: input.fitOutStartDate } }); return { projectId: project.id }; });
+    },
+    async setPlanOverrides(input: CommandContext & { projectId: string; overrides: Partial<PlanIntervals> | null }) {
+      const userId = requireCommand(input, P.projectManage); const overrides = input.overrides;
+      if (overrides && Object.values(overrides).some((n) => n !== undefined && (!Number.isInteger(n) || n < 1 || n > 260))) throw invalid("PLAN_OVERRIDES_INVALID", "Plan overrides must be whole working days from 1 to 260.");
+      return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); await tx.sfProject.update({ where: { id: project.id }, data: { plan_overrides: overrides ?? Prisma.DbNull } }); await writeAudit(ports, tx, { action: "studioflow.project.plan-overrides-set", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id } }); return { projectId: project.id }; });
+    },
+    async applyProjectPlan(input: CommandContext & { projectId: string }) {
+      const userId = requireCommand(input, P.projectManage);
+      return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); if (!project.fit_out_start_date) throw invalid("FIT_OUT_START_REQUIRED", "Set Fit Out Start before applying the plan."); const defaults = await readSettings(tx); const overrides = (project.plan_overrides as Partial<PlanIntervals> | null) ?? {}; const intervals = { ...DEFAULT_PLAN_INTERVALS, ...defaults, ...overrides }; const holidays = new Set((await tx.sfHoliday.findMany({ select: { date: true } })).map((h) => dateToDateOnly(h.date)!)); const phases = await tx.sfPhase.findMany({ where: { project_id: project.id }, select: { id: true, definition_id: true, planned_dates_manual: true } }); const cd = phases.find((p) => p.definition_id === LEGACY_PHASE_DEFINITION_IDS.cd); const cdDone = cd ? await tx.sfPhase.findUnique({ where: { id: cd.id }, select: { status: true, status_changed_at: true } }) : null; const plan = computeProjectPlan({ fitOutStart: dateToDateOnly(project.fit_out_start_date)!, intervals, holidays, openingDate: dateToDateOnly(project.opening_date), timelineStart: dateToDateOnly(project.timeline_start_date), cdDoneDate: cdDone?.status === "DONE" ? dateToDateOnly(cdDone.status_changed_at) : null, today: dateToDateOnly(nowOf(ports))! }); const dates: Record<string, { start?: string; end?: string }> = { [LEGACY_PHASE_DEFINITION_IDS.design3d]: { end: plan.milestones.designFinal }, [LEGACY_PHASE_DEFINITION_IDS.cd]: { start: plan.milestones.cdMallStart, end: plan.milestones.end }, [LEGACY_PHASE_DEFINITION_IDS.supervision]: { start: plan.milestones.fitOutStart, end: plan.milestones.handover } }; const written: string[] = [], kept: string[] = []; for (const phase of phases) { const next = dates[phase.definition_id]; if (!next) continue; if (phase.planned_dates_manual) { kept.push(phase.id); continue; } await tx.sfPhase.update({ where: { id: phase.id }, data: { ...(next.start ? { planned_start_date: dateOnlyToDate(next.start) } : {}), ...(next.end ? { planned_end_date: dateOnlyToDate(next.end) } : {}) } }); written.push(phase.id); } await writeAudit(ports, tx, { action: "studioflow.project.plan-applied", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, written, kept } }); return { written, kept, warnings: plan.warnings, milestones: plan.milestones }; });
+    },
+    async resetPhasePlannedDates(input: CommandContext & { projectId: string; phaseId: string }) {
+      const userId = requireCommand(input, P.projectManage); await requireProjectAccess(db, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "content", phaseId: input.phaseId }); await db.sfPhase.update({ where: { id: input.phaseId }, data: { planned_dates_manual: false } }); return this.applyProjectPlan(input);
     },
 
     async setProjectPriority(input: CommandContext & { projectId: string; priority: ProjectPriority }) {

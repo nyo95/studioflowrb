@@ -212,7 +212,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId } });
         if (!phase || phase.project_id !== project.id) throw notFound("phase");
         const changes: Record<string, { from: unknown; to: unknown }> = {};
-        const data: { planned_start_date?: Date | null; planned_end_date?: Date | null } = {};
+        const data: { planned_start_date?: Date | null; planned_end_date?: Date | null; planned_dates_manual?: boolean } = { planned_dates_manual: true };
         if (startDate !== undefined) {
           const to = dateToDateOnly(startDate);
           if (dateToDateOnly(phase.planned_start_date) !== to) { changes.plannedStartDate = { from: dateToDateOnly(phase.planned_start_date), to }; data.planned_start_date = startDate; }

@@ -165,6 +165,7 @@ const ProjectFields = {
   picDrafterId: Id,
   openingDate: DateOnly,
   timelineStartDate: DateOnly,
+  fitOutStartDate: DateOnly,
   clientContact: z.string().max(200).nullish(),
   address: OptionalText,
   area: z.string().max(20).nullish(),
@@ -202,6 +203,9 @@ export async function setProjectDatesAction(input: z.infer<typeof ProjectDates>)
     return result;
   });
 }
+const FitOutStart = z.strictObject({ projectId: Id, fitOutStartDate: DateOnly });
+export async function setFitOutStartAction(input: z.infer<typeof FitOutStart>): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const ctx = await context(); const data = parse(FitOutStart, input); const result = await studioFlow.projects.setFitOutStart({ ...ctx, projectId: data.projectId, fitOutStartDate: data.fitOutStartDate || null }); refresh(data.projectId); return result; }); }
+export async function applyProjectPlanAction(projectId: string): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const ctx = await context(); const id = parse(Id, projectId); const result = await studioFlow.projects.applyProjectPlan({ ...ctx, projectId: id }); refresh(id); return result; }); }
 
 export async function setProjectPriorityAction(projectId: string, priority: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {

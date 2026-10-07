@@ -18,6 +18,7 @@ export type EditableProject = {
   openingDate: string | null;
   /** Gantt/timeline start; always a resolved date (falls back to createdAt server-side), never null on read. */
   timelineStartDate: string;
+  fitOutStartDate?: string | null;
   clientContact: string | null;
   address: string | null;
   area: string | null;
@@ -45,6 +46,7 @@ export function EditProjectDialog({ project, designers, drafters, clients, onClo
     clientContact: project.clientContact ?? "",
     address: project.address ?? "",
     area: project.area ?? "",
+    fitOutStartDate: project.fitOutStartDate ?? "",
   });
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -59,6 +61,7 @@ export function EditProjectDialog({ project, designers, drafters, clients, onClo
       clientContact: form.clientContact || null,
       address: form.address || null,
       area: form.area || null,
+      fitOutStartDate: form.fitOutStartDate || null,
     }));
     if (!ok) return;
     if (form.priority !== project.priority) await run("priority", () => setProjectPriorityAction(project.id, form.priority));
@@ -93,6 +96,7 @@ export function EditProjectDialog({ project, designers, drafters, clients, onClo
             </Select>
           </Field>
           <Field label="Area (m²)"><Input inputMode="decimal" value={form.area} onChange={(e) => set("area", e.target.value)} /></Field>
+          <Field label="Fit Out Start"><Input type="date" value={form.fitOutStartDate} onChange={(e) => set("fitOutStartDate", e.target.value)} /></Field>
         </div>
         <Field label="Site address"><Textarea rows={2} value={form.address} onChange={(e) => set("address", e.target.value)} /></Field>
         {error ? <InlineError>{error}</InlineError> : null}

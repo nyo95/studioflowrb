@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.379 | 2026-10-07 | feat(studioflow): plan working dates from Fit Out Start
+
+- Added StudioFlow working-day planning, office defaults, holiday rows, Fit Out Start, per-project interval overrides, milestones/warnings, and protected manual phase dates.
+- Added migration `20261007090000_sf_working_time_plan`: preserves existing planned dates as manual and renames the fixed Supervision definition/snapshots to Construction.
+- Applied the migration to rebuild-only dev and test databases on localhost:5433. No dependency added; working-day logic remains StudioFlow-owned.
+- Checks: typecheck, lint, boundaries, legacy runtime, test suite, and production build.
+
 ## R8.378 | 2026-10-07 | docs(plan): WO-SF-PLAN-01 working-time planning from Fit Out Start (Lead)
 
 - Studied the current logic first: phases and CD Mall/CD Final iterations exist; projects have `timeline_start_date` and `opening_date`; phases already carry overridable planned start/end (`setPhasePlannedDates`, `domain/timeline.ts`) with an equal-width fallback; there was no Fit Out Start, no Handover, no working-day math.
