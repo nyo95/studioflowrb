@@ -90,6 +90,12 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - Create accepts an optional active Brand and requires at least one of `code` or `name`, exactly one
   active PRODUCT `categoryId`, Unit, and at least one `PriceMaterial`; a live SKU must retain
   at least one live `PriceMaterial`.
+- **One exception (owner, 2026-10-07): the sample shelf.** A physical sample often arrives
+  before any price, so the shelf's quick "New SKU" (`createSkuForSampleShelf`, permission
+  `masterdata.sample.manage`) creates a SKU with no `PriceMaterial`, under the same
+  identity, category, unit and brand rules; its `sku.created` audit carries
+  `origin: "sample-shelf"`. Every other entry point still requires a price. Such a SKU
+  gets its first price on Pricing when a supplier quotes it.
 - `code` and `name` are stored separately and may both be present. When only
   `code` exists, it is the display fallback and the slug source; when only
   `name` exists, the name remains the slug source.

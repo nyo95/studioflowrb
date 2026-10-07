@@ -3,7 +3,7 @@
 Plan ID: WO-MD-SAMPLE-01 (physical sample shelf in Master Data; a requested sample goes onto the shelf and StudioFlow learns it arrived)
 Scope: Master Data backend for the office sample shelf (rack/box, quantity, status, holder, movement history), the "put on shelf" step from a sample request, and the StudioFlow public command that marks that request received. Minimal UI wiring only; the Lead designs the screens in the next revision.
 Target revisions: R8.385 (this plan), R8.386 (Executor: backend + minimal wiring), R8.387 (Lead review), R8.388 (Executor correction pass), R8.389 (Lead review: PASS), R8.390 (Lead UI revision).
-Status: BUILT — UI shipped at R8.390; open: owner browser acceptance (BACKLOG [UNVERIFIED]) and the quick "New SKU" question (BACKLOG [BLOCKED]).
+Status: BUILT — UI shipped at R8.390, quick "New SKU" at R8.391; open: owner browser acceptance (BACKLOG [UNVERIFIED]).
 Priority: P1
 Owner: Product Owner. Decisions confirmed by the owner in chat on 2026-10-07 (kantor).
 Last updated: 2026-10-07
@@ -314,6 +314,12 @@ requires a material price, so both shelf forms point to Pricing instead
 (BACKLOG [BLOCKED], owner decision). The shelf rows also open the same actions
 on right-click. A shelf-only SKU read (`listSampleSkuChoices`, gated by
 `masterdata.sample.manage`) feeds the shelf's SKU picker.
+
+**R8.391 (owner, 2026-10-07: "a, sku tanpa harga khusus dari rak sampel").** Quick
+"New SKU" on both shelf forms through `createSkuForSampleShelf`: no price, shelf
+permission, the catalogue's identity/category/unit/brand rules (one shared
+insert with `createSku`, which still requires a price), audit origin
+`sample-shelf`. Recorded in `masterdata.md` §2.
 
 ## Executor Prompt
 

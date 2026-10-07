@@ -35,6 +35,7 @@ import {
 import type { SampleQueueRow } from "@/application/sample-request-coordinator";
 
 import { VendorQuickCreateDialog, type VendorTypeOption } from "../vendor-quick-create-dialog";
+import { ShelfSkuPicker, type ShelfSkuRefs } from "../samples/shelf-sku-dialog";
 import { createPricingVendorQuickAction } from "../pricing/actions";
 
 import {
@@ -95,7 +96,7 @@ function readyForPriceList(row: SampleQueueRow): boolean {
   return Boolean(intake && intake.vendorId && intake.skuId && intake.quotedAmount && intake.quotedCurrency);
 }
 
-export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManageVendors, vendorTypes, canShelve = false, racks = [] }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[]; skus: readonly SkuChoice[]; canPrice: boolean; canManageVendors: boolean; vendorTypes: readonly VendorTypeOption[]; canShelve?: boolean; racks?: readonly string[] }) {
+export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManageVendors, vendorTypes, canShelve = false, racks = [], skuRefs = null }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[]; skus: readonly SkuChoice[]; canPrice: boolean; canManageVendors: boolean; vendorTypes: readonly VendorTypeOption[]; canShelve?: boolean; racks?: readonly string[]; skuRefs?: ShelfSkuRefs | null }) {
   const [shelveTarget, setShelveTarget] = useState<SampleQueueRow | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -375,6 +376,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
           key={shelveTarget.sourceRequestId}
           row={shelveTarget}
           skus={skus}
+          skuRefs={skuRefs}
           racks={racks}
           pending={pendingId === shelveTarget.sourceRequestId}
           error={rowError}
@@ -439,7 +441,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
 type ShelveInput = { skuId: string; rack: string; box: string; quantity: number; locationNote?: string };
 
 /** Put a requested sample on the shelf: its SKU (prefilled from the quote) and where it goes. */
-function ShelveDialog({ row, skus, racks, pending, error, onCancel, onSubmit }: { row: SampleQueueRow; skus: readonly SkuChoice[]; racks: readonly string[]; pending: boolean; error: string | null; onCancel: () => void; onSubmit: (input: ShelveInput) => void }) {
+function ShelveDialog({ row, skus, skuRefs, racks, pending, error, onCancel, onSubmit }: { row: SampleQueueRow; skus: readonly SkuChoice[]; skuRefs: ShelfSkuRefs | null; racks: readonly string[]; pending: boolean; error: string | null; onCancel: () => void; onSubmit: (input: ShelveInput) => void }) {
   const [skuId, setSkuId] = useState(row.intake?.skuId ?? "");
   const [rack, setRack] = useState("");
   const [box, setBox] = useState("");
@@ -455,10 +457,7 @@ function ShelveDialog({ row, skus, racks, pending, error, onCancel, onSubmit }: 
         {error ? <InlineError>{error}</InlineError> : null}
         <Text size="sm" tone="secondary">The sample goes onto the shelf, and the designer&apos;s Schedule shows it as received with where it is.</Text>
         <Field label="Product in the catalogue" required>
-          <div className="grid gap-1">
-            <CreatableSearch label="SKU" options={skus.map((sku) => ({ id: sku.id, label: skuLabel(sku) }))} value={skuId} onValueChange={setSkuId} placeholder="Pick a SKU" searchPlaceholder="Search SKUs…" emptyLabel="No SKU matches this search." className="w-full" />
-            <p className="text-xs text-ink-secondary">Not there yet? A SKU is created with its price on Pricing.</p>
-          </div>
+          <ShelfSkuPicker skus={skus} value={skuId} onChange={setSkuId} refs={skuRefs} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Rack" required>

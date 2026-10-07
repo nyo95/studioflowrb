@@ -86,11 +86,9 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   note in that project's Schedule plus the requester's notification. Staff
   roles first need `masterdata.sample.read` / `masterdata.sample.manage`
   granted in Settings → Access.
-- [ ] [BLOCKED] Quick "New SKU" from the sample shelf: `createSku` requires at
-  least one material price (`SKU_PRICE_REQUIRED`), but a sample usually arrives
-  before any price (legacy made a price-less DRAFT SKU). Owner to decide:
-  allow a SKU without a price (from the shelf only, or everywhere), or keep
-  "create the SKU on Pricing first" (today's hint on both shelf forms).
+- [ ] [UNVERIFIED] Quick "New SKU" (no price) from Add sample and Put on shelf
+  (R8.391): type a name nobody has, create it, and it is selected; the SKU then
+  shows on the SKU page without prices until one is added on Pricing.
 
 - [ ] [UNVERIFIED] Text price labels (R8.298): typing and pasting quoted text
   in the compare-suppliers grid (needs two labor suppliers) and the material

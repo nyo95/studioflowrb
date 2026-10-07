@@ -29,11 +29,12 @@ export default async function SamplesPage() {
   }
 
   const canManage = hasPermission(grants, MASTERDATA_PERMISSIONS.sampleManage);
-  const [samples, skus, projects] = await Promise.all([
+  const [samples, skus, skuRefs, projects] = await Promise.all([
     masterDataService.listSamples({ grants }),
     canManage ? masterDataService.listSampleSkuChoices({ grants }) : [],
+    canManage ? masterDataService.listSampleSkuFormRefs({ grants }) : null,
     canManage ? sampleRequestCoordinator.listProjectChoices({ grants }) : [],
   ]);
 
-  return <SampleShelf samples={samples} skus={skus} projects={projects} canManage={canManage} />;
+  return <SampleShelf samples={samples} skus={skus} skuRefs={skuRefs} projects={projects} canManage={canManage} />;
 }

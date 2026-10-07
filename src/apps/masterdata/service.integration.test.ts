@@ -2243,6 +2243,28 @@ describe("Physical sample shelf (WO-MD-SAMPLE-01)", () => {
   }
   const movements = (sampleId: string) => testDb.prisma.sampleMovement.findMany({ where: { sample_id: sampleId }, orderBy: [{ created_at: "asc" }, { id: "asc" }] });
 
+  it("creates a price-less SKU only through the shelf, with the catalogue's own rules and its origin audited", async () => {
+    const context = (shared ??= await createMaterialContext());
+    const SHELF = [MASTERDATA_PERMISSIONS.sampleManage];
+    // The catalogue path still needs a price and the SKU permission.
+    await assert.rejects(service.createSku({ grants: GRANTS, actor: ACTOR, name: "No Price Oak", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [] }), code("SKU_PRICE_REQUIRED"));
+    await assert.rejects(service.createSku({ grants: SHELF, actor: ACTOR, name: "No Price Oak", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] }), code("PERMISSION_DENIED"));
+    // The shelf path: shelf permission only, no price, same category and identity rules.
+    await assert.rejects(service.createSkuForSampleShelf({ grants: READ_ONLY, actor: SAMPLE_ACTOR, name: "Shelf Only Oak", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId }), code("PERMISSION_DENIED"));
+    await assert.rejects(service.createSkuForSampleShelf({ grants: SHELF, actor: SAMPLE_ACTOR, name: "Shelf Only Oak", baseUnitId: context.unit.id, categoryId: "" }), code("SKU_CATEGORY_REQUIRED"));
+    const { skuId } = await service.createSkuForSampleShelf({ grants: SHELF, actor: SAMPLE_ACTOR, name: "Shelf Only Oak", code: "SO-1", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId });
+    const sku = await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId }, include: { categories: true, material_prices: true } });
+    assert.deepEqual([sku.name, sku.code, sku.brand_id, sku.categories.length, sku.material_prices.length], ["Shelf Only Oak", "SO-1", context.brandId, 1, 0]);
+    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { entity_id: skuId, action: "sku.created" } });
+    assert.equal((audit.metadata as { origin?: string }).origin, "sample-shelf");
+    // It can take a sample straight away, and the form's choices are shelf-gated too.
+    const sample = await service.createSample({ grants: SHELF, actor: SAMPLE_ACTOR, skuId, rack: "N", box: "1" });
+    assert.equal(sample.sku_id, skuId);
+    await assert.rejects(service.listSampleSkuFormRefs({ grants: READ_ONLY }), code("PERMISSION_DENIED"));
+    const refs = await service.listSampleSkuFormRefs({ grants: SHELF });
+    assert.ok(refs.categories.some((category) => category.id === context.categoryId) && refs.units.some((unit) => unit.id === context.unit.id) && refs.brands.some((brand) => brand.id === context.brandId));
+  });
+
   it("creates a sample with a normalised rack and box, validates limits, and writes the IN movement", async () => {
     const skuId = await makeSku("Shelf Oak");
     const sample = await service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "  a  1 ", box: "b-2", quantity: 3, locationNote: " top shelf ", notes: "swatch" });

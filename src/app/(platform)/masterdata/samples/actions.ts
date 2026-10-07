@@ -16,6 +16,23 @@ const refresh = () => revalidatePath("/masterdata/samples");
 export async function createSampleAction(input: unknown): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const c = await requirePrincipalGrants(); const x = Create.safeParse(input); if (!x.success) throw validationError(x.error); const result = await masterDataService.createSample({ grants: c.grants, actor: actor(c.principal), ...x.data }); refresh(); return result; }); }
 export async function updateSampleLocationAction(input: unknown): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const c = await requirePrincipalGrants(); const x = Location.safeParse(input); if (!x.success) throw validationError(x.error); const result = await masterDataService.updateSampleLocation({ grants: c.grants, actor: actor(c.principal), ...x.data }); refresh(); return result; }); }
 export async function setSampleStatusAction(input: unknown): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const c = await requirePrincipalGrants(); const x = Status.safeParse(input); if (!x.success) throw validationError(x.error); const result = await sampleRequestCoordinator.setSampleStatus({ grants: c.grants, actor: actor(c.principal), ...x.data }); refresh(); return result; }); }
+const ShelfSku = z.object({ name: z.string().max(128).optional(), code: z.string().max(32).optional(), brandId: z.string().uuid().optional(), categoryId: z.string().uuid(), baseUnitId: z.string().uuid() })
+  .refine((value) => Boolean(value.name?.trim() || value.code?.trim()), { message: "SKU code or name is required.", path: ["name"] });
+
+/** Quick "New SKU" from the shelf: a price-less SKU (owner, 2026-10-07: only from the sample shelf). */
+export async function createShelfSkuAction(input: unknown) {
+  return runSafeAction(async () => {
+    const c = await requirePrincipalGrants();
+    const x = ShelfSku.safeParse(input);
+    if (!x.success) throw validationError(x.error);
+    const result = await masterDataService.createSkuForSampleShelf({ grants: c.grants, actor: actor(c.principal), name: x.data.name?.trim() || null, code: x.data.code?.trim() || null, brandId: x.data.brandId ?? null, categoryId: x.data.categoryId, baseUnitId: x.data.baseUnitId });
+    revalidatePath("/masterdata/skus");
+    revalidatePath("/masterdata/sample-requests");
+    refresh();
+    return result;
+  });
+}
+
 /** One sample's movements, newest first, loaded when its history is opened. */
 export async function getSampleHistoryAction(sampleId: string) {
   return runSafeAction(async () => {

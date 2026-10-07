@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.391 | 2026-10-07 | feat(masterdata): price-less "New SKU" from the sample shelf (Lead)
+
+- **Owner decision (2026-10-07): "a, sku tanpa harga khusus dari rak sampel".** A sample usually arrives before any price, and `createSku` requires one. New `createSkuForSampleShelf` (permission `masterdata.sample.manage`) creates a SKU without a `PriceMaterial`; `createSku` and `createSkuForSampleShelf` now share one insert, so identity, category, unit and brand rules cannot drift. `createSku` keeps the price and SKU-permission requirements. `sku.created` audits carry `origin` (`catalog` or `sample-shelf`).
+- **Screen:** both shelf forms (Add sample, Put on shelf) use one `ShelfSkuPicker`: typing a name nobody has offers "New SKU … (no price yet)", which opens a short dialog (name or code, optional brand, product category, unit with `pcs` preselected) and selects the new SKU. Choices come from `listSampleSkuFormRefs` (shelf-gated).
+- `masterdata.md` §2 records the exception; BACKLOG: the [BLOCKED] question becomes an [UNVERIFIED] browser check; PLAN.md updated.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet` (and full lint of the touched files), `check:boundaries`, `check:legacy-runtime`, `npm test` 905/905 (none failed, skipped or cancelled; 1 new: price-less SKU only through the shelf, catalogue path still refuses, audit origin, form choices gated), `npm run build` passes. Browser not opened.
+
 ## R8.390 | 2026-10-07 | feat(masterdata): sample shelf screens and put-on-shelf from a request - WO-MD-SAMPLE-01 UI (Lead)
 
 - **Samples page** (`/masterdata/samples`, replaces the minimal table): status chips with counts (All, On the shelf, Borrowed, With a client, Lost or discarded) and the rack count; search across rack, box, product, brand, holder, project and the in-box note; "By rack" (one group per rack, boxes in natural order) and "List" views. Each row shows box and in-box note, product with brand and notes (archived SKU flagged), quantity, status with holder, project and "since". Actions in the row menu and on right-click: Change status (holder required while borrowed or with a client, optional StudioFlow project picker, note), Move or edit (rack picker that takes a new rack, box, quantity, note), History (drawer with every movement, from/to on moves, who and when), Remove (disabled while out, with the reason). "Add sample" with a SKU picker. Staff without `masterdata.sample.read` get an access-denied state instead of an error.

@@ -7,8 +7,45 @@ import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
 import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredPriceAmount, resolveSkuIdentity, resolveSkuMeasurement, assertSkuRestorable, assertPriceMaterialRestorable, assertVendorMaterialCapable, assertPriceMaterialBrandSupplierChain, assertWorkPriceRestorable, pruneOriginlessBrandCategories, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, createDeletionRequest, writeAudit } from "./shared";
 
+type CreateSkuInput = { grants: PermissionGrants; actor: AuditActor; name?: string | null; code?: string | null; notes?: string; brandId?: string | null; baseUnitId: string; purchaseUnitId?: string; dimensionLength?: string; dimensionWidth?: string; dimensionThickness?: string; dimensionUnitId?: string; categoryId: string; priceMaterials: Array<{ supplierVendorId: string; amount: string; currency: string; notes?: string }> };
+
 export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
+
+  /** One SKU insert for both entry points; the callers own the permission and the price rule. */
+  async function insertSku(input: CreateSkuInput, origin: "catalog" | "sample-shelf") {
+    const identity = resolveSkuIdentity(input.name, input.code);
+    if (!input.categoryId) throw new AppError("VALIDATION", "SKU_CATEGORY_REQUIRED", "At least one category is required.");
+    const categoryIds = [input.categoryId];
+    const supplierIds = input.priceMaterials.map((price) => price.supplierVendorId);
+    if (new Set(supplierIds).size !== supplierIds.length) throw new AppError("VALIDATION", "SKU_PRICE_VENDOR_DUPLICATE", "Only one initial price is allowed per Supplier.");
+    return runTransaction(async (tx) => {
+      const baseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.baseUnitId } });
+      if (baseUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_BASE_UNIT_INACTIVE", "Base unit must be active.");
+      let purchaseUnit = null;
+      if (input.purchaseUnitId) { purchaseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.purchaseUnitId } }); if (purchaseUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_PURCHASE_UNIT_INACTIVE", "Purchase unit must be active."); }
+      const measurement = await resolveSkuMeasurement(tx, input, baseUnit, purchaseUnit);
+      const categories = await tx.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, kind: true, status: true } });
+      if (categories.length !== categoryIds.length) throw new AppError("VALIDATION", "SKU_CATEGORY_NOT_FOUND", "One or more categories not found.");
+      for (const cat of categories) { if (cat.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_CATEGORY_INACTIVE", `Category ${cat.id} is not active.`); if (cat.kind !== "PRODUCT") throw new AppError("VALIDATION", "SKU_CATEGORY_KIND_INVALID", "SKU categories must be PRODUCT categories."); }
+      const brand = input.brandId ? await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } }) : null;
+      if (brand?.deleted_at) throw new AppError("VALIDATION", "SKU_BRAND_ARCHIVED", "Brand is archived.");
+      const priceUnitId = input.purchaseUnitId ?? input.baseUnitId;
+      for (const pm of input.priceMaterials) { requiredCurrency(pm.currency); requiredPriceAmount(pm.amount); const supplier = await tx.vendor.findUniqueOrThrow({ where: { id: pm.supplierVendorId } }); if (supplier.deleted_at !== null) throw new AppError("VALIDATION", "PRICE_VENDOR_ARCHIVED", "Supplier is archived."); await assertVendorMaterialCapable(tx, pm.supplierVendorId); }
+      let sku;
+      try { sku = await tx.sku.create({ data: { id: randomUUID(), name: identity.name, slug: identity.slug, code: identity.code, notes: input.notes?.trim() || null, brand_id: input.brandId || null, base_unit_id: input.baseUnitId, purchase_unit_id: input.purchaseUnitId ?? null, ...measurement } }); } catch (error) { mapWriteError(error); }
+      const skuId = sku!.id;
+      await tx.skuCategory.createMany({ data: categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: skuId, category_id: categoryId })) });
+      const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
+      for (const catId of input.brandId ? productCategoryIds : []) { let bc = await tx.brandCategory.findUnique({ where: { brand_id_category_id: { brand_id: input.brandId!, category_id: catId } } }); if (!bc) { bc = await tx.brandCategory.create({ data: { id: randomUUID(), brand_id: input.brandId!, category_id: catId } }); } await tx.brandCategoryOrigin.create({ data: { id: randomUUID(), brand_category_id: bc.id, kind: "SKU_ENRICHMENT", source_sku_id: skuId, actor_user_id: input.actor.userId ?? null, actor_label: input.actor.label } }); }
+      const initialPrices = input.priceMaterials.map((pm) => ({ id: randomUUID(), sku_id: skuId, supplier_vendor_id: pm.supplierVendorId, ...(({ amount, label }) => ({ amount, amount_label: label }))(requiredPriceAmount(pm.amount)), currency: requiredCurrency(pm.currency), unit_id: priceUnitId, notes: pm.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label }));
+      for (const price of initialPrices) await assertPriceMaterialBrandSupplierChain(tx, skuId, price.supplier_vendor_id);
+      await tx.priceMaterial.createMany({ data: initialPrices });
+      await writeAudit(ports, tx, { action: "sku.created", entityType: "sku", entityId: skuId, actor: input.actor, metadata: { slug: identity.slug, brand_id: input.brandId, categories: categoryIds.length, prices: input.priceMaterials.length, purchase_to_base_factor: measurement.purchase_to_base_factor, origin } });
+      for (const price of initialPrices) await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price.id, actor: input.actor, metadata: { sku_id: skuId, vendor_id: price.supplier_vendor_id } });
+      return { skuId };
+    });
+  }
 
   return {
     async listSkus(input: { grants: PermissionGrants; search?: string; brandId?: string; categoryId?: string; includeArchived?: boolean }) {
@@ -44,42 +81,24 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
       });
     },
 
-    async createSku(input: { grants: PermissionGrants; actor: AuditActor; name?: string | null; code?: string | null; notes?: string; brandId?: string | null; baseUnitId: string; purchaseUnitId?: string; dimensionLength?: string; dimensionWidth?: string; dimensionThickness?: string; dimensionUnitId?: string; categoryId: string; priceMaterials: Array<{ supplierVendorId: string; amount: string; currency: string; notes?: string }> }) {
+    async createSku(input: CreateSkuInput) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);
       actorIsUsable(input.actor);
-      const identity = resolveSkuIdentity(input.name, input.code);
-      if (!input.categoryId) throw new AppError("VALIDATION", "SKU_CATEGORY_REQUIRED", "At least one category is required.");
       if (!input.priceMaterials || input.priceMaterials.length === 0) throw new AppError("VALIDATION", "SKU_PRICE_REQUIRED", "At least one material price is required.");
-      const categoryIds = [input.categoryId];
-      const supplierIds = input.priceMaterials.map((price) => price.supplierVendorId);
-      if (new Set(supplierIds).size !== supplierIds.length) throw new AppError("VALIDATION", "SKU_PRICE_VENDOR_DUPLICATE", "Only one initial price is allowed per Supplier.");
-      return runTransaction(async (tx) => {
-        const baseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.baseUnitId } });
-        if (baseUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_BASE_UNIT_INACTIVE", "Base unit must be active.");
-        let purchaseUnit = null;
-        if (input.purchaseUnitId) { purchaseUnit = await tx.unit.findUniqueOrThrow({ where: { id: input.purchaseUnitId } }); if (purchaseUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_PURCHASE_UNIT_INACTIVE", "Purchase unit must be active."); }
-        const measurement = await resolveSkuMeasurement(tx, input, baseUnit, purchaseUnit);
-        const categories = await tx.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, kind: true, status: true } });
-        if (categories.length !== categoryIds.length) throw new AppError("VALIDATION", "SKU_CATEGORY_NOT_FOUND", "One or more categories not found.");
-        for (const cat of categories) { if (cat.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_CATEGORY_INACTIVE", `Category ${cat.id} is not active.`); if (cat.kind !== "PRODUCT") throw new AppError("VALIDATION", "SKU_CATEGORY_KIND_INVALID", "SKU categories must be PRODUCT categories."); }
-        const brand = input.brandId ? await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } }) : null;
-        if (brand?.deleted_at) throw new AppError("VALIDATION", "SKU_BRAND_ARCHIVED", "Brand is archived.");
-        const priceUnitId = input.purchaseUnitId ?? input.baseUnitId;
-        for (const pm of input.priceMaterials) { requiredCurrency(pm.currency); requiredPriceAmount(pm.amount); const supplier = await tx.vendor.findUniqueOrThrow({ where: { id: pm.supplierVendorId } }); if (supplier.deleted_at !== null) throw new AppError("VALIDATION", "PRICE_VENDOR_ARCHIVED", "Supplier is archived."); await assertVendorMaterialCapable(tx, pm.supplierVendorId); }
-        let sku;
-        try { sku = await tx.sku.create({ data: { id: randomUUID(), name: identity.name, slug: identity.slug, code: identity.code, notes: input.notes?.trim() || null, brand_id: input.brandId || null, base_unit_id: input.baseUnitId, purchase_unit_id: input.purchaseUnitId ?? null, ...measurement } }); } catch (error) { mapWriteError(error); }
-        const skuId = sku!.id;
-        await tx.skuCategory.createMany({ data: categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: skuId, category_id: categoryId })) });
-        const productCategoryIds = categories.filter((c) => c.kind === "PRODUCT").map((c) => c.id);
-        for (const catId of input.brandId ? productCategoryIds : []) { let bc = await tx.brandCategory.findUnique({ where: { brand_id_category_id: { brand_id: input.brandId!, category_id: catId } } }); if (!bc) { bc = await tx.brandCategory.create({ data: { id: randomUUID(), brand_id: input.brandId!, category_id: catId } }); } await tx.brandCategoryOrigin.create({ data: { id: randomUUID(), brand_category_id: bc.id, kind: "SKU_ENRICHMENT", source_sku_id: skuId, actor_user_id: input.actor.userId ?? null, actor_label: input.actor.label } }); }
-        const initialPrices = input.priceMaterials.map((pm) => ({ id: randomUUID(), sku_id: skuId, supplier_vendor_id: pm.supplierVendorId, ...(({ amount, label }) => ({ amount, amount_label: label }))(requiredPriceAmount(pm.amount)), currency: requiredCurrency(pm.currency), unit_id: priceUnitId, notes: pm.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label }));
-        for (const price of initialPrices) await assertPriceMaterialBrandSupplierChain(tx, skuId, price.supplier_vendor_id);
-        await tx.priceMaterial.createMany({ data: initialPrices });
-        await writeAudit(ports, tx, { action: "sku.created", entityType: "sku", entityId: skuId, actor: input.actor, metadata: { slug: identity.slug, brand_id: input.brandId, categories: categoryIds.length, prices: input.priceMaterials.length, purchase_to_base_factor: measurement.purchase_to_base_factor } });
-        for (const price of initialPrices) await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price.id, actor: input.actor, metadata: { sku_id: skuId, vendor_id: price.supplier_vendor_id } });
-        return { skuId };
-      });
+      return insertSku(input, "catalog");
     },
+
+    /**
+     * A SKU for a physical sample that arrived before any price (owner, 2026-10-07: price-less SKUs only from the
+     * sample shelf). Same identity, category, unit and brand rules as `createSku`; no price, and the shelf
+     * permission instead of the SKU one. The audit event records where it came from.
+     */
+    async createSkuForSampleShelf(input: Omit<CreateSkuInput, "priceMaterials">) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleManage);
+      actorIsUsable(input.actor);
+      return insertSku({ ...input, priceMaterials: [] }, "sample-shelf");
+    },
+
 
     async updateSku(input: { grants: PermissionGrants; actor: AuditActor; skuId: string; name?: string | null; code?: string | null; notes?: string | null; brandId?: string | null; baseUnitId: string; purchaseUnitId?: string | null; dimensionLength?: string | null; dimensionWidth?: string | null; dimensionThickness?: string | null; dimensionUnitId?: string | null; categoryId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage);

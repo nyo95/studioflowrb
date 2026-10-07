@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
@@ -40,6 +39,7 @@ import {
   type SemanticTone,
 } from "@/platform/ui_engine";
 
+import { ShelfSkuPicker, type ShelfSkuRefs } from "./shelf-sku-dialog";
 import { createSampleAction, deleteSampleAction, getSampleHistoryAction, setSampleStatusAction, updateSampleLocationAction } from "./actions";
 
 type Status = SampleRead["status"];
@@ -74,14 +74,10 @@ function productLabel(sample: Pick<SampleRead, "skuCode" | "skuName">): string {
   return [sample.skuCode, sample.skuName].filter(Boolean).join(" · ") || "Unnamed SKU";
 }
 
-function skuLabel(sku: SkuChoice): string {
-  return [sku.code, sku.name, sku.brandName ? `(${sku.brandName})` : null].filter(Boolean).join(" ") || "Unnamed SKU";
-}
-
 /** Rack and box sort as a person reads a shelf: "BOX 2" before "BOX 10". */
 const naturally = (a: string, b: string) => a.localeCompare(b, "id-ID", { numeric: true });
 
-export function SampleShelf({ samples, skus, projects, canManage }: { samples: SampleRead[]; skus: readonly SkuChoice[]; projects: readonly ProjectChoice[]; canManage: boolean }) {
+export function SampleShelf({ samples, skus, skuRefs, projects, canManage }: { samples: SampleRead[]; skus: readonly SkuChoice[]; skuRefs: ShelfSkuRefs | null; projects: readonly ProjectChoice[]; canManage: boolean }) {
   const { locale, timezone } = useDisplaySettings();
   const confirm = useConfirm();
   const [query, setQuery] = useState("");
@@ -246,7 +242,7 @@ export function SampleShelf({ samples, skus, projects, canManage }: { samples: S
         )}
       </DirectoryShell>
 
-      {form ? <SampleFormDialog key={form.sample?.id ?? "new"} sample={form.sample} skus={skus} racks={racks} pending={pending === "form"} error={error} onCancel={() => setForm(null)} onSubmit={(input) => run("form", () => (form.sample ? updateSampleLocationAction({ sampleId: form.sample.id, ...input }) : createSampleAction(input)), () => setForm(null))} /> : null}
+      {form ? <SampleFormDialog key={form.sample?.id ?? "new"} sample={form.sample} skus={skus} skuRefs={skuRefs} racks={racks} pending={pending === "form"} error={error} onCancel={() => setForm(null)} onSubmit={(input) => run("form", () => (form.sample ? updateSampleLocationAction({ sampleId: form.sample.id, ...input }) : createSampleAction(input)), () => setForm(null))} /> : null}
       {statusTarget ? <StatusDialog key={statusTarget.id} sample={statusTarget} projects={projects} pending={pending === "status"} error={error} onCancel={() => setStatusTarget(null)} onSubmit={(input) => run("status", () => setSampleStatusAction({ sampleId: statusTarget.id, ...input }), () => setStatusTarget(null))} /> : null}
       {historyTarget ? <HistoryDrawer key={historyTarget.id} sample={historyTarget} onClose={() => setHistoryTarget(null)} /> : null}
       {confirm.dialog}
@@ -256,7 +252,7 @@ export function SampleShelf({ samples, skus, projects, canManage }: { samples: S
 
 type FormInput = { skuId: string; rack: string; box: string; quantity: number; locationNote?: string; notes?: string };
 
-function SampleFormDialog({ sample, skus, racks, pending, error, onCancel, onSubmit }: { sample: SampleRead | null; skus: readonly SkuChoice[]; racks: readonly string[]; pending: boolean; error: string | null; onCancel: () => void; onSubmit: (input: FormInput) => void }) {
+function SampleFormDialog({ sample, skus, skuRefs, racks, pending, error, onCancel, onSubmit }: { sample: SampleRead | null; skus: readonly SkuChoice[]; skuRefs: ShelfSkuRefs | null; racks: readonly string[]; pending: boolean; error: string | null; onCancel: () => void; onSubmit: (input: FormInput) => void }) {
   const [skuId, setSkuId] = useState(sample?.skuId ?? "");
   const [rack, setRack] = useState(sample?.rack ?? "");
   const [box, setBox] = useState(sample?.box ?? "");
@@ -281,10 +277,7 @@ function SampleFormDialog({ sample, skus, racks, pending, error, onCancel, onSub
         {error ? <InlineError>{error}</InlineError> : null}
         {sample ? null : (
           <Field label="Product (SKU)" required>
-            <div className="grid gap-1">
-              <CreatableSearch label="SKU" options={skus.map((sku) => ({ id: sku.id, label: skuLabel(sku) }))} value={skuId} onValueChange={setSkuId} placeholder="Pick a SKU" searchPlaceholder="Search SKUs…" emptyLabel="No SKU matches this search." className="w-full" />
-              <Text size="sm" tone="tertiary">Not in the list? A SKU is created with its price on <Link href="/masterdata/pricing" className="underline">Pricing</Link>.</Text>
-            </div>
+            <ShelfSkuPicker skus={skus} value={skuId} onChange={setSkuId} refs={skuRefs} />
           </Field>
         )}
         <div className="grid grid-cols-2 gap-3">
