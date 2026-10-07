@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.393 | 2026-10-07 | docs(plan): WO-SF-NOTE-IMG-01 images on an iteration's client notes (Lead)
+
+- Owner (2026-10-07): images in client notes by drag, paste or pick; shown under the notes, in the next iteration's brief and in history.
+- `PLAN.md` READY for the Executor (R8.394): `sf_iteration_image` per iteration (PNG/JPEG/WebP, 3 MB, 12 per iteration), add/remove with the client-notes permission rules, signed-URL reads wherever notes are read, cleanup on remove, never-sent delete, admin reset and archived-project purge; not undoable. The Lead builds the screens next. WO-MD-SAMPLE-01 stays BUILT (its browser walk is in BACKLOG).
+
+**Checks.** Docs only; no code changed.
+
 ## R8.392 | 2026-10-07 | feat(studioflow,ui-engine): formatted client notes, pinned notes and MOM; CD step names locked (Lead)
 
 - **Owner:** "mana tempat numbering, bold gitu2?" and "Notes + MOM" chosen. Client notes, pinned notes and site-visit notes were plain text boxes, and the MOM editor's bold/italic/bullet buttons wrote `**`/`*`/`- ` marks that every screen showed raw.
