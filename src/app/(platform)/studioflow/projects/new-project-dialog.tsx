@@ -27,7 +27,7 @@ export function NewProjectDialog({ designers, drafters, clients, onClose }: { de
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
 
   return (
-    <DraftDialog open onOpenChange={(open) => { if (!open) onClose(); }} title="New project" description="Creates the five phases, starts Moodboard at v1.0, and adds the Studio checklist." size="lg" pending={pending} watchedValue={JSON.stringify(form)}>
+    <DraftDialog open onOpenChange={(open) => { if (!open) onClose(); }} title="New project" description="Creates the phases from the default template, opens the first phase with its first iteration, and adds the Studio checklist." size="lg" pending={pending} watchedValue={JSON.stringify(form)}>
       <form className="grid gap-3.5" onSubmit={(event) => {
         event.preventDefault();
         void run("create", () => createProjectAction({

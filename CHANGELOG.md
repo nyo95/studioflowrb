@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.404 | 2026-10-07 | fix(shell,studioflow,bq): audit findings on screen - one first-load poll, no "five phases", BQ dates follow the account, /ui-engine needs sign-in (Lead)
+
+- **Polling.** The bell and the messenger each asked the server twice on first load (a mount request and a route request). The mount request is gone; the route effect makes the first one and the minute timer is unchanged. In development React Strict Mode still runs effects twice, so the dev log shows two of each; production now makes one.
+- **Copy.** New-project dialog and Projects header no longer say "five phases" (phase templates are configurable); the dialog now says what creation does: phases from the default template, the first phase opened with its first iteration, the Studio checklist.
+- **Dates.** The BQ project-deletion review shows requests in the account's locale and time zone instead of fixed `id-ID`. Print pages keep their fixed Indonesian format on purpose (client-facing documents).
+- **/ui-engine** is no longer a public path: the proxy requires a session cookie and the page checks the session itself.
+- Left for later: splitting `studioflow/actions.ts` (1,248 lines) and `schedule-board.tsx` (1,533 lines).
+
+**Checks.** `tsc --noEmit`, lint (touched files). Browser: Home loads (GET /studioflow 123 ms after the rail-badge change). Full tests not re-run: only screens and the proxy changed while the Executor works on other files.
+
 ## R8.403 | 2026-10-07 | docs(plan): WO-PLAT-COST-02 split the phase service and type Master Data, run in parallel with Lead UI fixes (Lead)
 
 - Owner (2026-10-07): fix the audit findings in parallel. `PLAN.md` READY for the Executor: item B (R8.404, split `phases/service.ts` into workflow, templates and deliverables behind the same members) and item C (R8.405, no `any` in Master Data services), each verified and committed on its own; stopping after B is a valid result. An explicit ownership rule keeps the two lanes on different files (Executor: `phases/**` and `apps/masterdata/**`; Lead: shell, UI Engine, proxy, screens, docs). Owner override of serial work recorded in the plan.

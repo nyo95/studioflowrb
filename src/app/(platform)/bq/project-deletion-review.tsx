@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { ConfirmDialog, DataTable, DirectoryShell, EmptyState, InlineError, Pagination, RowActionMenu, usePagination, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/platform/ui_engine";
 import { decideProjectDeletionAction } from "./actions";
 
 export type ProjectDeletionRequestRow = { id: string; projectTitle: string; requesterLabel: string; requestedAt: string };
 
 export function ProjectDeletionReview({ requests }: { requests: ProjectDeletionRequestRow[] }) {
+  const { locale, timezone } = useDisplaySettings();
   const [target, setTarget] = useState<{ row: ProjectDeletionRequestRow; decision: "approve" | "reject" } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -22,7 +24,7 @@ export function ProjectDeletionReview({ requests }: { requests: ProjectDeletionR
   return <DirectoryShell surface header={error ? <InlineError>{error}</InlineError> : undefined} pagination={<Pagination page={paging.page} pageCount={paging.pageCount} total={requests.length} pageSize={25} onPageChange={paging.setPage} label="Deletion review pages" />}>
     {requests.length === 0 ? <EmptyState title="No pending project deletions" description="Archived BQ projects stay protected until a deletion request is approved." /> : <DataTable framed={false} density="compact" stickyHeader minWidth={680}>
       <TableHeader><TableRow><TableHead>Project</TableHead><TableHead>Requested by</TableHead><TableHead>Requested</TableHead><TableHead stickyEnd align="end">Actions</TableHead></TableRow></TableHeader>
-      <TableBody>{pageRequests.map((row) => <TableRow key={row.id}><TableCell><span className="font-medium">{row.projectTitle}</span></TableCell><TableCell>{row.requesterLabel}</TableCell><TableCell>{new Intl.DateTimeFormat("id-ID", { dateStyle: "medium", timeStyle: "short" }).format(new Date(row.requestedAt))}</TableCell><TableCell stickyEnd align="end"><RowActionMenu label={`Actions for ${row.projectTitle}`} pending={pending} items={[
+      <TableBody>{pageRequests.map((row) => <TableRow key={row.id}><TableCell><span className="font-medium">{row.projectTitle}</span></TableCell><TableCell>{row.requesterLabel}</TableCell><TableCell>{new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short", timeZone: timezone }).format(new Date(row.requestedAt))}</TableCell><TableCell stickyEnd align="end"><RowActionMenu label={`Actions for ${row.projectTitle}`} pending={pending} items={[
         { label: "Approve permanent deletion", danger: true, onSelect: () => { setError(null); setTarget({ row, decision: "approve" }); } },
         { label: "Reject request", separatorBefore: true, onSelect: () => { setError(null); setTarget({ row, decision: "reject" }); } },
       ]} /></TableCell></TableRow>)}</TableBody>

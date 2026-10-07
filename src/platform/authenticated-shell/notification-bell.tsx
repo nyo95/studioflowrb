@@ -49,7 +49,7 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
-    refreshCount();
+    // The route effect below makes the first load's request; this one only keeps the minute timer.
     // A background tab does not need fresh counts; catch up as soon as it is visible again.
     const tick = () => { if (document.visibilityState === "visible") refreshCount(); };
     const interval = setInterval(tick, POLL_INTERVAL_MS);
