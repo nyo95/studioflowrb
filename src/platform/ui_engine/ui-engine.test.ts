@@ -83,6 +83,7 @@ describe("UI Engine foundation", () => {
       // R7.48 — canonical copy-to-clipboard button; no StudioFlow vocabulary.
       "CopyButton",
       "SimpleTextEditor",
+      "FormattedText",
       // R7.52 — activated by the project MOM image consumer.
       "ImageWorkspace",
       "useDebouncedValue",

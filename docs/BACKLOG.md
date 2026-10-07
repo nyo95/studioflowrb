@@ -129,6 +129,12 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## StudioFlow
 
+- [ ] [UNVERIFIED] Formatted notes R8.392 in the browser: bold, italic, bullets,
+  numbering and Enter-continues-the-list in client notes, pinned notes, visit
+  notes and MOM; the brief, earlier iterations, MOM read-only and MOM print show
+  them formatted; "Add to notes" on the brief; renaming CD Mall is refused with
+  a clear message.
+
 - [ ] [UNVERIFIED] Timeline R8.384 in the browser: "Dates & plan" dialog (lead
   times load, Save, Save and apply plan, Back to the plan, suggested Fit Out
   Start), "Edit dates and plan" from a project's read-only Timeline tab opening

@@ -69,7 +69,7 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
     let live = true;
     void getProjectPlanEditorAction(project.id).then((response) => { if (live) receive(response); });
     return () => { live = false; };
-  }, [project.id]); // eslint-disable-line react-hooks/exhaustive-deps -- `receive` only sets this dialog's own state
+  }, [project.id]);
 
   const parsed = (key: keyof Intervals) => (lead[key].trim() === "" ? null : /^\d+$/.test(lead[key].trim()) && Number(lead[key]) >= 1 && Number(lead[key]) <= 260 ? Number(lead[key]) : Number.NaN);
   const leadInvalid = INTERVAL_FIELDS.some(([key]) => Number.isNaN(parsed(key)));

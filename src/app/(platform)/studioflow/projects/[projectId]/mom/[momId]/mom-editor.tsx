@@ -15,6 +15,7 @@ import {
   Dialog,
   Field,
   FormattedInstant,
+  FormattedText,
   IconButton,
   ImageWorkspace,
   InlineError,
@@ -450,7 +451,7 @@ function ItemContentEditor({ projectId, item, canEdit, command }: { projectId: s
   };
 
   if (!canEdit) {
-    return <p className="m-0 whitespace-pre-wrap text-sm text-ink">{item.content || "—"}</p>;
+    return item.content ? <FormattedText text={item.content} className="text-sm text-ink" /> : <p className="m-0 text-sm text-ink">—</p>;
   }
 
   return (

@@ -7,7 +7,7 @@ import { AppError } from "@platform/core/errors";
 import { formatDateOnly } from "@platform/utilities/date";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { DocumentBlock, DocumentSheet, PrintButton } from "@/platform/ui_engine";
+import { DocumentBlock, DocumentSheet, FormattedText, PrintButton } from "@/platform/ui_engine";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +81,7 @@ export default async function MomPrintPage({ params }: { params: Promise<{ proje
                   ) : null}
                   <div className="min-w-0">
                     <p className={`${LABEL} mb-2`}>Section {String(index + 1).padStart(2, "0")}</p>
-                    <p className="m-0 min-w-0 whitespace-pre-wrap text-sm leading-6">{item.content || "—"}</p>
+                    {item.content ? <FormattedText text={item.content} className="min-w-0 text-sm leading-6" /> : <p className="m-0 text-sm leading-6">—</p>}
                   </div>
                 </div>
               </DocumentBlock>

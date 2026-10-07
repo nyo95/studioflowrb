@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { currentDateOnly } from "@platform/utilities/date";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { Button, Dialog, Field, FormActions, InlineError, Input, Textarea } from "@/platform/ui_engine";
+import { Button, Dialog, Field, FormActions, InlineError, Input, SimpleTextEditor } from "@/platform/ui_engine";
 
 import { phaseCommandAction, undoPhaseEventAction, type PhaseCommandInput, type PhaseCommandOutcome } from "../actions";
 import { useCommand } from "./use-command";
@@ -193,8 +193,8 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
       }
     >
       <div className="grid gap-3">
-        <Field label="Client notes" description="One point per line is easiest to read later.">
-          <Textarea rows={6} maxLength={4000} value={note} onChange={(event) => setNote(event.target.value)} placeholder={"e.g.\n- Warmer palette for the lounge\n- Keep the marble at reception"} autoFocus />
+        <Field label="Client notes" description="One point per line is easiest to read later. Use the buttons for bold, bullets or numbering.">
+          <SimpleTextEditor rows={6} maxLength={4000} value={note} onChange={(event) => setNote(event.target.value)} placeholder={"e.g.\n- Warmer palette for the lounge\n- Keep the marble at reception"} autoFocus />
         </Field>
         {commands.error ? <InlineError>{commands.error}</InlineError> : null}
       </div>
@@ -214,7 +214,7 @@ export function VisitDialog({ open, onOpenChange, onSave, pending, error }: { op
         if (await onSave(date, note.trim() || null)) { setNote(""); onOpenChange(false); }
       }}>
         <Field label="Visit date" required><Input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-        <Field label="Note"><Textarea rows={3} maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
+        <Field label="Note"><SimpleTextEditor rows={3} maxLength={2000} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
         {error ? <InlineError>{error}</InlineError> : null}
         <FormActions>
           <Button type="button" onClick={() => onOpenChange(false)} disabled={pending}>Cancel</Button>

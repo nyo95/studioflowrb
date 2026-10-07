@@ -385,7 +385,13 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     },
     async renameIteration(input: PhaseCommandInput & { iterationId: string; name: string }) {
       const name = requiredText(input.name, "ITERATION_NAME_REQUIRED", "Iteration name", 200);
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!iteration) throw iterationNotFound(); if (iteration.name === name) return { iterationId: iteration.id }; await tx.sfRevision.update({ where: { id: iteration.id }, data: { name } }); await recordEvent(tx, input, phase, iteration.id, iteration.name, name, { beforeIteration: iterationUndo(iteration) }); await audit(tx, input.actor, "iteration-renamed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!iteration) throw iterationNotFound(); if (iteration.name === name) return { iterationId: iteration.id };
+        // A two-step phase knows its step by the iteration name (`isCdMall`): renaming "CD Mall" would let OK close the
+        // phase without CD Final, and naming another iteration "CD Mall" would fake the step. Those names stay put.
+        const definition = await tx.sfPhaseDefinition.findUnique({ where: { id: phase.definition_id }, select: { default_iteration_kinds: true } });
+        const kinds = iterationKinds(definition?.default_iteration_kinds);
+        if (kinds.length >= 2 && (kinds.includes(iteration.name) || kinds.includes(name))) throw conflict("ITERATION_KIND_NAME_LOCKED", `${kinds.join(" and ")} keep their names: the phase uses them to know which step it is in.`);
+        await tx.sfRevision.update({ where: { id: iteration.id }, data: { name } }); await recordEvent(tx, input, phase, iteration.id, iteration.name, name, { beforeIteration: iterationUndo(iteration) }); await audit(tx, input.actor, "iteration-renamed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async deleteNeverSentIteration(input: PhaseCommandInput & { iterationId: string }) {
       return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id }, include: { _count: { select: { activities: true, deliverables: true } } } }); if (!iteration) throw iterationNotFound(); if (iteration.status !== "NOT_SENT") throw invalidState("Only an iteration that was never sent can be deleted.");

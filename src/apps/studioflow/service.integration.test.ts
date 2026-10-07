@@ -2663,6 +2663,12 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "CD Mall" }, { name: "CD Final" }] } });
     const mall = await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
     assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: mall.iterationId } })).name, "CD Mall");
+    // The step is read from the name, so the step names are locked both ways (a renamed CD Mall could close without CD Final).
+    await rejectsWith(sf.phases.renameIteration({ ...as(designer), projectId, phaseId: cd.id, iterationId: mall.iterationId, name: "CD Mall lobby" }), "ITERATION_KIND_NAME_LOCKED");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const moodboardIteration = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: moodboard.id } });
+    await sf.phases.renameIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: moodboardIteration.id, name: "CD Mall" });
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: moodboardIteration.id } })).name, "CD Mall", "a one-step phase has no step names to protect");
     const base = { ...as(designer), projectId, phaseId: cd.id, iterationId: mall.iterationId };
     await sf.phases.sendIteration(base);
     await sf.phases.recordClientAnswer(base);

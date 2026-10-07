@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.392 | 2026-10-07 | feat(studioflow,ui-engine): formatted client notes, pinned notes and MOM; CD step names locked (Lead)
+
+- **Owner:** "mana tempat numbering, bold gitu2?" and "Notes + MOM" chosen. Client notes, pinned notes and site-visit notes were plain text boxes, and the MOM editor's bold/italic/bullet buttons wrote `**`/`*`/`- ` marks that every screen showed raw.
+- **UI Engine:** `SimpleTextEditor` gains a numbered-list button, and Enter inside a list starts the next bullet or number (Enter on an empty item ends the list). New `FormattedText` shows that text formatted: bold, italic, bullet and numbered lists (numbering starts at the first number), line breaks kept; plain text reads as before and typed HTML is never rendered (tested).
+- **StudioFlow:** the client-answer dialog, both client-notes dialogs (project card, phase page), the pinned-note editor, the pinned-notes dialog and the site-visit note use the editor; the phase page brief, the answered note, earlier iterations and the pinned note show `FormattedText`; MOM shows it on screen (read-only) and in print.
+- **Client adds feedback later (owner question):** the "Client notes from …" brief now has **Add to notes**, which edits that iteration's notes in place (before, only Earlier iterations → ⋯ → Edit client notes).
+- **Bug found while answering "rename iterasi buat apa?":** a two-step phase reads its step from the iteration name (`isCdMall`), so renaming "CD Mall" let OK close Construction Drawing without CD Final, and naming another iteration "CD Mall" faked the step. `renameIteration` now refuses both (`ITERATION_KIND_NAME_LOCKED`); one-step phases rename freely (tested).
+- Cleanup: an unused `eslint-disable` left in the Timeline dates dialog (R8.384).
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 910/910 (none failed, skipped or cancelled; 5 FormattedText tests, rename-lock assertions in the CD chain test), `npm run build` passes. Browser not opened.
+
 ## R8.391 | 2026-10-07 | feat(masterdata): price-less "New SKU" from the sample shelf (Lead)
 
 - **Owner decision (2026-10-07): "a, sku tanpa harga khusus dari rak sampel".** A sample usually arrives before any price, and `createSku` requires one. New `createSkuForSampleShelf` (permission `masterdata.sample.manage`) creates a SKU without a `PriceMaterial`; `createSku` and `createSkuForSampleShelf` now share one insert, so identity, category, unit and brand rules cannot drift. `createSku` keeps the price and SKU-permission requirements. `sku.created` audits carry `origin` (`catalog` or `sample-shelf`).

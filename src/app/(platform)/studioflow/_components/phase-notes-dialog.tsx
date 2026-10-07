@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Button, Dialog, EmptyState, Field, InlineError, Text, Textarea } from "@/platform/ui_engine";
+import { Button, Dialog, EmptyState, Field, InlineError, SimpleTextEditor, Text } from "@/platform/ui_engine";
 
 import { listPhaseNotesAction } from "../actions";
 import { usePhaseCommands } from "./phase-commands";
@@ -50,7 +50,7 @@ function NotesBody({ projectId, canEdit }: { projectId: string; canEdit: boolean
         return (
           <div key={entry.phaseId} className="grid gap-1.5">
             <Field label={entry.phaseName}>
-              <Textarea
+              <SimpleTextEditor
                 rows={2}
                 maxLength={2000}
                 value={draft}
