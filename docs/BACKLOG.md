@@ -79,10 +79,18 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## Master Data
 
-- [ ] [PLANNED][P1] Physical sample shelf (legacy `/masterdata/samples` parity
-  plus a holder project and visible history) and "put on shelf" from a sample
-  request: WO-MD-SAMPLE-01 in `PLAN.md`, READY for the Executor (R8.386), then
-  the Lead's UI revision including a quick "New SKU".
+- [ ] [UNVERIFIED] Sample shelf R8.386–R8.390 in the browser (WO-MD-SAMPLE-01
+  "Reviewer Acceptance"): add, move, lend with a project, send to a client,
+  mark lost, return, the remove refusal while out, history, right-click menu;
+  then "Put on shelf" from Sample requests and "Sample received" with the shelf
+  note in that project's Schedule plus the requester's notification. Staff
+  roles first need `masterdata.sample.read` / `masterdata.sample.manage`
+  granted in Settings → Access.
+- [ ] [BLOCKED] Quick "New SKU" from the sample shelf: `createSku` requires at
+  least one material price (`SKU_PRICE_REQUIRED`), but a sample usually arrives
+  before any price (legacy made a price-less DRAFT SKU). Owner to decide:
+  allow a SKU without a price (from the shelf only, or everywhere), or keep
+  "create the SKU on Pricing first" (today's hint on both shelf forms).
 
 - [ ] [UNVERIFIED] Text price labels (R8.298): typing and pasting quoted text
   in the compare-suppliers grid (needs two labor suppliers) and the material

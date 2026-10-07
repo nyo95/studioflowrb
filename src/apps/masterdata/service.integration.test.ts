@@ -2398,6 +2398,9 @@ describe("Physical sample shelf (WO-MD-SAMPLE-01)", () => {
     await assert.rejects(service.listSamples({ grants: [MASTERDATA_PERMISSIONS.sampleManage] }), denied, "manage alone does not read");
     assert.equal((await service.listSamples({ grants: READ_ONLY })).length, 1);
     assert.equal((await movements(sample.id)).length, 1, "refused calls wrote nothing");
+    // The shelf's own SKU picker: shelf managers only, live SKUs only.
+    await assert.rejects(service.listSampleSkuChoices({ grants: READ_ONLY }), denied);
+    assert.ok((await service.listSampleSkuChoices({ grants: [MASTERDATA_PERMISSIONS.sampleManage] })).some((choice) => choice.id === skuId));
   });
 
   it("shelves a request from any open state, fills an empty SKU, keeps the intake status and refuses a second shelving", async () => {

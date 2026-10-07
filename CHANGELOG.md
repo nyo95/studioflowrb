@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.390 | 2026-10-07 | feat(masterdata): sample shelf screens and put-on-shelf from a request - WO-MD-SAMPLE-01 UI (Lead)
+
+- **Samples page** (`/masterdata/samples`, replaces the minimal table): status chips with counts (All, On the shelf, Borrowed, With a client, Lost or discarded) and the rack count; search across rack, box, product, brand, holder, project and the in-box note; "By rack" (one group per rack, boxes in natural order) and "List" views. Each row shows box and in-box note, product with brand and notes (archived SKU flagged), quantity, status with holder, project and "since". Actions in the row menu and on right-click: Change status (holder required while borrowed or with a client, optional StudioFlow project picker, note), Move or edit (rack picker that takes a new rack, box, quantity, note), History (drawer with every movement, from/to on moves, who and when), Remove (disabled while out, with the reason). "Add sample" with a SKU picker. Staff without `masterdata.sample.read` get an access-denied state instead of an error.
+- **Sample requests:** "Put on shelf" on new, in-progress and priced rows (SKU prefilled from the quote, rack picker, box, quantity, in-box note); the row then shows "On the shelf: RACK / BOX" and, when StudioFlow could not be told, "Tell StudioFlow it arrived". The result says whether the designer now sees the sample as received.
+- Backend glue: `listSampleSkuChoices` (shelf managers, live SKUs) so the shelf's SKU picker does not need the sample-request permission; `getSampleHistoryAction`.
+- **Not built: quick "New SKU".** `createSku` requires a material price, and a sample usually arrives before one; both forms point to Pricing. BACKLOG [BLOCKED] for the owner.
+- PLAN.md marked BUILT; BACKLOG: browser walk [UNVERIFIED] (including granting the two new permissions to staff roles).
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 904/904 (none failed, skipped or cancelled; the permission test also covers `listSampleSkuChoices`), `npm run build` passes (`/masterdata/samples` built). Browser not opened (owner tests in the browser).
+
 ## R8.389 | 2026-10-07 | docs(plan): review of R8.388 (WO-MD-SAMPLE-01) - PASS (Lead)
 
 - **Verdict: PASS** for `09e78f2`. All six corrections from R8.387 are in the code: the receipt command is out of the client-imported StudioFlow barrel, 26 tests cover Acceptance Criteria 1–8, shelving notifies the requester in the same transaction, the holder project name is resolved from StudioFlow (never the browser), `listSamples` returns a mapped read with `skuArchived` and a wider search, app clock and required coordinator dependencies. The extra criterion-2 fix (project with a non-held status refused) is correct.

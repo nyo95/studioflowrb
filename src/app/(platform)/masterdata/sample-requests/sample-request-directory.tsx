@@ -41,6 +41,8 @@ import {
   declineSampleRequestAction,
   markSampleRequestPricedAction,
   recordSampleQuoteAction,
+  retrySampleReceivedAction,
+  shelveSampleRequestAction,
   syncSampleQuoteToPriceAction,
   takeSampleRequestAction,
 } from "./actions";
@@ -59,10 +61,17 @@ function alreadyReceived(row: SampleQueueRow): boolean {
 }
 
 function statusBadge(row: SampleQueueRow) {
-  const primary = row.state === "NEW" ? <StatusBadge tone="warning">New</StatusBadge>
+  const shelved = row.intake?.shelvedSample;
+  const base = row.state === "NEW" ? <StatusBadge tone="warning">New</StatusBadge>
     : row.state === "IN_PROGRESS" ? <StatusBadge tone="neutral">In progress · {row.intake?.handledBy.label}</StatusBadge>
     : row.state === "PRICED" ? <StatusBadge tone="success">Priced</StatusBadge>
     : <StatusBadge tone="danger">Declined</StatusBadge>;
+  const primary = shelved ? (
+    <div className="grid gap-0.5">
+      {base}
+      <span className="text-xs text-ink-tertiary">On the shelf: {shelved.rack} / {shelved.box}{row.sourceStatus === "REQUESTED" ? " · StudioFlow not told yet" : ""}</span>
+    </div>
+  ) : base;
   if (!alreadyReceived(row)) return primary;
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -86,7 +95,9 @@ function readyForPriceList(row: SampleQueueRow): boolean {
   return Boolean(intake && intake.vendorId && intake.skuId && intake.quotedAmount && intake.quotedCurrency);
 }
 
-export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManageVendors, vendorTypes }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[]; skus: readonly SkuChoice[]; canPrice: boolean; canManageVendors: boolean; vendorTypes: readonly VendorTypeOption[] }) {
+export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManageVendors, vendorTypes, canShelve = false, racks = [] }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[]; skus: readonly SkuChoice[]; canPrice: boolean; canManageVendors: boolean; vendorTypes: readonly VendorTypeOption[]; canShelve?: boolean; racks?: readonly string[] }) {
+  const [shelveTarget, setShelveTarget] = useState<SampleQueueRow | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showFinished, setShowFinished] = useState(false);
   const [detail, setDetail] = useState<SampleQueueRow | null>(null);
@@ -176,7 +187,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
   return (
     <DirectoryShell
       fill
-      header={rowError ? <InlineError>{rowError}</InlineError> : undefined}
+      header={rowError ? <InlineError>{rowError}</InlineError> : notice ? <Text size="sm" tone="secondary" role="status">{notice}</Text> : undefined}
       surface
       pagination={pageFooter}
       toolbar={
@@ -203,7 +214,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
           <TableBody>
             {visibleRows.map((row) => {
               const busy = pendingId === row.sourceRequestId;
-              const items = row.state === "NEW"
+              const stateItems = row.state === "NEW"
                 ? [{ label: "Take", onSelect: () => run(row.sourceRequestId, () => takeSampleRequestAction(row.sourceRequestId)), disabled: busy, danger: false, separatorBefore: false }]
                 : row.state === "PRICED" && canPrice && readyForPriceList(row) && !row.intake?.priceMaterialId
                   ? [{ label: "Add to price list", onSelect: () => run(row.sourceRequestId, () => syncSampleQuoteToPriceAction(row.intake!.id)), disabled: busy, danger: false, separatorBefore: false }]
@@ -213,6 +224,15 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
                       { label: "Decline", onSelect: () => { setDeclineReason(""); setDeclineTarget(row); }, disabled: busy, danger: true, separatorBefore: true },
                     ]
                   : [];
+              // A requested sample that arrived goes onto the shelf from here; a declined one cannot.
+              const canPutOnShelf = canShelve && row.state !== "DECLINED" && !row.intake?.shelvedSample && !(row.state === "NEW" && row.sourceStatus !== "REQUESTED");
+              const shelfItems = [
+                ...(canPutOnShelf ? [{ label: "Put on shelf", onSelect: () => { setNotice(null); setShelveTarget(row); }, disabled: busy, danger: false, separatorBefore: stateItems.length > 0 }] : []),
+                ...(canShelve && row.intake?.shelvedSample && row.sourceStatus === "REQUESTED"
+                  ? [{ label: "Tell StudioFlow it arrived", onSelect: () => run(row.sourceRequestId, () => retrySampleReceivedAction(row.sourceRequestId)), disabled: busy, danger: false, separatorBefore: stateItems.length > 0 }]
+                  : []),
+              ];
+              const items = [...stateItems, ...shelfItems];
               return (
                 <TableRow key={row.sourceRequestId}>
                   <TableCell>
@@ -350,6 +370,32 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
         </DraftDialog>
       ) : null}
 
+      {shelveTarget ? (
+        <ShelveDialog
+          key={shelveTarget.sourceRequestId}
+          row={shelveTarget}
+          skus={skus}
+          racks={racks}
+          pending={pendingId === shelveTarget.sourceRequestId}
+          error={rowError}
+          onCancel={() => setShelveTarget(null)}
+          onSubmit={(input) => {
+            const target = shelveTarget;
+            run(target.sourceRequestId, async () => {
+              const result = await shelveSampleRequestAction(target.sourceRequestId, input);
+              if (result.ok) {
+                const data = result.data as { sample: { rack: string; box: string }; studioFlowUpdated: boolean; reason?: string };
+                const where = `${data.sample.rack} / ${data.sample.box}`;
+                setNotice(data.studioFlowUpdated ? `On the shelf at ${where}. The designer now sees it as received.`
+                  : data.reason ? `On the shelf at ${where}. StudioFlow already had it as received or the project is archived, so nothing changed there.`
+                  : `On the shelf at ${where}, but StudioFlow could not be told. Use “Tell StudioFlow it arrived” on the row.`);
+              }
+              return result;
+            }, () => setShelveTarget(null));
+          }}
+        />
+      ) : null}
+
       <VendorQuickCreateDialog
         open={quickOpen}
         pending={quickPending}
@@ -387,5 +433,48 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
         </DraftDialog>
       ) : null}
     </DirectoryShell>
+  );
+}
+
+type ShelveInput = { skuId: string; rack: string; box: string; quantity: number; locationNote?: string };
+
+/** Put a requested sample on the shelf: its SKU (prefilled from the quote) and where it goes. */
+function ShelveDialog({ row, skus, racks, pending, error, onCancel, onSubmit }: { row: SampleQueueRow; skus: readonly SkuChoice[]; racks: readonly string[]; pending: boolean; error: string | null; onCancel: () => void; onSubmit: (input: ShelveInput) => void }) {
+  const [skuId, setSkuId] = useState(row.intake?.skuId ?? "");
+  const [rack, setRack] = useState("");
+  const [box, setBox] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [locationNote, setLocationNote] = useState("");
+  const qty = Number(quantity);
+  const qtyValid = Number.isInteger(qty) && qty >= 1 && qty <= 999;
+  const valid = Boolean(skuId && rack.trim() && box.trim() && qtyValid);
+  const rackOptions = [...new Set([...racks, ...(rack.trim() ? [rack] : [])])].map((name) => ({ id: name, label: name }));
+  return (
+    <DraftDialog open onOpenChange={(open) => !open && onCancel()} title="Put on shelf" description={`${row.product.name} · ${row.project.name}`} pending={pending} watchedValue={JSON.stringify({ skuId, rack, box, quantity, locationNote })}>
+      <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); if (valid) onSubmit({ skuId, rack, box, quantity: qty, locationNote: locationNote.trim() || undefined }); }}>
+        {error ? <InlineError>{error}</InlineError> : null}
+        <Text size="sm" tone="secondary">The sample goes onto the shelf, and the designer&apos;s Schedule shows it as received with where it is.</Text>
+        <Field label="Product in the catalogue" required>
+          <div className="grid gap-1">
+            <CreatableSearch label="SKU" options={skus.map((sku) => ({ id: sku.id, label: skuLabel(sku) }))} value={skuId} onValueChange={setSkuId} placeholder="Pick a SKU" searchPlaceholder="Search SKUs…" emptyLabel="No SKU matches this search." className="w-full" />
+            <p className="text-xs text-ink-secondary">Not there yet? A SKU is created with its price on Pricing.</p>
+          </div>
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Rack" required>
+            <CreatableSearch label="Rack" options={rackOptions} value={rack} onValueChange={setRack} onCreate={(name) => name.trim()} createLabel={(name) => `New rack “${name}”`} placeholder="Pick or type a rack" searchPlaceholder="Search racks…" emptyLabel="No rack yet. Type a new one." className="w-full" />
+          </Field>
+          <Field label="Box" required><Input value={box} onChange={(event) => setBox(event.target.value)} maxLength={40} placeholder="e.g. 3" /></Field>
+        </div>
+        <div className="grid grid-cols-[8rem_1fr] gap-3">
+          <Field label="Quantity" required error={qtyValid ? undefined : "1 to 999."}><Input type="number" inputMode="numeric" min={1} max={999} step={1} value={quantity} onChange={(event) => setQuantity(event.target.value)} /></Field>
+          <Field label="Where in the box"><Input value={locationNote} onChange={(event) => setLocationNote(event.target.value)} maxLength={200} /></Field>
+        </div>
+        <FormActions>
+          <Button type="button" variant="ghost" data-dialog-cancel disabled={pending}>Cancel</Button>
+          <Button type="submit" pending={pending} disabled={!valid}>Put on shelf</Button>
+        </FormActions>
+      </form>
+    </DraftDialog>
   );
 }

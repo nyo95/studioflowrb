@@ -16,4 +16,14 @@ const refresh = () => revalidatePath("/masterdata/samples");
 export async function createSampleAction(input: unknown): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const c = await requirePrincipalGrants(); const x = Create.safeParse(input); if (!x.success) throw validationError(x.error); const result = await masterDataService.createSample({ grants: c.grants, actor: actor(c.principal), ...x.data }); refresh(); return result; }); }
 export async function updateSampleLocationAction(input: unknown): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const c = await requirePrincipalGrants(); const x = Location.safeParse(input); if (!x.success) throw validationError(x.error); const result = await masterDataService.updateSampleLocation({ grants: c.grants, actor: actor(c.principal), ...x.data }); refresh(); return result; }); }
 export async function setSampleStatusAction(input: unknown): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const c = await requirePrincipalGrants(); const x = Status.safeParse(input); if (!x.success) throw validationError(x.error); const result = await sampleRequestCoordinator.setSampleStatus({ grants: c.grants, actor: actor(c.principal), ...x.data }); refresh(); return result; }); }
+/** One sample's movements, newest first, loaded when its history is opened. */
+export async function getSampleHistoryAction(sampleId: string) {
+  return runSafeAction(async () => {
+    const c = await requirePrincipalGrants();
+    const x = z.string().uuid().safeParse(sampleId);
+    if (!x.success) throw validationError(x.error);
+    const rows = await masterDataService.getSampleHistory({ grants: c.grants, sampleId: x.data });
+    return rows.map((row) => ({ id: row.id, kind: row.kind, statusAfter: row.status_after, holderName: row.holder_name, holderProjectName: row.holder_project_name, fromRack: row.from_rack, fromBox: row.from_box, toRack: row.to_rack, toBox: row.to_box, note: row.note, actorLabel: row.actor_label, createdAt: row.created_at }));
+  });
+}
 export async function deleteSampleAction(sampleId: string): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const c = await requirePrincipalGrants(); const x = z.string().uuid().safeParse(sampleId); if (!x.success) throw validationError(x.error); const result = await masterDataService.deleteSample({ grants: c.grants, actor: actor(c.principal), sampleId: x.data }); refresh(); return result; }); }

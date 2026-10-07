@@ -29,11 +29,14 @@ export default async function SampleRequestsPage() {
   }
 
   const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
-  const [queue, vendors, vendorTypes, skus] = await Promise.all([
+  // Putting a request on the shelf needs the shelf permission as well (WO-MD-SAMPLE-01 decision 9).
+  const canShelve = hasPermission(grants, MASTERDATA_PERMISSIONS.sampleManage);
+  const [queue, vendors, vendorTypes, skus, racks] = await Promise.all([
     sampleRequestCoordinator.listQueue({ grants, includeFinished: true }),
     masterDataService.listSampleRequestVendorChoices({ grants }),
     canManageVendors ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
     masterDataService.listSampleRequestSkuChoices({ grants }),
+    canShelve && hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRead) ? masterDataService.listSampleRacks({ grants }) : [],
   ]);
 
   return (
@@ -45,6 +48,8 @@ export default async function SampleRequestsPage() {
         skus={skus}
         canPrice={hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage)}
         canManageVendors={canManageVendors}
+        canShelve={canShelve}
+        racks={racks}
         vendorTypes={vendorTypes.filter((type) => type.can_supply_material).map((type) => ({ id: type.id, name: type.name }))}
       />
     </>
