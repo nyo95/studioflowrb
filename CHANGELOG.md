@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.387 | 2026-10-07 | docs(plan): review of R8.386 (WO-MD-SAMPLE-01) - CORRECTION REQUIRED (Lead)
+
+- **Verdict: CORRECTION REQUIRED** for `187102b`. Schema, permission registration, shelf rules and the StudioFlow receipt command match the plan.
+- **Build regression proven, not pre-existing:** R8.386 re-exports the StudioFlow receipt command from `@/apps/studioflow/public`, which client components import, pulling the generated Prisma client into a browser chunk (`node:module`, MOM page). With the two export lines removed `npm run build` passes; restored afterwards, the fix is item 1 of the correction pass. This also shows R8.382–R8.384 build cleanly.
+- Other corrections: no tests were added (878 before and after); the shelving notification is missing; the holder project name is trusted from the browser; `listSamples` returns raw rows and searches too little; app clock and required coordinator dependencies. The minimal screen wiring is waived because the Lead builds the screens next.
+- `PLAN.md` carries the consolidated correction list and the Executor prompt for R8.388.
+
+**Checks.** `npm run build` run twice by the Lead (fails at `187102b`; passes with the barrel export removed); docs only otherwise. The temporary edit and the build's `next-env.d.ts` change were reverted; tree clean.
+
 ## R8.386 | 2026-10-07 | feat(masterdata): add physical sample shelf and request shelving
 
 - Adds the Master Data sample shelf: SKU-bound samples have a normalised rack and box, quantity, status, optional holder/project snapshot, out-since fact, soft deletion, and immutable movements for receipt, checkout, return, status change, move, and removal. Archived SKUs are refused for new shelf records while historical records remain readable.

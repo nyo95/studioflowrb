@@ -2,8 +2,8 @@
 
 Plan ID: WO-MD-SAMPLE-01 (physical sample shelf in Master Data; a requested sample goes onto the shelf and StudioFlow learns it arrived)
 Scope: Master Data backend for the office sample shelf (rack/box, quantity, status, holder, movement history), the "put on shelf" step from a sample request, and the StudioFlow public command that marks that request received. Minimal UI wiring only; the Lead designs the screens in the next revision.
-Target revisions: R8.385 (this plan), R8.386 (Executor: backend + minimal wiring), then the Lead's UI revision.
-Status: READY
+Target revisions: R8.385 (this plan), R8.386 (Executor: backend + minimal wiring), R8.387 (Lead review), R8.388 (Executor correction pass), then the Lead's UI revision.
+Status: READY — correction pass (review of R8.386: CORRECTION REQUIRED, see "Review of R8.386")
 Priority: P1
 Owner: Product Owner. Decisions confirmed by the owner in chat on 2026-10-07 (kantor).
 Last updated: 2026-10-07
@@ -205,7 +205,7 @@ each queue row.
 
 `npx tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`,
 `npm run check:legacy-runtime`, `npm test` (all, nothing skipped), and
-`npm run build` if no other dev server is using the checkout (otherwise say so).
+`npm run build`, which must pass (Next 16 builds beside a running dev server).
 New integration tests in the Master Data and StudioFlow suites and coordinator
 unit tests for the criteria above. Migration applied to the rebuild dev and
 test databases only, after confirming both targets.
@@ -227,17 +227,67 @@ roles the new pair the same way `masterdata.sample-request.manage` was granted.
 Recovery: revert R8.386; the migration is additive (drop the two tables and two
 enums).
 
+## Review of R8.386 (Lead, 2026-10-07) — CORRECTION REQUIRED
+
+Commit `187102b`. What holds: the migration and models match the plan; the
+permission pair is registered (through `Object.values(MASTERDATA_PERMISSIONS)`
+in `app-registrations.ts`); normalising, limits, out-since, no-op detection,
+delete refusal, the StudioFlow receipt command's idempotent outcomes, the
+coordinator's order and retry are as locked. Shelving keeps the intake status.
+
+Corrections, one consolidated pass (R8.388):
+
+1. **Production build broken by R8.386 (not pre-existing).**
+   `src/apps/studioflow/public/index.ts` now re-exports
+   `createStudioFlowSampleRequestCommand`, which imports `../shared` (runtime
+   `Prisma` from the generated client). Client components import
+   `@/apps/studioflow/public` (the MOM pages, the schedule board), so the
+   generated client lands in a browser chunk: Turbopack fails on
+   `node:module` at `/(platform)/studioflow/projects/[projectId]/mom/page`.
+   Proven by the Lead: with those two export lines removed, `npm run build`
+   passes; with them, it fails. Keep the command out of the barrel that client
+   code imports (the runtime already imports the file directly), and make
+   `npm run build` part of the checks again. The R8.386 changelog's
+   "pre-existing unrelated" wording is corrected in the R8.388 entry, not by
+   amending R8.386.
+2. **No tests were added** (878 before and after). Add the integration and
+   coordinator tests for every Acceptance Criterion 1–8 above, including the
+   StudioFlow side of shelving (RECEIVED, note, actor, `metadata.via`) and its
+   three no-write outcomes, and the retry path with a failing StudioFlow step.
+3. **Requester notification on shelving missing** (decision 11). Notify the
+   requester through the existing Master Data sample-request notifier, in the
+   shelving transaction, with product, project, rack and box.
+4. **The holder project is trusted from the browser** (decision 3 requires a
+   snapshot of a real, non-archived StudioFlow project). The client sends
+   `holderProjectName` and any id. Route a status change that names a project
+   through the coordinator: it resolves the id through StudioFlow's public read
+   (unknown or archived → `SAMPLE_PROJECT_NOT_FOUND`) and passes the resolved
+   name to Master Data; the Master Data action no longer accepts a project name
+   from the client.
+5. **Read shape.** `listSamples` returns raw Prisma rows. Return a mapped read
+   (rack, box, quantity, notes, status, holder, project name, out since, SKU id,
+   code, name, brand name and an explicit `skuArchived`), and let search also
+   match brand name, holder name and project name (legacy searched borrower and
+   brand).
+6. **Small fixes.** The StudioFlow receipt command uses the app clock
+   (`nowOf(ports)`) like the existing receive; the coordinator's new
+   dependencies are required instead of optional-with-runtime-throw.
+
+Waived: the minimal Samples and "Put on shelf" screen wiring (decision: the
+Lead builds those screens in the next revision, so throw-away forms are not
+needed). Leave the current minimal page as is.
+
 ## Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this `PLAN.md` (WO-MD-SAMPLE-01), then implement
-the entire READY backend outcome and nothing beyond it. Start from a clean tree
-on `main`; confirm the next unused revision in `CHANGELOG.md` (expected
-R8.386). Verify both database targets are the rebuild-only dev and test
+the **"Review of R8.386" correction pass** (items 1–6) and nothing beyond it.
+Start from a clean tree on `main`; confirm the next unused revision in
+`CHANGELOG.md` (expected R8.388). Verify both database targets are the rebuild-only dev and test
 databases before any database command. Do not read or touch the legacy
-checkout; the plan already records the legacy evidence. Keep the UI to the
-minimal wiring described; the Lead designs the screens next. Run the checks
-listed, update `CHANGELOG.md`, and create one local commit. Do not push. Stop
+checkout; the plan already records the legacy evidence. Do not build screens;
+the Lead designs them next. Run the checks listed, including `npm run build`
+(it must pass), update `CHANGELOG.md`, and create one local commit. Do not push. Stop
 with the BLOCKED / CONFLICT report only for a locked-decision conflict or an
 unsafe boundary; otherwise finish and return one Planner/Reviewer prompt with
 the outcome, commit, checks and test count, limitations, and dirty files.
