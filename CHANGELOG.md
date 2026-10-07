@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.378 | 2026-10-07 | docs(plan): WO-SF-PLAN-01 working-time planning from Fit Out Start (Lead)
+
+- Studied the current logic first: phases and CD Mall/CD Final iterations exist; projects have `timeline_start_date` and `opening_date`; phases already carry overridable planned start/end (`setPhasePlannedDates`, `domain/timeline.ts`) with an equal-width fallback; there was no Fit Out Start, no Handover, no working-day math.
+- Owner model (2026-10-07, from the manual spreadsheet): design is counted backward from Fit Out Start (CD Mall 1 week, CD Final 1 week, 1 week gap, END = CD completed), construction forward (2 months to Handover, 2 weeks to Opening); Monday-Friday, hand-entered holidays; defaults overridable per project and per phase. END is a Timeline word only; completion rules are unchanged. Supervision is renamed Construction.
+- `PLAN.md` replaced with READY WO-SF-PLAN-01 (backend, target R8.379); the Gantt drawing is the Lead's follow-up WO-SF-GANTT-01. WO-SF-ACCESS-BATCH-01 was accepted at R8.376. No code changed.
+
+**Checks.** Documentation only.
+
 ## R8.377 | 2026-10-07 | fix(studioflow): "iteration" replaces "round" on screen; schedule card opens its panel (Lead)
 
 - Owner (2026-10-07): the phase system already has iterations, so "round" is one thing with two names; and clicking a Product Schedule card must open the panel, not the photo picker.

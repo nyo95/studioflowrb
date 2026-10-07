@@ -145,8 +145,9 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   (owner: replace, not add alongside); the carry-over of notes to the next
   iteration stays. Needs a Work Order with a safe migration of existing plain
   notes. Independent of the working-time/Gantt item below.
-- [ ] [PLANNED][P2] Working-time back-planning, then a real Gantt (owner,
-  2026-10-07). Decisions: working days are **Monday–Friday**; public holidays
+- [ ] [PLANNED][P2] Working-time planning is now WO-SF-PLAN-01 in `PLAN.md`
+  (R8.378); the Gantt drawing follows as WO-SF-GANTT-01 (read-only first).
+  Original note (owner, 2026-10-07): Decisions: working days are **Monday–Friday**; public holidays
   are **entered by hand** in Settings (a Google-based import is a later
   option — keep the holiday list behind one function so it can be swapped);
   each phase definition carries a **default lead time in working days to the
