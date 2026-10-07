@@ -129,6 +129,15 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   spot-check a few projects' round notes and requirements.
 - [ ] [PLANNED][P3] After that migration has run everywhere: drop
   `sf_activity`, its relations and the `activity.*` History labels.
+- [ ] [PLANNED][P3] Home "needs attention" row (from the unmerged R8.335 branch,
+  owner not yet asked): counts of live phases that are *Client answered*
+  (decide Revision/Done), *With client*, *Ready to send*; each count filters
+  the project cards and selecting it again clears the filter. Not built in
+  `main`. Needs an owner yes before a plan; must use DESIGN v2 stat cards.
+- [ ] [UNVERIFIED][P3] Phone width (owner, 2026-10-06, seen on the phone): the
+  header and tabs stay fixed and only the content scrolls; the phase row
+  scrolls inside its own card instead of pushing the page sideways. DESIGN v2
+  (R8.357–R8.362) may already cover it; check at 390 px before planning.
 - [ ] [BLOCKED][P3] AI file filing (owner, 2026-09-27: lowest priority, do not
   pick up until the owner raises it again). What is known: the real driver is
   proposing requirement ticks when an expected input arrives (the human

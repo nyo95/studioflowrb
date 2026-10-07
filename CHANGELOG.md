@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.375 | 2026-10-07 | docs(plan): WO-SF-ACCESS-BATCH-01 carried over; branch ideas recorded (Lead)
+
+- Reviewed the two remaining remote branches against `main` at R8.374. `claude/trusting-mayer-vkbdnb` (R8.335–R8.337): the shell/phase UI work is superseded by DESIGN v2 (R8.357–R8.362) and the consolidated phase workspace (R8.347, R8.355) and is not merged. Its READY Work Order WO-SF-ACCESS-BATCH-01 is still valid (the Projects list and Timeline read access once per project) and is now `PLAN.md`, target R8.376. `idea/sidebar-rail`: its rail ideas (group labels, full-width active item, round icon chips, counts, account block in the rail, expand on press) are already in DESIGN v2 §10.1; its inspiration screenshots were not imported.
+- `docs/BACKLOG.md` StudioFlow: two items recorded — the Home "needs attention" row, and the phone-width header/tabs/phase-row behaviour (check against DESIGN v2 first).
+- No code changed. Both branches are deleted on the remote after this commit.
+
+**Checks.** Documentation only.
+
 ## R8.374 | 2026-10-06 | feat(platform): per-person Light/Dark/System theme and the shared LogoFrame — WO-THEME-01
 
 - Owner (2026-10-06): dark mode is an approved UI mode, chosen per person; read-only Master Data roles stay out of Settings (confirmed); merge to `main` after this work.
