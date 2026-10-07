@@ -32,8 +32,8 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     studioFlow.projects.getStudioSettings({ grants }),
   ]);
 
-  const accessRows = await Promise.all(projects.map(async (project) => [project.id, (await studioFlow.projects.getAccess({ grants, actor, projectId: project.id })).canEditProject] as const));
-  const editableProjectIds = accessRows.filter(([, editable]) => editable).map(([id]) => id);
+  const access = await studioFlow.projects.listAccess({ grants, actor, projectIds: projects.map((project) => project.id) });
+  const editableProjectIds = projects.filter((project) => access.get(project.id)?.canEditProject).map((project) => project.id);
 
   return (
     <PageShell measure="wide">

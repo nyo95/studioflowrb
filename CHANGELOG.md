@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.376 | 2026-10-07 | perf(studioflow): batch project access reads — WO-SF-ACCESS-BATCH-01
+
+- Project access rules now live in one pure evaluator shared by the existing single-project read and the new `projects.listAccess` batch read. The batch read requires the same authenticated person and read grants, returns no query for an empty list, and uses one project query for all requested IDs; unknown IDs remain absent.
+- Projects and Timeline each ask for access once per page, retaining the same edit choices for projects, documents, and phases without changing their layout or wording.
+- Browser acceptance items for the unchanged Projects and Timeline affordances are queued for the Reviewer.
+- Integration coverage proves batched results equal the single-project result for designer PIC, drafter PIC, override holder, and unrelated staff across active and completed projects; it also proves one project query for multiple IDs and none for an empty list.
+- No schema, migration, or dependency change.
+
+**Checks.** `npm run typecheck`; `npm run lint -- --quiet`; `npm run check:boundaries`; `npm run check:legacy-runtime`; `npm test` (867/867); `npm run build`; `git diff --check`.
+
 ## R8.375 | 2026-10-07 | docs(plan): WO-SF-ACCESS-BATCH-01 carried over; branch ideas recorded (Lead)
 
 - Reviewed the two remaining remote branches against `main` at R8.374. `claude/trusting-mayer-vkbdnb` (R8.335–R8.337): the shell/phase UI work is superseded by DESIGN v2 (R8.357–R8.362) and the consolidated phase workspace (R8.347, R8.355) and is not merged. Its READY Work Order WO-SF-ACCESS-BATCH-01 is still valid (the Projects list and Timeline read access once per project) and is now `PLAN.md`, target R8.376. `idea/sidebar-rail`: its rail ideas (group labels, full-width active item, round icon chips, counts, account block in the rail, expand on press) are already in DESIGN v2 §10.1; its inspiration screenshots were not imported.

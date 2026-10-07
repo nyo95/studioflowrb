@@ -49,11 +49,12 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
     return true;
   });
 
+  const accessByProject = await studioFlow.projects.listAccess({ grants, actor, projectIds: projects.map((project) => project.id) });
   const editable: Record<string, { project: boolean; phaseIds: string[] }> = {};
-  await Promise.all(projects.map(async (project) => {
-    const access = await studioFlow.projects.getAccess({ grants, actor, projectId: project.id });
-    editable[project.id] = { project: access.canEditProject, phaseIds: access.phases.filter((phase) => phase.canEditContent).map((phase) => phase.phaseId) };
-  }));
+  for (const project of projects) {
+    const access = accessByProject.get(project.id);
+    if (access) editable[project.id] = { project: access.canEditProject, phaseIds: access.phases.filter((phase) => phase.canEditContent).map((phase) => phase.phaseId) };
+  }
 
   return (
     <PageShell measure="wide">

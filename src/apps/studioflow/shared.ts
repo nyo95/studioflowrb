@@ -73,10 +73,15 @@ export type ProjectAccess = {
   phases: Array<{ phaseId: string; canTransition: boolean; canEditContent: boolean }>;
 };
 
-/** The single StudioFlow PIC-assignment policy (WO-SF-ACCESS-01). */
-export async function getProjectAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<ProjectAccess> {
-  const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } } } });
-  if (!project) throw notFound("project");
+type ProjectAccessFacts = {
+  status: string;
+  pic_designer_id: string | null;
+  pic_drafter_id: string | null;
+  phases: Array<{ id: string; seat_snapshot: string }>;
+};
+
+/** The single StudioFlow PIC-assignment policy, evaluated from already-read project facts. */
+export function projectAccessFromFacts(project: ProjectAccessFacts, input: { grants: PermissionGrants; actorId: string }): ProjectAccess {
   const override = hasPermission(input.grants, P.projectOverride);
   const isDesigner = project.pic_designer_id === input.actorId;
   const isDrafter = project.pic_drafter_id === input.actorId;
@@ -95,6 +100,13 @@ export async function getProjectAccess(tx: Db | TxClient, input: { grants: Permi
       canEditContent: open && (override || isDesigner || (isDrafter && phase.seat_snapshot === "drafter")),
     })),
   };
+}
+
+/** The single StudioFlow PIC-assignment policy (WO-SF-ACCESS-01). */
+export async function getProjectAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<ProjectAccess> {
+  const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } } } });
+  if (!project) throw notFound("project");
+  return projectAccessFromFacts(project, input);
 }
 
 /** Who may mark a project completed or reopen it: either PIC, or an override holder. */

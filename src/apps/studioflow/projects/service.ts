@@ -23,6 +23,7 @@ import {
   notFound,
   nowOf,
   optionalText,
+  projectAccessFromFacts,
   requireCommand,
   requireProjectAccess,
   requireRead,
@@ -598,6 +599,17 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       requireRead(input.grants);
       if (input.actor.kind !== "USER" || !input.actor.userId) throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
       return getProjectAccess(db, { grants: input.grants, actorId: input.actor.userId, projectId: input.projectId });
+    },
+
+    async listAccess(input: ReadContext & { actor: CommandContext["actor"]; projectIds: string[] }) {
+      requireRead(input.grants);
+      if (input.actor.kind !== "USER" || !input.actor.userId) throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
+      if (input.projectIds.length === 0) return new Map<string, ReturnType<typeof projectAccessFromFacts>>();
+      const projects = await db.sfProject.findMany({
+        where: { id: { in: input.projectIds } },
+        select: { id: true, status: true, pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } } },
+      });
+      return new Map(projects.map((project) => [project.id, projectAccessFromFacts(project, { grants: input.grants, actorId: input.actor.userId! })]));
     },
 
     /** WO-SF-ITER-01 card read. One relation query keeps card rendering bounded at volume. */

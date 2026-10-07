@@ -30,6 +30,22 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.376] StudioFlow Projects batch access read
+- Surface: `/studioflow/projects`
+- Fixture: an unassigned staff member with project read access; the project's designer PIC
+- Viewport: desktop (default)
+- Steps: 1. Open Projects as the unassigned staff member. 2. Open the same list as the designer PIC.
+- Acceptance: the unassigned staff member still sees View only for each project; the designer PIC still sees the same row edit menu as before.
+- Status: PENDING
+
+### [R8.376] StudioFlow Timeline batch access read
+- Surface: `/studioflow/timeline`
+- Fixture: an unassigned staff member with project read access; the project's designer PIC
+- Viewport: desktop (default)
+- Steps: 1. Open Timeline as the unassigned staff member. 2. Open the same timeline as the designer PIC.
+- Acceptance: editable segments and Edit dates remain unavailable to the unassigned staff member and available for the designer PIC exactly as before.
+- Status: PENDING
+
 ### [R8.355] StudioFlow phase menu and active skip
 - Surface: `/studioflow` and `/studioflow/projects/[projectId]?phase=...`
 - Fixture: signed-in designer PIC; one fresh project and one project whose active phase has a sent round with client notes

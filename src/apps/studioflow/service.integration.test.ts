@@ -910,6 +910,57 @@ describe("SF-R1 bootstrap and naming", () => {
     await sf.projects.setProjectStatus({ ...as(override), projectId, status: "ON_HOLD" });
   });
 
+  it("reads batch access once and keeps every single-project access result", async () => {
+    const active = await newProject("Batch access active");
+    const completed = await newProject("Batch access completed");
+    await testDb.prisma.sfProject.update({ where: { id: completed.projectId }, data: { status: "COMPLETED" } });
+    const outsiderGrants = [P.access, P.projectRead];
+    const outsider = await seedUser("Batch access outsider", outsiderGrants);
+    const override = await seedUser("Batch access override", ALL);
+    const projectIds = [active.projectId, completed.projectId];
+
+    for (const person of [
+      { user: designer, grants: ALL },
+      { user: drafter, grants: DRAFTER_GRANTS },
+      { user: override, grants: ALL },
+      { user: outsider, grants: outsiderGrants },
+    ]) {
+      const batch = await sf.projects.listAccess({ grants: person.grants, actor: person.user.actor, projectIds });
+      for (const projectId of projectIds) {
+        assert.deepEqual(batch.get(projectId), await sf.projects.getAccess({ grants: person.grants, actor: person.user.actor, projectId }));
+      }
+    }
+
+    let projectQueries = 0;
+    const countedProjectDelegate = new Proxy(testDb.prisma.sfProject, {
+      get(target, property, receiver) {
+        if (property === "findMany") return async (...args: Parameters<typeof target.findMany>) => {
+          projectQueries += 1;
+          return target.findMany(...args);
+        };
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const countedDb = new Proxy(testDb.prisma, {
+      get(target, property, receiver) {
+        return property === "sfProject" ? countedProjectDelegate : Reflect.get(target, property, receiver);
+      },
+    }) as PrismaClient;
+    const countedService = createStudioFlowService(countedDb, {
+      runTransaction: <T>(work: (tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]) => Promise<T>) => countedDb.$transaction((tx) => work(tx)),
+      auditWriter: createAuditEventWriter(),
+      people: createPeopleDirectory(countedDb),
+      storage,
+      notificationWriter: createNotificationWriter(),
+      masterData: createMasterDataPublicRead(countedDb),
+      now: () => clock,
+    });
+    await countedService.projects.listAccess({ grants: ALL, actor: designer.actor, projectIds });
+    assert.equal(projectQueries, 1, "one project query serves every requested project");
+    await countedService.projects.listAccess({ grants: ALL, actor: designer.actor, projectIds: [] });
+    assert.equal(projectQueries, 1, "an empty batch makes no project query");
+  });
+
   it("archives read-only and restores with audit", async () => {
     const { projectId } = await newProject();
     await rejectsWith(sf.projects.archiveProject({ ...as(designer), projectId, reason: " " }), "ARCHIVE_REASON_REQUIRED");
