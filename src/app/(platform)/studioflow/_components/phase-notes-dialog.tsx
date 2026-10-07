@@ -15,7 +15,7 @@ type Note = { phaseId: string; phaseName: string; note: string | null };
  */
 export function PhaseNotesDialog({ projectId, open, onOpenChange, canEdit }: { projectId: string; open: boolean; onOpenChange: (open: boolean) => void; canEdit: boolean }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Pinned notes" description="One pinned note per phase: what holds for the whole phase, whatever the round.">
+    <Dialog open={open} onOpenChange={onOpenChange} title="Pinned notes" description="One pinned note per phase: what holds for the whole phase, whatever the iteration.">
       {open ? <NotesBody projectId={projectId} canEdit={canEdit} /> : null}
     </Dialog>
   );

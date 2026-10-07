@@ -282,7 +282,6 @@ function BoardView({
   filter,
   section,
   onReorder,
-  onOpenPhoto,
   onNewCategory,
 }: {
   projectId: string;
@@ -293,7 +292,6 @@ function BoardView({
   filter: ScheduleFilter;
   section: Section;
   onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
-  onOpenPhoto: (entry: ScheduleEntryView, option: ScheduleOptionView) => void;
   onNewCategory: () => void;
 }) {
   const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
@@ -310,7 +308,6 @@ function BoardView({
               const fieldValue = cardFieldValuesOf(entry);
               const details: Array<[string, string | null | undefined]> = effectiveCardFields(entry)
                 .map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as [string, string | null | undefined]);
-              const photoTarget = templateSourceOf(entry);
               const badges = entryBadges(entry);
               return (
                 <article
@@ -327,7 +324,7 @@ function BoardView({
                   }}
                   className={`group grid min-w-0 content-start text-left ${reorderEnabled ? "cursor-grab active:cursor-grabbing" : ""} ${draggingId === entry.id ? "opacity-40" : ""} ${dragOverId === entry.id && draggingId && draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}
                 >
-                  <button type="button" onClick={() => canEdit && photoTarget ? onOpenPhoto(entry, photoTarget) : onOpen(entry.id)} className="relative mb-2.5 block aspect-[4/5] w-full overflow-hidden bg-surface-muted text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+                  <button type="button" onClick={() => onOpen(entry.id)} className="relative mb-2.5 block aspect-[4/5] w-full overflow-hidden bg-surface-muted text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
                     {shown?.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={shown.imageUrl} alt={shown.productName} className="h-full w-full object-cover transition-opacity group-hover:opacity-90" draggable={false} />
@@ -335,15 +332,6 @@ function BoardView({
                       <span className="absolute inset-0 grid place-items-center text-micro tracking-[0.18em] text-ink-tertiary">NO IMAGE</span>
                     )}
                     <span className="absolute right-2 top-2 rounded-action bg-surface/90 px-1.5 py-0.5 font-ui-mono text-micro font-bold tabular-nums text-ink">{entry.code}</span>
-                    {canEdit && photoTarget ? (
-                      <span
-                        className="pointer-events-none absolute inset-0 grid place-items-center opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        <span className="rounded-action bg-ink/70 px-2 py-1 text-micro font-semibold uppercase tracking-[0.1em] text-surface">
-                          {photoTarget.imageUrl ? "Change photo" : "+ Add photo"}
-                        </span>
-                      </span>
-                    ) : null}
                   </button>
                   <button type="button" onClick={() => onOpen(entry.id)} className="grid min-w-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
                   <span className="mb-1 flex flex-wrap gap-1">{badges.map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span>
@@ -556,7 +544,6 @@ export function ScheduleBoard({
                 filter={filter}
                 section={section}
                 onReorder={reorderGroup}
-                onOpenPhoto={(entry, option) => openEntry(entry.id, option.id)}
                 onNewCategory={() => setDialog("add")}
               />
             ) : (

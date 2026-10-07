@@ -107,7 +107,7 @@ function PhaseCanvasSkeleton() {
         </div>
       </SectionCard>
       <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)] items-start gap-4 max-[1100px]:grid-cols-1">
-        <SectionCard title="Earlier rounds" padded>
+        <SectionCard title="Earlier iterations" padded>
           <div className="grid gap-2">
             <SkeletonBlock className="h-4 w-3/4" />
             <SkeletonBlock className="h-4 w-1/2" />

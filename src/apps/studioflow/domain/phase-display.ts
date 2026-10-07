@@ -2,11 +2,6 @@ export type PhaseStepState = "done" | "current" | "waiting" | "attention" | "upc
 
 type IterationState = "NOT_SENT" | "SENT" | "ANSWERED" | "REVISED" | "DONE";
 
-export function roundDisplayName(phaseName: string, iterationName: string): string {
-  const match = /^(.*) (\d+)$/.exec(iterationName);
-  return match && match[1] === phaseName ? `Round ${match[2]}` : iterationName;
-}
-
 export function phaseStepPresentation(input: {
   phaseName: string;
   phaseStatus: "PENDING" | "ACTIVE" | "DONE";
@@ -20,7 +15,7 @@ export function phaseStepPresentation(input: {
   if (input.phaseStatus === "DONE") {
     return {
       state: "done",
-      note: input.skippedReason ? "Skipped" : input.iterationCount && input.iterationCount > 1 ? `Done in ${input.iterationCount} rounds` : "Done",
+      note: input.skippedReason ? "Skipped" : input.iterationCount && input.iterationCount > 1 ? `Done in ${input.iterationCount} iterations` : "Done",
     };
   }
   if (input.phaseStatus === "PENDING") {
@@ -31,14 +26,14 @@ export function phaseStepPresentation(input: {
   }
   const iteration = input.iteration;
   if (!iteration) return { state: "current", note: "In progress" };
-  const round = roundDisplayName(input.phaseName, iteration.name);
+  const name = iteration.name;
   if (iteration.state === "SENT") {
     const wait = iteration.waitingDays === null || iteration.waitingDays <= 0 ? "today" : `${iteration.waitingDays}d`;
-    return { state: "waiting", note: `${round} · with client ${wait}` };
+    return { state: "waiting", note: `${name} · with client ${wait}` };
   }
-  if (iteration.state === "ANSWERED") return { state: "attention", note: `${round} · client answered` };
+  if (iteration.state === "ANSWERED") return { state: "attention", note: `${name} · client answered` };
   if (input.isSupervision && iteration.state === "NOT_SENT") return { state: "current", note: "Visit planned" };
-  return { state: "current", note: `${round} · in progress` };
+  return { state: "current", note: `${name} · in progress` };
 }
 
 /** A skipped finish is stored in the existing phase-event JSON snapshot, not in a new schema column. */

@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.377 | 2026-10-07 | fix(studioflow): "iteration" replaces "round" on screen; schedule card opens its panel (Lead)
+
+- Owner (2026-10-07): the phase system already has iterations, so "round" is one thing with two names; and clicking a Product Schedule card must open the panel, not the photo picker.
+- **Wording.** Every user-visible "round" in StudioFlow (menus, dialogs, History labels, "Earlier iterations", "+ New iteration", error messages, the admin reset) now says "iteration". `roundDisplayName` is removed: an iteration shows its own name ("Moodboard 2", "CD Mall") instead of a generic "Round 2". Database and code identifiers are unchanged.
+- **Product Schedule.** Clicking a card's image opens the entry panel like the rest of the card; the hover "Change photo" overlay and the straight-to-picker path are gone. Changing the photo stays inside the panel (option photo button and menu).
+- `BACKLOG.md`: owner decisions for the phase-notes editor and for working-time back-planning / Gantt recorded as [PLANNED].
+- UI and wording only; no schema, migration or dependency change. One obsolete test (`roundDisplayName`) removed; phase-display expectations updated.
+
+**Checks.** `tsc --noEmit`, `eslint --quiet` on StudioFlow, `npm test` 866/866. No browser pass (owner tests in the browser).
+
 ## R8.376 | 2026-10-07 | perf(studioflow): batch project access reads — WO-SF-ACCESS-BATCH-01
 
 - Project access rules now live in one pure evaluator shared by the existing single-project read and the new `projects.listAccess` batch read. The batch read requires the same authenticated person and read grants, returns no query for an empty list, and uses one project query for all requested IDs; unknown IDs remain absent.

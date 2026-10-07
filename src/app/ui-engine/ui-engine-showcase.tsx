@@ -491,7 +491,7 @@ export function UiEngineShowcase() {
                 variant="track"
                 steps={[
                   { id: "1", label: "Brief", note: "Done", state: "done" },
-                  { id: "2", label: "Design", note: "Round 2 · with client today", state: "waiting" },
+                  { id: "2", label: "Design", note: "Iteration 2 · with client today", state: "waiting" },
                   { id: "3", label: "Review", note: "Needs your decision", state: "attention", action: <Button size="sm" variant="secondary">Review</Button> },
                   { id: "4", label: "Handover", note: "Not started", state: "upcoming" },
                 ]}

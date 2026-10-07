@@ -87,7 +87,7 @@ export type PhaseView = { id: string; name: string; status: "PENDING" | "ACTIVE"
 /**
  * The buttons that move a phase forward from where it is now. Which ones exist is decided by the server's `choices`.
  * On Home several phases sit side by side, so only a decision after the client answered is a primary button. With
- * `lead` (the phase page's round card, the one place to act) the forward step is primary too.
+ * `lead` (the phase page's iteration card, the one place to act) the forward step is primary too.
  */
 export function IterationButtons({
   phase,
@@ -118,7 +118,7 @@ export function IterationButtons({
     if (!canAct) return null;
     if (phase.isSupervision && phase.status === "ACTIVE") return <Button size="sm" variant={startVariant} onClick={onNewVisit}>New visit</Button>;
     if (!lead) return null;
-    return <Button size="sm" variant="secondary" pending={busy("add")} onClick={() => phase.isSupervision ? onNewVisit() : run("add", { ...base, command: "addIteration" }, `New ${phase.name} round added`)}>+ New round</Button>;
+    return <Button size="sm" variant="secondary" pending={busy("add")} onClick={() => phase.isSupervision ? onNewVisit() : run("add", { ...base, command: "addIteration" }, `New ${phase.name} iteration added`)}>+ New iteration</Button>;
   }
 
   if (!canAct) return null;
@@ -181,7 +181,7 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
       open
       onOpenChange={(open) => { if (!open && !busyKey) onClose(); }}
       title={`${iteration.name}: the client answered`}
-      description="Write what the client said. If you choose Revision, the next round shows these notes as its brief."
+      description="Write what the client said. If you choose Revision, the next iteration shows these notes as its brief."
       dismissible={!busyKey}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
