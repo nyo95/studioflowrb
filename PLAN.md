@@ -3,10 +3,10 @@
 Plan ID: WO-SF-PLAN-01 (working-time planning from Fit Out Start; Supervision becomes Construction)
 Scope: StudioFlow backend — a working-day calculator, studio planning defaults, a holiday list, a Fit Out Start date per project, a plan that fills phase dates backward and forward from it, and the rename of the Supervision phase to Construction. The Timeline/Gantt drawing is a separate Lead work order (WO-SF-GANTT-01) after this commit.
 Target revisions: R8.378 (this plan), R8.379 (WO-SF-PLAN-01), then WO-SF-GANTT-01.
-Status: READY
+Status: DONE — implemented R8.379, finished by the Lead at R8.380 (plan read, atomic reset, settings, Timeline wiring, tests); the Gantt (WO-SF-GANTT-01) shipped at R8.381. Open: owner browser acceptance of the Gantt pages and Planning settings (BACKLOG [UNVERIFIED]).
 Priority: P1
 Owner: Product Owner. Decisions confirmed by the owner in chat on 2026-10-07.
-Last updated: 2026-10-07
+Last updated: 2026-10-07 (closed)
 
 ## Outcome
 

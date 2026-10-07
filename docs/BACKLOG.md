@@ -145,19 +145,14 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   (owner: replace, not add alongside); the carry-over of notes to the next
   iteration stays. Needs a Work Order with a safe migration of existing plain
   notes. Independent of the working-time/Gantt item below.
-- [ ] [PLANNED][P2] Working-time planning is now WO-SF-PLAN-01 in `PLAN.md`
-  (R8.378); the Gantt drawing follows as WO-SF-GANTT-01 (read-only first).
-  Original note (owner, 2026-10-07): Decisions: working days are **Monday–Friday**; public holidays
-  are **entered by hand** in Settings (a Google-based import is a later
-  option — keep the holiday list behind one function so it can be swapped);
-  each phase definition carries a **default lead time in working days to the
-  phase after it**, and the plan counts back from the handover date through the
-  phase order (example from the owner: E→C one week, D→E one week, and so on).
-  A project may override a phase's lead time. Open before the plan: confirm the
-  wording of the owner's example (is a lead time measured from a phase's start
-  or from its end), and what happens when the back-counted start is already in
-  the past. The Gantt (per project and per phase) is read-only first, drawn
-  from those dates with the handover marker; drag-to-edit comes after.
+- [ ] [PLANNED][P3] Gantt follow-ups (R8.381 shipped the read-only Gantt, the
+  project Timeline tab and the Plan panel): drag a bar to move or resize its
+  dates (today a click opens the date dialog); a "today / this month" jump
+  control; a print view of the Gantt; Design 3D keeps only an end date, so
+  "Design Final" is a marker, not a bar — give Design 3D a start if the owner
+  wants a bar; holiday import from a public calendar (the list sits behind one
+  function). [UNVERIFIED] Both Gantt pages and the Settings "Planning and
+  holidays" page on real data and at phone width.
 - [ ] [BLOCKED][P3] AI file filing (owner, 2026-09-27: lowest priority, do not
   pick up until the owner raises it again). What is known: the real driver is
   proposing requirement ticks when an expected input arrives (the human

@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.381 | 2026-10-07 | feat(studioflow): real calendar Gantt on the Timeline and a per-project Timeline tab - WO-SF-GANTT-01 (Lead)
+
+- **Gantt.** One shared calendar axis (Week/Month zoom, weekend shading, today line; opens with today a third in). Bars sit at their real dates, a phase with one date is a marker, a phase with none is not drawn (the row says "N phases without dates") - the old equal-width slots implied dates nobody set. Geometry is pure and tested (`domain/gantt.ts`). The chart is app-owned for now (`_components/gantt-chart.tsx`); it moves to the UI Engine when a second app needs a Gantt.
+- **Portfolio Timeline** (`/studioflow/timeline`): one row per project, Fit Out Start and Opening markers, a thin start-to-opening line; clicking a bar still opens the phase date dialog, "Dates" opens the project dates dialog.
+- **Project Timeline tab** (`/studioflow/projects/[id]/timeline`): a row per phase plus a Milestones row (Start, Design Final, END planned/actual, Fit Out Start, Handover, Opening, and a forecast marker when the plan lands after the opening date); Construction Drawing splits into CD Mall / CD Final while its dates are the plan's. Plan panel: warnings, suggested Fit Out Start, per-project lead-time overrides (only values that differ from the studio default are stored), "Back to the plan" for hand-set dates, Apply plan.
+- **Bug found while checking it in the browser.** `tokens.css` had an unclosed comment that swallowed `--ph-mood` (and left `--ui-mark` undefined in light mode), so the Moodboard colour was transparent everywhere. Fixed, with a guard test (balanced comments; every phase token declared in the light and both dark paths).
+- Removed the dead `computePhaseSegments` (and its tests); `resolveTimelineSpan` stays for the date filter. `listProjectPhases` now exposes `plannedDatesManual`.
+- Contract section 8 updated. BACKLOG: Gantt follow-ups (drag-to-edit, jump control, print, Design 3D start) and an [UNVERIFIED] check on real data.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 874/874 (none failed, skipped or cancelled; six dead `computePhaseSegments` tests were removed after the 881 run), `npm run build`. Browser: the chart component checked in a temporary public preview (bars, markers, today line, scroll, Moodboard colour); the signed-in pages were not opened (no session in the browser pane), so they are listed as [UNVERIFIED].
+
 ## R8.380 | 2026-10-07 | fix(studioflow): finish WO-SF-PLAN-01 - plan read, atomic reset, settings, timeline wiring, tests (Lead takeover)
 
 - Lead review of R8.379 returned CORRECTION REQUIRED (two failing tests, stray `next-env.d.ts`, no integration tests, missing wiring, non-atomic reset); the owner asked the Lead to take over, so this revision is the Lead's, done directly.

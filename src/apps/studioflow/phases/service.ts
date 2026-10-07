@@ -509,7 +509,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         select: {
           id: true, project_id: true, definition_id: true, order_index: true, status: true, is_locked: true,
           allow_parallel: true, name_snapshot: true, prefix_snapshot: true, seat_snapshot: true,
-          status_changed_at: true, planned_start_date: true, planned_end_date: true,
+          status_changed_at: true, planned_start_date: true, planned_end_date: true, planned_dates_manual: true,
           revisions: { where: { status: { in: OPEN_ITERATION_STATES } }, take: 1, select: { major: true, name: true, status: true, sent_at: true } },
           events: { where: { to_state: "DONE", undone_at: null }, orderBy: { occurred_at: "desc" }, take: 1, select: { auto_created: true } },
         },
@@ -535,6 +535,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           statusChangedAt: phase.status_changed_at,
           plannedStartDate: dateToDateOnly(phase.planned_start_date),
           plannedEndDate: dateToDateOnly(phase.planned_end_date),
+          plannedDatesManual: phase.planned_dates_manual,
           activeRevision: phase.revisions[0] ? revisionLabel(phase.revisions[0], snap.prefixSnapshot) : null,
           iterationName: phase.revisions[0]?.name ?? null,
           iterationState: phase.revisions[0]?.status ?? null,

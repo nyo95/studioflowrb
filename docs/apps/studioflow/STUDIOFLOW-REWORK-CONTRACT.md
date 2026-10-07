@@ -334,6 +334,7 @@ Brand cards choose official logo metadata or logo assets first; social preview i
 | `/studioflow/projects/[projectId]/mom`, `/mom/[momId]` (+ print) | MOM (§10) |
 | `/studioflow/projects/[projectId]/schedule` (+ print) | Product Schedule (§11) |
 | `/studioflow/projects/[projectId]/presentation`, `/presentation/[boardId]` (+ print) | Presentation (§8a) |
+| `/studioflow/projects/[projectId]/timeline` | the project's Gantt and plan |
 | `/studioflow/projects/[projectId]/history` | audit timeline for the project |
 | `/studioflow/clients`, `/studioflow/clients/[clientId]` | clients |
 | `/studioflow/library` | §7a |
@@ -356,15 +357,27 @@ notes once answered), Earlier rounds (each with dates, outcome and its client
 notes), and the Drawing list on a drafter phase; the aside holds the pinned
 note, requirements and files.
 
-**Timeline.** A project's bar spans `timeline_start_date` (falls back to the
-created date) to `opening_date` (falls back to today + 30 days). Each phase is
-a segment coloured by its accent, dimmed while `PENDING`; a phase with
-`planned_start_date` and `planned_end_date` draws at its real position,
-otherwise it takes an equal-width slot (`domain/timeline.ts`).
-`/studioflow/timeline` shows one bar per non-archived project, filterable by
-client, designer/drafter, status and date range; clicking a segment
-(`project.manage`) sets or clears its planned dates. Planned dates are entered,
-not derived from status history.
+**Timeline (R8.381).** A real calendar Gantt (`domain/gantt.ts`, `_components/gantt-chart.tsx`):
+one shared time axis, Week or Month zoom, weekend shading, a today line, and
+the page opens with today a third of the way in. A phase with both
+`planned_start_date` and `planned_end_date` is a bar at its real dates, coloured
+by its accent (lighter while `PENDING`, outlined while `ACTIVE`); a phase with one
+date is a marker; a phase with none is not drawn and the row says how many have
+no dates (the old equal-width stand-in implied dates nobody had set).
+Markers: Fit Out Start and Opening. A thin line runs from the project start to
+its opening date.
+`/studioflow/timeline` shows one row per non-archived project, filterable by
+client, designer/drafter, status and date range; clicking a bar
+(`project.manage`) sets or clears its planned dates, and "Dates" sets start,
+Fit Out Start and opening (with "Save and apply plan").
+`/studioflow/projects/[projectId]/timeline` shows one row per phase plus a
+Milestones row (Start, Design Final, END, Fit Out Start, Handover, Opening, and a
+forecast marker when the plan lands after the opening date), Construction
+Drawing split into CD Mall and CD Final while its dates are the plan's own, and
+the Plan panel: warnings, a suggested Fit Out Start, per-project lead-time
+overrides, "Back to the plan" for hand-set dates, and Apply plan (WO-SF-PLAN-01).
+Planned dates are entered or computed from Fit Out Start, not derived from
+status history.
 
 ## 8a. Presentation
 

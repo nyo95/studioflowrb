@@ -150,6 +150,15 @@ describe("UI Engine foundation", () => {
     assert.equal(definitions[1], definitions[2]);
   });
 
+  it("closes every comment in tokens.css so no phase colour is swallowed (Moodboard went transparent once)", () => {
+    const tokens = readFileSync(fileURLToPath(new URL("./tokens/tokens.css", import.meta.url)), "utf8");
+    assert.equal((tokens.match(/\/\*/g) ?? []).length, (tokens.match(/\*\//g) ?? []).length, "unbalanced comment markers");
+    const declarations = tokens.replace(/\/\*[\s\S]*?\*\//g, "");
+    for (const token of ["--ph-mood", "--ph-layout", "--ph-3d", "--ph-cd", "--ph-sup", "--ui-mark"]) {
+      assert.ok((declarations.match(new RegExp(`${token}:`, "g")) ?? []).length >= 3, `${token} must be declared in light and both dark paths`);
+    }
+  });
+
   it("keeps paper light: dark tokens are screen-only and never apply while a DocumentSheet is shown", () => {
     const tokens = readFileSync(fileURLToPath(new URL("./tokens/tokens.css", import.meta.url)), "utf8");
     assert.match(tokens, /@media screen and \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\):not\(:has\(\.ui-document\)\) \{/);

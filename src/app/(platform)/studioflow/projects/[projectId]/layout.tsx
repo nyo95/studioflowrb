@@ -20,6 +20,7 @@ function navigation(projectId: string, counts?: { mom: number; schedule: number;
     { href: STUDIOFLOW_ROUTES.projectMom(projectId), label: "MOM", detail: counts?.mom ? String(counts.mom) : null },
     { href: STUDIOFLOW_ROUTES.projectSchedule(projectId), label: "Schedule", detail: counts?.schedule ? String(counts.schedule) : null },
     { href: STUDIOFLOW_ROUTES.projectPresentation(projectId), label: "Presentation", detail: counts?.presentation ? String(counts.presentation) : null },
+    { href: STUDIOFLOW_ROUTES.projectTimeline(projectId), label: "Timeline", detail: null },
     { href: STUDIOFLOW_ROUTES.projectHistory(projectId), label: "History", detail: null },
   ];
 }

@@ -4,11 +4,13 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { phaseAccentDotClass, phaseStatusDisplay, type PhaseStatus } from "@/apps/studioflow/domain/phase";
-import { computePhaseSegments, resolveTimelineSpan } from "@/apps/studioflow/domain/timeline";
+import type { GanttZoom } from "@/apps/studioflow/domain/gantt";
+import type { PhaseStatus } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { Button, EmptyState, FilterChip, Input, SectionCard, Select, TableToolbar, Text } from "@/platform/ui_engine";
 
+import { GanttChart, type GanttRowData } from "../_components/gantt-chart";
+import { phaseBarsAndMarkers } from "../_components/gantt-rows";
 import { EditPhaseDatesDialog } from "./edit-phase-dates-dialog";
 import { EditProjectDatesDialog } from "./edit-project-dates-dialog";
 
@@ -49,6 +51,28 @@ export function TimelineDirectory({
   const searchParams = useSearchParams();
   const [editing, setEditing] = useState<{ projectId: string; phase: TimelinePhase } | null>(null);
   const [editingProject, setEditingProject] = useState<TimelineProject | null>(null);
+  const [zoom, setZoom] = useState<GanttZoom>("month");
+  const today = new Date(now).toISOString().slice(0, 10);
+
+  const rows: GanttRowData[] = projects.filter((project) => project.phases.length > 0).map((project) => {
+    const phaseIds = editable[project.id]?.phaseIds ?? [];
+    const { bars, markers, undated } = phaseBarsAndMarkers(project.phases, {
+      onBarClick: canManage ? (phase) => { if (phaseIds.includes(phase.id)) setEditing({ projectId: project.id, phase }); } : undefined,
+    });
+    if (project.fitOutStartDate) markers.push({ id: `${project.id}:fit-out`, date: project.fitOutStartDate, label: "Fit Out Start", tone: "milestone" });
+    if (project.openingDate) markers.push({ id: `${project.id}:opening`, date: project.openingDate, label: "Opening", tone: "opening" });
+    const canEditDates = canManage && (editable[project.id]?.project ?? false);
+    return {
+      id: project.id,
+      title: <Link href={STUDIOFLOW_ROUTES.projectTimeline(project.id)} prefetch={false} className="no-underline hover:underline">{project.name}</Link>,
+      subtitle: `${project.client?.name ?? "No client"}${undated > 0 ? ` · ${undated} phase${undated === 1 ? "" : "s"} without dates` : ""}`,
+      bars: canManage ? bars.map((bar) => (phaseIds.includes(bar.id) ? bar : { ...bar, onClick: undefined })) : bars,
+      markers,
+      span: project.openingDate ? { start: project.timelineStartDate, end: project.openingDate } : null,
+      trailing: canEditDates ? <Button type="button" size="sm" variant="ghost" onClick={() => setEditingProject(project)}>Dates</Button> : null,
+      emptyText: "No planned dates — open Dates",
+    };
+  });
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -76,6 +100,9 @@ export function TimelineDirectory({
               </FilterChip>
             ))}
             <FilterChip selected={filters.archived} onClick={() => setParam("view", filters.archived ? "" : "archived")}>Archived</FilterChip>
+            <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
+            <FilterChip selected={zoom === "week"} onClick={() => setZoom("week")}>Week</FilterChip>
+            <FilterChip selected={zoom === "month"} onClick={() => setZoom("month")}>Month</FilterChip>
             <div className="w-40 shrink-0">
               <Select aria-label="Designer / drafter" density="compact" value={filters.pic} onChange={(e) => setParam("pic", e.target.value)}>
                 <option value="">Anyone</option>
@@ -105,11 +132,9 @@ export function TimelineDirectory({
           <EmptyState title={filters.archived ? "No archived projects match" : "No projects match"} />
         </SectionCard>
       ) : (
-        <div className="grid gap-3">
-          {projects.map((project) => (
-            <TimelineRow key={project.id} project={project} canManage={canManage} canEditDates={canManage && (editable[project.id]?.project ?? false)} phaseIds={editable[project.id]?.phaseIds ?? []} now={now} onEditPhase={(phase) => setEditing({ projectId: project.id, phase })} onEditDates={() => setEditingProject(project)} />
-          ))}
-        </div>
+        <SectionCard padded={false}>
+          <GanttChart label="Project timeline" rows={rows} today={today} zoom={zoom} />
+        </SectionCard>
       )}
 
       {editingProject ? <EditProjectDatesDialog project={editingProject} onClose={() => setEditingProject(null)} /> : null}
@@ -118,48 +143,5 @@ export function TimelineDirectory({
         <EditPhaseDatesDialog projectId={editing.projectId} phase={editing.phase} onClose={() => setEditing(null)} />
       ) : null}
     </div>
-  );
-}
-
-function TimelineRow({ project, canManage, canEditDates, phaseIds, now, onEditPhase, onEditDates }: { project: TimelineProject; canManage: boolean; canEditDates: boolean; phaseIds: string[]; now: number; onEditPhase: (phase: TimelinePhase) => void; onEditDates: () => void }) {
-  if (project.phases.length === 0) return null;
-  const span = resolveTimelineSpan(project.timelineStartDate, project.openingDate, { phases: project.phases, now });
-  const segments = computePhaseSegments(span, project.phases);
-
-  return (
-    <SectionCard
-      title={<Link href={STUDIOFLOW_ROUTES.project(project.id)} prefetch={false} className="no-underline hover:underline">{project.name}</Link>}
-      description={project.client?.name ?? "No client"}
-    >
-      <div className="grid gap-2 px-(--ui-section-px) py-3">
-        <div className="relative h-7 overflow-hidden rounded-control border border-line bg-surface-muted">
-          {project.phases.map((phase, index) => {
-            const segment = segments[index]!;
-            const style = { left: `${segment.leftPct}%`, width: `${segment.widthPct}%` };
-            const title = `${phase.label} — ${phaseStatusDisplay(phase.status).label}${segment.dated ? ` (${phase.plannedStartDate} – ${phase.plannedEndDate})` : " — no planned dates, click to set"}`;
-            const tone = `${phaseAccentDotClass(phase.definitionId)} ${phase.status === "PENDING" ? "opacity-30" : "opacity-90"}`;
-            return canManage && phaseIds.includes(phase.id) ? (
-              <button
-                key={phase.id}
-                type="button"
-                title={title}
-                aria-label={title}
-                style={style}
-                className={`absolute inset-y-0 cursor-pointer border-r border-surface p-0 last:border-r-0 hover:brightness-95 ${tone}`}
-                onClick={() => onEditPhase(phase)}
-              />
-            ) : (
-              <div key={phase.id} title={title} style={style} className={`absolute inset-y-0 border-r border-surface last:border-r-0 ${tone}`} />
-            );
-          })}
-          {span.showTodayMarker ? <div className="absolute inset-y-0 w-px bg-ink" style={{ left: `${span.todayPct}%` }} aria-hidden="true" /> : null}
-        </div>
-        <div className="flex items-center justify-between">
-          <Text tone="tertiary" size="sm">{project.timelineStartDate}</Text>
-          {canEditDates ? <Button type="button" size="sm" variant="ghost" onClick={onEditDates}>Edit project dates</Button> : null}
-          <Text tone="tertiary" size="sm">{project.openingDate ?? "Ongoing"}</Text>
-        </div>
-      </div>
-    </SectionCard>
   );
 }

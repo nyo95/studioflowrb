@@ -67,7 +67,7 @@
      legend. Lightness, not hue, is the channel — a hue-only set fails for
      the readers who cannot separate the hues. Every step clears 3:1 against
      surface, canvas and rail in both themes; the guard test proves it.
-     A phase label is ink, never the mark colour, so there is no deep ramp.
+     A phase label is ink, never the mark colour, so there is no deep ramp. */
   --ph-mood:       #888177;  /* Moodboard        L* 54.3 */
   --ph-layout:     #746E66;  /* Layout Plan      L* 46.7 */
   --ph-3d:         #615B55;  /* 3D Design        L* 39.0 */

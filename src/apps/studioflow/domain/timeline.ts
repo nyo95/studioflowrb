@@ -2,11 +2,10 @@
  * Gantt/timeline geometry (contract §8, portfolio Timeline page).
  *
  * A project's overall span runs from its (possibly defaulted) start date to
- * its opening date (or "today +30 days, ongoing" when unset). Within that
- * span, a phase with both `plannedStartDate` and `plannedEndDate` set draws
- * at its real position; a phase without them keeps the original equal-width
- * sequence slot, so an all-undated project renders identically to before
- * this feature existed.
+ * its opening date (or "today +30 days, ongoing" when unset), widened to
+ * cover any phase's planned dates. The Gantt itself is drawn on a real
+ * calendar axis (`domain/gantt.ts`); this span is only used to decide whether
+ * a project overlaps the page's date filter.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -58,27 +57,4 @@ export function resolveTimelineSpan(startDate: string, openingDate: string | nul
     todayPct: clamp(((now - startMs) / totalMs) * 100, 0, 100),
     showTodayMarker: now > startMs && now < endMs,
   };
-}
-
-export type TimelineSegment = { id: string; leftPct: number; widthPct: number; dated: boolean };
-
-/**
- * One segment per phase, in order. A phase with both planned dates set is
- * positioned by real duration against `span`; otherwise it takes the
- * `index / count` equal-width slot the whole bar always used before planned
- * dates existed.
- */
-export function computePhaseSegments(span: TimelineSpan, phases: readonly TimelinePhaseDates[]): TimelineSegment[] {
-  if (phases.length === 0) return [];
-  const equalWidth = 100 / phases.length;
-  return phases.map((phase, index) => {
-    if (phase.plannedStartDate && phase.plannedEndDate) {
-      const pStart = parseDateOnly(phase.plannedStartDate);
-      const pEnd = Math.max(parseDateOnly(phase.plannedEndDate), pStart);
-      const left = clamp(((pStart - span.startMs) / span.totalMs) * 100, 0, 100);
-      const width = clamp(((pEnd - pStart) / span.totalMs) * 100, 0.5, 100 - left);
-      return { id: phase.id, leftPct: left, widthPct: width, dated: true };
-    }
-    return { id: phase.id, leftPct: index * equalWidth, widthPct: equalWidth, dated: false };
-  });
 }
