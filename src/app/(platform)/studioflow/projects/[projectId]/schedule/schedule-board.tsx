@@ -50,6 +50,7 @@ import {
   Text,
   Textarea,
   useConfirm,
+  type CreatableSearchGroup,
   type CreatableSearchOption,
 } from "@/platform/ui_engine";
 
@@ -83,6 +84,8 @@ import { useCommand } from "../../../_components/use-command";
 
 type Section = "MATERIAL" | "FIXTURE";
 type Brand = { id: string; name: string };
+/** A category the studio already knows (template category or prefix dictionary). */
+type CategoryChoice = { section: Section; category: string; prefix: string | null };
 
 type ReuseHit = {
   optionId: string;
@@ -275,29 +278,53 @@ function QuickAddTile({ group, command, projectId, section }: { group: { categor
   );
 }
 
-/** One-line "New category": type a name, and it reserves the category's first code (the backend assigns the code letters). */
-function NewCategoryInline({ command, projectId, section, categories, className = "justify-self-start" }: { command: Command; projectId: string; section: Section; categories: readonly string[]; className?: string }) {
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
+/** Same comparison as the server's category key: trimmed, single-spaced, case-insensitive. */
+const categoryKeyOf = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase("id-ID");
+
+/**
+ * Category picker options: the project's own categories first, then the studio's (template categories,
+ * then the prefix dictionary) that the project does not use yet. Typing a name nobody knows creates it.
+ */
+function categoryGroups(projectCategories: readonly string[], studio: readonly CategoryChoice[], section: Section, projectLabel: string, disableProject: boolean): CreatableSearchGroup[] {
+  const inProject = new Set(projectCategories.map(categoryKeyOf));
+  const fromStudio = studio.filter((choice) => choice.section === section && !inProject.has(categoryKeyOf(choice.category)));
+  return [
+    { label: projectLabel, options: projectCategories.map((name) => ({ id: name, label: name, disabled: disableProject })) },
+    { label: "Studio categories", options: fromStudio.map((choice) => ({ id: choice.category, label: choice.category, badge: choice.prefix ? <span className="font-ui-mono text-xs text-ink-tertiary">{choice.prefix}</span> : undefined })) },
+  ].filter((group) => group.options.length > 0);
+}
+
+/** "New category": pick a studio category or type a new one; it reserves that category's first code at once. */
+function NewCategoryInline({ command, projectId, section, categories, categoryChoices, className = "justify-self-start" }: { command: Command; projectId: string; section: Section; categories: readonly string[]; categoryChoices: readonly CategoryChoice[]; className?: string }) {
+  const [hint, setHint] = useState<string | null>(null);
+  const [round, setRound] = useState(0);
   const key = `new-category-${section}`;
-  // Same comparison as the server's category key: trimmed, single-spaced, case-insensitive.
-  const keyOf = (value: string) => value.trim().replace(/\s+/g, " ").toLocaleUpperCase("id-ID");
-  const existing = name.trim() ? categories.find((category) => keyOf(category) === keyOf(name)) ?? null : null;
-  const submit = async () => {
+  const pick = async (name: string) => {
     const value = name.trim();
-    if (!value || existing) return;
+    if (!value) return;
+    const existing = categories.find((category) => categoryKeyOf(category) === categoryKeyOf(value));
+    if (existing) { setHint(`${existing} is already in this project. Add to it with its own add tile.`); return; }
+    setHint(null);
     const ok = await command.run(key, () => createScheduleEntryAction({ projectId, section, category: value, qty: null, unit: null, location: null, snapshot: null }));
-    if (ok) { setName(""); setOpen(false); }
+    if (ok) setRound((current) => current + 1);
   };
-  if (!open) return <Button size="sm" variant="ghost" leadingIcon={<Plus className="h-3.5 w-3.5" />} className={className} onClick={() => setOpen(true)}>New category</Button>;
   return (
-    <form className={`grid max-w-md gap-1 ${className}`} onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-      <div className="flex items-center gap-2">
-        <Input aria-label="New category name" autoFocus value={name} onChange={(event) => setName(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") { setName(""); setOpen(false); } }} maxLength={80} placeholder="Category name, e.g. Paint" density="compact" />
-        <Button type="submit" size="sm" variant="secondary" pending={command.isPending(key)} disabled={!name.trim() || Boolean(existing)}>Add</Button>
-      </div>
-      {existing ? <Text size="sm" tone="tertiary">{`${existing} already exists. Add to it with its own add tile.`}</Text> : null}
-    </form>
+    <div className={`grid gap-1 ${className}`}>
+      <CreatableSearch
+        key={round}
+        label="New category"
+        groups={categoryGroups(categories, categoryChoices, section, "Already in this project", true)}
+        value=""
+        onValueChange={(name) => void pick(name)}
+        onCreate={(name) => name.trim()}
+        createLabel={(name) => `New category “${name}”`}
+        placeholder="+ New category"
+        searchPlaceholder="Pick a studio category or type a new one…"
+        emptyLabel="No studio category yet. Type a new one."
+        disabled={command.isPending(key)}
+      />
+      {hint ? <Text size="sm" tone="tertiary">{hint}</Text> : null}
+    </div>
   );
 }
 
@@ -313,6 +340,7 @@ function BoardView({
   section,
   onReorder,
   onDelete,
+  categoryChoices,
 }: {
   projectId: string;
   groups: Array<{ category: string; rows: ScheduleEntryView[] }>;
@@ -323,6 +351,7 @@ function BoardView({
   section: Section;
   onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
   onDelete: (entry: ScheduleEntryView) => void;
+  categoryChoices: readonly CategoryChoice[];
 }) {
   const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
   const reorderEnabled = canEdit && filter === "all";
@@ -393,7 +422,7 @@ function BoardView({
           </div>
         </section>
       ))}
-      {canEdit && filter === "all" ? <NewCategoryInline command={command} projectId={projectId} section={section} categories={groups.map((group) => group.category)} /> : null}
+      {canEdit && filter === "all" ? <NewCategoryInline command={command} projectId={projectId} section={section} categories={groups.map((group) => group.category)} categoryChoices={categoryChoices} /> : null}
     </div>
   );
 }
@@ -402,6 +431,7 @@ export function ScheduleBoard({
   projectId,
   entries,
   brands,
+  categoryChoices,
   canEdit,
   canManageTemplates,
   templatesHref,
@@ -409,6 +439,7 @@ export function ScheduleBoard({
   projectId: string;
   entries: readonly ScheduleEntryView[];
   brands: readonly Brand[];
+  categoryChoices: readonly CategoryChoice[];
   canEdit: boolean;
   /** Studio settings permission: template settings link and "Save as template". */
   canManageTemplates: boolean;
@@ -585,7 +616,7 @@ export function ScheduleBoard({
             description={progress.all === 0 && canEdit ? "Start a category below, add an item, apply the studio templates, or import the Google Sheets schedule." : progress.all === 0 ? "This project has no schedule items in this section." : "Choose another progress filter to see more items."}
             className="py-10"
           />
-          {progress.all === 0 && canEdit ? <NewCategoryInline command={command} projectId={projectId} section={section} categories={[]} className="mb-8 justify-self-center" /> : null}
+          {progress.all === 0 && canEdit ? <NewCategoryInline command={command} projectId={projectId} section={section} categories={[]} categoryChoices={categoryChoices} className="mb-8 justify-self-center" /> : null}
         </div>
       ) : (
         <div className="grid">
@@ -601,6 +632,7 @@ export function ScheduleBoard({
                 section={section}
                 onReorder={reorderGroup}
                 onDelete={(entry) => void removeEntry(entry)}
+                categoryChoices={categoryChoices}
               />
             ) : (
               <div className="grid">
@@ -710,7 +742,7 @@ export function ScheduleBoard({
       ) : null}
 
       {dialog === "add" ? (
-        <AddItemDrawer projectId={projectId} section={section} categoriesBySection={categoriesBySection} brands={brands} command={command} confirm={confirm.confirm} onClose={() => setDialog(null)} />
+        <AddItemDrawer projectId={projectId} section={section} categoriesBySection={categoriesBySection} categoryChoices={categoryChoices} brands={brands} command={command} confirm={confirm.confirm} onClose={() => setDialog(null)} />
       ) : null}
       {dialog === "import" ? <ImportDialog projectId={projectId} section={section} command={command} onClose={() => setDialog(null)} /> : null}
       {dialog && typeof dialog === "object" ? (
@@ -779,7 +811,7 @@ function VisibilityField({ label, visible, onToggle, disabled, children, always 
   );
 }
 
-function AddItemDrawer({ projectId, section, categoriesBySection, brands, command, confirm, onClose }: { projectId: string; section: Section; categoriesBySection: Record<Section, string[]>; brands: readonly Brand[]; command: Command; confirm: ReturnType<typeof useConfirm>["confirm"]; onClose: () => void }) {
+function AddItemDrawer({ projectId, section, categoriesBySection, categoryChoices, brands, command, confirm, onClose }: { projectId: string; section: Section; categoriesBySection: Record<Section, string[]>; categoryChoices: readonly CategoryChoice[]; brands: readonly Brand[]; command: Command; confirm: ReturnType<typeof useConfirm>["confirm"]; onClose: () => void }) {
   const [targetSection, setTargetSection] = useState<Section>(section);
   // Categories belong to a section: Material and Fixture number separately, so switching the section
   // switches the list and never carries a Material category into a Fixture row.
@@ -866,7 +898,7 @@ function AddItemDrawer({ projectId, section, categoriesBySection, brands, comman
             <CreatableSearch
               key={targetSection}
               label="Category"
-              options={categories.map((name) => ({ id: name, label: name }))}
+              groups={categoryGroups(categories, categoryChoices, targetSection, "In this project", false)}
               value={category}
               onValueChange={setCategory}
               onCreate={(name) => name.trim()}

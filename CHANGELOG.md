@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.383 | 2026-10-07 | feat(studioflow): category pickers offer the studio's categories (Lead)
+
+- Owner: "ini harusnya creatablesearch? dari template?" — the inline "New category" field from R8.382 was a plain text box. It is now a `CreatableSearch`: pick a studio category (template categories in settings order, then prefix-dictionary categories, with their prefix shown) or type a new one; picking reserves that category's first code at once. The project's own categories are listed as "Already in this project" and disabled; choosing one by typing says so instead of adding to it.
+- The Add item drawer's category picker offers the same studio categories next to the project's own (it only listed categories already in the project).
+- New read `schedule.listCategoryChoices` (each section/category once; `prefix` from the dictionary when set), loaded by the schedule page.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 877/877 (none failed, skipped or cancelled; the category-order test now also covers `listCategoryChoices`). `npm run build` not run (another session's dev server uses this checkout). Browser not opened.
+
 ## R8.382 | 2026-10-07 | fix(studioflow): Product Schedule logic and flow review - stable codes, decisions only by Set as final, safe re-import (Lead)
 
 - **Owner review, all recommendations applied (owner, 2026-10-07: "ikut rekomendasi kamu semua").**

@@ -1398,6 +1398,17 @@ describe("SF-R3 Product Schedule", () => {
     await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Acrylic" });
     const categories = [...new Set((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((row) => row.category))];
     assert.deepEqual(categories, ["Wallpaper", "Paint", "Acrylic", "Brick"]);
+
+    // The category pickers offer what the studio knows: template categories in order, then the prefix dictionary.
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Granite", prefix: "GR" });
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "FIXTURE", category: "Lamp", prefix: "LP" });
+    assert.deepEqual(await sf.schedule.listCategoryChoices({ grants: DRAFTER_GRANTS }), [
+      { section: "MATERIAL", category: "Wallpaper", prefix: null },
+      { section: "MATERIAL", category: "Paint", prefix: "PT" },
+      { section: "MATERIAL", category: "Granite", prefix: "GR" },
+      { section: "FIXTURE", category: "Lamp", prefix: "LP" },
+    ], "each category once; read-only users may read it");
   });
 
   it("keeps quantity and unit for Fixture only", async () => {

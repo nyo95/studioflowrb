@@ -364,6 +364,28 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       return db.sfSchedulePrefix.findMany({ orderBy: [{ section: "asc" }, { category_key: "asc" }] });
     },
 
+    /**
+     * Categories the studio already knows, per section, for the category pickers: template categories
+     * in their settings order, then prefix-dictionary categories A to Z. `prefix` is the dictionary's when set.
+     */
+    async listCategoryChoices(input: ReadContext): Promise<Array<{ section: ScheduleSection; category: string; prefix: string | null }>> {
+      requireRead(input.grants);
+      const [templates, prefixes] = await Promise.all([
+        db.sfScheduleTemplateCategory.findMany({ orderBy: [{ sort_order: "asc" }, { category_key: "asc" }], select: { section: true, category: true, category_key: true } }),
+        db.sfSchedulePrefix.findMany({ orderBy: { category_key: "asc" }, select: { section: true, category: true, category_key: true, prefix: true } }),
+      ]);
+      const prefixOf = new Map(prefixes.map((row) => [`${row.section}:${row.category_key}`, row.prefix]));
+      const seen = new Set<string>();
+      const choices: Array<{ section: ScheduleSection; category: string; prefix: string | null }> = [];
+      for (const row of [...templates, ...prefixes]) {
+        const key = `${row.section}:${row.category_key}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        choices.push({ section: row.section, category: row.category, prefix: prefixOf.get(key) ?? null });
+      }
+      return choices;
+    },
+
     async listBrandChoices(input: ReadContext & { search?: string }) {
       requireRead(input.grants);
       const brands = await ports.masterData.listBrandLibraryReads({ search: input.search });

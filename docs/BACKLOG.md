@@ -116,9 +116,10 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## StudioFlow
 
-- [ ] [UNVERIFIED] Product Schedule R8.382 in the browser: right-click Open/Delete
-  on a board card, inline "New category" (also in an empty section, and the
-  "already exists" hint), "Unset final" in the option menu, "Apply studio
+- [ ] [UNVERIFIED] Product Schedule R8.382–R8.383 in the browser: right-click Open/Delete
+  on a board card, the "New category" picker (studio categories, typing a new
+  one, also in an empty section, the "already in this project" hint), studio
+  categories in the Add item category picker, "Unset final" in the option menu, "Apply studio
   templates" confirm and its count, a new option staying selected after Save,
   and a re-import of a real Google Sheets export.
 - [ ] [BLOCKED] Rows made Final automatically before R8.382 (typed product on

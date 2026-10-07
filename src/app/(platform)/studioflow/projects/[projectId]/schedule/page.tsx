@@ -15,13 +15,14 @@ export const dynamic = "force-dynamic";
 export default async function ProjectSchedulePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const { grants } = await pageSession();
-  const [project, entries, brands, access] = await Promise.all([
+  const [project, entries, brands, categoryChoices, access] = await Promise.all([
     studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
       if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
       throw error;
     }),
     studioFlow.schedule.listSchedule({ grants, projectId }),
     studioFlow.schedule.listBrandChoices({ grants }),
+    studioFlow.schedule.listCategoryChoices({ grants }),
     pageProjectAccess(projectId),
   ]);
   const canEdit = studioFlow.schedule.canManage(grants) && project.archivedAt === null && access.canEditDocuments;
@@ -34,6 +35,7 @@ export default async function ProjectSchedulePage({ params }: { params: Promise<
         projectId={projectId}
         entries={entries}
         brands={brands}
+        categoryChoices={categoryChoices}
         canEdit={canEdit}
         canManageTemplates={hasPermission(grants, P.settingsManage)}
         templatesHref={STUDIOFLOW_ROUTES.scheduleTemplates}
