@@ -235,3 +235,19 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   steps; check a step's `requires` against the permission registry.
 - [ ] [PLANNED] Tours for Master Data and BQ (same registration as
   `STUDIOFLOW_TOUR`), after the owner approves the StudioFlow flow.
+- [ ] [PLANNED][P2] WO-PLAT-COST-01 item B (from the 2026-10-07 audit, split off
+  after the Executor's BLOCKED report): split `apps/studioflow/phases/service.ts`
+  (1,210 lines: phase workflow, phase-template administration ~L798–L1076,
+  deliverables ~L1077–end) into three files behind the same
+  `studioFlow.phases.*` surface; a pure move, own work order and commit.
+- [ ] [PLANNED][P2] WO-PLAT-COST-01 item C: remove the ~40 `any` (`tx as any`,
+  `rows: any`) from `apps/masterdata` services with the real Prisma transaction
+  and row types; own work order, own commit. Do it before WO-MD-SCALE-01 touches
+  the same services.
+- [ ] [PLANNED][P3] Lead findings of the 2026-10-07 audit: shell polling fires
+  twice on first load (mount effect and pathname effect), hard-coded "five
+  phases" copy (new-project dialog, Projects header) although phase templates
+  are configurable, `id-ID` hard-coded in print pages and BQ review instead of
+  the account's display locale, `/ui-engine` showcase is a public path, and
+  `studioflow/actions.ts` (1,248 lines) and `schedule-board.tsx` (1,533 lines)
+  are oversized.

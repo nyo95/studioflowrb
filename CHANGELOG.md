@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.401 | 2026-10-07 | docs(plan): WO-PLAT-COST-01 re-scoped to items A and D after the Executor's BLOCKED report (Lead)
+
+- The Executor stopped without changing code: four items (page-cost query, a 1,210-line service split, ~40 `any` across Master Data, asset routes) were too large for one verified commit. Accepted option A: `PLAN.md` now covers items A (rail badge count, one preference read) and D (asset routes) only, target R8.402. Items B and C moved to BACKLOG as their own work orders, with the Lead's UI findings.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.400 | 2026-10-07 | docs(plan): WO-PLAT-COST-01 cheaper page loads and code hygiene from the whole-repo audit (Lead)
 
 - Audit of the whole repository (business rules, flows, backend, architecture). Verified fine: serializable transactions with retry, 60 s polling that pauses in hidden tabs, no `any` in StudioFlow or BQ. Found and planned for the Executor: the platform layout loads every running project just for the rail badge and reads the preference row twice, `phases/service.ts` mixes three jobs in 1,210 lines, about 40 `any` in Master Data, and the private asset route answers every failure with 401.
