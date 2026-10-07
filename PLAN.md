@@ -1,109 +1,103 @@
 # Active Plan
 
-Plan ID: WO-PLAT-COST-01 (cheaper page loads and asset-route hygiene; items A and D)
-Scope: Behaviour-preserving backend work found by the Lead's whole-repo audit of 2026-10-07. No product change, no schema change, no new dependency.
-Target revisions: R8.400 (plan), R8.401 (re-scope after the Executor's BLOCKED report), R8.402 (Executor: A and D), then Lead review and the Lead's UI findings.
-Re-scoped R8.401: the Executor reported the four items too large for one verified commit; items B (service split) and C (typed Master Data) moved to BACKLOG as their own work orders.
+Plan ID: WO-PLAT-COST-02 (split the phase service; type the Master Data services — items B and C of the 2026-10-07 audit)
+Scope: Two independent, behaviour-preserving refactors, each its own commit. No product change, no schema change, no new dependency.
+Target revisions: R8.403 (this plan), R8.404 (Executor: item B), R8.405 (Executor: item C). The Lead's UI fixes run in parallel under later revisions and touch other files.
 Status: READY
 Priority: P2
-Owner: Product Owner ("buat prompt untuk codex", 2026-10-07).
+Owner: Product Owner ("paralel", 2026-10-07).
 Last updated: 2026-10-07
 
-Previous plan WO-PLAT-TOUR-01 is BUILT (R8.396–R8.399); its open browser walk is in BACKLOG.
+Previous plan WO-PLAT-COST-01 (items A and D) is BUILT at R8.402.
 
 ## Outcome
 
-The same screens and answers, for less work per click, and code that is easier
-to change safely.
+Easier-to-change code with exactly the same behaviour: the 1,210-line phase
+service is three files by job, and the Master Data services stop bypassing the
+type checker.
 
-## Evidence (verified in code on 2026-10-07)
+## Parallel-work rule (owner override of serial work, 2026-10-07)
 
-- `src/app/(platform)/layout.tsx` runs on every navigation in every app and calls
-  `studioFlow.projects.getHomeStats` only to read `waitingOnYou` for the rail
-  badge. `getHomeStats` loads every running project with all phases and latest
-  iteration into memory (`projects/service.ts` ~L797). On `/studioflow` the page
-  calls it a second time. The same layout also reads `user_preference` twice
-  (`resolveDisplay` and `getShellState`).
-- `phases/service.ts` is 1,210 lines and holds three separate jobs: the phase
-  workflow commands and reads, phase-template administration (~L798–L1076), and
-  deliverables (~L1077–end).
-- Master Data services carry about 40 `any` (`tx as any`, `rows: any`), while
-  StudioFlow and BQ carry none.
-- `src/app/api/platform/assets/private/route.ts` answers every failure with 401
-  (a missing file should be 404), derives the content type from the file
-  extension instead of the stored type, and imports `fs/promises` without using
-  it. `public/[...key]/route.ts` reads the whole file into memory.
-- Checked and fine, do not change: phase commands run in serializable
-  transactions with retry (`platform/core/db/transactions.ts`), so the
-  read-then-write pattern is safe; polling is 60 s and pauses in hidden tabs.
+The Lead edits only these areas while the Executor runs: `src/platform/authenticated-shell`,
+`src/platform/ui_engine`, `src/proxy.ts`, `src/app/(platform)/studioflow/**`
+(screens), `src/app/(document)/**`, `src/app/(platform)/bq/**` (screens), and
+docs. The Executor must not edit those. The Executor edits only
+`src/apps/studioflow/phases/**` (item B) and `src/apps/masterdata/**` (item C).
+Both stage only their own files and never run `git add -A`, `git stash`, `git
+checkout`, or reformat files they do not own. If a check fails in a file the
+other lane is editing, report it instead of fixing it.
 
 ## Locked Decisions
 
-0. **This plan is items A and D only.** B and C wait in BACKLOG.
-1. **Behaviour must not change.** Every item keeps the current results; the
-   existing 936 tests are the safety net and new tests pin the new seams.
-2. **Item A (page cost).** Add a narrow read for the rail badge, e.g.
-   `studioFlow.projects.countWaitingOnYou({ grants, actorId })`, that returns
-   exactly the same number as `getHomeStats({ filter: "mine" }).waitingOnYou`
-   (same rule: iteration ANSWERED, project ACTIVE, caller can work, caller holds
-   the seat or can override) using a counting query, not by loading every phase.
-   Add a test that compares the two on the same data. The layout uses it and
-   no longer calls `getHomeStats`. The layout reads `user_preference` once:
-   fold the guide language into the existing display read (or make
-   `getShellState` take what it needs) so the preference row is fetched one time.
-2b. **Item D (asset routes).** Private route: 404 for a missing file (401/403
-   stay for auth and signature failures), content type from the stored type
-   where the caller can know it, otherwise the extension map kept in one shared
-   helper; remove the unused import. Public route: stream the file instead of
-   `readFile`. Same URLs, same signatures.
-3. **Out of scope:** item B (split `phases/service.ts`) and item C (remove `any` from Master Data), now separate work orders in BACKLOG; and, for the Lead's next revision, shell polling firing twice on first
-   load, hard-coded "five phases" copy, mixed `id-ID` date formatting,
-   `/ui-engine` showcase being a public path, splitting the 1,248-line
-   `studioflow/actions.ts` and the 1,533-line `schedule-board.tsx`.
+1. **Behaviour must not change.** The existing tests are the safety net.
+2. **Item B (R8.404).** Split `apps/studioflow/phases/service.ts` by job into
+   three files: the phase workflow (commands and reads, incl. iterations,
+   notes, images, outcomes, undo, completion), phase-template administration
+   (templates and definitions, currently ~L798–L1076) and deliverables
+   (currently ~L1077–end, incl. the expiry sweep). `createPhaseService` keeps its
+   name, signature and the exact same members, composed from the three parts, so
+   no caller outside `phases/` changes. A pure move: no logic edit, rename or
+   reformat mixed in. Add a test that lists the members of `studioFlow.phases`
+   and compares them with the list before the split (capture it first).
+3. **Item C (R8.405).** Remove `any` from the Master Data services by using the
+   real Prisma transaction and row types. Files with `any` today: `service.ts`
+   (2), `services/deletion.service.ts` (11), `services/pricing.service.ts` (20),
+   `services/sku-price-workbook.service.ts` (3),
+   `services/price-database-workbook.service.ts` (2), `services/vendor.service.ts`
+   (1). Where a cast is truly unavoidable (for example giving a service a
+   transaction as its client), keep one commented, typed helper in
+   `services/shared.ts` instead of scattered casts.
+4. **Stopping rule.** Each item is verified and committed on its own. If the
+   run window ends after B, stop with B committed and report C as not started;
+   that is a valid result, not a failure. Never commit a half-done item.
 
 ## Boundaries and Non-goals
 
-No schema or migration change; no change to who may see what; no new caching
-layer; no change to the home page's own `getHomeStats` result; no push, tag, PR
-or release.
+No schema or migration change; no change to permissions or results; no new
+abstraction beyond the single typed helper in item C; no work on the Lead's
+areas above; no push, tag, PR or release.
 
 ## Acceptance Criteria
 
-1. `countWaitingOnYou` equals `getHomeStats(...).waitingOnYou` for: no projects,
-   answered phase held by the caller, held by someone else, caller with override,
-   caller without phase-work permission, completed and archived projects.
-2. The platform layout no longer calls `getHomeStats` and reads
-   `user_preference` once per request.
-3. Private asset route: unknown key with a valid signature gives 404; bad
-   signature or expired gives 403; unauthenticated gives 401; a valid read
-   returns the same bytes and `nosniff`.
+1. B: `studioFlow.phases` has the same members as before; `phases/service.ts`
+   no longer contains template or deliverable code; every existing phase,
+   template and deliverable test passes unchanged.
+2. C: `grep -rnE ": any\b|as any\b" src/apps/masterdata --include=*.ts` returns
+   no match outside tests, or only the one documented helper; Master Data tests
+   pass unchanged.
+3. `tsc --noEmit` reports no new error in either item.
 
 ## Verification
 
-Executor, before commit: `tsc --noEmit`, `npm run lint -- --quiet`,
+For each item, before its commit: `tsc --noEmit`, `npm run lint -- --quiet`,
 `check:boundaries`, `check:legacy-runtime`, `npm test` (full; report any
-failed, skipped or cancelled; the known flaky workbook test in BACKLOG may need
-one re-run, say so), `npm run build`. Verify the database target is
-rebuild-only before any database command. Browser not required.
+failed, skipped or cancelled, and name the known flaky workbook test in BACKLOG
+if it is the only failure and passes on one re-run), `npm run build`. Run
+long checks as background jobs so the run window is not the limit. Verify the
+database target is rebuild-only before any database command. Browser not
+required.
 
 ## Reviewer Acceptance
 
-After commit, the Lead opens Home, a project and Master Data in the browser and
-checks the rail badge number is unchanged, then reads the dev log for the
-number of queries per navigation before and after.
+Lead reads each commit as a diff (moves only for B; type-only for C) and
+re-runs the full gates.
 
 ## Regression Risks and Recovery
 
-The badge number is the only user-visible value touched; the equality test
-guards it. Item D changes only error codes and streaming; each item can be reverted on its own.
+B can break an import cycle or drop a member from the composed service: the
+member-list test guards it. C can change inferred types in a way that hides a
+real bug: if a typed version exposes an actual defect, record it as `[BUG]` in
+BACKLOG and keep behaviour. Each item reverts as one commit.
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY
-outcome (WO-PLAT-COST-01, items A and D only, target revision R8.402) and nothing
-beyond it; items B and C are not part of this plan. Preserve unrelated owner work, run the
-required checks, update `CHANGELOG.md`, and create the local revision commit.
-Stop only for a material locked-decision conflict or unsafe boundary, using the
-BLOCKED / CONFLICT report; otherwise report the commit, checks, limitations,
-and remaining unrelated dirty files.
+`docs/agent/EXECUTOR.md`, and `PLAN.md`, then implement item B (target
+revision R8.404) and then item C (R8.405) of WO-PLAT-COST-02, each verified and
+committed on its own, and nothing beyond them. The Lead is editing other areas
+in parallel; follow the Parallel-work rule in `PLAN.md` exactly and stage only
+your own files. Run the long checks (`npm test`, `npm run build`) as background
+jobs. Update `CHANGELOG.md` for each revision. Stop only for a material
+locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT
+report; otherwise report each commit, checks, limitations, and remaining
+unrelated dirty files.

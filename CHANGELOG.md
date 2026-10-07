@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.403 | 2026-10-07 | docs(plan): WO-PLAT-COST-02 split the phase service and type Master Data, run in parallel with Lead UI fixes (Lead)
+
+- Owner (2026-10-07): fix the audit findings in parallel. `PLAN.md` READY for the Executor: item B (R8.404, split `phases/service.ts` into workflow, templates and deliverables behind the same members) and item C (R8.405, no `any` in Master Data services), each verified and committed on its own; stopping after B is a valid result. An explicit ownership rule keeps the two lanes on different files (Executor: `phases/**` and `apps/masterdata/**`; Lead: shell, UI Engine, proxy, screens, docs). Owner override of serial work recorded in the plan.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.402 | 2026-10-07 | perf(platform,studioflow): rail badge by one count, one preference read, asset routes answer correctly - WO-PLAT-COST-01 items A and D (Executor, verified and committed by the Lead)
 
 - **A. Page cost.** New `studioFlow.projects.countWaitingOnYou`: one counting query with the same rule as the Home number (answered iteration, running project, caller may work, caller holds the seat or can override). The platform layout uses it instead of loading every running project through `getHomeStats`. `resolveDisplay` now also returns the guide language and `getShellState` receives it, so the preference row is read once per page. New equality test against `getHomeStats` (nothing answered, sent only, answered by the caller, held by someone else, no work permission, override, archived, completed).
