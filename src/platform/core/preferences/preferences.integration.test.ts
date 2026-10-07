@@ -25,7 +25,7 @@ describe("personal preferences", () => {
     await preferences.update({ userId: person.id, grants, theme: null, locale: null, timezone: null, startPage: null });
     assert.deepEqual(await preferences.get({ userId: person.id }), { theme: null, locale: null, timezone: null, startPage: null, language: null });
     await assert.rejects(() => preferences.update({ userId: person.id, grants, startPage: "/studioflow" }), (error: unknown) => error instanceof AppError && error.code === "PREFERENCE_START_PAGE");
-    assert.deepEqual(await preferences.resolveDisplay({ userId: person.id }), { locale: "id-ID", timezone: "Asia/Jakarta" });
+    assert.deepEqual(await preferences.resolveDisplay({ userId: person.id }), { locale: "id-ID", timezone: "Asia/Jakarta", language: null });
   });
 
   it("persists each theme choice and resolves the active theme: own choice, else organisation default, else system", async () => {

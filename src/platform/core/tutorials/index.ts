@@ -67,12 +67,9 @@ export function createUserTutorialService(db: PrismaClient) {
       await db.userTutorial.deleteMany({ where: { user_id: input.userId, tour_key: input.tourKey } });
     },
     /** One runtime call for shell consumers: guide language plus this person's progress only. */
-    async getShellState(input: { userId: string }): Promise<ShellTutorialState> {
-      const [preference, tutorials] = await Promise.all([
-        db.userPreference.findUnique({ where: { user_id: input.userId }, select: { language: true } }),
-        db.userTutorial.findMany({ where: { user_id: input.userId }, orderBy: { tour_key: "asc" } }),
-      ]);
-      return { language: preference?.language === "id" || preference?.language === "en" ? preference.language : null, tutorials: tutorials.map(toProgress) };
+    async getShellState(input: { userId: string; language: ShellTutorialState["language"] }): Promise<ShellTutorialState> {
+      const tutorials = await db.userTutorial.findMany({ where: { user_id: input.userId }, orderBy: { tour_key: "asc" } });
+      return { language: input.language, tutorials: tutorials.map(toProgress) };
     },
   };
 }

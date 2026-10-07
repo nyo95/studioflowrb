@@ -258,6 +258,31 @@ describe("WO-UI-V2-02 Home stats and rail counts", () => {
     assert.equal(forDrafter.runningProjects, 1);
   });
 
+  it("countWaitingOnYou equals the Home stats number for every kind of caller", async () => {
+    const same = async (grants: readonly string[], actorId: string) => {
+      const stats = await sf.projects.getHomeStats({ grants, filter: "mine", actorId });
+      assert.equal(await sf.projects.countWaitingOnYou({ grants, actorId }), stats.waitingOnYou);
+      return stats.waitingOnYou;
+    };
+    const noWork = ALL.filter((grant) => grant !== P.phaseWork);
+    const override = [...ALL, P.projectOverride];
+    assert.equal(await same(ALL, designer.id), 0, "nothing answered yet");
+    const { projectId } = await newProject("Count equals stats");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const round = await openIteration(moodboard.id);
+    await sf.phases.sendIteration({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: round.id });
+    assert.equal(await same(ALL, designer.id), 0, "sent but not answered");
+    await sf.phases.recordClientAnswer({ ...as(designer), projectId, phaseId: moodboard.id, iterationId: round.id, note: "Warmer" });
+    assert.equal(await same(ALL, designer.id), 1, "answered, held by the caller");
+    assert.equal(await same(DRAFTER_GRANTS, drafter.id), 0, "answered, held by someone else");
+    assert.equal(await same(noWork, designer.id), 0, "caller may not work phases");
+    assert.equal(await same(override, designer.id), 1, "caller with override");
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date(), archive_reason: "test" } });
+    assert.equal(await same(ALL, designer.id), 0, "archived project");
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: null, status: "COMPLETED" } });
+    assert.equal(await same(ALL, designer.id), 0, "completed project");
+  });
+
   it("counts samples still waiting in running, unarchived projects", async () => {
     const { projectId } = await newProject("Samples waiting");
     const { entryId } = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Sample paint" } });

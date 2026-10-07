@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import fs from "node:fs/promises";
+import { stat } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { Readable } from "node:stream";
 import path from "node:path";
 import { resolveSafePath } from "@platform/infrastructure/storage/filesystem";
+import { contentTypeFromKey } from "@platform/infrastructure/storage/content-type";
 
 export async function GET(
   request: Request,
@@ -15,19 +18,12 @@ export async function GET(
 
     const filePath = await resolveSafePath(rootDir, key);
 
-    const data = await fs.readFile(filePath);
-    const ext = path.extname(key).toLowerCase();
-    const contentType =
-      ext === ".png"
-        ? "image/png"
-        : ext === ".jpg" || ext === ".jpeg"
-          ? "image/jpeg"
-          : "application/octet-stream";
+    await stat(filePath);
 
-    return new NextResponse(data, {
+    return new NextResponse(Readable.toWeb(createReadStream(filePath)) as ReadableStream<Uint8Array>, {
       status: 200,
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": contentTypeFromKey(key),
         "Cache-Control": "public, max-age=86400",
       },
     });

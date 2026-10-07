@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
-import fs from "node:fs/promises";
+import { stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { Readable } from "node:stream";
 import path from "node:path";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { verifyAssetRead } from "@platform/infrastructure/storage/asset-signing";
 import { resolveSafePath } from "@platform/infrastructure/storage/filesystem";
+import { contentTypeFromKey } from "@platform/infrastructure/storage/content-type";
 
 export async function GET(request: Request) {
   try {
     await requirePrincipalGrants();
+  } catch {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+  try {
     const url = new URL(request.url);
     const key = url.searchParams.get("key");
     const token = url.searchParams.get("token");
@@ -32,30 +37,17 @@ export async function GET(request: Request) {
     const rootDir = path.resolve(storageRoot, "private-assets");
 
     const filePath = await resolveSafePath(rootDir, key);
-
-    const ext = path.extname(key).toLowerCase();
-    const contentType =
-      ext === ".pdf"
-        ? "application/pdf"
-        : ext === ".zip"
-          ? "application/zip"
-        : ext === ".png"
-        ? "image/png"
-        : ext === ".jpg" || ext === ".jpeg"
-          ? "image/jpeg"
-          : ext === ".webp"
-            ? "image/webp"
-            : "application/octet-stream";
+    await stat(filePath);
 
     return new NextResponse(Readable.toWeb(createReadStream(filePath)) as ReadableStream<Uint8Array>, {
       status: 200,
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": contentTypeFromKey(key),
         "Cache-Control": "private, no-cache",
         "X-Content-Type-Options": "nosniff",
       },
     });
   } catch {
-    return new NextResponse("Unauthorized", { status: 401 });
+    return new NextResponse("Not Found", { status: 404 });
   }
 }

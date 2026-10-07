@@ -29,11 +29,11 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   if (!principalGrants) redirect("/login");
   const { principal, grants } = principalGrants;
   const canManageSampleRequests = hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
-  const [settings, display, tutorial, studioFlowStats, openSampleRequests] = await Promise.all([
+  const display = await userPreferences.resolveDisplay({ userId: principal.userId });
+  const [settings, tutorial, waitingOnYou, openSampleRequests] = await Promise.all([
     readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key)),
-    userPreferences.resolveDisplay({ userId: principal.userId }),
-    userTutorials.getShellState({ userId: principal.userId }),
-    grants.includes("studioflow.access") ? studioFlow.projects.getHomeStats({ grants, filter: "mine", actorId: principal.userId }) : Promise.resolve(null),
+    userTutorials.getShellState({ userId: principal.userId, language: display.language }),
+    grants.includes("studioflow.access") ? studioFlow.projects.countWaitingOnYou({ grants, actorId: principal.userId }) : Promise.resolve(0),
     canManageSampleRequests ? studioFlowSampleRequestRead.countPendingSampleRequests() : Promise.resolve(0),
   ]);
   const apps = getPermissionRegistry().apps
@@ -43,7 +43,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const domainNavigation = <>
     {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav canManageSampleRequests={canManageSampleRequests} canReadSamples={hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRead)} openSampleRequests={openSampleRequests} canUseWorkbook={(hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) || (hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage))} /> : null}
     {apps.some((app) => app.appId === "bq") ? <BqNav /> : null}
-    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav waitingOnYou={studioFlowStats?.waitingOnYou ?? 0} /> : null}
+    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav waitingOnYou={waitingOnYou} /> : null}
   </>;
 
   // Each app's Settings sits in the rail's utility area; each component renders only inside its own app.

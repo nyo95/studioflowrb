@@ -72,9 +72,9 @@ export function createUserPreferencesService(db: PrismaClient) {
       ]);
       return resolveThemePreference(parseStoredTheme(preference?.theme), parseStoredTheme(settings.theme));
     },
-    async resolveDisplay(input: { userId: string }): Promise<{ locale: string; timezone: string }> {
+    async resolveDisplay(input: { userId: string }): Promise<{ locale: string; timezone: string; language: UserPreferenceLanguage | null }> {
       const [preference, settings] = await Promise.all([db.userPreference.findUnique({ where: { user_id: input.userId } }), readPlatformGeneralSettings(db)]);
-      return { locale: preference?.locale ?? settings.locale, timezone: preference?.timezone ?? settings.timezone };
+      return { locale: preference?.locale ?? settings.locale, timezone: preference?.timezone ?? settings.timezone, language: preference?.language && isGuideLanguage(preference.language) ? preference.language : null };
     },
   };
 }

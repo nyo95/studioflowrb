@@ -828,6 +828,21 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       };
     },
 
+    /** Narrow rail-badge read: exactly the Mine Home answered-work rule, without loading project trees. */
+    async countWaitingOnYou(input: ReadContext & { actorId: string }): Promise<number> {
+      requireRead(input.grants);
+      if (!hasPermission(input.grants, P.phaseWork)) return 0;
+      const canOverride = hasPermission(input.grants, P.projectOverride);
+      return db.sfRevision.count({ where: {
+        status: "ANSWERED",
+        phase: { project: {
+          archived_at: null,
+          status: "ACTIVE",
+          OR: [{ pic_designer_id: input.actorId }, { pic_drafter_id: input.actorId }],
+        }, ...(canOverride ? {} : { OR: [{ seat_snapshot: "designer", project: { pic_designer_id: input.actorId } }, { seat_snapshot: "drafter", project: { pic_drafter_id: input.actorId } }] }) },
+      } });
+    },
+
     canManageProjects(grants: ReadContext["grants"]) {
       return hasPermission(grants, P.projectManage);
     },

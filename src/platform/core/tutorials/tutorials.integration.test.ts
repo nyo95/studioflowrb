@@ -63,7 +63,7 @@ describe("personal tutorial progress", () => {
     await tutorials.record({ userId: first.id, tourKey: "studioflow", version: 1, state: "completed" });
     await tutorials.record({ userId: second.id, tourKey: "masterdata", version: 1, state: "dismissed" });
 
-    const state = await tutorials.getShellState({ userId: first.id });
+    const state = await tutorials.getShellState({ userId: first.id, language: "id" });
     assert.equal(state.language, "id");
     assert.deepEqual(state.tutorials.map((row) => row.tourKey), ["studioflow"]);
   });

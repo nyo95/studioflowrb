@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.402 | 2026-10-07 | perf(platform,studioflow): rail badge by one count, one preference read, asset routes answer correctly - WO-PLAT-COST-01 items A and D (Executor, verified and committed by the Lead)
+
+- **A. Page cost.** New `studioFlow.projects.countWaitingOnYou`: one counting query with the same rule as the Home number (answered iteration, running project, caller may work, caller holds the seat or can override). The platform layout uses it instead of loading every running project through `getHomeStats`. `resolveDisplay` now also returns the guide language and `getShellState` receives it, so the preference row is read once per page. New equality test against `getHomeStats` (nothing answered, sent only, answered by the caller, held by someone else, no work permission, override, archived, completed).
+- **D. Asset routes.** Private route: sign-in failure 401, bad or expired signature 403, missing file 404 (was 401 for everything); content type from one shared `contentTypeFromKey`; unused import removed. Public route streams the file instead of reading it whole. Same URLs and signatures.
+- Items B and C stay in BACKLOG. The Executor stopped before committing (its run window ended during the full tests); the Lead reviewed the diff, added the equality test, fixed the one preference test that expects the new `language` field, and ran the gates.
+- Known and left: the layout still reads general settings twice (once in `resolveDisplay`); the private route has no route-level test.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 937/937 (none failed, skipped or cancelled), `npm run build` passes. Browser not opened.
+
 ## R8.401 | 2026-10-07 | docs(plan): WO-PLAT-COST-01 re-scoped to items A and D after the Executor's BLOCKED report (Lead)
 
 - The Executor stopped without changing code: four items (page-cost query, a 1,210-line service split, ~40 `any` across Master Data, asset routes) were too large for one verified commit. Accepted option A: `PLAN.md` now covers items A (rail badge count, one preference read) and D (asset routes) only, target R8.402. Items B and C moved to BACKLOG as their own work orders, with the Lead's UI findings.
