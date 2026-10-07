@@ -3,7 +3,7 @@
 Plan ID: WO-PLAT-TOUR-01 (first-use guided tour, all apps, Indonesian / English)
 Scope: Platform backend for a per-person first-use tour: a chosen guide language and a per-tour "already seen" record, stored on the account. The Lead builds the tour component, the language pick on the first screen, the Help entry, and the StudioFlow tour text and anchors in the next revision.
 Target revisions: R8.396 (this plan), R8.397 (Executor: backend), R8.398 (Lead review + UI + StudioFlow tour).
-Status: READY
+Status: BUILT — backend R8.397 (review PASS), UI + StudioFlow tour R8.398; open: browser walk (BACKLOG [UNVERIFIED]).
 Priority: P2
 Owner: Product Owner. Decisions confirmed by the owner in chat on 2026-10-07 (kantor).
 Last updated: 2026-10-07
@@ -147,15 +147,3 @@ on the separate test data:
   dropping the new column and table.
 - Applying the migration to the wrong database: stop if the target is not the
   rebuild-only dev or test database.
-
-## Executor Prompt
-
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY
-backend outcome (WO-PLAT-TOUR-01, target revision R8.397) and nothing beyond it.
-Inspect current repository evidence, preserve unrelated owner work (`next-env.d.ts`
-is dirty and not yours), make sound in-scope implementation decisions, run the
-required checks, update `CHANGELOG.md`, and create the local revision commit.
-Stop only for a material locked-decision conflict or unsafe boundary, using the
-BLOCKED / CONFLICT report; otherwise finish the coherent outcome and report the
-commit, checks, limitations, and remaining unrelated dirty files.

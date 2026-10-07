@@ -20,6 +20,9 @@ import type { PlatformGeneralSettings } from "@platform/core/settings";
 import { AuthenticatedPlatformNavigation,HeaderApplicationNavigation,type ShellAppLink } from "./navigation";
 import { RouteAwareAppShell } from "./route-aware-app-shell";
 import { getSettingsMenuVisibility } from "./shell-rules";
+import { TourProvider, type TourActions } from "./tour";
+import type { ShellTour } from "./tour-rules";
+import type { ShellTutorialState } from "@platform/core/tutorials";
 
 
 /**
@@ -37,7 +40,7 @@ function brandMark(name: string): string {
   return initials.slice(0, 3).toUpperCase();
 }
 
-export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, children }: {
+export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, tours = [], tutorial = { language: null, tutorials: [] }, tourActions, children }: {
   principal: SessionPrincipal;
   grants: readonly string[];
   settings: PlatformGeneralSettings;
@@ -47,6 +50,10 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
   domainNavigation?: ReactNode;
   domainUtilityNavigation?: ReactNode;
   contextSlot?: ReactNode;
+  /** Each app's first-use tour (app-owned), plus this person's guide language and progress. */
+  tours?: readonly ShellTour[];
+  tutorial?: ShellTutorialState;
+  tourActions: TourActions;
   children: ReactNode;
 }) {
   /* The app chip beside this already names the active application, so the mark
@@ -58,7 +65,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
   const productMark = brandMark(markSource) || "SF";
   const { showSettings } = getSettingsMenuVisibility(grants);
   return (
-    <DisplaySettingsProvider value={{ locale: settings.locale, timezone: settings.timezone }}><RouteAwareAppShell
+    <DisplaySettingsProvider value={{ locale: settings.locale, timezone: settings.timezone }}><TourProvider tours={tours} grants={grants} language={tutorial.language} progress={tutorial.tutorials} actions={tourActions}><RouteAwareAppShell
       appRootPaths={apps.map((app) => app.rootPath)}
       /* The top bar is one 46px line and the app chip beside it already names
          the application, so the mark stays compact in both rail states: the
@@ -105,6 +112,6 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
       </div>}
     >
       {children}
-    </RouteAwareAppShell></DisplaySettingsProvider>
+    </RouteAwareAppShell></TourProvider></DisplaySettingsProvider>
   );
 }

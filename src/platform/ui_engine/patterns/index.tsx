@@ -16,3 +16,4 @@ export * from "./print-button";
 export * from "./print-format";
 export * from "./print-format-values";
 export * from "./pill-tabs";
+export * from "./guided-tour";

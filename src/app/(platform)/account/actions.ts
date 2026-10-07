@@ -135,3 +135,8 @@ export async function getStorageUsageAction(): Promise<ActionResult<unknown>> {
     return storageUsage.getStorageUsage({ grants });
   });
 }
+
+/** The guide language chosen on the first tour screen; personal-only like the other preference actions. */
+export async function setGuideLanguageAction(input: { language: "id" | "en" }): Promise<ActionResult<unknown>> {
+  return updateMyPreferencesAction({ language: input.language });
+}

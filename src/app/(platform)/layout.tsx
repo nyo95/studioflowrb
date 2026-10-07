@@ -7,9 +7,12 @@ import { prisma } from "@platform/core/db";
 import { hasPermission } from "@platform/core/rbac";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
-import { brandMarkStorage, userPreferences } from "@platform/runtime";
+import { brandMarkStorage, userPreferences, userTutorials } from "@platform/runtime";
+import { validateAppTutorial } from "@platform/core/tutorials";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
+import { STUDIOFLOW_TOUR } from "@/apps/studioflow/public";
 import { studioFlow, studioFlowSampleRequestRead } from "@/apps/studioflow/runtime";
+import { recordTutorialAction, setGuideLanguageAction } from "./account/actions";
 import { logoutAction } from "./logout-action";
 import { BqNav } from "./bq/nav";
 import { StudioFlowHeaderSearch } from "./studioflow/header-search";
@@ -26,9 +29,10 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   if (!principalGrants) redirect("/login");
   const { principal, grants } = principalGrants;
   const canManageSampleRequests = hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
-  const [settings, display, studioFlowStats, openSampleRequests] = await Promise.all([
+  const [settings, display, tutorial, studioFlowStats, openSampleRequests] = await Promise.all([
     readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key)),
     userPreferences.resolveDisplay({ userId: principal.userId }),
+    userTutorials.getShellState({ userId: principal.userId }),
     grants.includes("studioflow.access") ? studioFlow.projects.getHomeStats({ grants, filter: "mine", actorId: principal.userId }) : Promise.resolve(null),
     canManageSampleRequests ? studioFlowSampleRequestRead.countPendingSampleRequests() : Promise.resolve(0),
   ]);
@@ -48,9 +52,12 @@ export default async function PlatformLayout({ children }: { children: ReactNode
     {apps.some((app) => app.appId === "studioflow") ? <StudioFlowUtilityNav canOpenSettings={firstSettingsHref(studioFlowSettingsGroups(grants)) !== null} /> : null}
   </>;
 
+  // Each app registers its own first-use tour; the shell plays the one for the app the person is in.
+  const tours = apps.some((app) => app.appId === "studioflow") ? [{ appRootPath: "/studioflow", tour: validateAppTutorial(STUDIOFLOW_TOUR) }] : [];
+
   const contextSlot = apps.some((app) => app.appId === "studioflow") ? <StudioFlowHeaderSearch /> : null;
 
-  return <AuthenticatedShell principal={principal} grants={grants} settings={{ ...settings, ...display }} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation} domainUtilityNavigation={domainUtilityNavigation} contextSlot={contextSlot}>
+  return <AuthenticatedShell principal={principal} grants={grants} settings={{ ...settings, ...display }} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation} domainUtilityNavigation={domainUtilityNavigation} contextSlot={contextSlot} tours={tours} tutorial={tutorial} tourActions={{ record: recordTutorialAction, setLanguage: setGuideLanguageAction }}>
     {children}
   </AuthenticatedShell>;
 }

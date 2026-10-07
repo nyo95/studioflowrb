@@ -224,3 +224,14 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   versions per file name, working files expire after 30 days (R8.240).
   Before a plan: confirm which file types to add, the folder-watching
   mechanism, and the hardware.
+
+- [ ] [UNVERIFIED] First-use tour (WO-PLAT-TOUR-01, R8.397–R8.398) in the browser:
+  fresh account sees the language pick then 4 StudioFlow steps; Skip/Escape/Done
+  never replay it, also on another browser; "Help: replay guide" reopens it in
+  the rail and on a phone; a role without project read skips step 2; a phone
+  skips steps whose control is hidden. Re-run the two Playwright full sessions
+  that stalled earlier to completion and the 13 phone layout checks.
+- [ ] [CLEANUP] Tour validator: refuse duplicate step ids and a tour with zero
+  steps; check a step's `requires` against the permission registry.
+- [ ] [PLANNED] Tours for Master Data and BQ (same registration as
+  `STUDIOFLOW_TOUR`), after the owner approves the StudioFlow flow.

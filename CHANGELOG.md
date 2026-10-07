@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.398 | 2026-10-07 | feat(platform,studioflow): first-use guided tour on screen; review of R8.397 PASS (Lead)
+
+- **Review of R8.397 (`fd96882`): PASS.** Language and progress are personal-only, the SQL checks and cascade are in place, the tour validator matches the plan. Small notes left open: duplicate step ids and a zero-step tour are not refused; step permission names are not checked against the registry.
+- **Tour on screen.** New UI Engine `GuidedTour`: a card with a ring round the real control, Next/Back/Skip/Done, Escape or the close button at any moment, the page stays usable, a phone docks the card at the bottom; the first card asks Bahasa Indonesia or English (saved on the account) and a small ID/EN switch stays on every card. The shell `TourProvider` plays the tour of the app the person is in, once (until a row exists), skips steps whose permission is missing or whose control is not on screen, and records Completed or Dismissed. Help item "Help: replay guide" / "Bantuan: ulangi panduan" in the rail General group and the phone account menu, shown only inside an app that has a tour.
+- **StudioFlow tour** (app-owned, `STUDIOFLOW_TOUR`, 4 steps, both languages): Home, Projects, phase work, reminders and files. Other apps register theirs the same way; none yet.
+- Wiring: layout reads the shell state and passes the personal-only actions; new `setGuideLanguageAction`.
+- PLAN.md: BUILT. BACKLOG: browser walk [UNVERIFIED].
+
+**Checks.** `tsc --noEmit`, lint (touched files), `check:boundaries`, `check:legacy-runtime`, `npm test` 936/936 (none failed, skipped or cancelled; 4 new tour-rule tests), `npm run build` passes. Browser not opened; the two stalled Playwright sessions are not yet re-run.
+
 ## R8.397 | 2026-10-07 | feat(platform): persist first-use tour progress
 
 - **Guide preference.** Personal preferences now retain an optional guide language (`id` or `en`) separately from display locale; unsupported values are refused. Existing preferences remain unset until the person chooses a guide language.

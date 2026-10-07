@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTransition } from "react";
 import { DropdownMenu } from "radix-ui";
-import { ChevronRight, LogOut, SlidersHorizontal, UserRound } from "lucide-react";
+import { ChevronRight, CircleHelp, LogOut, SlidersHorizontal, UserRound } from "lucide-react";
 import { initialsOf, NavAction, NavItem } from "@/platform/ui_engine";
 
 import { isRailPath } from "./shell-rules";
+import { useTour } from "./tour";
 
 export function AccountMenu({ name, logoutAction, showSettings }: {
   name: string;
@@ -15,6 +16,7 @@ export function AccountMenu({ name, logoutAction, showSettings }: {
   showSettings: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const tour = useTour();
   const itemClass = "flex min-h-9 w-full items-center gap-2 rounded-action px-3 py-2 text-sm outline-none data-[highlighted]:bg-surface-muted focus-visible:bg-surface-muted";
   return <DropdownMenu.Root>
     {/* Prototype `.a-av`: a 24px filled circle, not a named button. The name
@@ -33,6 +35,7 @@ export function AccountMenu({ name, logoutAction, showSettings }: {
       <DropdownMenu.Label className="truncate px-3 pb-1 pt-1.5 text-xs font-semibold text-ink">{name}</DropdownMenu.Label>
       <DropdownMenu.Item asChild><Link href="/account" className={itemClass}><UserRound size={16} aria-hidden="true" />My preferences</Link></DropdownMenu.Item>
       {showSettings ? <DropdownMenu.Item asChild><Link href="/settings" className={itemClass}><SlidersHorizontal size={16} aria-hidden="true" />Platform settings</Link></DropdownMenu.Item> : null}
+      {tour.available ? <DropdownMenu.Item className={itemClass} onSelect={() => tour.replay()}><CircleHelp size={16} aria-hidden="true" />{tour.replayLabel}</DropdownMenu.Item> : null}
       <DropdownMenu.Separator className="my-1 h-px bg-line" />
       <DropdownMenu.Item
         className={itemClass}
@@ -77,10 +80,12 @@ export function RailAccount({ name, detail }: { name: string; detail?: string | 
 export function RailGeneral({ logoutAction, showSettings }: { logoutAction: () => Promise<void>; showSettings: boolean }) {
   const [pending, startTransition] = useTransition();
   const settingsActive = usePathname().startsWith("/settings");
+  const tour = useTour();
   return (
     <>
       <p className="m-0 px-2 pt-1 pb-1 text-label text-ink-tertiary group-data-collapsed:hidden">General</p>
       {showSettings ? <NavItem href="/settings" icon={<SlidersHorizontal />} active={settingsActive} prefetch={false}>Platform settings</NavItem> : null}
+      {tour.available ? <NavAction icon={<CircleHelp />} onClick={() => tour.replay()}>{tour.replayLabel}</NavAction> : null}
       <NavAction icon={<LogOut />} disabled={pending} onClick={() => startTransition(async () => { await logoutAction(); })}>
         {pending ? "Signing out…" : "Log out"}
       </NavAction>
