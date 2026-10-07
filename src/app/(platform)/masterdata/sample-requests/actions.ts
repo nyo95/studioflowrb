@@ -21,6 +21,7 @@ const QuoteInputSchema = z.object({
   quotedCurrency: z.string().max(8).optional().nullable().or(z.literal("")),
   staffNote: z.string().max(1000).optional().nullable().or(z.literal("")),
 });
+const ShelfInputSchema = z.object({ skuId: z.string().uuid(), rack: z.string().max(40), box: z.string().max(40), quantity: z.coerce.number().int().min(1).max(999).optional(), locationNote: z.string().max(200).optional().nullable() });
 
 function actorOf(principal: { userId: string; displayName: string }) {
   return { kind: "USER" as const, userId: principal.userId, label: principal.displayName };
@@ -102,4 +103,16 @@ export async function syncSampleQuoteToPriceAction(intakeId: string): Promise<Ac
     revalidatePath("/masterdata/pricing");
     return result;
   });
+}
+
+export async function shelveSampleRequestAction(sourceRequestId: string, input: unknown): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants(); const parsed = ShelfInputSchema.safeParse(input); if (!parsed.success) throw validationError(parsed.error);
+    const result = await sampleRequestCoordinator.shelve({ grants, actor: actorOf(principal), sourceRequestId, ...parsed.data });
+    revalidateSampleRequests(); revalidatePath("/masterdata/samples"); return result;
+  });
+}
+
+export async function retrySampleReceivedAction(sourceRequestId: string): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { const { principal, grants } = await requirePrincipalGrants(); const result = await sampleRequestCoordinator.retryStudioFlowReceived({ grants, actor: actorOf(principal), sourceRequestId }); revalidateSampleRequests(); return result; });
 }

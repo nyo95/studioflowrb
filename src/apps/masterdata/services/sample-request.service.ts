@@ -57,11 +57,12 @@ export type SampleRequestIntakeRead = SampleRequestSnapshot & {
   handledBy: { id: string; label: string };
   startedAt: Date;
   resolvedAt: Date | null;
+  shelvedSample?: { id: string; rack: string; box: string } | null;
 };
 
 type Row = Awaited<ReturnType<PrismaClient["sampleRequestIntake"]["findUniqueOrThrow"]>>;
 
-function toRead(row: Row, links: { skuName: string | null; skuCode: string | null; priceAmount: string | null } = { skuName: null, skuCode: null, priceAmount: null }): SampleRequestIntakeRead {
+function toRead(row: Row, links: { skuName: string | null; skuCode: string | null; priceAmount: string | null; shelvedSample: { id: string; rack: string; box: string } | null } = { skuName: null, skuCode: null, priceAmount: null, shelvedSample: null }): SampleRequestIntakeRead {
   return {
     id: row.id,
     status: row.status,
@@ -92,22 +93,25 @@ function toRead(row: Row, links: { skuName: string | null; skuCode: string | nul
     handledBy: { id: row.handled_by_user_id, label: row.handled_by_label },
     startedAt: row.started_at,
     resolvedAt: row.resolved_at,
+    shelvedSample: links.shelvedSample,
   };
 }
 
 async function enrichIntakes(db: PrismaClient, rows: readonly Row[]): Promise<SampleRequestIntakeRead[]> {
   const skuIds = [...new Set(rows.flatMap((row) => row.sku_id ? [row.sku_id] : []))];
   const priceIds = [...new Set(rows.flatMap((row) => row.price_material_id ? [row.price_material_id] : []))];
-  const [skus, prices] = await Promise.all([
+  const [skus, prices, samples] = await Promise.all([
     skuIds.length ? db.sku.findMany({ where: { id: { in: skuIds } }, select: { id: true, name: true, code: true } }) : [],
     priceIds.length ? db.priceMaterial.findMany({ where: { id: { in: priceIds } }, select: { id: true, amount: true } }) : [],
+    rows.length ? db.sample.findMany({ where: { source_intake_id: { in: rows.map((row) => row.id) } }, select: { id: true, source_intake_id: true, rack: true, box: true } }) : [],
   ]);
   const skuById = new Map(skus.map((sku) => [sku.id, sku]));
   const priceById = new Map(prices.map((price) => [price.id, price]));
+  const sampleByIntakeId = new Map(samples.flatMap((sample) => sample.source_intake_id ? [[sample.source_intake_id, { id: sample.id, rack: sample.rack, box: sample.box }] as const] : []));
   return rows.map((row) => {
     const sku = row.sku_id ? skuById.get(row.sku_id) : undefined;
     const price = row.price_material_id ? priceById.get(row.price_material_id) : undefined;
-    return toRead(row, { skuName: sku?.name ?? null, skuCode: sku?.code ?? null, priceAmount: price?.amount.toString() ?? null });
+    return toRead(row, { skuName: sku?.name ?? null, skuCode: sku?.code ?? null, priceAmount: price?.amount.toString() ?? null, shelvedSample: sampleByIntakeId.get(row.id) ?? null });
   });
 }
 

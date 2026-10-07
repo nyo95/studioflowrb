@@ -16,6 +16,7 @@ export const MASTERDATA_ROUTES = {
   categories: "/masterdata/categories",
   deletions: "/masterdata/deletions",
   sampleRequests: "/masterdata/sample-requests",
+  samples: "/masterdata/samples",
   workbook: "/masterdata/workbook",
 } as const;
 
@@ -27,5 +28,6 @@ export const MASTERDATA_NAV_LINKS: readonly MasterDataNavLink[] = [
   { href: "/masterdata/vendors", label: "Suppliers" },
   { href: "/masterdata/pricing", label: "Pricing" },
   { href: "/masterdata/sample-requests", label: "Sample requests" },
+  { href: "/masterdata/samples", label: "Samples" },
   { href: "/masterdata/workbook", label: "Import & export" },
 ];

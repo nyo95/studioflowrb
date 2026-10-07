@@ -12,6 +12,7 @@ import { createSkuService } from "./services/sku.service";
 import { createPricingService } from "./services/pricing.service";
 import { createDeletionService } from "./services/deletion.service";
 import { createSampleRequestService } from "./services/sample-request.service";
+import { createSampleService } from "./services/sample.service";
 import { createSkuPriceWorkbookService } from "./services/sku-price-workbook.service";
 import { createPriceDatabaseWorkbookService } from "./services/price-database-workbook.service";
 
@@ -31,6 +32,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
   const pricingService = createPricingService(db, p);
   const deletionService = createDeletionService(db, p);
   const sampleRequestService = createSampleRequestService(db, p);
+  const sampleService = createSampleService(db, p);
   const skuPriceWorkbookService = createSkuPriceWorkbookService(db, p, (tx) => createMasterDataService(tx as PrismaClient, {
     ...p,
     runTransaction: async (work) => work(tx as any),
@@ -139,6 +141,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     ...pricingService,
     ...deletionService,
     ...sampleRequestService,
+    ...sampleService,
     ...skuPriceWorkbookService,
     ...priceDatabaseWorkbookService,
 

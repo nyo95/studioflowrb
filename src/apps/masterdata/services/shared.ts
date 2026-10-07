@@ -85,6 +85,8 @@ export const MASTERDATA_PERMISSIONS = {
   promotionApprove: "masterdata.promotion.approve",
   deletionApprove: "masterdata.deletion.approve",
   sampleRequestManage: "masterdata.sample-request.manage",
+  sampleRead: "masterdata.sample.read",
+  sampleManage: "masterdata.sample.manage",
 } as const;
 
 /** A typed or imported price: a number, a quoted text label (amount 0), or "by request". "Not offered" is not a price. */

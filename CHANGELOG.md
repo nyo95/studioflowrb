@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.386 | 2026-10-07 | feat(masterdata): add physical sample shelf and request shelving
+
+- Adds the Master Data sample shelf: SKU-bound samples have a normalised rack and box, quantity, status, optional holder/project snapshot, out-since fact, soft deletion, and immutable movements for receipt, checkout, return, status change, move, and removal. Archived SKUs are refused for new shelf records while historical records remain readable.
+- Adds `masterdata.sample.read` and `masterdata.sample.manage`, the backend sample commands and safe server-action boundary, a permission-gated Samples navigation entry and minimal listing route.
+- Adds the Master Data-to-StudioFlow shelving coordinator. It takes an unclaimed request when necessary, shelves a single SKU-bound sample, retains the Master Data result if the subsequent trusted StudioFlow receipt command cannot run, and supports retrying that receipt. StudioFlow's public command writes the receiving staff and the shelf note without a cross-app database relation or transaction.
+- Adds shelf context to Sample Request intake reads and applies the additive `20261007093000_masterdata_sample_shelf` migration to the verified rebuild development and disposable test databases only.
+
+**Checks.** `npx tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime`, and `npm test` passed: 878 tests, 0 failed, 0 cancelled, 0 skipped. `npm run build` reached the existing unrelated Turbopack failure for the StudioFlow MOM endpoint (`node:module` external module chunking).
+
 ## R8.385 | 2026-10-07 | docs(plan): WO-MD-SAMPLE-01 physical sample shelf and put-on-shelf from a request (Lead)
 
 - Legacy read-only audit of physical samples (kantor checkout `D:\Misc\ProjectsHUB\studioflow`, `main` at `c4b0c466`, tracked tree clean; committed files only, no legacy database). At that commit only the shelf (`/masterdata/samples`) was live; the request panel, the Library request/inventory tables and the schedule's request read had no screen. KEEP/FIX/MERGE/PURGE table in `PLAN.md`.

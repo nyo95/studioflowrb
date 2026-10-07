@@ -302,6 +302,7 @@ model Sku {
   categories       SkuCategory[]
   material_prices  PriceMaterial[]
   category_origins BrandCategoryOrigin[]
+  samples          Sample[]
 
   @@index([brand_id])
   @@index([base_unit_id])
@@ -458,6 +459,78 @@ enum SampleRequestIntakeStatus {
   @@schema("master_data")
 }
 
+enum SampleStatus {
+  AVAILABLE
+  BORROWED
+  SENT_TO_CLIENT
+  LOST
+  DISCARDED
+
+  @@schema("master_data")
+}
+
+enum SampleMovementKind {
+  IN
+  OUT
+  RETURN
+  STATUS
+  MOVED
+  REMOVED
+
+  @@schema("master_data")
+}
+
+model Sample {
+  id                  String       @id @default(uuid())
+  sku_id              String
+  source_intake_id    String?      @unique
+  rack                String
+  box                 String
+  quantity            Int          @default(1)
+  location_note       String?
+  notes               String?
+  status              SampleStatus @default(AVAILABLE)
+  holder_name         String?
+  holder_project_id   String?
+  holder_project_name String?
+  out_since           DateTime?
+  deleted_at          DateTime?
+  created_at          DateTime     @default(now())
+  updated_at          DateTime     @updatedAt
+
+  sku       Sku                  @relation(fields: [sku_id], references: [id], onDelete: Restrict)
+  intake    SampleRequestIntake? @relation(fields: [source_intake_id], references: [id], onDelete: Restrict)
+  movements SampleMovement[]
+
+  @@index([rack, box])
+  @@index([status])
+  @@index([sku_id])
+  @@index([deleted_at])
+  @@schema("master_data")
+}
+
+model SampleMovement {
+  id                  String             @id @default(uuid())
+  sample_id           String
+  kind                SampleMovementKind
+  status_after        SampleStatus
+  holder_name         String?
+  holder_project_name String?
+  from_rack           String?
+  from_box            String?
+  to_rack             String?
+  to_box              String?
+  note                String?
+  actor_user_id       String
+  actor_label         String
+  created_at          DateTime           @default(now())
+
+  sample Sample @relation(fields: [sample_id], references: [id], onDelete: Restrict)
+
+  @@index([sample_id, created_at])
+  @@schema("master_data")
+}
+
 /// Master Data's own record of working a StudioFlow sample request. StudioFlow only asks; this table is
 /// where staff take it, note the vendor's quote, and finish it as priced or declined. Every source and
 /// reference column is a plain id or a snapshot: there is no foreign key to StudioFlow, and vendor/SKU/price
@@ -491,6 +564,8 @@ model SampleRequestIntake {
   started_at          DateTime                  @default(now())
   resolved_at         DateTime?
   updated_at          DateTime                  @updatedAt
+
+  shelved_sample      Sample?
 
   @@index([status, started_at])
   @@schema("master_data")

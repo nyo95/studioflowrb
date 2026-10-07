@@ -27,12 +27,12 @@ const iconMap: Record<string, typeof LayoutGrid> = {
  * `canUseWorkbook` does the same for Import & export: it shows for anyone who may export (read SKUs and prices) or import (manage them).
  *
  */
-export function MasterDataNav({ canManageSampleRequests = false, canUseWorkbook = false, openSampleRequests = 0 }: { canManageSampleRequests?: boolean; canUseWorkbook?: boolean; openSampleRequests?: number }) {
+export function MasterDataNav({ canManageSampleRequests = false, canReadSamples = false, canUseWorkbook = false, openSampleRequests = 0 }: { canManageSampleRequests?: boolean; canReadSamples?: boolean; canUseWorkbook?: boolean; openSampleRequests?: number }) {
   const pathname = usePathname();
 
   if (!pathname.startsWith("/masterdata")) return null;
 
-  const links = MASTERDATA_NAV_LINKS.filter((link) => (link.href !== "/masterdata/sample-requests" || canManageSampleRequests) && (link.href !== "/masterdata/workbook" || canUseWorkbook));
+  const links = MASTERDATA_NAV_LINKS.filter((link) => (link.href !== "/masterdata/sample-requests" || canManageSampleRequests) && (link.href !== "/masterdata/samples" || canReadSamples) && (link.href !== "/masterdata/workbook" || canUseWorkbook));
 
   return (
     <NavGroup label="Master Data navigation" heading="Master Data">
