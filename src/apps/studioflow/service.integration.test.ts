@@ -23,6 +23,7 @@ import { readBlockerCounts, readBlockerCountsBatch } from "./phases/blocker-quer
 import { fullBlockers } from "./domain/blockers";
 import { createAssetRetentionService } from "./projects/asset-retention";
 import { createStudioFlowSampleRequestRead } from "./public/sample-request-read";
+import { createStudioFlowSampleRequestCommand } from "./public/sample-request-command";
 import { runSerializableTransaction } from "@platform/core/db/transactions";
 import type { StudioFlowPorts } from "./shared";
 
@@ -2461,6 +2462,87 @@ describe("Sample-request read contract (StudioFlow public)", () => {
     assert.ok(byId.get(received.requestId)?.receivedAt instanceof Date);
     assert.equal(byId.get(archived.requestId)?.project.archived, true);
     assert.deepEqual(await read.getSampleRequests([]), []);
+  });
+});
+
+describe("Sample receipt from the Master Data shelf (StudioFlow public command)", () => {
+  function commandWith() {
+    const db = testDb.prisma;
+    return createStudioFlowSampleRequestCommand(db, {
+      runTransaction: <T>(work: (tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]) => Promise<T>) => db.$transaction((tx) => work(tx)),
+      auditWriter: createAuditEventWriter(),
+      people: createPeopleDirectory(db),
+      storage,
+      masterData: createMasterDataPublicRead(db),
+      now: () => clock,
+    });
+  }
+  async function pendingRequest(name: string) {
+    const { projectId } = await newProject(name);
+    const { entryId } = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: `Shelf paint ${name}` } });
+    const entry = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entryId)!;
+    const { requestId } = await sf.schedule.requestSample({ ...as(designer), projectId, optionId: entry.options[0].id, requestedFrom: "Toko Cat" });
+    return { projectId, requestId, optionId: entry.options[0].id, entryId };
+  }
+
+  it("marks a requested sample received with the shelf note, the staff member and the app clock, and audits it as coming from Master Data", async () => {
+    const staff = await seedUser("Sari Shelf", []);
+    const { projectId, requestId, optionId, entryId } = await pendingRequest("Receipt A");
+    clock = new Date("2026-09-20T08:30:00Z");
+    assert.deepEqual(await commandWith().markSampleReceivedFromShelf({ actor: staff.actor, requestId, rack: "A1", box: "B2" }), { updated: true });
+    const row = await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: requestId } });
+    assert.deepEqual([row.status, row.received_by_id, row.received_by_name, row.received_note, row.received_at?.toISOString()], ["RECEIVED", staff.id, "Sari Shelf", "On the shelf: A1 / B2 (Master Data)", "2026-09-20T08:30:00.000Z"]);
+    const events = await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.schedule.sample-received", entity_id: optionId } });
+    assert.equal(events.length, 1);
+    assert.equal(events[0].actor_user_id, staff.id);
+    assert.deepEqual(events[0].metadata, { via: "masterdata", projectId, entryId, label: "A" });
+    const option = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((e) => e.id === entryId)!.options[0];
+    assert.equal(option.sampleRequest?.status, "RECEIVED", "the designer's Schedule shows Sample received");
+    assert.equal(option.sampleRequest?.receivedNote, "On the shelf: A1 / B2 (Master Data)");
+  });
+
+  it("writes nothing when the request is already received (and a repeat is harmless)", async () => {
+    const staff = await seedUser("Sari Shelf", []);
+    const { requestId, optionId } = await pendingRequest("Receipt B");
+    await sf.schedule.receiveSample({ ...as(designer), projectId: (await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: requestId }, include: { option: { include: { entry: true } } } })).option.entry.project_id, requestId, note: "Designer got it" });
+    const before = await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: requestId } });
+    assert.deepEqual(await commandWith().markSampleReceivedFromShelf({ actor: staff.actor, requestId, rack: "A1", box: "B2" }), { updated: false, reason: "ALREADY_RECEIVED" });
+    assert.deepEqual(await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: requestId } }), before);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.schedule.sample-received", entity_id: optionId, metadata: { path: ["via"], equals: "masterdata" } } }), 0);
+
+    const second = await pendingRequest("Receipt B2");
+    const command = commandWith();
+    assert.equal((await command.markSampleReceivedFromShelf({ actor: staff.actor, requestId: second.requestId, rack: "A1", box: "B2" })).updated, true);
+    assert.deepEqual(await command.markSampleReceivedFromShelf({ actor: staff.actor, requestId: second.requestId, rack: "X", box: "Y" }), { updated: false, reason: "ALREADY_RECEIVED" });
+    assert.equal((await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: second.requestId } })).received_note, "On the shelf: A1 / B2 (Master Data)", "the first receipt is not rewritten");
+  });
+
+  it("writes nothing for a cancelled (deleted) request", async () => {
+    const staff = await seedUser("Sari Shelf", []);
+    const { projectId, requestId } = await pendingRequest("Receipt C");
+    await sf.schedule.cancelSample({ ...as(designer), projectId, requestId });
+    assert.deepEqual(await commandWith().markSampleReceivedFromShelf({ actor: staff.actor, requestId, rack: "A1", box: "B2" }), { updated: false, reason: "REQUEST_MISSING" });
+    assert.deepEqual(await commandWith().markSampleReceivedFromShelf({ actor: staff.actor, requestId: randomUUID(), rack: "A1", box: "B2" }), { updated: false, reason: "REQUEST_MISSING" });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.schedule.sample-received", metadata: { path: ["via"], equals: "masterdata" } } }), 0);
+  });
+
+  it("writes nothing for a request in an archived project", async () => {
+    const staff = await seedUser("Sari Shelf", []);
+    const { projectId, requestId } = await pendingRequest("Receipt D");
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date("2026-09-01T00:00:00Z") } });
+    assert.deepEqual(await commandWith().markSampleReceivedFromShelf({ actor: staff.actor, requestId, rack: "A1", box: "B2" }), { updated: false, reason: "PROJECT_ARCHIVED" });
+    const row = await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: requestId } });
+    assert.deepEqual([row.status, row.received_note, row.received_at], ["REQUESTED", null, null]);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.schedule.sample-received", metadata: { path: ["via"], equals: "masterdata" } } }), 0);
+  });
+
+  it("lists live projects by name for the holder picker, and leaves archived ones out", async () => {
+    const { projectId: bravo } = await newProject("Bravo Project");
+    const { projectId: alpha } = await newProject("Alpha Project");
+    const { projectId: gone } = await newProject("Archived Project");
+    await testDb.prisma.sfProject.update({ where: { id: gone }, data: { archived_at: new Date("2026-09-01T00:00:00Z") } });
+    const choices = await commandWith().listProjectChoices();
+    assert.deepEqual(choices, [{ id: alpha, name: "Alpha Project" }, { id: bravo, name: "Bravo Project" }]);
   });
 });
 

@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.388 | 2026-10-07 | fix(masterdata): correct R8.386 sample shelf (build, tests, notification, project snapshot, mapped read)
+
+- **Build fixed.** The StudioFlow receipt command is no longer exported from `@/apps/studioflow/public` (client components import that barrel, which dragged the generated Prisma client into a browser chunk and broke `npm run build`); the runtime imports the file directly. The R8.386 changelog line calling the build failure "pre-existing unrelated" was wrong: R8.386 caused it. R8.382–R8.384 build cleanly.
+- **Requester notified on shelving** (decision 11): new optional `sampleRequestNotifier.shelved` port, implemented by the Master Data notifier ("Your sample is on the shelf", product, project, rack and box, link to the project's Schedule) and called inside the shelving transaction, so a failed notice rolls the shelving back.
+- **Holder project no longer trusted from the browser** (decision 3): new coordinator command `setSampleStatus` resolves the project id through StudioFlow's `listProjectChoices` (unknown or archived → `SAMPLE_PROJECT_NOT_FOUND`) and passes the resolved name to Master Data; the Samples server action no longer accepts a project name.
+- **Mapped read:** `listSamples` returns `SampleRead` (rack, box, quantity, notes, status, holder, project, out-since, SKU id/code/name, brand name, `skuArchived`), exported as a public type; search now also matches brand, holder and project name. The minimal Samples page reads the new shape.
+- **Small fixes:** the StudioFlow receipt command uses `nowOf(ports)`; the coordinator's shelf dependencies are required, not optional-with-runtime-throw. Found while testing: `setSampleStatus` silently dropped a project sent with a non-held status instead of refusing it (`SAMPLE_PROJECT_STATUS_INVALID`, Acceptance Criterion 2); now refused.
+- **Tests added (26):** Master Data integration suite for criteria 1–8 (create/limits/normalising, MOVED and no-op, holder/project rules and out-since, exact movement kinds, delete refusal and history, archived SKU, mapped read and search, summary, permissions, shelving states, notification and rollback); StudioFlow public-command suite (RECEIVED with note, actor, app clock and `metadata.via`; the three no-write outcomes; project choices); coordinator unit tests for permissions, take-then-shelve order, declined and double shelving, StudioFlow failure plus retry, and the project snapshot.
+
+**Checks.** `npx tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm run build` (passes), and `npm test` passed: 904 tests, 0 failed, 0 cancelled, 0 skipped (878 before). Database targets verified as the rebuild-only test database (`studioflow_rebuild_test`, localhost:5433) before the tests ran; no schema change, so no migration. No browser checks run (none required by this pass).
+
 ## R8.387 | 2026-10-07 | docs(plan): review of R8.386 (WO-MD-SAMPLE-01) - CORRECTION REQUIRED (Lead)
 
 - **Verdict: CORRECTION REQUIRED** for `187102b`. Schema, permission registration, shelf rules and the StudioFlow receipt command match the plan.

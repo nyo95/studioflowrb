@@ -9,6 +9,7 @@ import {
 } from "@/apps/masterdata/public";
 import type { SampleRequestRead } from "@/apps/studioflow/public";
 
+type SampleStatus = "AVAILABLE" | "BORROWED" | "SENT_TO_CLIENT" | "LOST" | "DISCARDED";
 type Actor = { kind: "USER"; userId: string; label: string };
 
 type SampleRequestCoordinatorDependencies = {
@@ -16,8 +17,8 @@ type SampleRequestCoordinatorDependencies = {
   studioFlow: {
     listPendingSampleRequests(input?: { limit?: number }): Promise<SampleRequestRead[]>;
     getSampleRequests(ids: readonly string[]): Promise<SampleRequestRead[]>;
-    markSampleReceivedFromShelf?(input: { actor: Actor; requestId: string; rack: string; box: string }): Promise<{ updated: boolean; reason?: string }>;
-    listProjectChoices?(): Promise<Array<{ id: string; name: string }>>;
+    markSampleReceivedFromShelf(input: { actor: Actor; requestId: string; rack: string; box: string }): Promise<{ updated: boolean; reason?: string }>;
+    listProjectChoices(): Promise<Array<{ id: string; name: string }>>;
   };
   /** Master Data's own commands for working a request. */
   masterData: {
@@ -27,7 +28,8 @@ type SampleRequestCoordinatorDependencies = {
     syncSampleQuoteToPrice(input: { grants: PermissionGrants; actor: Actor; intakeId: string }): Promise<SampleRequestIntakeRead>;
     declineSampleRequest(input: { grants: PermissionGrants; actor: Actor; intakeId: string; reason: string }): Promise<SampleRequestIntakeRead>;
     listSampleRequestIntakes(input: { grants: PermissionGrants; status?: SampleRequestIntakeStatus; sourceRequestIds?: readonly string[]; limit?: number }): Promise<SampleRequestIntakeRead[]>;
-    shelveSampleFromIntake?(input: { grants: PermissionGrants; actor: Actor; intakeId: string; skuId: string; rack: string; box: string; quantity?: number; locationNote?: string | null }): Promise<{ id: string; rack: string; box: string }>;
+    shelveSampleFromIntake(input: { grants: PermissionGrants; actor: Actor; intakeId: string; skuId: string; rack: string; box: string; quantity?: number; locationNote?: string | null }): Promise<{ id: string; rack: string; box: string }>;
+    setSampleStatus(input: { grants: PermissionGrants; actor: Actor; sampleId: string; status: SampleStatus; holderName?: string | null; holderProjectId?: string | null; holderProjectName?: string | null; note?: string | null }): Promise<unknown>;
   };
 };
 
@@ -163,7 +165,6 @@ export function createSampleRequestCoordinator(deps: SampleRequestCoordinatorDep
     },
     async shelve(input: { grants: PermissionGrants; actor: Actor; sourceRequestId: string; skuId: string; rack: string; box: string; quantity?: number; locationNote?: string | null }) {
       authorizeShelf(input.grants);
-      if (!deps.masterData.shelveSampleFromIntake || !deps.studioFlow.markSampleReceivedFromShelf) throw new AppError("INTERNAL", "SAMPLE_SHELF_UNAVAILABLE", "Sample shelf is unavailable.");
       let intake = (await deps.masterData.listSampleRequestIntakes({ grants: input.grants, sourceRequestIds: [input.sourceRequestId] }))[0];
       if (!intake) intake = await this.take({ grants: input.grants, actor: input.actor, sourceRequestId: input.sourceRequestId });
       if (intake.status === "DECLINED") throw new AppError("CONFLICT", "SAMPLE_INTAKE_DECLINED", "A declined request cannot be put on the shelf.");
@@ -173,9 +174,23 @@ export function createSampleRequestCoordinator(deps: SampleRequestCoordinatorDep
     async retryStudioFlowReceived(input: { grants: PermissionGrants; actor: Actor; sourceRequestId: string }) {
       authorizeShelf(input.grants); const intake = (await deps.masterData.listSampleRequestIntakes({ grants: input.grants, sourceRequestIds: [input.sourceRequestId] }))[0];
       if (!intake?.shelvedSample) throw new AppError("CONFLICT", "SAMPLE_NOT_SHELVED", "This request has no shelved sample.");
-      if (!deps.studioFlow.markSampleReceivedFromShelf) throw new AppError("INTERNAL", "SAMPLE_SHELF_UNAVAILABLE", "Sample shelf is unavailable."); return deps.studioFlow.markSampleReceivedFromShelf({ actor: input.actor, requestId: input.sourceRequestId, rack: intake.shelvedSample.rack, box: intake.shelvedSample.box });
+      return deps.studioFlow.markSampleReceivedFromShelf({ actor: input.actor, requestId: input.sourceRequestId, rack: intake.shelvedSample.rack, box: intake.shelvedSample.box });
     },
-    async listProjectChoices(input: { grants: PermissionGrants }) { requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleManage); if (!deps.studioFlow.listProjectChoices) throw new AppError("INTERNAL", "SAMPLE_SHELF_UNAVAILABLE", "Sample shelf is unavailable."); return deps.studioFlow.listProjectChoices(); },
+    async listProjectChoices(input: { grants: PermissionGrants }) { requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleManage); return deps.studioFlow.listProjectChoices(); },
+    /**
+     * Status change that may name the StudioFlow project the sample went out for. The browser sends only the project id;
+     * the name Master Data keeps as a snapshot is resolved here from StudioFlow's non-archived projects.
+     */
+    async setSampleStatus(input: { grants: PermissionGrants; actor: Actor; sampleId: string; status: SampleStatus; holderName?: string | null; holderProjectId?: string | null; note?: string | null }) {
+      requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleManage);
+      const { holderProjectId, ...rest } = input;
+      let project: { id: string; name: string } | null = null;
+      if (holderProjectId) {
+        project = (await deps.studioFlow.listProjectChoices()).find((choice) => choice.id === holderProjectId) ?? null;
+        if (!project) throw new AppError("NOT_FOUND", "SAMPLE_PROJECT_NOT_FOUND", "That project was not found or is archived.");
+      }
+      return deps.masterData.setSampleStatus({ ...rest, holderProjectId: project?.id ?? null, holderProjectName: project?.name ?? null });
+    },
   };
 }
 

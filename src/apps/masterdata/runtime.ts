@@ -18,6 +18,7 @@ export const masterDataPublicCommands = {
   declineSampleRequest: masterDataService.declineSampleRequest,
   listSampleRequestIntakes: masterDataService.listSampleRequestIntakes,
   shelveSampleFromIntake: masterDataService.shelveSampleFromIntake,
+  setSampleStatus: masterDataService.setSampleStatus,
   listPromotionReferences: masterDataService.listPromotionReferences,
   validatePromotionReference: masterDataService.validatePromotionReference,
 };

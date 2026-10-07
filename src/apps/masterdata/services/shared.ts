@@ -312,10 +312,17 @@ export type SampleRequestResolution = {
   };
 };
 
+/** Told when a requested sample is put on the shelf, inside the same transaction, so the requester can be informed. Optional. */
+export type SampleShelvedEvent = {
+  intake: { id: string; requesterUserId: string; sourceProjectId: string; sourceProjectName: string; productName: string };
+  rack: string;
+  box: string;
+};
+
 export type MasterDataServicePorts = {
   runTransaction: <T>(work: (tx: TxClient) => Promise<T>) => Promise<T>;
   auditWriter: AuditWriter;
-  sampleRequestNotifier?: { resolved(tx: TxClient, resolution: SampleRequestResolution): Promise<void> };
+  sampleRequestNotifier?: { resolved(tx: TxClient, resolution: SampleRequestResolution): Promise<void>; shelved?(tx: TxClient, event: SampleShelvedEvent): Promise<void> };
 };
 
 export async function writeAudit(ports: MasterDataServicePorts, tx: TxClient, input: { action: string; entityType: string; entityId: string; actor: AuditActor; changes?: Record<string, { from: unknown; to: unknown }>; metadata?: Record<string, unknown> }): Promise<void> {

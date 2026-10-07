@@ -2219,3 +2219,233 @@ describe("Text price labels (WO-MD-PRICE-LABEL-01)", () => {
     assert.deepEqual(works.map((row) => [row.name, row.amount, row.amountLabel]).sort(), [["Public Labor", "0", "ask Budi"], ["Public Plain", "5000", null]]);
   });
 });
+
+describe("Physical sample shelf (WO-MD-SAMPLE-01)", () => {
+  const SAMPLE_ACTOR = { kind: "USER" as const, userId: "shelf-staff-1", label: "Sari Shelf" };
+  const READ_ONLY = [MASTERDATA_PERMISSIONS.sampleRead];
+  const code = (expected: string) => (error: unknown) => error instanceof AppError && error.code === expected;
+  const notifying = () => createMasterDataService(testDb.prisma, {
+    runTransaction: (work) => testDb.prisma.$transaction(work),
+    auditWriter: createAuditEventWriter(),
+    sampleRequestNotifier: createSampleRequestResolvedNotifier({ writer: createNotificationWriter() }),
+  });
+  const snapshot = (id: string) => ({
+    sourceRequestId: id, sourceProjectId: "project-9", sourceProjectName: "2026-506 Sociolla", sourceOptionId: "option-1", productName: "Oak Panel",
+    brandName: null, color: null, pattern: null, finishing: null, dimension: null, requestedFrom: "Toko Kayu", requestNote: null,
+    requesterUserId: "designer-1", requesterLabel: "Dina Designer", requestedAt: new Date("2026-09-20T03:00:00Z"),
+  });
+  let shared: Awaited<ReturnType<typeof createMaterialContext>> | null = null;
+  beforeEach(() => { shared = null; });
+  async function makeSku(name: string, withBrand = true) {
+    const context = (shared ??= await createMaterialContext());
+    const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name, brandId: withBrand ? context.brandId : null, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "120", currency: "IDR" }] });
+    return skuId;
+  }
+  const movements = (sampleId: string) => testDb.prisma.sampleMovement.findMany({ where: { sample_id: sampleId }, orderBy: [{ created_at: "asc" }, { id: "asc" }] });
+
+  it("creates a sample with a normalised rack and box, validates limits, and writes the IN movement", async () => {
+    const skuId = await makeSku("Shelf Oak");
+    const sample = await service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "  a  1 ", box: "b-2", quantity: 3, locationNote: " top shelf ", notes: "swatch" });
+    assert.deepEqual([sample.rack, sample.box, sample.quantity, sample.location_note, sample.status], ["A 1", "B-2", 3, "top shelf", "AVAILABLE"]);
+    const [first, ...rest] = await movements(sample.id);
+    assert.equal(rest.length, 0);
+    assert.deepEqual([first.kind, first.status_after, first.to_rack, first.to_box, first.actor_user_id, first.actor_label], ["IN", "AVAILABLE", "A 1", "B-2", "shelf-staff-1", "Sari Shelf"]);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "masterdata.sample.created", entity_id: sample.id } }), 1);
+    for (const bad of [{ rack: "" }, { rack: "x".repeat(41) }, { box: "  " }, { box: "y".repeat(41) }]) {
+      await assert.rejects(service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "R", box: "B", ...bad }), (error: unknown) => error instanceof AppError && error.code.startsWith("SAMPLE_"));
+    }
+    for (const quantity of [0, 1000, 1.5]) await assert.rejects(service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "R", box: "B", quantity }), code("SAMPLE_QUANTITY_INVALID"));
+    await assert.rejects(service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "R", box: "B", locationNote: "n".repeat(201) }), code("SAMPLE_LOCATION_NOTE_INVALID"));
+    await assert.rejects(service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "R", box: "B", notes: "n".repeat(1001) }), code("SAMPLE_NOTES_INVALID"));
+    await assert.rejects(service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId: crypto.randomUUID(), rack: "R", box: "B" }), code("SAMPLE_SKU_NOT_FOUND"));
+    assert.equal(await testDb.prisma.sample.count(), 1, "refused creations leave nothing behind");
+  });
+
+  it("writes MOVED with from and to only when the rack or box changes, and nothing for a no-op", async () => {
+    const skuId = await makeSku("Move Oak");
+    const sample = await service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "A1", box: "B1" });
+    const same = await service.updateSampleLocation({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id, rack: " a1", box: "b1", quantity: 1 });
+    assert.equal(same.id, sample.id);
+    assert.equal((await movements(sample.id)).length, 1, "same values write no movement");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "masterdata.sample.location-updated" } }), 0, "and no audit");
+    await service.updateSampleLocation({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id, rack: "a1", box: "b1", quantity: 5, notes: "more pieces" });
+    assert.equal((await movements(sample.id)).length, 1, "a quantity or notes change is not a move");
+    await service.updateSampleLocation({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id, rack: "c3", box: "d4", quantity: 5, notes: "more pieces" });
+    const last = (await movements(sample.id)).at(-1)!;
+    assert.deepEqual([last.kind, last.from_rack, last.from_box, last.to_rack, last.to_box], ["MOVED", "A1", "B1", "C3", "D4"]);
+    await assert.rejects(service.updateSampleLocation({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: crypto.randomUUID(), rack: "A", box: "B", quantity: 1 }), code("SAMPLE_NOT_FOUND"));
+  });
+
+  it("applies the holder and project rules, out-since and the exact movement kinds", async () => {
+    const skuId = await makeSku("Status Oak");
+    const sample = await service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "A", box: "1" });
+    const set = (input: Record<string, unknown>) => service.setSampleStatus({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id, ...input } as never);
+    await assert.rejects(set({ status: "BORROWED" }), code("SAMPLE_HOLDER_REQUIRED"));
+    await assert.rejects(set({ status: "SENT_TO_CLIENT", holderName: "   " }), code("SAMPLE_HOLDER_REQUIRED"));
+    await assert.rejects(set({ status: "AVAILABLE", holderProjectId: "p1", holderProjectName: "P" }), code("SAMPLE_PROJECT_STATUS_INVALID"));
+    await assert.rejects(set({ status: "LOST", holderProjectId: "p1", holderProjectName: "P" }), code("SAMPLE_PROJECT_STATUS_INVALID"));
+    await assert.rejects(set({ status: "BORROWED", holderName: "Dina", holderProjectId: "p1" }), code("SAMPLE_PROJECT_INVALID"));
+    assert.equal((await movements(sample.id)).length, 1, "refusals write nothing");
+
+    const lent = await set({ status: "BORROWED", holderName: " Dina  Designer ", holderProjectId: "p1", holderProjectName: "2026-506 Sociolla" });
+    assert.deepEqual([lent.holder_name, lent.holder_project_id, lent.holder_project_name], ["Dina Designer", "p1", "2026-506 Sociolla"]);
+    assert.ok(lent.out_since);
+    const outSince = lent.out_since!.getTime();
+
+    const same = await set({ status: "BORROWED", holderName: "Dina Designer", holderProjectId: "p1", holderProjectName: "2026-506 Sociolla" });
+    assert.equal(same.out_since!.getTime(), outSince);
+    assert.equal((await movements(sample.id)).length, 2, "an identical status change writes nothing");
+
+    const sent = await set({ status: "SENT_TO_CLIENT", holderName: "Pak Budi" });
+    assert.equal(sent.out_since!.getTime(), outSince, "moving between held statuses keeps out-since");
+    assert.deepEqual([sent.holder_project_id, sent.holder_project_name], [null, null], "the project is cleared when it is not named again");
+    const handover = await set({ status: "SENT_TO_CLIENT", holderName: "Bu Rina" });
+    assert.equal(handover.out_since!.getTime(), outSince, "a holder change keeps out-since");
+
+    const back = await set({ status: "AVAILABLE" });
+    assert.deepEqual([back.holder_name, back.out_since], [null, null]);
+    const lost = await set({ status: "LOST" });
+    assert.deepEqual([lost.holder_name, lost.holder_project_name, lost.out_since], [null, null, null]);
+    await set({ status: "AVAILABLE" });
+    await set({ status: "DISCARDED", note: "broken" });
+    const kinds = (await movements(sample.id)).map((m) => [m.kind, m.status_after]);
+    assert.deepEqual(kinds, [["IN", "AVAILABLE"], ["OUT", "BORROWED"], ["OUT", "SENT_TO_CLIENT"], ["OUT", "SENT_TO_CLIENT"], ["RETURN", "AVAILABLE"], ["STATUS", "LOST"], ["STATUS", "AVAILABLE"], ["STATUS", "DISCARDED"]]);
+    const outRows = (await movements(sample.id)).filter((m) => m.kind === "OUT");
+    assert.deepEqual([outRows[0].holder_name, outRows[0].holder_project_name], ["Dina Designer", "2026-506 Sociolla"], "movements keep holder and project snapshots");
+    assert.equal((await movements(sample.id)).at(-1)!.note, "broken");
+  });
+
+  it("refuses to delete a sample that is out; a deleted one leaves lists and counts but keeps its history", async () => {
+    const skuId = await makeSku("Delete Oak");
+    const sample = await service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "A", box: "1" });
+    await service.setSampleStatus({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id, status: "BORROWED", holderName: "Dina" });
+    await assert.rejects(service.deleteSample({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id }), code("SAMPLE_OUT"));
+    await service.setSampleStatus({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id, status: "AVAILABLE" });
+    assert.equal((await service.getSampleSummary({ grants: GRANTS })).total, 1);
+    await service.deleteSample({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id });
+    assert.deepEqual(await service.listSamples({ grants: GRANTS }), []);
+    assert.deepEqual(await service.getSampleSummary({ grants: GRANTS }), { total: 0, available: 0, borrowed: 0, sentToClient: 0, offShelf: 0, racks: 0 });
+    assert.deepEqual(await service.listSampleRacks({ grants: GRANTS }), []);
+    const history = await service.getSampleHistory({ grants: GRANTS, sampleId: sample.id });
+    assert.deepEqual(history.map((m) => m.kind), ["REMOVED", "RETURN", "OUT", "IN"], "newest first");
+    assert.equal(history[0].actor_user_id, "shelf-staff-1", "the delete is logged under the real actor");
+    await assert.rejects(service.deleteSample({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id }), code("SAMPLE_NOT_FOUND"));
+    await assert.rejects(service.setSampleStatus({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: sample.id, status: "LOST" }), code("SAMPLE_NOT_FOUND"));
+  });
+
+  it("refuses an archived SKU for create and shelving, but still lists existing samples with the archived flag", async () => {
+    const skuId = await makeSku("Archive Oak");
+    await service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "A", box: "1" });
+    const intake = await service.startSampleRequestIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, snapshot: snapshot("archived-sku") });
+    await service.archiveSku({ grants: GRANTS, actor: ACTOR, skuId });
+    await assert.rejects(service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "A", box: "2" }), code("SAMPLE_SKU_NOT_FOUND"));
+    await assert.rejects(service.shelveSampleFromIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, intakeId: intake.id, skuId, rack: "A", box: "2" }), code("SAMPLE_SKU_NOT_FOUND"));
+    const [row] = await service.listSamples({ grants: GRANTS });
+    assert.equal(row.skuId, skuId);
+    assert.equal(row.skuArchived, true);
+    assert.equal(await testDb.prisma.sample.count({ where: { source_intake_id: intake.id } }), 0);
+  });
+
+  it("returns a mapped read and searches rack, box, SKU, brand, holder and project", async () => {
+    const oak = await makeSku("Oak Plank");
+    const bare = await makeSku("Bare Tile", false);
+    const a = await service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId: oak, rack: "B", box: "2", quantity: 2, locationNote: "left", notes: "n1" });
+    await service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId: bare, rack: "A", box: "9" });
+    await service.setSampleStatus({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: a.id, status: "BORROWED", holderName: "Dina Designer", holderProjectId: "p1", holderProjectName: "Sociolla Flagship" });
+    const all = await service.listSamples({ grants: READ_ONLY });
+    assert.deepEqual(all.map((row) => [row.rack, row.box]), [["A", "9"], ["B", "2"]], "ordered by rack, box");
+    const row = all[1];
+    assert.deepEqual(Object.keys(row).sort(), ["box", "brandName", "createdAt", "holderName", "holderProjectId", "holderProjectName", "id", "locationNote", "notes", "outSince", "quantity", "rack", "skuArchived", "skuCode", "skuId", "skuName", "sourceIntakeId", "status", "updatedAt"]);
+    assert.deepEqual([row.skuId, row.skuName, row.brandName, row.skuArchived, row.status, row.holderName, row.holderProjectName, row.quantity, row.locationNote, row.notes], [oak, "Oak Plank", "Panel Brand", false, "BORROWED", "Dina Designer", "Sociolla Flagship", 2, "left", "n1"]);
+    assert.equal(all[0].brandName, null);
+    const names = async (search: string) => (await service.listSamples({ grants: READ_ONLY, search })).map((r) => r.skuName);
+    assert.deepEqual(await names("panel brand"), ["Oak Plank"], "brand");
+    assert.deepEqual(await names("designer"), ["Oak Plank"], "holder");
+    assert.deepEqual(await names("flagship"), ["Oak Plank"], "project");
+    assert.deepEqual(await names("bare"), ["Bare Tile"], "SKU name");
+    assert.deepEqual(await names("9"), ["Bare Tile"], "box");
+    assert.deepEqual((await service.listSamples({ grants: READ_ONLY, status: "BORROWED" })).map((r) => r.skuName), ["Oak Plank"]);
+    assert.deepEqual((await service.listSamples({ grants: READ_ONLY, rack: " a " })).map((r) => r.skuName), ["Bare Tile"]);
+  });
+
+  it("counts each status separately, with lost and discarded together as off-shelf, and counts racks", async () => {
+    const skuId = await makeSku("Count Oak");
+    const make = (rack: string) => service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack, box: "1" });
+    const [s1, s2, s3, s4, s5] = [await make("A"), await make("A"), await make("B"), await make("C"), await make("C")];
+    await service.setSampleStatus({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: s2.id, status: "BORROWED", holderName: "x" });
+    await service.setSampleStatus({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: s3.id, status: "SENT_TO_CLIENT", holderName: "y" });
+    await service.setSampleStatus({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: s4.id, status: "LOST" });
+    await service.setSampleStatus({ grants: GRANTS, actor: SAMPLE_ACTOR, sampleId: s5.id, status: "DISCARDED" });
+    assert.ok(s1);
+    assert.deepEqual(await service.getSampleSummary({ grants: READ_ONLY }), { total: 5, available: 1, borrowed: 1, sentToClient: 1, offShelf: 2, racks: 3 });
+    assert.deepEqual(await service.listSampleRacks({ grants: READ_ONLY }), ["A", "B", "C"]);
+  });
+
+  it("enforces the read and manage permissions", async () => {
+    const skuId = await makeSku("Perm Oak");
+    const sample = await service.createSample({ grants: GRANTS, actor: SAMPLE_ACTOR, skuId, rack: "A", box: "1" });
+    const denied = (error: unknown) => error instanceof AppError && error.code === "PERMISSION_DENIED";
+    const none: string[] = [MASTERDATA_PERMISSIONS.sampleRequestManage];
+    await assert.rejects(service.createSample({ grants: READ_ONLY, actor: SAMPLE_ACTOR, skuId, rack: "A", box: "2" }), denied);
+    await assert.rejects(service.updateSampleLocation({ grants: READ_ONLY, actor: SAMPLE_ACTOR, sampleId: sample.id, rack: "B", box: "1", quantity: 1 }), denied);
+    await assert.rejects(service.setSampleStatus({ grants: READ_ONLY, actor: SAMPLE_ACTOR, sampleId: sample.id, status: "LOST" }), denied);
+    await assert.rejects(service.deleteSample({ grants: READ_ONLY, actor: SAMPLE_ACTOR, sampleId: sample.id }), denied);
+    await assert.rejects(service.shelveSampleFromIntake({ grants: READ_ONLY, actor: SAMPLE_ACTOR, intakeId: "x", skuId, rack: "A", box: "1" }), denied);
+    await assert.rejects(service.listSamples({ grants: none }), denied);
+    await assert.rejects(service.getSampleSummary({ grants: none }), denied);
+    await assert.rejects(service.listSampleRacks({ grants: none }), denied);
+    await assert.rejects(service.getSampleHistory({ grants: none, sampleId: sample.id }), denied);
+    await assert.rejects(service.listSamples({ grants: [MASTERDATA_PERMISSIONS.sampleManage] }), denied, "manage alone does not read");
+    assert.equal((await service.listSamples({ grants: READ_ONLY })).length, 1);
+    assert.equal((await movements(sample.id)).length, 1, "refused calls wrote nothing");
+  });
+
+  it("shelves a request from any open state, fills an empty SKU, keeps the intake status and refuses a second shelving", async () => {
+    const skuId = await makeSku("Shelved Oak");
+    for (const state of ["IN_PROGRESS", "PRICED"] as const) {
+      const intake = await service.startSampleRequestIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, snapshot: snapshot(`req-${state}`) });
+      if (state === "PRICED") await service.markSampleRequestPriced({ grants: GRANTS, actor: SAMPLE_ACTOR, intakeId: intake.id, quotedAmount: "100", quotedCurrency: "IDR" });
+      const sample = await service.shelveSampleFromIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, intakeId: intake.id, skuId, rack: " x1 ", box: "y1", quantity: 2, locationNote: "front" });
+      assert.deepEqual([sample.rack, sample.box, sample.quantity, sample.source_intake_id, sample.sku_id], ["X1", "Y1", 2, intake.id, skuId]);
+      const row = await testDb.prisma.sampleRequestIntake.findUniqueOrThrow({ where: { id: intake.id } });
+      assert.equal(row.status, state, "shelving never changes the intake status");
+      assert.equal(row.sku_id, skuId, "an empty intake SKU is filled");
+      assert.deepEqual((await movements(sample.id)).map((m) => [m.kind, m.to_rack, m.to_box]), [["IN", "X1", "Y1"]]);
+      assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "masterdata.sample.shelved", entity_id: sample.id } }), 1);
+      await assert.rejects(service.shelveSampleFromIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, intakeId: intake.id, skuId, rack: "X2", box: "Y2" }), code("SAMPLE_ALREADY_SHELVED"));
+      assert.equal(await testDb.prisma.sample.count({ where: { source_intake_id: intake.id } }), 1);
+      const [read] = await service.listSampleRequestIntakes({ grants: GRANTS, sourceRequestIds: [`req-${state}`] });
+      assert.deepEqual(read.shelvedSample, { id: sample.id, rack: "X1", box: "Y1" }, "the intake read exposes the shelved sample");
+    }
+    const other = await makeSku("Other Oak");
+    const second = await service.startSampleRequestIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, snapshot: snapshot("req-linked") });
+    await service.recordSampleQuote({ grants: GRANTS, actor: SAMPLE_ACTOR, intakeId: second.id, skuId });
+    await service.shelveSampleFromIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, intakeId: second.id, skuId: other, rack: "Z", box: "1" });
+    assert.equal((await testDb.prisma.sampleRequestIntake.findUniqueOrThrow({ where: { id: second.id } })).sku_id, skuId, "an already linked SKU is kept");
+    await assert.rejects(service.shelveSampleFromIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, intakeId: crypto.randomUUID(), skuId, rack: "Z", box: "1" }), code("SAMPLE_INTAKE_NOT_FOUND"));
+    const none = (await service.listSampleRequestIntakes({ grants: GRANTS, sourceRequestIds: ["req-none"] }));
+    assert.deepEqual(none, []);
+  });
+
+  it("notifies the requester when their sample is shelved, and rolls the shelving back if the notice fails", async () => {
+    const skuId = await makeSku("Notify Oak");
+    const service2 = notifying();
+    const intake = await service2.startSampleRequestIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, snapshot: snapshot("req-notify") });
+    assert.equal(await testDb.prisma.notification.count(), 0);
+    const sample = await service2.shelveSampleFromIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, intakeId: intake.id, skuId, rack: "r1", box: "b1" });
+    const [note, ...rest] = await testDb.prisma.notification.findMany();
+    assert.equal(rest.length, 0);
+    assert.deepEqual([note.recipient_user_id, note.kind, note.app_id, note.href, note.entity_type, note.entity_id], ["designer-1", "masterdata.sample-request.shelved", "masterdata", "/studioflow/projects/project-9/schedule", "sample_request_intake", intake.id]);
+    assert.ok(note.body?.includes("Oak Panel") && note.body.includes("2026-506 Sociolla") && note.body.includes("R1 / B1"), "product, project, rack and box");
+    assert.ok(sample.id);
+
+    const failing = createMasterDataService(testDb.prisma, {
+      runTransaction: (work) => testDb.prisma.$transaction(work),
+      auditWriter: createAuditEventWriter(),
+      sampleRequestNotifier: { async resolved() {}, async shelved() { throw new Error("inbox unavailable"); } },
+    });
+    const second = await failing.startSampleRequestIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, snapshot: snapshot("req-notify-2") });
+    await assert.rejects(failing.shelveSampleFromIntake({ grants: GRANTS, actor: SAMPLE_ACTOR, intakeId: second.id, skuId, rack: "r2", box: "b2" }), /inbox unavailable/);
+    assert.equal(await testDb.prisma.sample.count({ where: { source_intake_id: second.id } }), 0, "the shelving is rolled back with the notice");
+  });
+});

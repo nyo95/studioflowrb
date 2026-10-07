@@ -1,7 +1,7 @@
 import type { NotificationWriter } from "@platform/core/notifications";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 
-import type { SampleRequestResolution, TxClient } from "./services/shared";
+import type { SampleRequestResolution, SampleShelvedEvent, TxClient } from "./services/shared";
 
 function fit(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1).trimEnd()}…`;
@@ -25,6 +25,21 @@ export function createSampleRequestResolvedNotifier(deps: { writer: Notification
           kind: `masterdata.sample-request.${outcome}`,
           title: outcome === "priced" ? "Your sample request was priced" : "Your sample request was declined",
           body: fit(outcome === "priced" ? `Master Data priced ${where}.${price}` : `Master Data declined ${where}.${reason}`, 300),
+          href: STUDIOFLOW_ROUTES.projectSchedule(intake.sourceProjectId),
+          entity: { type: "sample_request_intake", id: intake.id },
+        },
+        tx,
+      );
+    },
+    /** The sample the designer asked for is now on the shelf; says where. */
+    async shelved(tx: TxClient, { intake, rack, box }: SampleShelvedEvent): Promise<void> {
+      await deps.writer.notify(
+        {
+          recipientUserIds: [intake.requesterUserId],
+          appId: "masterdata",
+          kind: "masterdata.sample-request.shelved",
+          title: "Your sample is on the shelf",
+          body: fit(`Your sample of ${intake.productName} (${intake.sourceProjectName}) is on the shelf: ${rack} / ${box}.`, 300),
           href: STUDIOFLOW_ROUTES.projectSchedule(intake.sourceProjectId),
           entity: { type: "sample_request_intake", id: intake.id },
         },

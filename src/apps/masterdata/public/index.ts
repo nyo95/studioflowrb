@@ -4,6 +4,7 @@ import { MASTERDATA_PERMISSIONS } from "../service";
 export * from "./nav";
 
 export { MASTERDATA_PERMISSIONS };
+export type { SampleRead } from "../services/sample.service";
 export type { SampleQuoteInput, SampleRequestIntakeRead, SampleRequestIntakeStatus, SampleRequestSnapshot } from "../services/sample-request.service";
 
 export type BrandLibraryRead = {
