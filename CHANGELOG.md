@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.400 | 2026-10-07 | docs(plan): WO-PLAT-COST-01 cheaper page loads and code hygiene from the whole-repo audit (Lead)
+
+- Audit of the whole repository (business rules, flows, backend, architecture). Verified fine: serializable transactions with retry, 60 s polling that pauses in hidden tabs, no `any` in StudioFlow or BQ. Found and planned for the Executor: the platform layout loads every running project just for the rail badge and reads the preference row twice, `phases/service.ts` mixes three jobs in 1,210 lines, about 40 `any` in Master Data, and the private asset route answers every failure with 401.
+- `PLAN.md` READY (R8.401). Left for the Lead (R8.402): double first-load polling, "five phases" copy, mixed `id-ID` dates, public `/ui-engine` showcase, oversized `actions.ts` and `schedule-board.tsx`.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.399 | 2026-10-07 | fix(ui-engine): guided tour card sits under the highlighted control on narrow screens (Lead)
 
 - **Browser walk (owner account, dev server, narrow window):** language pick, the 4 steps in Indonesian with the ring on Home, Projects and the bell, Done, no replay after reload, "Bantuan: ulangi panduan" in the account menu replays it, Escape closes. Found and fixed: at 840px and below the card covered the neighbouring menu items; it now sits under the highlighted control.
