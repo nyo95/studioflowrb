@@ -1,145 +1,161 @@
 # Active Plan
 
-Plan ID: WO-SF-NOTE-IMG-01 (images on an iteration's client notes)
-Scope: StudioFlow backend for images attached to one iteration's client notes: storage, add/remove commands, reads with signed URLs, cleanup on every delete path, and the history labels. The Lead builds the drag/paste/pick UI and the thumbnails in the next revision.
-Target revisions: R8.393 (this plan), R8.394 (Executor: backend), R8.395 (Lead review PASS + UI).
-Status: BUILT — backend R8.394 (review PASS), UI R8.395; open: owner browser acceptance (BACKLOG [UNVERIFIED]).
-Priority: P1
+Plan ID: WO-PLAT-TOUR-01 (first-use guided tour, all apps, Indonesian / English)
+Scope: Platform backend for a per-person first-use tour: a chosen guide language and a per-tour "already seen" record, stored on the account. The Lead builds the tour component, the language pick on the first screen, the Help entry, and the StudioFlow tour text and anchors in the next revision.
+Target revisions: R8.396 (this plan), R8.397 (Executor: backend), R8.398 (Lead review + UI + StudioFlow tour).
+Status: READY
+Priority: P2
 Owner: Product Owner. Decisions confirmed by the owner in chat on 2026-10-07 (kantor).
 Last updated: 2026-10-07
 
-Previous plan WO-MD-SAMPLE-01 is BUILT (R8.385–R8.391); its open browser walk is in BACKLOG.
+Previous plan WO-SF-NOTE-IMG-01 is BUILT (R8.393–R8.395); its open browser walk is in BACKLOG.
 
 ## Outcome
 
-When a client answers with screenshots or marked-up photos, the designer drops,
-pastes or picks them into the client notes of that iteration. They sit under
-the notes, travel with the notes as the brief of the next iteration, stay in
-the iteration history, and open large on click. Nothing is copied: the next
-iteration reads the previous iteration's images.
+A person opening an app for the first time sees a short guided tour (at most 4
+steps) that points at real parts of the screen, can be closed at any moment, and
+does not come back on its own. It can be opened again from Help in the account
+menu. The tour speaks Indonesian or English, chosen by the person at the very
+first screen and remembered on the account. The mechanism belongs to the
+platform so every app (StudioFlow, Master Data, BQ, later ones) registers its
+own steps instead of building its own tour.
 
-## Locked Decisions (owner 2026-10-07: "Drag, tempel, pilih")
+## Locked Decisions (owner 2026-10-07)
 
-1. **One image set per iteration** (`SfRevision`), new table
-   `studioflow.sf_iteration_image`: id, `iteration_id` (FK to `SfRevision`,
-   `onDelete: Cascade`), `storage_key` (unique), `content_type`, `bytes`,
-   `sort_order`, `uploaded_by_id`, `uploaded_by_name` (snapshot), `created_at`.
-   Additive migration; apply to the rebuild dev and test databases only.
-2. **Files:** PNG, JPEG or WebP, sniffed like Schedule/MOM images
-   (`domain/images.ts`), at most **3 MB each** (same as MOM; the UI shrinks
-   large photos before upload), at most **12 per iteration**
-   (`ITERATION_IMAGE_LIMIT`). Private keys under
-   `studioflow/iterations/<projectId>/…` through `platform/core/storage`; the
-   object is written before the row and discarded if the transaction fails
-   (the Schedule `setOptionImage` order).
-3. **Commands** (same permission and project rules as `setIterationNote`,
-   including closed iterations that may still get notes):
-   `addIterationImage({ iterationId, file })` appends at the end;
-   `removeIterationImage({ imageId })`. Both audit
-   (`studioflow.iteration.image-added` / `-removed`, with History labels) and
-   are **not undoable** (an upload is not reversible within the five-minute
-   undo; removal asks for confirmation in the UI). No reorder in this work order.
-4. **Reads:** every read that returns an iteration's `note` also returns its
-   `images` (`{ id, url, contentType, bytes }`, ordered, short-lived signed
-   URLs as for Schedule photos): the phase page iterations (current, previous
-   brief, earlier iterations) and the project card's current iteration. No
-   storage keys leave the server.
-5. **Cleanup on every delete path:** removing an image releases the object
-   after commit when nothing else references it (`asset-cleanup.ts`
-   reference count gains `sf_iteration_image`); deleting a never-sent
-   iteration counts images as attached work (`ITERATION_HAS_ATTACHED_WORK`),
-   the same as files; the admin iteration reset and the archived-project purge
-   (`projects/asset-retention.ts`) release the image keys like MOM images.
-6. **Notes stay text.** Images are not inline in the note; the formatted note
-   (R8.392) shows above the images.
+1. **Two guide languages: `id` and `en`**, picked by the person on the first
+   screen of their first tour and kept on the account. Not set yet = `null`
+   (the tour then asks). The language only drives guide text for now; it is
+   **not** the date/number `locale` preference ("Date and number format" stays
+   as is) and it does not translate the rest of the app (non-goal).
+2. **One shared mechanism for all apps.** Platform owns the storage, the
+   service and (Lead) the component. Each app owns its own steps, wording and
+   anchors and registers them through a public contract. Platform never knows an
+   app's steps.
+3. **Seen-state is per person, per tour, on the server** (not the browser), so a
+   new computer does not replay it. States: `completed` or `dismissed`; both
+   mean "do not show again automatically". A `version` number is stored so an
+   app may later choose to re-show a materially changed tour; this work order
+   never re-shows on its own.
+4. **Same tour for every role; steps follow access.** A step may require a
+   permission and a screen anchor; a step whose permission the person lacks, or
+   whose anchor is not on screen (hidden for the role, or a phone layout), is
+   skipped. That filtering is Lead/UI work; the backend only has to expose the
+   person's grants as it already does.
+5. **Screen markers only.** The tour never forces an action and never changes
+   data. Help in the account menu reopens it (Lead).
+
+## Business Rules and Architecture Constraints
+
+- Capability: **EXTEND** `platform/core/preferences` (add `language`); **ADD**
+  a small domain-neutral "tutorial progress" record in the platform schema. App
+  step content is **APP-OWNED**. REUSE the existing authenticated-shell, action
+  wrapper, audit and error conventions; add no dependency.
+- Platform must not import app code. Tour keys are plain strings
+  (`^[a-z][a-z0-9-]{0,39}$`, e.g. `studioflow`, `masterdata`, `bq`); the platform
+  does not validate them against an app list.
+- A person can read and write only their own rows. No role grants extra reach;
+  no cross-person read.
 
 ## Backend Contract
 
-- Prisma model, migration, and the image domain constants.
-- Phase service commands and their server-action wiring (multipart for the
-  file, like `setScheduleOptionImageAction`).
-- Read changes per decision 4 in the phase reads and the project cards read.
-- Cleanup per decision 5 and the History labels for the two audit actions.
+- **Preference `language`**: new nullable column on `platform.user_preference`;
+  allowed values `id` | `en` | null (invalid value gets its own plain code, in
+  the style of `PREFERENCE_LOCALE`). Exposed through the existing preferences
+  `get` / `update` view and `updateMyPreferencesAction`; the account page form
+  is not changed in this work order.
+- **Table `platform.user_tutorial`** (additive migration; apply to the rebuild
+  dev and test databases only): `user_id` (FK to user, `onDelete: Cascade`),
+  `tour_key`, `version` (positive int), `state` (`completed` | `dismissed`, SQL
+  CHECK), `updated_at`; unique on (`user_id`, `tour_key`).
+- **Service** (beside preferences, same style): `list({ userId })` returns the
+  person's rows; `record({ userId, tourKey, version, state })` upserts one row
+  (a later call overwrites state/version); `clear({ userId, tourKey })` removes
+  the row (so a person can reset a tour). Validation for key shape, version,
+  state with plain error codes.
+- **Server actions** for the signed-in person only (never take a user id from
+  the client): `recordTutorialAction({ tourKey, version, state })` and
+  `clearTutorialAction({ tourKey })`; language goes through the existing
+  `updateMyPreferencesAction`.
+- **Read for the shell**: the shell layout must be able to get, in one call, the
+  person's `language` and tutorial rows. Expose it from the platform runtime the
+  way preferences already are; the Lead wires it into the shell.
+- **Registration contract (types only)**: a public platform type for an app's
+  tour: `{ key, version, steps: [{ id, anchor, requires?: permission code,
+  title: { id, en }, body: { id, en } }] }`, with a check that every step has
+  both languages, a non-empty title and body, and that there are at most 4
+  steps. Pure types plus a validator, no registry state, no app content.
 
-## UI Contract (minimal wiring only; the Lead owns the design)
+## UI Contract
 
-- Nothing beyond what is needed to exercise the commands in tests. The Lead
-  builds the drop/paste/pick area, thumbnails and the large view.
+The Lead owns the tour component, the language pick, the Help menu item, the
+anchors, all wording and responsive behavior. The Executor may add only what is
+needed to exercise the backend (no visible UI is required). Do not touch the
+account menu, the shell layout rendering, or any app screen.
 
 ## Boundaries and Non-goals
 
-- No images in pinned notes, visit notes or MOM through this table.
-- No image editing, captions, reorder or undo.
-- No cross-app change.
+- No translation of the rest of the interface; no change to `locale`,
+  `timezone` or the "Date and number format" form.
+- No tour content for any app, no anchors, no component, no Help item.
+- No automatic re-show on version change; no analytics of who finished a tour.
+- No admin-wide reset; no push, tag, PR or release.
 
-## Acceptance Criteria (Executor)
+## Acceptance Criteria
 
-1. Add stores the object and the row; type, size and count limits refuse with
-   their own codes and write nothing (no stored object left behind).
-2. Remove deletes the row and releases the object after commit; an object
-   still referenced elsewhere is kept.
-3. Permission and project rules match `setIterationNote` (refused for a
-   viewer, an archived or inactive project, another project's iteration).
-4. Reads return ordered images with signed URLs for the current, previous and
-   earlier iterations and the card's current iteration; no storage keys.
-5. A never-sent iteration with images cannot be deleted; admin reset and the
-   archived-project purge release the image objects.
-6. Audit events and History labels exist for add and remove; neither is
-   offered for undo.
+1. A person can save `language` as `id`, `en` or clear it; any other value is
+   refused with a plain error; it is returned by the preferences read.
+2. `record` creates then overwrites the single row per (person, tour); `list`
+   returns only that person's rows; `clear` removes it; a second person never
+   sees or changes the first person's rows.
+3. Bad key shape, version below 1 or non-integer, and unknown state are refused
+   with plain errors; no row is written.
+4. Deleting a user removes their tutorial rows.
+5. The tour definition validator accepts a valid tour and refuses: more than 4
+   steps, a missing language, an empty title or body.
+6. The actions work only for the signed-in person and reject anonymous calls
+   like the neighbouring account actions.
 
 ## Verification
 
-`npx tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`,
-`npm run check:legacy-runtime`, `npm test` (all, nothing skipped), and
-`npm run build`, which must pass. Integration tests for criteria 1–6.
-Migration applied to the rebuild dev and test databases only, after
-confirming both targets. Keep server-only modules out of any barrel that
-client components import (the R8.386 build failure).
+Executor, before commit: `tsc --noEmit`, `npm run lint -- --quiet`,
+`check:boundaries`, `check:legacy-runtime`, `npm test` (full, report
+failed/skipped/cancelled), `npm run build`; migration applied to dev and test
+databases and recorded; new integration tests for criteria 1–4 and 6 and unit
+tests for criterion 5, in the existing preferences test style. Verify the
+database target is the rebuild-only database before any database command.
+Browser not required.
 
 ## Reviewer Acceptance
 
-After the Lead's UI revision: drop, paste and pick images into client notes;
-see them in the next iteration's brief and in earlier iterations; open one
-large; remove one; try a 13th image and a PDF.
+After the Lead's UI revision (R8.398), in the browser with a fresh test account
+on the separate test data:
+
+1. First sign-in: the language pick appears first; choosing Indonesian or
+   English changes the tour text; closing at step 1 and at step 4 both work and
+   the tour does not return after reload or on another browser.
+2. Help in the account menu reopens it; a role without Files access skips the
+   files part; a phone-width layout skips steps whose anchor is hidden and
+   nothing covers the screen.
+3. The two Playwright full sessions that stalled in the review of this idea must
+   be re-run to completion; a stalled session is not a pass. The 13 phone
+   layout checks stay green with the tour added.
 
 ## Regression Risks and Recovery
 
-Risk: orphaned objects if a delete path is missed; mitigated by decision 5 and
-its tests. Risk: slow phase pages from signing many URLs; images are signed
-only for the iterations a page shows. Recovery: revert R8.394; the migration
-is additive (drop the table).
-
-## Review of R8.394 (Lead, 2026-10-07) — PASS
-
-Commit `7ff75b6`. Decisions 1–6 are in the code; the extra attached-work checks
-(skip, Supervision auto-start, undo of a creation) close real orphan paths and
-are accepted. Gates re-run by the Lead: tsc, lint, boundaries, legacy-runtime,
-build pass; `npm test` passed 921/921 twice, but one full run failed the Master
-Data workbook round-trip test once (it passes alone, 3/3, and its file passes
-2/2) — flaky, not caused by R8.394 (BACKLOG [BUG]). The home page signs card
-images one at a time (BACKLOG [CLEANUP]).
-
-**UI built at R8.395:** `IterationImageArea` (drop anywhere on the notes, paste
-a screenshot, or "Add images"; uploads at once, one by one, large photos
-shrunk with the new UI Engine `shrinkImageFile`; remove with confirmation) in
-the client-answer dialog, the card's and the phase page's client-notes
-dialogs; `IterationImageList` (thumbnails, large view with previous/next) in
-the brief, the answered note and earlier iterations.
+- `user_preference` gains a column: existing preference tests and the account
+  page keep working with `language` null. Additive migration only; recovery is
+  dropping the new column and table.
+- Applying the migration to the wrong database: stop if the target is not the
+  rebuild-only dev or test database.
 
 ## Executor Prompt
 
-None: the work order is built.
-
-## Former Executor Prompt
-
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md` (WO-SF-NOTE-IMG-01), then implement
-the entire READY backend outcome and nothing beyond it. Start from a clean tree
-on `main`; confirm the next unused revision in `CHANGELOG.md` (expected
-R8.394). Verify both database targets are the rebuild-only dev and test
-databases before any database command. Do not build screens; the Lead designs
-them next. Run the checks listed, including `npm run build` (it must pass),
-update `CHANGELOG.md`, and create one local commit. Do not push. Stop with the
-BLOCKED / CONFLICT report only for a locked-decision conflict or an unsafe
-boundary; otherwise finish and return one Planner/Reviewer prompt with the
-outcome, commit, checks and test count, limitations, and dirty files.
+`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY
+backend outcome (WO-PLAT-TOUR-01, target revision R8.397) and nothing beyond it.
+Inspect current repository evidence, preserve unrelated owner work (`next-env.d.ts`
+is dirty and not yours), make sound in-scope implementation decisions, run the
+required checks, update `CHANGELOG.md`, and create the local revision commit.
+Stop only for a material locked-decision conflict or unsafe boundary, using the
+BLOCKED / CONFLICT report; otherwise finish the coherent outcome and report the
+commit, checks, limitations, and remaining unrelated dirty files.

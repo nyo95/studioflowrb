@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.396 | 2026-10-07 | docs(plan): WO-PLAT-TOUR-01 first-use guided tour for all apps, Indonesian / English (Lead)
+
+- Owner (2026-10-07): the first-use tour is platform-wide (every app registers its own steps), has Indonesian and English text chosen by the person on the first screen, and is built by the Executor (backend) with the Lead reviewing and building the UI.
+- `PLAN.md` READY for the Executor (R8.397): `language` (`id` | `en`) on the account preferences, a per-person per-tour "seen" record (`user_tutorial`), service and own-account actions, a read for the shell, and a tour-definition type with validator (at most 4 steps, both languages required). Same tour for all roles; steps follow access. The Lead builds the component, language pick, Help item and the StudioFlow tour in R8.398. No translation of the rest of the interface.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.395 | 2026-10-07 | feat(studioflow,ui-engine): client-note images on screen; review of R8.394 PASS (Lead)
 
 - **Review of R8.394 (`7ff75b6`): PASS.** Storage, add/remove, signed reads and every delete path match WO-SF-NOTE-IMG-01; the extra attached-work checks (skip, Supervision auto-start, undo of a creation) are accepted. Gates re-run by the Lead; one full `npm test` run failed a Master Data workbook test once (passes alone and in every other run): recorded as a flaky-test [BUG], not caused by R8.394.
