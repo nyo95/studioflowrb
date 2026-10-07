@@ -214,6 +214,25 @@ const PlanOverridesInput = z.strictObject({ projectId: Id, overrides: PlanInterv
 export async function setPlanOverridesAction(input: z.infer<typeof PlanOverridesInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => { const ctx = await context(); const data = parse(PlanOverridesInput, input); const result = await studioFlow.projects.setPlanOverrides({ ...ctx, projectId: data.projectId, overrides: data.overrides }); refresh(data.projectId); return result; });
 }
+/** Read for the Timeline "Dates & plan" dialog, loaded when it opens: the plan, studio lead times, and phases with hand-set dates. */
+export async function getProjectPlanEditorAction(projectId: string) {
+  return runSafeAction(async () => {
+    const { grants } = await context();
+    const id = parse(Id, projectId);
+    // Same reads, in the same order, as the project Timeline page: the project read checks it exists and is visible.
+    await studioFlow.projects.getProject({ grants, projectId: id });
+    const [plan, settings, phases] = await Promise.all([
+      studioFlow.projects.getProjectPlan({ grants, projectId: id }),
+      studioFlow.projects.getStudioSettings({ grants }),
+      studioFlow.phases.listProjectPhases({ grants, projectId: id }),
+    ]);
+    return {
+      plan,
+      studioDefaults: { cdMall: settings.cdMall, cdFinal: settings.cdFinal, gap: settings.gap, fitOutToHandover: settings.fitOutToHandover, handoverToOpening: settings.handoverToOpening },
+      phases: phases.map((phase) => ({ id: phase.id, definitionId: phase.definitionId, label: phase.label, plannedStartDate: phase.plannedStartDate, plannedEndDate: phase.plannedEndDate, manual: phase.plannedDatesManual })),
+    };
+  });
+}
 export async function resetPhasePlannedDatesAction(projectId: string, phaseId: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => { const ctx = await context(); const result = await studioFlow.projects.resetPhasePlannedDates({ ...ctx, projectId: parse(Id, projectId), phaseId: parse(Id, phaseId) }); refresh(projectId); return result; });
 }

@@ -1,4 +1,5 @@
 import { hasPermission } from "@platform/core/rbac";
+import { currentDateOnly } from "@platform/utilities/date";
 import { resolveTimelineSpan } from "@/apps/studioflow/domain/timeline";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
@@ -70,7 +71,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
         filters={{ status, pic: params.pic ?? "", client: params.client ?? "", from: from ?? "", to: to ?? "", archived }}
         canManage={hasPermission(grants, P.projectManage)}
         editable={editable}
-        now={now}
+        today={currentDateOnly({ now: new Date(now) })}
       />
     </PageShell>
   );

@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.384 | 2026-10-07 | feat(studioflow): plan settings move into the Timeline "Dates & plan" dialog; project Timeline read-only; dated today label (Lead)
+
+- **Owner:** "settingan ini bisa ga dibuat modals popup di timeline aja ... di project detail full hanya read-only timeline". The studio Timeline's per-project "Dates" dialog becomes **"Dates & plan"**: start, Fit Out Start, opening, the five per-project lead times (empty = studio default; only values that differ are stored, as before), the plan's warnings, the suggested Fit Out Start (now fills the field instead of saving at once), "Back to the plan" for hand-set dates, and one Save / Save and apply plan. Its data loads when it opens (new read action `getProjectPlanEditorAction`: plan, studio lead times, phases with the hand-set flag).
+- **Project Timeline tab is read-only:** the Plan panel and "Project dates" button are gone; the description says what the plan is counted from. Editors get "Edit dates and plan", which opens `/studioflow/timeline?plan=<projectId>` with that project's dialog already open (closing it clears the parameter).
+- **Today:** owner: "today nya jg kurang jelas, tanggal brp hari ini". The red line now carries a "Today · 7 Oct 2026" label (`ganttDayLabel`, tested). Both Timeline pages took today from the UTC date, a day behind in Jakarta before 07:00; they now use the canonical `currentDateOnly()` (studio time zone).
+- Contract section 8 updated.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 878/878 (none failed, skipped or cancelled; 1 new). `npm run build` not run (another session's dev server uses this checkout). Browser not opened.
+
 ## R8.383 | 2026-10-07 | feat(studioflow): category pickers offer the studio's categories (Lead)
 
 - Owner: "ini harusnya creatablesearch? dari template?" — the inline "New category" field from R8.382 was a plain text box. It is now a `CreatableSearch`: pick a studio category (template categories in settings order, then prefix-dictionary categories, with their prefix shown) or type a new one; picking reserves that category's first code at once. The project's own categories are listed as "Already in this project" and disabled; choosing one by typing says so instead of adding to it.

@@ -34,14 +34,14 @@ export function TimelineDirectory({
   filters,
   canManage,
   editable,
-  now,
+  today,
 }: {
   projects: TimelineProject[];
   people: Array<{ id: string; displayName: string }>;
   clients: Array<{ id: string; name: string }>;
   filters: { status: string; pic: string; client: string; from: string; to: string; archived: boolean };
-  /** Captured once on the server and passed through, so the "today" marker matches between SSR and hydration instead of drifting with a fresh client-side `Date.now()`. */
-  now: number;
+  /** Today in the studio time zone (Asia/Jakarta), decided once on the server so SSR and hydration agree; a UTC date was a day behind before 07:00. */
+  today: string;
   canManage: boolean;
   /** Per project: may the viewer edit its dates, and which phases (PIC assignment). */
   editable: Record<string, { project: boolean; phaseIds: string[] }>;
@@ -50,9 +50,13 @@ export function TimelineDirectory({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [editing, setEditing] = useState<{ projectId: string; phase: TimelinePhase } | null>(null);
-  const [editingProject, setEditingProject] = useState<TimelineProject | null>(null);
+  // `?plan=<projectId>` (the project Timeline tab's "Edit dates and plan") opens that project's dialog straight away.
+  const [editingProject, setEditingProject] = useState<TimelineProject | null>(() => {
+    const wanted = searchParams.get("plan");
+    const project = wanted ? projects.find((row) => row.id === wanted) ?? null : null;
+    return project && canManage && editable[project.id]?.project ? project : null;
+  });
   const [zoom, setZoom] = useState<GanttZoom>("month");
-  const today = new Date(now).toISOString().slice(0, 10);
 
   const rows: GanttRowData[] = projects.filter((project) => project.phases.length > 0).map((project) => {
     const phaseIds = editable[project.id]?.phaseIds ?? [];
@@ -69,10 +73,15 @@ export function TimelineDirectory({
       bars: canManage ? bars.map((bar) => (phaseIds.includes(bar.id) ? bar : { ...bar, onClick: undefined })) : bars,
       markers,
       span: project.openingDate ? { start: project.timelineStartDate, end: project.openingDate } : null,
-      trailing: canEditDates ? <Button type="button" size="sm" variant="ghost" onClick={() => setEditingProject(project)}>Dates</Button> : null,
-      emptyText: "No planned dates — open Dates",
+      trailing: canEditDates ? <Button type="button" size="sm" variant="ghost" onClick={() => setEditingProject(project)}>Dates &amp; plan</Button> : null,
+      emptyText: "No planned dates — open Dates & plan",
     };
   });
+
+  const closeProjectDialog = () => {
+    setEditingProject(null);
+    if (searchParams.has("plan")) setParam("plan", "");
+  };
 
   const setParam = (key: string, value: string) => {
     const next = new URLSearchParams(searchParams.toString());
@@ -137,7 +146,7 @@ export function TimelineDirectory({
         </SectionCard>
       )}
 
-      {editingProject ? <EditProjectDatesDialog project={editingProject} onClose={() => setEditingProject(null)} /> : null}
+      {editingProject ? <EditProjectDatesDialog project={editingProject} onClose={closeProjectDialog} /> : null}
 
       {editing ? (
         <EditPhaseDatesDialog projectId={editing.projectId} phase={editing.phase} onClose={() => setEditing(null)} />

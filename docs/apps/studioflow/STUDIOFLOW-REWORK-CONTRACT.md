@@ -358,8 +358,10 @@ notes), and the Drawing list on a drafter phase; the aside holds the pinned
 note, requirements and files.
 
 **Timeline (R8.381).** A real calendar Gantt (`domain/gantt.ts`, `_components/gantt-chart.tsx`):
-one shared time axis, Week or Month zoom, weekend shading, a today line, and
-the page opens with today a third of the way in. A phase with both
+one shared time axis, Week or Month zoom, weekend shading, a today line labelled
+with its date ("Today · 7 Oct 2026"; today is the studio time zone's date,
+Asia/Jakarta, never the UTC date), and the page opens with today a third of
+the way in. A phase with both
 `planned_start_date` and `planned_end_date` is a bar at its real dates, coloured
 by its accent (lighter while `PENDING`, outlined while `ACTIVE`); a phase with one
 date is a marker; a phase with none is not drawn and the row says how many have
@@ -368,14 +370,17 @@ Markers: Fit Out Start and Opening. A thin line runs from the project start to
 its opening date.
 `/studioflow/timeline` shows one row per non-archived project, filterable by
 client, designer/drafter, status and date range; clicking a bar
-(`project.manage`) sets or clears its planned dates, and "Dates" sets start,
-Fit Out Start and opening (with "Save and apply plan").
-`/studioflow/projects/[projectId]/timeline` shows one row per phase plus a
-Milestones row (Start, Design Final, END, Fit Out Start, Handover, Opening, and a
-forecast marker when the plan lands after the opening date), Construction
-Drawing split into CD Mall and CD Final while its dates are the plan's own, and
-the Plan panel: warnings, a suggested Fit Out Start, per-project lead-time
-overrides, "Back to the plan" for hand-set dates, and Apply plan (WO-SF-PLAN-01).
+(`project.manage`) sets or clears its planned dates, and "Dates & plan" opens
+the one dialog where a project's schedule is set (owner, 2026-10-07): start,
+Fit Out Start and opening, per-project lead-time overrides, the plan's
+warnings, a suggested Fit Out Start (fills the field), "Back to the plan" for
+hand-set dates, and Save / Save and apply plan (WO-SF-PLAN-01).
+`/studioflow/projects/[projectId]/timeline` is **read-only**: one row per phase
+plus a Milestones row (Start, Design Final, END, Fit Out Start, Handover,
+Opening, and a forecast marker when the plan lands after the opening date), with
+Construction Drawing split into CD Mall and CD Final while its dates are the
+plan's own. Someone who may edit gets "Edit dates and plan", which opens that
+project's dialog on `/studioflow/timeline?plan=<projectId>`.
 Planned dates are entered or computed from Fit Out Start, not derived from
 status history.
 

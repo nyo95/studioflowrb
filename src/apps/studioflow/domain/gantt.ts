@@ -12,6 +12,14 @@ export const GANTT_PX_PER_DAY: Record<GanttZoom, number> = { week: 18, month: 6 
 export function dayNumber(date: string): number {
   return Math.round(Date.parse(`${date}T00:00:00.000Z`) / DAY_MS);
 }
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-10-07" → "7 Oct 2026" for the today label, read from the string so no time zone can shift the day. */
+export function ganttDayLabel(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  return `${day} ${MONTH_SHORT[month - 1] ?? ""} ${year}`;
+}
+
 export function dateOfDay(day: number): string {
   return new Date(day * DAY_MS).toISOString().slice(0, 10);
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, type ReactNode } from "react";
 
-import { buildGanttAxis, ganttBar, ganttMarkerX, type GanttAxis, type GanttZoom } from "@/apps/studioflow/domain/gantt";
+import { buildGanttAxis, ganttBar, ganttDayLabel, ganttMarkerX, type GanttAxis, type GanttZoom } from "@/apps/studioflow/domain/gantt";
 import { Text } from "@/platform/ui_engine";
 
 export type GanttBarData = {
@@ -82,7 +82,13 @@ export function GanttChart({ rows, today, zoom, label }: { rows: GanttRowData[];
           </div>
         ))}
         {axis.todayPx !== null ? (
-          <div className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-danger/70" style={{ left: LABEL_WIDTH + axis.todayPx + axis.pxPerDay / 2 }} aria-hidden="true" />
+          <>
+            <div className="pointer-events-none absolute bottom-0 top-0 z-10 w-px bg-danger/70" style={{ left: LABEL_WIDTH + axis.todayPx + axis.pxPerDay / 2 }} aria-hidden="true" />
+            {/* The line alone did not say which day it is (owner, 2026-10-07). */}
+            <div className="pointer-events-none absolute top-[21px] z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-danger px-1.5 py-px text-micro font-semibold text-ink-inverse" style={{ left: LABEL_WIDTH + axis.todayPx + axis.pxPerDay / 2 }}>
+              Today · {ganttDayLabel(today)}
+            </div>
+          </>
         ) : null}
       </div>
     </div>

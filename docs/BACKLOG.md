@@ -116,6 +116,12 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## StudioFlow
 
+- [ ] [UNVERIFIED] Timeline R8.384 in the browser: "Dates & plan" dialog (lead
+  times load, Save, Save and apply plan, Back to the plan, suggested Fit Out
+  Start), "Edit dates and plan" from a project's read-only Timeline tab opening
+  the dialog, and the "Today · date" label at Week and Month zoom (it must not
+  hide a week number that matters, and must read in Dark).
+
 - [ ] [UNVERIFIED] Product Schedule R8.382–R8.383 in the browser: right-click Open/Delete
   on a board card, the "New category" picker (studio categories, typing a new
   one, also in an empty section, the "already in this project" hint), studio

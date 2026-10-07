@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { buildGanttAxis, dateOfDay, dayNumber, ganttBar, ganttMarkerX, ganttWeekends, GANTT_PX_PER_DAY } from "./gantt";
+import { buildGanttAxis, dateOfDay, dayNumber, ganttBar, ganttDayLabel, ganttMarkerX, ganttWeekends, GANTT_PX_PER_DAY } from "./gantt";
 
 describe("Gantt geometry", () => {
+  it("labels today by its own calendar date", () => {
+    assert.equal(ganttDayLabel("2026-10-07"), "7 Oct 2026");
+    assert.equal(ganttDayLabel("2027-01-31"), "31 Jan 2027");
+  });
+
   const axis = buildGanttAxis(["2026-10-12", "2026-12-28"], { zoom: "week", today: "2026-11-02" });
 
   it("starts on a Monday before the earliest date and runs past the latest", () => {
