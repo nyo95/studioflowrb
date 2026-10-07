@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.406 | 2026-10-07 | refactor(studioflow): split phase service by responsibility (Executor)
+
+- Split the phase workflow, phase-template administration, and deliverable handling into separate files while keeping the same public phase-service members and behavior. A member-surface regression test guards the composed service.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 938/938 (none failed, skipped or cancelled), `npm run build` pass. Browser not required.
+
 ## R8.405 | 2026-10-07 | docs(plan): WO-PLAT-COST-02 revision numbers no longer fixed in advance (Lead)
 
 - The Executor stopped (BLOCKED / CONFLICT) because the plan named R8.404 and R8.405 while the Lead had already taken R8.404. `PLAN.md` now says each side takes the next unused revision from this ledger at commit time, so parallel work cannot collide again. Items B and C unchanged.
