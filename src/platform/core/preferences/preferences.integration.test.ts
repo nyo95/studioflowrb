@@ -21,9 +21,9 @@ describe("personal preferences", () => {
     const preferences = createUserPreferencesService(db.prisma);
     const grants = ["masterdata.access"];
     const saved = await preferences.update({ userId: person.id, grants, theme: "dark", locale: "en-US", timezone: "UTC", startPage: "/masterdata" });
-    assert.deepEqual(saved, { theme: "dark", locale: "en-US", timezone: "UTC", startPage: "/masterdata" });
+    assert.deepEqual(saved, { theme: "dark", locale: "en-US", timezone: "UTC", startPage: "/masterdata", language: null });
     await preferences.update({ userId: person.id, grants, theme: null, locale: null, timezone: null, startPage: null });
-    assert.deepEqual(await preferences.get({ userId: person.id }), { theme: null, locale: null, timezone: null, startPage: null });
+    assert.deepEqual(await preferences.get({ userId: person.id }), { theme: null, locale: null, timezone: null, startPage: null, language: null });
     await assert.rejects(() => preferences.update({ userId: person.id, grants, startPage: "/studioflow" }), (error: unknown) => error instanceof AppError && error.code === "PREFERENCE_START_PAGE");
     assert.deepEqual(await preferences.resolveDisplay({ userId: person.id }), { locale: "id-ID", timezone: "Asia/Jakarta" });
   });
@@ -69,5 +69,15 @@ describe("personal preferences", () => {
     await preferences.update({ userId: person.id, grants: [], theme: "light" });
     await db.prisma.user.delete({ where: { id: person.id } });
     assert.equal(await db.prisma.userPreference.count({ where: { user_id: person.id } }), 0);
+  });
+
+  it("stores the guide language separately from display locale and rejects unsupported languages", async () => {
+    const person = await user("guide-language@test.local");
+    const preferences = createUserPreferencesService(db.prisma);
+    assert.equal((await preferences.update({ userId: person.id, grants: [], language: "id" })).language, "id");
+    assert.equal((await preferences.update({ userId: person.id, grants: [], language: "en" })).language, "en");
+    assert.equal((await preferences.update({ userId: person.id, grants: [], language: null })).language, null);
+    await assert.rejects(() => preferences.update({ userId: person.id, grants: [], language: "fr" as "id" }), (error: unknown) => error instanceof AppError && error.code === "PREFERENCE_LANGUAGE");
+    await assert.rejects(() => db.prisma.userPreference.upsert({ where: { user_id: person.id }, create: { user_id: person.id, language: "fr" }, update: { language: "fr" } }));
   });
 });

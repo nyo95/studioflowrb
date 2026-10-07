@@ -35,6 +35,7 @@ model User {
   sessions   Session[]
   user_roles UserRole[]
   preference UserPreference?
+  tutorials  UserTutorial[]
 
   @@index([status])
   @@schema("platform")
@@ -48,11 +49,29 @@ model UserPreference {
   locale     String?
   timezone   String?
   start_page String?
+  /// First-use guide language (`id` | `en`); null asks the person to choose.
+  language   String?
   updated_at DateTime @default(now()) @updatedAt
 
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@map("user_preference")
+  @@schema("platform")
+}
+
+/// A person's seen state for an app-owned guided tour. The platform stores no
+/// app steps: a tour key remains a plain, validated string at the boundary.
+model UserTutorial {
+  user_id  String @db.Uuid
+  tour_key String
+  version  Int
+  state    String
+  updated_at DateTime @default(now()) @updatedAt
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, tour_key])
+  @@map("user_tutorial")
   @@schema("platform")
 }
 

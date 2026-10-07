@@ -9,6 +9,7 @@ import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { createPlatformSettingsService } from "@platform/core/settings";
 import { createPlatformAccountService } from "@platform/core/auth/account";
 import { createStorageUsageService, createUserPreferencesService } from "@platform/core/preferences";
+import { createUserTutorialService } from "@platform/core/tutorials";
 import path from "node:path";
 import { resolveStorageRoot } from "@platform/infrastructure/storage/storage-root";
 import { createLocalFilesystemStorage, createLocalPublicFilesystemStorage } from "@platform/infrastructure/storage/filesystem";
@@ -68,6 +69,7 @@ export const platformAccount = createPlatformAccountService({
   ...commonPorts,
 });
 export const userPreferences = createUserPreferencesService(prisma);
+export const userTutorials = createUserTutorialService(prisma);
 export const storageUsage = createStorageUsageService(createStorageUsageReader(storageRoot));
 
 /** Name/eligibility lookup for app assignment pickers (no admin data). */

@@ -69,6 +69,7 @@ export async function createTestDb(databaseUrl: string): Promise<TestDb> {
 const PLATFORM_TABLES = [
   "User",
   "user_preference",
+  "user_tutorial",
   "Role",
   "UserRole",
   "RolePermission",

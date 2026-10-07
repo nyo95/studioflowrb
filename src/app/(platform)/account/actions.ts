@@ -6,7 +6,7 @@ import { z } from "zod";
 import { AppError } from "@platform/core/errors";
 import { displayNameSchema, passwordSchema, requirePrincipal, requirePrincipalGrants, revokeSessionById, setSessionCookie } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
-import { platformAccount, storageUsage, userPreferences } from "@platform/runtime";
+import { platformAccount, storageUsage, userPreferences, userTutorials } from "@platform/runtime";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
 
@@ -78,6 +78,7 @@ const PreferenceInput = z.strictObject({
   locale: z.string().max(80).nullable().optional(),
   timezone: z.string().max(120).nullable().optional(),
   startPage: z.string().max(300).nullable().optional(),
+  language: z.enum(["id", "en"]).nullable().optional(),
 });
 
 /** Personal-only boundary: the browser never supplies a user id. */
@@ -96,6 +97,36 @@ export async function updateMyPreferencesAction(input: z.infer<typeof Preference
 export async function getMyPreferences() {
   const principal = await requirePrincipal();
   return userPreferences.get({ userId: principal.userId });
+}
+
+const TutorialRecordInput = z.strictObject({
+  tourKey: z.string().max(40),
+  version: z.number().int().positive(),
+  state: z.enum(["completed", "dismissed"]),
+});
+const TutorialClearInput = z.strictObject({ tourKey: z.string().max(40) });
+
+/** Personal-only boundary: progress always belongs to the authenticated person. */
+export async function recordTutorialAction(input: z.infer<typeof TutorialRecordInput>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const principal = await requirePrincipal();
+    const parsed = TutorialRecordInput.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await userTutorials.record({ userId: principal.userId, ...parsed.data });
+    revalidatePath("/", "layout");
+    return result;
+  });
+}
+
+export async function clearTutorialAction(input: z.infer<typeof TutorialClearInput>): Promise<ActionResult<{ cleared: true }>> {
+  return runSafeAction(async () => {
+    const principal = await requirePrincipal();
+    const parsed = TutorialClearInput.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    await userTutorials.clear({ userId: principal.userId, ...parsed.data });
+    revalidatePath("/", "layout");
+    return { cleared: true };
+  });
 }
 
 export async function getStorageUsageAction(): Promise<ActionResult<unknown>> {

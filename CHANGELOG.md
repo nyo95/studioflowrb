@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.397 | 2026-10-07 | feat(platform): persist first-use tour progress
+
+- **Guide preference.** Personal preferences now retain an optional guide language (`id` or `en`) separately from display locale; unsupported values are refused. Existing preferences remain unset until the person chooses a guide language.
+- **Private progress.** Added the platform-owned `user_tutorial` record: one row per person and tour key, with a positive version and either completed or dismissed state. A later record replaces the prior state; clearing removes only that person's row. User deletion cascades this private state.
+- **Runtime and actions.** Platform exposes one shell read for guide language plus the authenticated person's tutorial rows. New personal-only record/clear actions derive the account identity from the signed-in session, never from the browser.
+- **App contract.** Apps can validate typed tour definitions with a key, version, at most four anchored steps, and non-empty Indonesian and English title/body text. Platform keeps no app registry or step content.
+- **Migration.** Additive `20261007110000_platform_user_tutorial` applied to the verified local rebuild development and test databases only.
+
+**Checks.** `npx tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm test` 932/932 (0 failed, cancelled, skipped), and `npm run build` all pass. Browser not required for this backend revision.
+
 ## R8.396 | 2026-10-07 | docs(plan): WO-PLAT-TOUR-01 first-use guided tour for all apps, Indonesian / English (Lead)
 
 - Owner (2026-10-07): the first-use tour is platform-wide (every app registers its own steps), has Indonesian and English text chosen by the person on the first screen, and is built by the Executor (backend) with the Lead reviewing and building the UI.

@@ -7,13 +7,24 @@ import { isSupportedLocale, isSupportedTimezone, isThemePreference, parseStoredT
 /** A person's own theme choice (`system` | `light` | `dark`); the contract lives in `@platform/core/settings` appearance. */
 export const USER_PREFERENCE_THEMES = THEME_PREFERENCES;
 export type UserPreferenceTheme = ThemePreference;
+export const USER_PREFERENCE_LANGUAGES = ["id", "en"] as const;
+export type UserPreferenceLanguage = (typeof USER_PREFERENCE_LANGUAGES)[number];
 /** Null means "not chosen": the organisation default from General Settings applies. */
-export type UserPreferences = { theme: UserPreferenceTheme | null; locale: string | null; timezone: string | null; startPage: string | null };
+export type UserPreferences = { theme: UserPreferenceTheme | null; locale: string | null; timezone: string | null; startPage: string | null; language: UserPreferenceLanguage | null };
 type Db = PrismaClient | Prisma.TransactionClient;
 
 function plainInvalid(code: string, message: string): never { throw new AppError("VALIDATION", code, message); }
-function toView(row: { theme: string | null; locale: string | null; timezone: string | null; start_page: string | null } | null): UserPreferences {
-  return { theme: parseStoredTheme(row?.theme), locale: row?.locale ?? null, timezone: row?.timezone ?? null, startPage: row?.start_page ?? null };
+function isGuideLanguage(value: string): value is UserPreferenceLanguage {
+  return (USER_PREFERENCE_LANGUAGES as readonly string[]).includes(value);
+}
+function toView(row: { theme: string | null; locale: string | null; timezone: string | null; start_page: string | null; language: string | null } | null): UserPreferences {
+  return {
+    theme: parseStoredTheme(row?.theme),
+    locale: row?.locale ?? null,
+    timezone: row?.timezone ?? null,
+    startPage: row?.start_page ?? null,
+    language: row?.language && isGuideLanguage(row.language) ? row.language : null,
+  };
 }
 
 function validateStartPage(value: string, grants: PermissionGrants): string {
@@ -28,7 +39,7 @@ export function createUserPreferencesService(db: PrismaClient) {
     async get(input: { userId: string }): Promise<UserPreferences> {
       return toView(await db.userPreference.findUnique({ where: { user_id: input.userId } }));
     },
-    async update(input: { userId: string; grants: PermissionGrants; theme?: UserPreferenceTheme | null; locale?: string | null; timezone?: string | null; startPage?: string | null }): Promise<UserPreferences> {
+    async update(input: { userId: string; grants: PermissionGrants; theme?: UserPreferenceTheme | null; locale?: string | null; timezone?: string | null; startPage?: string | null; language?: UserPreferenceLanguage | null }): Promise<UserPreferences> {
       const data: Prisma.UserPreferenceUpdateInput = {};
       if (input.theme !== undefined) {
         if (input.theme !== null && !isThemePreference(input.theme)) plainInvalid("PREFERENCE_THEME", "Choose System, Light or Dark.");
@@ -43,7 +54,11 @@ export function createUserPreferencesService(db: PrismaClient) {
         data.timezone = input.timezone;
       }
       if (input.startPage !== undefined) data.start_page = input.startPage === null ? null : validateStartPage(input.startPage, input.grants);
-      const row = await db.userPreference.upsert({ where: { user_id: input.userId }, create: { user_id: input.userId, theme: input.theme ?? null, locale: input.locale ?? null, timezone: input.timezone ?? null, start_page: input.startPage === undefined || input.startPage === null ? null : validateStartPage(input.startPage, input.grants) }, update: data });
+      if (input.language !== undefined) {
+        if (input.language !== null && !isGuideLanguage(input.language)) plainInvalid("PREFERENCE_LANGUAGE", "Choose Indonesian or English for guides.");
+        data.language = input.language;
+      }
+      const row = await db.userPreference.upsert({ where: { user_id: input.userId }, create: { user_id: input.userId, theme: input.theme ?? null, locale: input.locale ?? null, timezone: input.timezone ?? null, start_page: input.startPage === undefined || input.startPage === null ? null : validateStartPage(input.startPage, input.grants), language: input.language ?? null }, update: data });
       return toView(row);
     },
     /**
