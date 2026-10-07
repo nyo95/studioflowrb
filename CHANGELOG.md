@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.399 | 2026-10-07 | fix(ui-engine): guided tour card sits under the highlighted control on narrow screens (Lead)
+
+- **Browser walk (owner account, dev server, narrow window):** language pick, the 4 steps in Indonesian with the ring on Home, Projects and the bell, Done, no replay after reload, "Bantuan: ulangi panduan" in the account menu replays it, Escape closes. Found and fixed: at 840px and below the card covered the neighbouring menu items; it now sits under the highlighted control.
+- **Dev note:** the dev server must be restarted after R8.397 (new Prisma model); a stale server fails with `findMany` of undefined in the layout.
+- Not yet walked: English, a role without project access, phone width, the desktop rail, the two Playwright sessions (BACKLOG stays [UNVERIFIED]).
+
+**Checks.** `tsc --noEmit`, lint (touched file). Docs and one UI file only.
+
 ## R8.398 | 2026-10-07 | feat(platform,studioflow): first-use guided tour on screen; review of R8.397 PASS (Lead)
 
 - **Review of R8.397 (`fd96882`): PASS.** Language and progress are personal-only, the SQL checks and cascade are in place, the tour validator matches the plan. Small notes left open: duplicate step ids and a zero-step tour are not refused; step permission names are not checked against the registry.

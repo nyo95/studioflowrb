@@ -48,7 +48,8 @@ function cardPlace(target: DOMRect | null, cardHeight: number): Place {
   const room = window.innerWidth - 16;
   let left = target.right + GAP;
   let top = target.top;
-  if (left + CARD_WIDTH > room) { left = Math.min(Math.max(8, target.left), room - CARD_WIDTH); top = target.bottom + GAP; }
+  /* At 840px and below the rail is a horizontal strip, so beside the control would cover its neighbours. */
+  if (window.innerWidth <= 840 || left + CARD_WIDTH > room) { left = Math.min(Math.max(8, target.left), room - CARD_WIDTH); top = target.bottom + GAP; }
   top = Math.max(8, Math.min(top, window.innerHeight - cardHeight - 8));
   return { left, top };
 }
