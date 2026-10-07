@@ -2,7 +2,7 @@
 
 Plan ID: WO-PLAT-COST-02 (split the phase service; type the Master Data services — items B and C of the 2026-10-07 audit)
 Scope: Two independent, behaviour-preserving refactors, each its own commit. No product change, no schema change, no new dependency.
-Target revisions: R8.403 (this plan), R8.404 (Executor: item B), R8.405 (Executor: item C). The Lead's UI fixes run in parallel under later revisions and touch other files.
+Target revisions: not fixed in advance. The Lead and the Executor commit in parallel, so each takes the next unused revision from `CHANGELOG.md` at commit time (item B first, then item C).
 Status: READY
 Priority: P2
 Owner: Product Owner ("paralel", 2026-10-07).
@@ -30,7 +30,7 @@ other lane is editing, report it instead of fixing it.
 ## Locked Decisions
 
 1. **Behaviour must not change.** The existing tests are the safety net.
-2. **Item B (R8.404).** Split `apps/studioflow/phases/service.ts` by job into
+2. **Item B.** Split `apps/studioflow/phases/service.ts` by job into
    three files: the phase workflow (commands and reads, incl. iterations,
    notes, images, outcomes, undo, completion), phase-template administration
    (templates and definitions, currently ~L798–L1076) and deliverables
@@ -39,7 +39,7 @@ other lane is editing, report it instead of fixing it.
    no caller outside `phases/` changes. A pure move: no logic edit, rename or
    reformat mixed in. Add a test that lists the members of `studioFlow.phases`
    and compares them with the list before the split (capture it first).
-3. **Item C (R8.405).** Remove `any` from the Master Data services by using the
+3. **Item C.** Remove `any` from the Master Data services by using the
    real Prisma transaction and row types. Files with `any` today: `service.ts`
    (2), `services/deletion.service.ts` (11), `services/pricing.service.ts` (20),
    `services/sku-price-workbook.service.ts` (3),
@@ -93,7 +93,7 @@ BACKLOG and keep behaviour. Each item reverts as one commit.
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and `PLAN.md`, then implement item B (target
-revision R8.404) and then item C (R8.405) of WO-PLAT-COST-02, each verified and
+revision: next unused) and then item C (next unused after B) of WO-PLAT-COST-02, each verified and
 committed on its own, and nothing beyond them. The Lead is editing other areas
 in parallel; follow the Parallel-work rule in `PLAN.md` exactly and stage only
 your own files. Run the long checks (`npm test`, `npm run build`) as background

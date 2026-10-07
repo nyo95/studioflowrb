@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.405 | 2026-10-07 | docs(plan): WO-PLAT-COST-02 revision numbers no longer fixed in advance (Lead)
+
+- The Executor stopped (BLOCKED / CONFLICT) because the plan named R8.404 and R8.405 while the Lead had already taken R8.404. `PLAN.md` now says each side takes the next unused revision from this ledger at commit time, so parallel work cannot collide again. Items B and C unchanged.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.404 | 2026-10-07 | fix(shell,studioflow,bq): audit findings on screen - one first-load poll, no "five phases", BQ dates follow the account, /ui-engine needs sign-in (Lead)
 
 - **Polling.** The bell and the messenger each asked the server twice on first load (a mount request and a route request). The mount request is gone; the route effect makes the first one and the minute timer is unchanged. In development React Strict Mode still runs effects twice, so the dev log shows two of each; production now makes one.
