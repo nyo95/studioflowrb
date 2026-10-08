@@ -32,7 +32,7 @@ const PRICE_PAGE_SIZE = 25;
 
 
 
-export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Array<Ref & { brandIds: string[] }>; workVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
+export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Array<Ref & { brandIds: string[] }>; workVendors: Array<Ref & { categoryIds: string[] }>; materialLaborVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const { locale } = useDisplaySettings();
   /** A text price or a price on request is shown in italic, muted text instead of a number. */
   const displayPrice = (amount: string, currency: string, label?: string | null) => label
@@ -206,8 +206,8 @@ export function PricingDirectory(props: { materialPrices: MaterialRow[]; materia
   };
   return <div className="flex min-h-0 flex-1 flex-col gap-4">
     {rowError ? <InlineError>{rowError}</InlineError> : null}
-    {matrixKind && <PriceMatrixDialog key={matrixKind} kind={matrixKind} modes={(onChange) => entryModes({ kind: matrixKind, multiSupplier: true }, onChange)} onSwitch={openEntry} vendors={props.workVendors} categories={props.workCategories} units={props.units} onClose={() => setMatrixKind(null)} />}
-    {editor && <PriceEditor key={`${editor.kind}-${editor.row?.id ?? "new"}`} modes={editor.row ? undefined : (onChange) => entryModes({ kind: editor.kind, multiSupplier: false }, onChange)} onSwitch={openEntry} pending={savePending} editor={editor} refs={{ ...props, vendors: editor.kind === "material" ? props.materialVendors : props.workVendors }} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
+    {matrixKind && <PriceMatrixDialog key={matrixKind} kind={matrixKind} modes={(onChange) => entryModes({ kind: matrixKind, multiSupplier: true }, onChange)} onSwitch={openEntry} vendors={matrixKind === "material-labor" ? props.materialLaborVendors : props.workVendors} categories={props.workCategories} units={props.units} onClose={() => setMatrixKind(null)} />}
+    {editor && <PriceEditor key={`${editor.kind}-${editor.row?.id ?? "new"}`} modes={editor.row ? undefined : (onChange) => entryModes({ kind: editor.kind, multiSupplier: false }, onChange)} onSwitch={openEntry} pending={savePending} editor={editor} refs={{ ...props, vendors: editor.kind === "material" ? props.materialVendors : editor.kind === "material-labor" ? props.materialLaborVendors : props.workVendors }} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
     <PillTabPanels
       fill
       label="Price views"
@@ -312,7 +312,8 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const [dimensionThickness, setDimensionThickness] = useState("");
   const [dimensionUnitId, setDimensionUnitId] = useState(defaultDimensionUnit?.id ?? "");
   const needsMaterial = material;
-  const eligibleTypes = refs.vendorTypes.filter((type) => needsMaterial ? type.canSupplyMaterial : type.canSupplyLabor);
+  // Material+Labor accepts a Supplier that supplies material, provides labor, or both (owner, 2026-10-08).
+  const eligibleTypes = refs.vendorTypes.filter((type) => needsMaterial ? type.canSupplyMaterial : editor.kind === "material-labor" ? type.canSupplyMaterial || type.canSupplyLabor : type.canSupplyLabor);
   const newMaterialSku = material && !edit && materialEntryMode === "new";
   const selectedBaseUnit = refs.units.find((unit) => unit.id === baseUnitId);
   const selectedPurchaseUnit = refs.units.find((unit) => unit.id === purchaseUnitId);

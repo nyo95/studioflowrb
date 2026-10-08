@@ -174,7 +174,8 @@ export default async function PricingPage() {
         }))}
         vendors={[...new Map([...(materialRefs?.vendors ?? []), ...(workRefs?.vendors ?? [])].map((vendor) => [vendor.id, { id: vendor.id, name: vendor.name }] as const)).values()].sort((left, right) => left.name.localeCompare(right.name, "id"))}
         materialVendors={materialRefs?.vendors ?? []}
-        workVendors={workRefs?.vendors ?? []}
+        workVendors={workRefs?.laborVendors ?? []}
+        materialLaborVendors={workRefs?.materialLaborVendors ?? []}
         units={materialRefs?.units ?? workRefs?.units ?? []}
         workCategories={workRefs?.workCategories ?? []}
         vendorTypes={vendorTypes.map((vendorType) => ({ id: vendorType.id, name: vendorType.name, canSupplyMaterial: vendorType.can_supply_material, canSupplyLabor: vendorType.can_supply_labor }))}

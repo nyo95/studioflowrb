@@ -1,145 +1,127 @@
 # Active Plan
 
-Plan ID: WO-MD-CRUD-01 (Master Data CRUD audit fixes: restore, brand edit, duplicates, supplier archive cascade, Material+Labor supplier rule)
-Scope: Master Data service fixes found by the Lead's read-only audit of 2026-10-08, with two owner decisions. Backend only; the Lead adjusts the supplier pickers and the quick-add supplier form afterwards.
-Target revisions: next unused revision at commit time; one commit per item group, in order A, B, C. Stopping after any committed group is a valid result (report the rest as not started); never commit a half-done group.
-
-Previous plan WO-PLAT-COST-02 is BUILT (items B and C at R8.406 and R8.409).
+Plan ID: WO-MD-ENTRY-01 (data entry that does not fight the person: auto-link on price save, "still used by N prices" details, save-the-valid-rows in the price grids)
+Scope: Master Data backend for the three owner-approved recommendations of the 2026-10-08 data-entry review. The Lead changes the Pricing screens afterwards.
+Target revisions: next unused revision at commit time; one commit per group, in order A, B, C. Stopping after any committed group is a valid result (report the rest as not started); never commit a half-done group.
 Status: READY
 Priority: P2
-Owner: Product Owner. Decisions confirmed in chat on 2026-10-08 (kantor).
+Owner: Product Owner. Decisions confirmed in chat on 2026-10-08 (kantor): "ikut rekomendasi".
 Last updated: 2026-10-08
+
+Previous plan WO-MD-CRUD-01 is BUILT (R8.412–R8.414); the Lead wired the Material+Labor supplier lists in the Pricing screen.
 
 ## Outcome
 
-Master Data behaves the same on every path to the same state: a price-less SKU
-and its Brand can be restored, a Brand can be edited while its owner is archived,
-duplicate input never produces a generic error, archiving a Supplier archives
-what depends on it, and a Material+Labor price can come from a material
-supplier, a labor supplier or one that is both.
+A person typing a supplier's price list is no longer stopped by rules the system
+can work out for itself: pricing a Brand's SKU from a supplier makes that
+supplier a supplier of the Brand; a "still in use" refusal says exactly which
+Brand and supplier and how many prices so the screen can link to them; and in
+the price grids one bad row no longer throws away the good ones.
 
 ## Locked Decisions
 
-Owner (2026-10-08):
+1. **Group A, auto-link.** When a material price is created for a SKU that has a
+   Brand, and the supplier is not that Brand's owner and not yet one of its
+   suppliers, the link (`BrandSupplier`, `is_authorized` false, no notes) is
+   created in the same transaction instead of refusing with
+   `PRICE_BRAND_SUPPLIER_NOT_LINKED`. The supplier must still be live and
+   material-capable (unchanged). The link is audited as `brand.supplier-linked`
+   with the price as the reason. This applies to every path that creates a
+   material price: single create, `createMaterialPriceRows` and the bulk wrapper,
+   the SKU-with-prices create, and the workbook imports. Anyone allowed to create
+   the price may cause the link; no extra permission. Updating a price keeps its
+   existing chain check. `linkBrandToSupplier` and the removal rules
+   (`BRAND_SUPPLIER_IN_USE`, `BRAND_OWNER_IN_USE`) are unchanged.
+2. **Group B, details on "in use".** `BRAND_OWNER_IN_USE` and
+   `BRAND_SUPPLIER_IN_USE` (and the Supplier Type capability-in-use refusals)
+   carry structured `details` the screen can use: the Brand id and name, the
+   Supplier id and name, and the live price count. The message text stays
+   human-readable. No behaviour change otherwise.
+3. **Group C, save the valid rows.** The price grids get a second mode: save the
+   rows that pass and return the rows that do not, each with its message, instead
+   of refusing the whole batch. It applies to `createMaterialPriceRows` (and
+   `createMaterialPricesBulk`), `createWorkPricesBulk` and `createWorkPriceMatrix`.
+   - New input flag, e.g. `onInvalid: "reject-all" | "save-valid"`; the default
+     stays `reject-all` so existing callers and tests keep working; the Lead
+     switches the screens to `save-valid`.
+   - Result in `save-valid` mode: the saved ids and a `rejected` list with the row
+     index, supplier where the grid has one, field, code and message (the same
+     shape `details.rows` has today). It succeeds when at least one row was
+     saved, and still refuses with `BULK_ROWS_INVALID` when none was.
+   - The unit of saving is the row (the cell, in the compare grid). A database
+     error on one row must not poison the other rows: use a per-row savepoint (or
+     per-row transaction) so the batch continues, never a swallowed error inside
+     one aborted transaction.
+   - One audit entry per batch with saved and rejected counts. Duplicate-in-batch
+     and live-conflict checks keep working; rows rejected for them are listed
+     like any other.
+   - **Not in this work order:** the workbook imports keep their current
+     preview-then-apply, all-invalid-rows-rejected behaviour.
 
-1. **Supplier archive cascade.** Archiving a Supplier archives every price of it
-   (Material, Labor, Material+Labor, as today) **and every Brand it owns**
-   (`Brand.owner_vendor_id`), each Brand with its SKUs and their material prices
-   exactly as `archiveBrand` does. A Brand that merely lists the Supplier as one
-   of its suppliers stays live (other suppliers may still carry it). Restoring
-   the Supplier restores what it caused, with the existing restore checks.
-   The Brand-archived-by-Supplier uses the existing archive-cause model: a
-   `PARENT` cause (`parent_type: "vendor"`) on the Brand; a Brand that was also
-   archived by hand keeps its own direct cause and stays archived after the
-   Supplier is restored.
-2. **The "keep one live price" rule.** Archiving a single price by hand still
-   refuses to archive a live SKU's last live price (`SKU_PRICE_REQUIRED`).
-   Cascades (Supplier, Brand, SKU) are exempt, as they are today for Brand and
-   SKU. No change to that rule's code beyond not applying it to cascades.
-3. **Material+Labor supplier.** A Material+Labor price accepts a Supplier that
-   can supply material, or can provide labor, or both. A Labor price still needs
-   a labor-capable Supplier; a Material price still needs a material-capable one.
+## Business Rules and Architecture Constraints
 
-## Backend Contract
-
-**Item group A — restore and edit bugs** (BACKLOG [BUG] entries of 2026-10-08):
-- A1. A SKU with no archived-with-it prices restores. `assertSkuRestorable`
-  (`services/shared.ts`) must stop demanding a restorable price when the SKU
-  had none; it keeps every other check. `restoreSku` and `restoreBrand` both
-  succeed for a price-less SKU. A SKU whose prices exist but are all still held
-  by another archive cause keeps the current refusal.
-- A2. `updateBrand` checks the owner Supplier only when the owner is being
-  changed to a new one. Saving a live Brand whose current owner is archived
-  works for every other field; setting an archived Supplier as the owner is
-  still refused; `restoreBrand` keeps its own owner check.
-- A3. Create paths collapse duplicate input like the update paths do: link
-  URLs (trimmed, case as the unique index sees them), category ids, supplier
-  ids and hashtags in `createBrand`; supplier type ids in `createVendor`. SKU is
-  out: a SKU has exactly one category (`categoryId`), so it cannot repeat one.
-  No generic error from a unique index for input the caller repeated.
-
-**Item group B — Material+Labor capability** (decision 3):
-- `createPriceMaterialLabor`, `updatePriceMaterialLabor`, the bulk/matrix
-  creation for kind `material-labor`, `assertWorkPriceRestorable` for
-  `material-labor`, and `assertVendorTypeRemovalSafe` use a new check
-  "material-capable or labor-capable" for Material+Labor prices only.
-  Removing a Supplier Type is blocked for Material+Labor prices only when the
-  Supplier would end up with neither capability.
-- `listPricingWorkRefs` returns the Suppliers a Labor price may use and
-  separately the Suppliers a Material+Labor price may use (material- or
-  labor-capable), so the screens can offer the right list. `createPricingVendorQuick`
-  accepts capability `WORK` (either capability) for Material+Labor, still
-  refusing a Supplier Type that supplies neither.
-- The Lead then updates the pickers and the quick-add form; do not change screens.
-
-**Item group C — supplier archive cascade** (decision 1):
-- `archiveVendor` additionally archives the Brands it owns that are live, each
-  with the same cascade `archiveBrand` runs (extract one shared helper; no
-  second copy of that logic), records the audit counts for brands, SKUs and
-  prices, and `restoreVendor` restores those Brands and their SKUs and prices
-  through the existing cause bookkeeping, running the existing restore checks
-  (identity conflict, archived category, archived unit, and so on); a failed
-  check names the Brand and refuses the whole restore.
+Capability REUSE: the existing per-row creators and the archive/link helpers. No
+schema change expected; if one proves necessary, stop with BLOCKED / CONFLICT.
+Master Data stays the owner of Brand and Supplier links; StudioFlow and BQ are
+untouched.
 
 ## Boundaries and Non-goals
 
-No schema change expected (the cause table already carries parent type and id);
-if one proves necessary, stop with BLOCKED / CONFLICT. No screen changes. No
-change to the deletion-request workflow, to who may do what, or to SKU, unit,
-category and workbook code except where an item names it. No push, tag, PR or
-release.
+No screen changes (the Lead does them). No change to permissions beyond the
+side-effect link in group A. No change to the workbook imports, to SKU rules, or
+to archive and restore. No push, tag, PR or release.
 
 ## Acceptance Criteria
 
-1. A: archive then restore a price-less SKU works; archive then restore a Brand
-   holding a price-less SKU works; a SKU with prices still held by another cause
-   still refuses; renaming a Brand whose owner is archived works; making an
-   archived Supplier the owner is refused; creating a Brand with the same link
-   URL, category, supplier or hashtag twice succeeds once each; the same for a
-   Supplier's types.
-2. B: Material+Labor price accepted for a material-only, a labor-only and a
-   both-capable Supplier, refused for one with neither; Labor price still needs
-   labor; restore and Supplier-Type removal follow the new rule; the matrix and
-   bulk paths accept the same Suppliers as the single create.
-3. C: archiving a Supplier archives its prices and the Brands it owns with their
-   SKUs and prices, and not a Brand that only lists it as a supplier; restoring
-   it brings back exactly what it caused; a Brand also archived by hand stays
-   archived; a restore blocked by a check leaves everything unchanged.
-4. Each group has its own integration tests in the existing style, and the
-   existing suites pass unchanged except where a test asserted the old behaviour
-   (name each changed expectation in the changelog).
+1. A: a price for a SKU of Brand B from a supplier that is neither B's owner nor
+   linked creates the price and the link in one transaction; an archived or
+   non-material supplier is still refused; a failed price rolls the link back; the
+   link appears once when two rows in one batch use the same new supplier; the
+   audit shows the link; the old "not linked" refusal is gone from every create
+   path.
+2. B: each named refusal returns the ids, names and count in `details`; tests
+   assert them.
+3. C: a grid with some bad rows in `save-valid` mode saves the good ones and
+   returns the bad ones with index, field, code and message; with all rows bad it
+   refuses as today; a row that fails inside the database does not stop later
+   rows; `reject-all` mode behaves exactly as before; the compare grid reports
+   rejected cells with their supplier.
+4. The existing suites pass unchanged except where a test asserted the old "not
+   linked" refusal (name each changed expectation in the changelog).
 
 ## Verification
 
 Per commit: `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`,
 `check:legacy-runtime`, `npm test` (full), `npm run build`; run the long ones in
 the background and finish them before the commit. Verify the database target is
-rebuild-only before any database command. Browser not required.
+rebuild-only before any database command; use the reachable rebuild-only test
+database on port 5433 as is and do not stop, remove or recreate any Docker
+container. Browser not required.
 
 ## Reviewer Acceptance
 
-The Lead walks the Pricing screen (Material+Labor supplier lists and the quick
-add), archives and restores a test Supplier that owns a Brand, and restores a
-price-less sample SKU, in the browser.
+After the Lead's screen changes: enter a price for a Brand from an unlinked
+supplier in the browser, try removing a supplier link that prices use and follow
+the link in the message, and save a grid of ten rows with two bad ones.
 
 ## Regression Risks and Recovery
 
-The cascade touches every archive and restore path, so the existing archive
-cause tests are the guard; item group C can be reverted alone as one commit. The
-capability rule changes who may be picked for Material+Labor prices, never what
-is stored.
+Group C touches the all-or-nothing guarantee the grids have today; the default
+mode keeps it and each group reverts as one commit. A savepoint mistake could
+leave a half-saved row; the "database error mid-batch" test is the guard.
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and `PLAN.md`, then implement WO-MD-CRUD-01 as three
+`docs/agent/EXECUTOR.md`, and `PLAN.md`, then implement WO-MD-ENTRY-01 as three
 separately verified and committed groups in the order A, B, C (each takes the
 next unused revision from `CHANGELOG.md` at commit time), and nothing beyond
-them. Edit only `src/apps/masterdata/**`, `CHANGELOG.md` and `docs/BACKLOG.md`;
-close the matching BACKLOG [BUG] entries only after their group is verified.
+them. Stopping after any committed group is valid; never commit a half-done
+group. Edit only `src/apps/masterdata/**`, `CHANGELOG.md` and `docs/BACKLOG.md`.
 The Lead may edit other areas in parallel, so stage only your own files. Run the
 long checks (`npm test`, `npm run build`) as background jobs and finish them
-before each commit; never commit a half-done group. Stop only for a material
-locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report;
-otherwise report each commit, checks, limitations, and remaining unrelated dirty
-files.
+before each commit. Do not stop, remove or recreate any Docker container: use
+the reachable rebuild-only database on port 5433 as is, and tell the Lead if it
+is not reachable. Stop only for a material locked-decision conflict or unsafe
+boundary, using the BLOCKED / CONFLICT report; otherwise report each commit,
+checks, limitations, and remaining unrelated dirty files.

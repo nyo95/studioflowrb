@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.415 | 2026-10-08 | feat(masterdata): Material+Labor supplier lists on screen; review of R8.412-R8.414 PASS; WO-MD-ENTRY-01 (Lead)
+
+- **Review of WO-MD-CRUD-01 (R8.412 `fe7eddc`, R8.413 `937ddf4`, R8.414 `1f6dbd8`): PASS.** Read the cascade diff (one shared `archiveBrandCascade`, owned Brands archived with a parent cause, restore checks run per Brand and the whole restore rolls back on a failed check, a hand-archived Brand keeps its own cause). Lead re-ran `tsc --noEmit` and the full tests: 944/944. The Executor finished all three groups.
+- **Pricing screen.** A Material+Labor price now offers Suppliers that supply material, provide labor or both (single entry, compare grid and the quick-add supplier form, which accepts a Supplier Type with either capability); Labor still offers labor suppliers only. New `WORK` capability passed from the quick-add action.
+- **PLAN.md READY: WO-MD-ENTRY-01** from the owner's approval of the data-entry review: auto-link supplier to Brand on price save, structured "in use" details, and a save-the-valid-rows mode for the price grids. Workbook imports unchanged (BACKLOG).
+
+**Checks.** `tsc --noEmit`, lint (Pricing screen), `npm test` 944/944. Browser not opened (the dev server was down: two database containers shared port 5433); the walk is [UNVERIFIED] in BACKLOG.
+
 ## R8.414 | 2026-10-08 | fix(masterdata): cascade owned Brands through Supplier archive (Executor)
 
 - Archiving a Supplier now also archives each live Brand it owns, its SKUs, and their material prices using the same recorded cause chain as a direct Brand archive; Brands that only list that Supplier stay live.

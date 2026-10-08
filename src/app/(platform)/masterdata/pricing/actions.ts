@@ -169,7 +169,7 @@ export async function createPricingVendorQuickAction(kind: PriceKind, formData: 
       ...ctx,
       name: parsed.data.name,
       vendorTypeId: parsed.data.vendorTypeId,
-      capability: parsedKind === "material" ? "MATERIAL" : "LABOR",
+      capability: parsedKind === "material" ? "MATERIAL" : parsedKind === "material-labor" ? "WORK" : "LABOR",
     });
     refreshPricing();
     return result;
