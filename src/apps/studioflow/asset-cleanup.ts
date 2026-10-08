@@ -40,6 +40,8 @@ async function isReferenced(db: Db | TxClient, key: string): Promise<boolean> {
     db.sfScheduleOption.count({ where: { image_key: key } }),
     db.sfScheduleTemplateItem.count({ where: { image_key: key } }),
     db.sfClient.count({ where: { logo_storage_key: key } }),
+    // Same guard as below for the isolated storage tests' delegate subset.
+    ...(db.sfIdeaCard ? [db.sfIdeaCard.count({ where: { image_key: key } })] : []),
     // Older isolated storage tests deliberately provide only the pre-Presentation
     // delegate subset. Runtime Prisma always has this delegate after the migration.
     ...(db.sfPresentationSlide ? [db.sfPresentationSlide.count({ where: { image_key: key } })] : []),

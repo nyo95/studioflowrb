@@ -1,0 +1,117 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+import { requirePrincipalGrants } from "@platform/core/auth";
+import { runSafeAction, type ActionResult } from "@platform/core/actions";
+import { AppError } from "@platform/core/errors";
+import { validationError } from "@platform/core/validation";
+import { studioFlow } from "@/apps/studioflow/runtime";
+
+/**
+ * Ideas board actions (WO-SF-IDEAS-01). Transport validation only: ownership, limits and the schedule rules
+ * are decided by the StudioFlow services. Every card read and write is scoped to the signed-in user.
+ */
+
+const Id = z.uuid();
+const Text = (max: number) => z.string().max(max).nullish();
+
+async function context() {
+  const { principal, grants } = await requirePrincipalGrants();
+  return { grants, actor: { kind: "USER" as const, userId: principal.userId, label: principal.displayName } };
+}
+
+function parse<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) throw validationError(parsed.error);
+  return parsed.data;
+}
+
+function refresh(projectId?: string) {
+  revalidatePath("/studioflow/ideas");
+  if (projectId) revalidatePath(`/studioflow/projects/${projectId}`, "layout");
+}
+
+async function imageOf(formData: FormData) {
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new AppError("VALIDATION", "IDEA_IMAGE_REQUIRED", "Choose an image.");
+  return { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type };
+}
+
+function formText(formData: FormData, name: string): string | null | undefined {
+  const value = formData.get(name);
+  return typeof value === "string" ? value : undefined;
+}
+
+export type IdeaCardView = Awaited<ReturnType<typeof studioFlow.ideas.listIdeaCards>>[number];
+
+export async function listIdeaCardsAction(): Promise<ActionResult<IdeaCardView[]>> {
+  return runSafeAction(async () => studioFlow.ideas.listIdeaCards(await context()));
+}
+
+export async function listIdeaTargetsAction(): Promise<ActionResult<Array<{ id: string; name: string }>>> {
+  return runSafeAction(async () => studioFlow.ideas.listIdeaTargets(await context()));
+}
+
+const CreateForm = z.strictObject({ title: Text(160), sourceUrl: Text(2000), note: Text(2000) });
+/** FormData: `file` (required), optional `title`, `sourceUrl`, `note`. */
+export async function createIdeaCardAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(CreateForm, { title: formText(formData, "title"), sourceUrl: formText(formData, "sourceUrl"), note: formText(formData, "note") });
+    const result = await studioFlow.ideas.createIdeaCard({ ...ctx, ...data, file: await imageOf(formData) });
+    refresh();
+    return result;
+  });
+}
+
+const ImageForm = z.strictObject({ cardId: Id });
+export async function replaceIdeaImageAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ImageForm, { cardId: formData.get("cardId") });
+    const result = await studioFlow.ideas.replaceIdeaImage({ ...ctx, ...data, file: await imageOf(formData) });
+    refresh();
+    return result;
+  });
+}
+
+const IdeaCommand = z.discriminatedUnion("command", [
+  z.strictObject({ command: z.literal("update"), cardId: Id, title: Text(160).optional(), sourceUrl: Text(2000).optional(), note: Text(2000).optional() }),
+  z.strictObject({ command: z.literal("delete"), cardId: Id }),
+]);
+export type IdeaCommandInput = z.infer<typeof IdeaCommand>;
+
+export async function ideaCardAction(input: IdeaCommandInput): Promise<ActionResult<{ cardId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(IdeaCommand, input);
+    const result = data.command === "update"
+      ? await studioFlow.ideas.updateIdeaCard({ ...ctx, cardId: data.cardId, title: data.title, sourceUrl: data.sourceUrl, note: data.note })
+      : await studioFlow.ideas.deleteIdeaCard({ ...ctx, cardId: data.cardId });
+    refresh();
+    return result;
+  });
+}
+
+const UseInput = z.strictObject({
+  cardId: Id,
+  projectId: Id,
+  target: z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("new-item"), section: z.string().max(20), category: z.string().max(120), qty: Text(20), unit: Text(40), location: Text(160) }),
+    z.strictObject({ kind: z.literal("option"), entryId: Id }),
+  ]),
+  option: z.strictObject({ productName: z.string().max(200), brandName: Text(200), color: Text(200), pattern: Text(200), finishing: Text(200), dimension: Text(200), notes: Text(2000) }),
+});
+export type UseIdeaInput = z.infer<typeof UseInput>;
+
+export async function useIdeaInScheduleAction(input: UseIdeaInput): Promise<ActionResult<{ projectId: string; entryId: string; optionId: string; code: string; label: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(UseInput, input);
+    const result = await studioFlow.ideas.useIdeaInSchedule({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}

@@ -46,6 +46,7 @@ function storageThatFails(failingKeys: ReadonlySet<string>): ObjectStorage {
     async put() { throw new Error("not used"); },
     async putStream() { throw new Error("not used"); },
     async remove(key: string) { if (failingKeys.has(key)) throw new Error("disk unavailable"); },
+    async copy() { throw new Error("not used"); },
     async createSignedReadUrl() { throw new Error("not used"); },
   };
 }

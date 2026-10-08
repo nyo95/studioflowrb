@@ -139,6 +139,26 @@ export function createLocalFilesystemStorage(rootDir: string, options: LocalFile
         throw new AppError("INFRASTRUCTURE", "storage.provider-unavailable", "Image storage is unavailable. Try again later.");
       }
     },
+    async copy(input: { fromKey: string; toKey: string }): Promise<void> {
+      const [fromPath, toPath] = await Promise.all([resolveSafePath(root, input.fromKey), resolveSafePath(root, input.toKey)]);
+      let bytes: number;
+      try {
+        bytes = (await fs.stat(fromPath)).size;
+      } catch {
+        throw new AppError("NOT_FOUND", "storage.object-not-found", "The image is unavailable.");
+      }
+      await fs.mkdir(path.dirname(toPath), { recursive: true });
+      await assertFreeSpace(path.dirname(toPath), bytes);
+      try {
+        // COPYFILE_EXCL: never overwrite an object another row may already point at.
+        await fs.copyFile(fromPath, toPath, fs.constants.COPYFILE_EXCL);
+      } catch (error: unknown) {
+        if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "EEXIST") {
+          throw new AppError("CONFLICT", "storage.object-exists", "The storage destination is already taken.");
+        }
+        throw new AppError("INFRASTRUCTURE", "storage.provider-unavailable", "Image storage is unavailable. Try again later.");
+      }
+    },
     async createSignedReadUrl(key: string, expiresInSeconds: number): Promise<string> {
       const filePath = await resolveSafePath(root, key);
       try {

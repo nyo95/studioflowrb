@@ -83,7 +83,7 @@ async function reset() {
     "sf_deliverable", "sf_phase_note_image", "sf_phase_note", "sf_asset_cleanup_failure",
     "sf_activity", "sf_revision", "sf_phase",
     "sf_phase_definition", "sf_phase_template",
-    "sf_project", "sf_client", "sf_settings", "sf_holiday",
+    "sf_project", "sf_client", "sf_settings", "sf_holiday", "sf_idea_usage", "sf_idea_card",
   ].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
   await truncatePlatformTables(testDb);
   await testDb.prisma.notification.deleteMany();
@@ -591,6 +591,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const flaky: ObjectStorage = {
       put: (input) => storage.put(input),
       putStream: (input) => storage.putStream(input),
+      copy: (input) => storage.copy(input),
       createSignedReadUrl: (key, expiresIn) => storage.createSignedReadUrl(key, expiresIn),
       async remove(key: string) {
         if (key === flakyKey && failNext) { failNext = false; throw new Error("disk unavailable"); }
@@ -687,7 +688,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const writer = createAuditEventWriter();
     try {
       const result = await retention({
-        storage: { put: (input) => storage.put(input), putStream: (input) => storage.putStream(input), createSignedReadUrl: (key, seconds) => storage.createSignedReadUrl(key, seconds), remove: async (key) => {
+        storage: { put: (input) => storage.put(input), putStream: (input) => storage.putStream(input), copy: (input) => storage.copy(input), createSignedReadUrl: (key, seconds) => storage.createSignedReadUrl(key, seconds), remove: async (key) => {
           assert.equal(await testDb.prisma.sfDeliverable.count({ where: { project_id: expired.projectId } }), 0);
           if (key === expired.keys.deliverable) throw Error("secret filename");
           await storage.remove(key);
@@ -3253,5 +3254,142 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
     const latest = await sf.phases.latestUndoableEvent({ grants: ALL, actor: designer.actor, projectId: base.projectId });
     assert.ok(latest);
     await rejectsWith(sf.phases.undoPhaseEvent({ ...as(designer), projectId: base.projectId, eventId: latest!.id }), "UNDO_HAS_NEWER_DATA");
+  });
+});
+
+describe("WO-SF-IDEAS-01 personal Ideas board", () => {
+  const cardImage = (seed: number) => ({ body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, seed, seed, seed]), contentType: "image/png" });
+  const bytesOf = (key: string) => [...(storage.objects.get(key)?.body ?? [])];
+
+  it("keeps a card private to its owner and valid with only an image", async () => {
+    const other = await seedUser("Other Owner", ALL);
+    const { cardId } = await sf.ideas.createIdeaCard({ ...as(designer), file: cardImage(1) });
+    const card = await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: cardId } });
+    assert.deepEqual([card.title, card.source_url, card.note, card.owner_user_id], [null, null, null, designer.id]);
+    assert.deepEqual((await sf.ideas.listIdeaCards(as(designer))).map((row) => row.id), [cardId]);
+    // Every permission is not enough: another user's card does not exist for them.
+    assert.deepEqual(await sf.ideas.listIdeaCards(as(other)), []);
+    await rejectsWith(sf.ideas.updateIdeaCard({ ...as(other), cardId, title: "Mine" }), "IDEA_CARD_NOT_FOUND");
+    await rejectsWith(sf.ideas.replaceIdeaImage({ ...as(other), cardId, file: cardImage(2) }), "IDEA_CARD_NOT_FOUND");
+    await rejectsWith(sf.ideas.deleteIdeaCard({ ...as(other), cardId }), "IDEA_CARD_NOT_FOUND");
+    const { projectId } = await sf.projects.createProject({ ...as(other), name: "Other's project", newClientName: "Other", picDesignerId: other.id, picDrafterId: drafter.id, area: "10" });
+    await rejectsWith(sf.ideas.useIdeaInSchedule({ ...as(other), cardId, projectId, target: { kind: "new-item", section: "MATERIAL", category: "Stone" }, option: { productName: "Taken" } }), "IDEA_CARD_NOT_FOUND");
+    await sf.ideas.updateIdeaCard({ ...as(designer), cardId, title: "  Pink stone ", sourceUrl: "https://pinterest.com/pin/1", note: "Cashier wall?" });
+    const [row] = await sf.ideas.listIdeaCards(as(designer));
+    assert.deepEqual([row.title, row.sourceUrl, row.note], ["Pink stone", "https://pinterest.com/pin/1", "Cashier wall?"]);
+    await sf.ideas.updateIdeaCard({ ...as(designer), cardId, sourceUrl: "" });
+    assert.equal((await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: cardId } })).source_url, null);
+  });
+
+  it("stores a source link as text only and refuses anything but a web address", async () => {
+    await rejectsWith(sf.ideas.createIdeaCard({ ...as(designer), sourceUrl: "javascript:alert(1)", file: cardImage(1) }), "IDEA_URL_INVALID");
+    await rejectsWith(sf.ideas.createIdeaCard({ ...as(designer), sourceUrl: "data:text/html,x", file: cardImage(1) }), "IDEA_URL_INVALID");
+    await rejectsWith(sf.ideas.createIdeaCard({ ...as(designer), file: { body: new Uint8Array([1, 2, 3]), contentType: "image/png" } }), "IDEA_IMAGE_TYPE");
+    assert.equal(await testDb.prisma.sfIdeaCard.count(), 0);
+    const { cardId } = await sf.ideas.createIdeaCard({ ...as(designer), sourceUrl: "http://example.com/a", file: cardImage(1) });
+    assert.equal((await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: cardId } })).source_url, "http://example.com/a");
+  });
+
+  it("uses a card as a new item and as an extra option, each with its own image copy, never final", async () => {
+    const { projectId } = await newProject("Sociolla");
+    const { cardId } = await sf.ideas.createIdeaCard({ ...as(designer), title: "Calacatta Viola", file: cardImage(5) });
+    const cardKey = (await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: cardId } })).image_key;
+    const existing = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone", snapshot: { productName: "Travertine" } });
+
+    const asNew = await sf.ideas.useIdeaInSchedule({ ...as(designer), cardId, projectId, target: { kind: "new-item", section: "MATERIAL", category: "Stone" }, option: { productName: "Calacatta Viola", notes: "Cashier" } });
+    const asOption = await sf.ideas.useIdeaInSchedule({ ...as(designer), cardId, projectId, target: { kind: "option", entryId: existing.entryId }, option: { productName: "Calacatta Viola" } });
+
+    const entryOne = await testDb.prisma.sfScheduleEntry.findUniqueOrThrow({ where: { id: existing.entryId } });
+    const newEntry = await testDb.prisma.sfScheduleEntry.findUniqueOrThrow({ where: { id: asNew.entryId } });
+    assert.equal(newEntry.prefix, entryOne.prefix);
+    assert.equal(newEntry.increment, entryOne.increment + 1);
+    assert.equal(asNew.label, "A");
+    assert.equal(asOption.label, "B");
+    assert.equal(asOption.entryId, existing.entryId);
+
+    const options = await testDb.prisma.sfScheduleOption.findMany({ where: { id: { in: [asNew.optionId, asOption.optionId] } } });
+    for (const option of options) {
+      assert.equal(option.is_final, false);
+      assert.equal(option.status, "DRAFT");
+      assert.equal(option.brand_id, null);
+      assert.ok(option.image_key && option.image_key !== cardKey && option.image_key.startsWith(`studioflow/schedule/${projectId}/`));
+      assert.deepEqual(bytesOf(option.image_key!), bytesOf(cardKey));
+    }
+    assert.notEqual(options[0].image_key, options[1].image_key);
+    assert.equal(options.find((option) => option.id === asNew.optionId)!.notes, "Cashier");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.schedule.entry-created", entity_id: asNew.entryId } }), 1);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.idea.used", entity_id: cardId } }), 2);
+
+    const [card] = await sf.ideas.listIdeaCards(as(designer));
+    assert.deepEqual(card.usages.map((usage) => [usage.projectName, usage.code, usage.label]), [["Sociolla", asNew.code, "A"], ["Sociolla", asOption.code, "B"]]);
+
+    // Replacing, then deleting the card leaves the schedule's own images in place.
+    await sf.ideas.replaceIdeaImage({ ...as(designer), cardId, file: cardImage(9) });
+    assert.equal(storage.objects.has(cardKey), false);
+    await sf.ideas.deleteIdeaCard({ ...as(designer), cardId });
+    for (const option of options) assert.ok(storage.objects.has(option.image_key!));
+    assert.equal(await testDb.prisma.sfScheduleOption.count({ where: { id: { in: [asNew.optionId, asOption.optionId] } } }), 2);
+  });
+
+  it("shows the current code after a reorder and drops a usage whose option is deleted, keeping the card", async () => {
+    const { projectId } = await newProject("Reorder project");
+    const first = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone", snapshot: { productName: "First" } });
+    const { cardId } = await sf.ideas.createIdeaCard({ ...as(designer), file: cardImage(3) });
+    const used = await sf.ideas.useIdeaInSchedule({ ...as(designer), cardId, projectId, target: { kind: "new-item", section: "MATERIAL", category: "Stone" }, option: { productName: "Second" } });
+    const before = (await sf.ideas.listIdeaCards(as(designer)))[0].usages[0].code;
+    const prefix = (await testDb.prisma.sfScheduleEntry.findUniqueOrThrow({ where: { id: used.entryId } })).prefix;
+    await sf.schedule.reorderEntries({ ...as(designer), projectId, section: "MATERIAL", prefix, orderedIds: [used.entryId, first.entryId] });
+    const after = (await sf.ideas.listIdeaCards(as(designer)))[0].usages[0].code;
+    assert.notEqual(after, before);
+    const entry = await testDb.prisma.sfScheduleEntry.findUniqueOrThrow({ where: { id: used.entryId } });
+    assert.equal(entry.increment, 1);
+    assert.ok(after.endsWith("01"), after);
+
+    await sf.schedule.deleteOption({ ...as(designer), projectId, optionId: used.optionId });
+    const [card] = await sf.ideas.listIdeaCards(as(designer));
+    assert.equal(card.id, cardId);
+    assert.deepEqual(card.usages, []);
+    assert.ok(storage.objects.has((await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: cardId } })).image_key));
+  });
+
+  it("offers and allows only the projects the user holds, never a completed or archived one", async () => {
+    const outsiderGrants = [P.access, P.projectRead, P.scheduleManage];
+    const outsider = await seedUser("Outside Designer", outsiderGrants);
+    const held = await newProject("Held project");
+    const completed = await newProject("Completed project");
+    const archived = await newProject("Archived project");
+    await testDb.prisma.sfProject.update({ where: { id: completed.projectId }, data: { status: "COMPLETED" } });
+    await testDb.prisma.sfProject.update({ where: { id: archived.projectId }, data: { archived_at: new Date() } });
+    assert.deepEqual((await sf.ideas.listIdeaTargets(as(designer))).map((project) => project.name), ["Held project"]);
+    assert.deepEqual(await sf.ideas.listIdeaTargets(as(outsider, outsiderGrants)), []);
+    // A manager override holds every open project.
+    assert.deepEqual((await sf.ideas.listIdeaTargets(as(outsider))).map((project) => project.name), ["Held project"]);
+    // The drafter has no schedule permission in this fixture.
+    assert.deepEqual(await sf.ideas.listIdeaTargets(as(drafter, DRAFTER_GRANTS)), []);
+
+    const mine = await sf.ideas.createIdeaCard({ ...as(outsider, outsiderGrants), file: cardImage(4) });
+    const use = (projectId: string) => sf.ideas.useIdeaInSchedule({ ...as(outsider, outsiderGrants), cardId: mine.cardId, projectId, target: { kind: "new-item", section: "MATERIAL", category: "Stone" }, option: { productName: "X" } });
+    await rejectsWith(use(held.projectId), "PERMISSION_DENIED");
+    const designerCard = await sf.ideas.createIdeaCard({ ...as(designer), file: cardImage(6) });
+    const scheduleObjects = () => [...storage.objects.keys()].filter((key) => key.startsWith("studioflow/schedule/")).length;
+    const objectsBefore = scheduleObjects();
+    const useAsDesigner = (projectId: string) => sf.ideas.useIdeaInSchedule({ ...as(designer), cardId: designerCard.cardId, projectId, target: { kind: "new-item", section: "MATERIAL", category: "Stone" }, option: { productName: "X" } });
+    await rejectsWith(useAsDesigner(completed.projectId), "PROJECT_COMPLETED");
+    await rejectsWith(useAsDesigner(archived.projectId), "PROJECT_ARCHIVED");
+    assert.equal(await testDb.prisma.sfIdeaUsage.count(), 0);
+    assert.equal(scheduleObjects(), objectsBefore);
+  });
+
+  it("leaves no row, usage or copied object when the use fails inside the transaction", async () => {
+    const { projectId } = await newProject("Failing use");
+    const other = await newProject("Not this one");
+    const foreign = await sf.schedule.createEntry({ ...as(designer), projectId: other.projectId, section: "MATERIAL", category: "Stone", snapshot: { productName: "Elsewhere" } });
+    const { cardId } = await sf.ideas.createIdeaCard({ ...as(designer), file: cardImage(7) });
+    const before = { entries: await testDb.prisma.sfScheduleEntry.count(), options: await testDb.prisma.sfScheduleOption.count(), objects: storage.objects.size };
+    // An entry of another project, and a product name the schedule refuses, both fail after the image copy.
+    await rejectsWith(sf.ideas.useIdeaInSchedule({ ...as(designer), cardId, projectId, target: { kind: "option", entryId: foreign.entryId }, option: { productName: "X" } }), "SCHEDULE_ITEM_NOT_FOUND");
+    await assert.rejects(sf.ideas.useIdeaInSchedule({ ...as(designer), cardId, projectId, target: { kind: "new-item", section: "MATERIAL", category: "Stone" }, option: { productName: "   " } }));
+    assert.deepEqual({ entries: await testDb.prisma.sfScheduleEntry.count(), options: await testDb.prisma.sfScheduleOption.count(), objects: storage.objects.size }, before);
+    assert.equal(await testDb.prisma.sfIdeaUsage.count(), 0);
   });
 });

@@ -50,4 +50,26 @@ describe("Supabase storage bucket separation", () => {
       if (previousKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = previousKey;
     }
   });
+  it("copies inside the private bucket through the provider copy endpoint", async () => {
+    const previousUrl = process.env.SUPABASE_URL;
+    const previousKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    process.env.SUPABASE_URL = "https://project.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "server-secret";
+    const fetchBefore = globalThis.fetch;
+    let body: unknown;
+    globalThis.fetch = async (input, init) => {
+      assert.equal(String(input), "https://project.supabase.co/storage/v1/object/copy");
+      body = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ Key: "platform-assets/studioflow/schedule/p/b.png" }), { status: 200 });
+    };
+    try {
+      await createConfiguredObjectStorage().copy({ fromKey: "studioflow/ideas/u/a.png", toKey: "studioflow/schedule/p/b.png" });
+      assert.deepEqual(body, { bucketId: "platform-assets", sourceKey: "studioflow/ideas/u/a.png", destinationKey: "studioflow/schedule/p/b.png" });
+      await assert.rejects(() => createConfiguredObjectStorage().copy({ fromKey: "../a.png", toKey: "b.png" }), { code: "storage.invalid-key" });
+    } finally {
+      globalThis.fetch = fetchBefore;
+      if (previousUrl === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = previousUrl;
+      if (previousKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = previousKey;
+    }
+  });
 });

@@ -144,9 +144,10 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
     fetched by the server.
   - Not in this item: drag a card onto a schedule tab, cards shared between
     users, SketchUp/companion "unresolved material" intake (D-SF-06 stands).
-  - Split: backend (cards, images on storage with retention, use-in-schedule
-    command, owner-only access) for the Executor; board UI for the Lead. Reuse
-    the UI Engine image intake/gallery from Notes. Needs a `PLAN.md` slice.
+  - Backend built in R8.450 (WO-SF-IDEAS-01, by the Lead at the owner's
+    request). Remaining: the board page, card UI and "Use in schedule" dialog
+    (Lead), reusing the UI Engine image intake/gallery from Notes, then
+    browser acceptance.
 
 - [ ] [UNVERIFIED] Client-note images R8.394–R8.395 in the browser: drop,
   paste a screenshot (Ctrl+V) and pick several images in the answer dialog and

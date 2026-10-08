@@ -1,5 +1,19 @@
 # Changelog
 
+## R8.450 | 2026-10-08 | feat(studioflow): personal Ideas board backend, used in a schedule as a snapshot (Lead)
+
+- **Owner request:** build WO-SF-IDEAS-01 directly ("kamu eksekusi aja"), no Executor hand-off.
+- **Ideas cards (`SfIdeaCard`):** one image plus optional title, source link and note; a card with only an image is valid. Private to its owner (no manager override; another user's card is not found). Source links must be http/https and are stored as text, never fetched. Create, edit text, replace image, delete; audited as `studioflow.idea.*`.
+- **Use in schedule:** targets are the projects whose schedule the user may change (schedule permission + assigned designer/drafter or override; not archived or completed). A card becomes a new item (code allocated then) or an extra option (next label) on an existing item; never final, no Master Data brand id. The image is copied into a new object under the project; the entry/option and the usage row (`SfIdeaUsage`) are written in one transaction and the copy is discarded on failure. A usage is read live (current project name, code, option label) and disappears with the option. Deleting or changing a card never touches the schedule.
+- **One path for schedule rows:** `createEntry` / `createOption` now go through the schedule service's `writer` (validation, code and label allocation, audit), which Ideas uses inside its own transaction. Existing schedule behaviour and audit unchanged.
+- **Shared layer (EXTEND):** Core `ObjectStorage.copy({ fromKey, toKey })` in the contract, filesystem (no overwrite, same path checks, disk reserve), Supabase (provider copy endpoint) and `FakeObjectStorage`, with adapter tests. Card images count as references in StudioFlow asset cleanup.
+- **Server actions** in `studioflow/ideas/actions.ts` (list, targets, create/replace with FormData, update/delete, use). No UI yet (next, Lead).
+- **Data (migration `20261008160000_sf_idea_board`):** new tables `sf_idea_card`, `sf_idea_usage`. Applied to the disposable test database only; the office and home dev databases still need `prisma migrate deploy`.
+- **Docs:** StudioFlow contract §11.13; BACKLOG item updated; PLAN.md marked built.
+- **Dependencies:** none.
+
+**Checks.** On a disposable local `studioflow_rebuild_test`: `prisma validate`, migration applied; `tsc --noEmit`; eslint on `src/apps/studioflow`, `src/platform` and the StudioFlow routes (only the existing `<img>` warning); `npm test` 973/973 (none failed, skipped or cancelled; 6 new Ideas integration tests, 2 storage adapter tests); `npm run build` passes. No browser check (no UI yet).
+
 ## R8.449 | 2026-10-08 | docs(plan): WO-SF-IDEAS-01 personal Ideas board, backend (Lead)
 
 - **Owner decisions (2026-10-08):** Ideas belong to the user, Product Schedule to the project. A card is valid with only an image. "Use in schedule" is a snapshot: the image is copied into a new storage object for the project and the card keeps only a usage record (read live, so it shows the current code). Schedule rows are created only through the schedule service's own path (no second code/label allocator). No Master Data coupling.

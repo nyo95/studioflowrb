@@ -40,6 +40,26 @@ describe("LocalFilesystemStorage adapter", () => {
     }
   });
 
+  it("copies an object to an independent key and never overwrites or escapes the root", async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "studioflow-storage-"));
+    try {
+      const storage = createLocalFilesystemStorage(tmpDir, { freeSpaceBytes: async () => Number.MAX_SAFE_INTEGER });
+      await storage.put({ key: "ideas/a.png", body: Uint8Array.from([7, 8, 9]), bytes: 3, contentType: "image/png" });
+      await storage.copy({ fromKey: "ideas/a.png", toKey: "schedule/p1/b.png" });
+      assert.deepEqual([...await fs.readFile(path.join(tmpDir, "schedule/p1/b.png"))], [7, 8, 9]);
+      // The copy outlives its source.
+      await storage.remove("ideas/a.png");
+      assert.deepEqual([...await fs.readFile(path.join(tmpDir, "schedule/p1/b.png"))], [7, 8, 9]);
+      await assert.rejects(() => storage.copy({ fromKey: "ideas/missing.png", toKey: "schedule/p1/c.png" }), { code: "storage.object-not-found" });
+      await storage.put({ key: "ideas/d.png", body: Uint8Array.from([1]), bytes: 1, contentType: "image/png" });
+      await assert.rejects(() => storage.copy({ fromKey: "ideas/d.png", toKey: "schedule/p1/b.png" }), { code: "storage.object-exists" });
+      assert.deepEqual([...await fs.readFile(path.join(tmpDir, "schedule/p1/b.png"))], [7, 8, 9]);
+      await assert.rejects(() => storage.copy({ fromKey: "ideas/d.png", toKey: "../escape.png" }), { code: "storage.invalid-key" });
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
+  });
+
   it("rejects path traversal and symlink escape attacks", async () => {
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "studioflow-storage-"));
     const outsideDir = await fs.mkdtemp(path.join(os.tmpdir(), "studioflow-outside-"));

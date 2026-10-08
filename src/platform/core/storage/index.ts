@@ -23,6 +23,11 @@ export interface ObjectStorage {
   put(input: PutObjectInput): Promise<StoredObject>;
   putStream(input: PutStreamInput): Promise<StoredObject>;
   remove(key: string): Promise<void>;
+  /**
+   * Copies a stored object to a new key, so two owners can each hold an independent object. The source must
+   * exist (`storage.object-not-found` otherwise) and the destination must not.
+   */
+  copy(input: { fromKey: string; toKey: string }): Promise<void>;
   createSignedReadUrl(key: string, expiresInSeconds: number): Promise<string>;
 }
 
@@ -73,6 +78,13 @@ export class FakeObjectStorage implements ObjectStorage {
 
   async remove(key: string): Promise<void> {
     this.objects.delete(key);
+  }
+
+  async copy(input: { fromKey: string; toKey: string }): Promise<void> {
+    const source = this.objects.get(input.fromKey);
+    if (!source) throw new AppError("NOT_FOUND", "storage.object-not-found", "The image is unavailable.");
+    if (this.objects.has(input.toKey)) throw new AppError("CONFLICT", "storage.object-exists", "The storage destination is already taken.");
+    this.objects.set(input.toKey, { ...source, key: input.toKey, body: source.body.slice() });
   }
 
   async createSignedReadUrl(key: string, expiresInSeconds: number): Promise<string> {

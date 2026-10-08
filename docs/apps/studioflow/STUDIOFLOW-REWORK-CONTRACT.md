@@ -813,6 +813,27 @@ requester is never notified of their own request). Actions: `Request sample` /
 `Mark sample received` in the option's row-action menu
 (`requestScheduleSampleAction`/`receiveScheduleSampleAction`).
 
+### 11.13 Ideas board (WO-SF-IDEAS-01, owner 2026-10-08)
+
+Ownership: Ideas = the user, Product Schedule = the project, Master Data = the
+company, SketchUp = model facts. A card (`SfIdeaCard`) is one image plus
+optional title, source link (http/https text, never fetched) and note; no code,
+category or qty. It is private: only its owner lists, changes, deletes or uses
+it, with no manager override, and another user's card reads as not found.
+
+"Use in schedule" targets the projects whose schedule the user may change
+(`studioflow.schedule.manage` + document access: assigned designer/drafter or
+override; not archived or completed). It creates a new item (the code is
+allocated only then) or an extra option on an existing item, through the
+schedule service's `writer` — the one path that allocates codes and option
+labels — and the option is never final and carries no Master Data brand id.
+The card's image is copied into a new object under the project's schedule
+prefix (Core `ObjectStorage.copy`), so the card and the option are independent
+afterwards. `SfIdeaUsage` records the use (card and option FKs, both cascade)
+and is read live, so it shows the current code and disappears with the option.
+Not built: drag onto a schedule tab, sharing cards, several images per card,
+SketchUp intake (D-SF-06).
+
 ## 12. Foundation centralization map
 
 | Need | Classification | Canonical home |

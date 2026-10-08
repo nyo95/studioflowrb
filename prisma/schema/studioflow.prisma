@@ -769,6 +769,7 @@ model SfScheduleOption {
 
   entry SfScheduleEntry @relation(fields: [entry_id], references: [id], onDelete: Cascade)
   sample_requests SfScheduleSampleRequest[]
+  idea_usages     SfIdeaUsage[]
 
   @@unique([entry_id, label])
   @@index([search_key])
@@ -808,5 +809,45 @@ model SfScheduleSampleRequest {
 
   @@index([option_id, created_at])
   @@map("sf_schedule_sample_request")
+  @@schema("studioflow")
+}
+
+/// A personal Ideas card (WO-SF-IDEAS-01): one image, optional text, private to its owner. Owned by the user,
+/// not by a project; using it in a schedule copies it, so nothing here is a live link into project data.
+model SfIdeaCard {
+  id            String   @id @default(uuid())
+  /// Platform user id of the only person who may see or change the card.
+  owner_user_id String
+  title         String?
+  /// Stored as text only (http/https); never fetched by the server.
+  source_url    String?
+  note          String?
+  image_key     String   @unique
+  content_type  String
+  bytes         Int
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  usages SfIdeaUsage[]
+
+  @@index([owner_user_id, created_at])
+  @@map("sf_idea_card")
+  @@schema("studioflow")
+}
+
+/// Where a card has been used. Read live through the option, so it shows the current code and label, and it
+/// disappears with the option (or its project).
+model SfIdeaUsage {
+  id         String   @id @default(uuid())
+  card_id    String
+  option_id  String
+  created_at DateTime @default(now())
+
+  card   SfIdeaCard       @relation(fields: [card_id], references: [id], onDelete: Cascade)
+  option SfScheduleOption @relation(fields: [option_id], references: [id], onDelete: Cascade)
+
+  @@index([card_id, created_at])
+  @@index([option_id])
+  @@map("sf_idea_usage")
   @@schema("studioflow")
 }

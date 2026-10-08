@@ -3,7 +3,7 @@
 Plan ID: WO-SF-IDEAS-01 (personal Ideas board, backend)
 Scope: StudioFlow Ideas cards and their use in a project's Product Schedule; one Core storage extension (`copy`).
 Target revision: R8.450 (one Executor commit). R8.449 is this plan.
-Status: READY
+Status: BUILT — backend implemented by the Lead in R8.450 at the owner's request ("kamu eksekusi aja"); the board UI is next (Lead).
 Priority: P2
 Owner: Product Owner. Decisions approved in chat on 2026-10-08 (BACKLOG `[PLANNED][P2] Ideas board`).
 Last updated: 2026-10-08

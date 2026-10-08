@@ -53,6 +53,11 @@ export function createSupabaseObjectStorage(config: SupabaseStorageConfig): Obje
       const response = await fetch(`${baseUrl}/storage/v1/object/${bucket}/${encodedKey(key)}`, { method: "DELETE", headers: headers(config) });
       await requireSuccess(response);
     },
+    async copy(input: { fromKey: string; toKey: string }): Promise<void> {
+      encodedKey(input.fromKey); encodedKey(input.toKey);
+      const response = await fetch(`${baseUrl}/storage/v1/object/copy`, { method: "POST", headers: headers(config), body: JSON.stringify({ bucketId: config.bucket, sourceKey: input.fromKey, destinationKey: input.toKey }) });
+      await requireSuccess(response);
+    },
     async createSignedReadUrl(key: string, expiresInSeconds: number): Promise<string> {
       const response = await fetch(`${baseUrl}/storage/v1/object/sign/${bucket}/${encodedKey(key)}`, { method: "POST", headers: headers(config), body: JSON.stringify({ expiresIn: expiresInSeconds }) });
       await requireSuccess(response);
@@ -71,7 +76,7 @@ function configuredStorage(bucket: string): ObjectStorage | null {
 
 function unavailableStorage(): ObjectStorage {
   const unavailable = async (): Promise<never> => { throw new AppError("INFRASTRUCTURE", "storage.not-configured", "Image storage is not configured on this environment."); };
-  return { put: unavailable, putStream: unavailable, remove: unavailable, createSignedReadUrl: unavailable };
+  return { put: unavailable, putStream: unavailable, remove: unavailable, copy: unavailable, createSignedReadUrl: unavailable };
 }
 
 /** Private bucket for MOM and future private assets. Read URLs are signed. */

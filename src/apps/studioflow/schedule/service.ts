@@ -292,7 +292,49 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     await syncActiveIndex(tx, entryId);
   }
 
+  /**
+   * The one place a live schedule row or option is created (WO-SF-IDEAS-01). The schedule commands below and
+   * StudioFlow callers that hold their own transaction (Ideas) share it, so codes, option labels and the
+   * "a new option is never final" rule have a single home. Callers check access first (`requireAccess`) and
+   * resolve the brand themselves; `metadata` is added to the audit row.
+   */
+  const writer = {
+    requireAccess: requireScheduleCommand,
+
+    async createEntry(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; section: string; category: string; qty?: string | null; unit?: string | null; location?: string | null; snapshot?: SnapshotInput | null; metadata?: Record<string, unknown> }) {
+      const section = sectionOf(input.section);
+      const category = categoryOf(input.category);
+      await loadWritableProject(tx, input.projectId);
+      const entry = await createEntryWithOptionalOption(tx, {
+        projectId: input.projectId,
+        section,
+        category: category.label,
+        categoryKey: category.key,
+        // A Material line is specified, not counted: qty and unit belong to Fixture only.
+        qty: section === "FIXTURE" ? decimalText(input.qty) : null,
+        unit: section === "FIXTURE" ? optionalText(input.unit, 40) : null,
+        location: optionalText(input.location, 160),
+        snapshot: input.snapshot ?? null,
+      });
+      const code = scheduleCode(entry.prefix, entry.increment);
+      await writeAudit(ports, tx, { action: "studioflow.schedule.entry-created", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId, code, ...input.metadata } });
+      const option = input.snapshot ? await tx.sfScheduleOption.findFirst({ where: { entry_id: entry.id }, select: { id: true, label: true } }) : null;
+      return { entryId: entry.id, code, optionId: option?.id ?? null, label: option?.label ?? null };
+    },
+
+    async createOption(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; entryId: string; snapshot: SnapshotInput; metadata?: Record<string, unknown> }) {
+      const snapshot = cleanSnapshot(input.snapshot);
+      const entry = await loadEntry(tx, input.projectId, input.entryId, true);
+      const label = await nextLabel(tx, entry.id);
+      const option = await tx.sfScheduleOption.create({ data: { entry_id: entry.id, label, ...optionData(snapshot) } });
+      await writeAudit(ports, tx, { action: "studioflow.schedule.option-created", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: entry.id, label, ...input.metadata } });
+      return { entryId: entry.id, code: scheduleCode(entry.prefix, entry.increment), optionId: option.id, label };
+    },
+  };
+
   return {
+    writer,
+
     canManage(grants: ReadContext["grants"]) {
       return hasPermission(grants, P.access) && hasPermission(grants, P.scheduleManage);
     },
@@ -563,24 +605,12 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     async createEntry(input: CommandContext & { projectId: string; section: string; category: string; qty?: string | null; unit?: string | null; location?: string | null; snapshot?: SnapshotInput | null }) {
       await requireScheduleCommand(input);
-      const section = sectionOf(input.section);
-      const category = categoryOf(input.category);
+      sectionOf(input.section);
+      categoryOf(input.category);
       const brand = input.snapshot ? await brandSnapshot(ports, input.snapshot.brandId) : { brandId: null, brandName: null };
       return runTransaction(async (tx) => {
-        await loadWritableProject(tx, input.projectId);
-        const entry = await createEntryWithOptionalOption(tx, {
-          projectId: input.projectId,
-          section,
-          category: category.label,
-          categoryKey: category.key,
-          // A Material line is specified, not counted: qty and unit belong to Fixture only.
-          qty: section === "FIXTURE" ? decimalText(input.qty) : null,
-          unit: section === "FIXTURE" ? optionalText(input.unit, 40) : null,
-          location: optionalText(input.location, 160),
-          snapshot: input.snapshot ? { ...input.snapshot, ...brand, imageKey: null } : null,
-        });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.entry-created", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) } });
-        return { entryId: entry.id };
+        const created = await writer.createEntry(tx, { ...input, snapshot: input.snapshot ? { ...input.snapshot, ...brand, imageKey: null } : null });
+        return { entryId: created.entryId };
       });
     },
 
@@ -734,13 +764,11 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     async createOption(input: CommandContext & { projectId: string; entryId: string; snapshot: SnapshotInput }) {
       await requireScheduleCommand(input);
       const brand = await brandSnapshot(ports, input.snapshot.brandId);
-      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: null });
+      const snapshot = { ...input.snapshot, ...brand, imageKey: null };
+      cleanSnapshot(snapshot);
       return runTransaction(async (tx) => {
-        const entry = await loadEntry(tx, input.projectId, input.entryId, true);
-        const label = await nextLabel(tx, entry.id);
-        const option = await tx.sfScheduleOption.create({ data: { entry_id: entry.id, label, ...optionData(snapshot) } });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.option-created", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: entry.id, label } });
-        return { optionId: option.id };
+        const created = await writer.createOption(tx, { actor: input.actor, projectId: input.projectId, entryId: input.entryId, snapshot });
+        return { optionId: created.optionId };
       });
     },
 
