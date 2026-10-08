@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.430 | 2026-10-08 | docs(plan): WO-SF-ITERNAME-01 iteration names from project name, prefix and number (Lead)
+
+- Owner (2026-10-08): "R1" in the example is part of the project's own name; Rename stays as an override and the next iteration continues with the next number (D1 then custom, next D2); existing names are replaced. `PLAN.md` READY for the Executor: default name `<project name> <prefix><number>`, `shortName` on iteration reads ("D1" for default-like names, the name itself for kinds and custom names), empty rename resets to default, one idempotent data migration for names that equal the old default. CD Mall and CD Final keep their names. The Lead moves the screens to the short label afterwards.
+- The second owner idea (one merged Notes) stays in BACKLOG until the owner picks size A or B.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.429 | 2026-10-08 | fix(studioflow): client notes saved on an unsent iteration now show on its card; two owner ideas recorded (Lead)
 
 - **Owner report: "tidak muncul di mana-mana".** Client notes (text and images) saved on an iteration that had not been answered were shown nowhere: the card showed the previous iteration's notes as the brief and the iteration's own notes only after the client answered. The phase page now shows "Client notes for this iteration" with the text and images whenever the current iteration has any, in every state. Checked in the browser: a note typed on an unsent Moodboard 1 appears on the card at once, with its Undo bar.
