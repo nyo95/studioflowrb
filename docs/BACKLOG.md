@@ -264,3 +264,26 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   `masterdata/services/sample.service.ts` and
   `studioflow/public/sample-request-command.ts`. Not a defect; revisit as one
   application-level workflow once two or three more cross-app workflows exist.
+- [ ] [BUG][P2] Price-less SKU cannot be restored (Master Data CRUD audit
+  2026-10-08, from reading the code; not yet reproduced by a test): a SKU made
+  through the sample shelf has no price. Archiving it works, but
+  `assertSkuRestorable` (`services/shared.ts`) throws `SKU_NO_RESTORABLE_PRICE`
+  when no price row would come back with it, so `restoreSku` fails for good, and
+  `restoreBrand` fails as a whole whenever one of the Brand's SKUs is price-less.
+  Fix: allow a SKU with no archived-with-it prices to restore.
+- [ ] [BUG][P2] A live Brand whose owner Supplier was archived cannot be edited:
+  `updateBrand` rejects `BRAND_OWNER_ARCHIVED` on every save that still names that
+  owner, even when only the name or notes change. Check the owner only when it is
+  being changed (the restore path keeps its own check).
+- [ ] [BUG][P3] Creating a Brand, Supplier or SKU with the same item twice in the
+  input (the same link URL, category, Supplier Type) hits a unique index outside
+  `mapWriteError` and returns a generic error. The update paths already collapse
+  duplicates with a Map; make the create paths do the same (`createBrand` links
+  and categories, `createVendor` supplier types, `createSku` categories).
+- [ ] [PLANNED][P3] Owner decision: "a live SKU keeps at least one live material
+  price" is enforced when one price is archived (`SKU_PRICE_REQUIRED`) but not
+  when its Supplier is archived (the cascade archives every price), and price-less
+  SKUs now exist on purpose. Keep the rule, drop it, or apply it to the cascade.
+- [ ] [PLANNED][P3] Owner decision: a Material+Labor price needs a labor-capable
+  Supplier only (`assertVendorLaborCapable`). Should it also require the Supplier
+  to supply material?

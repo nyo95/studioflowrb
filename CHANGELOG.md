@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.408 | 2026-10-08 | docs(backlog): Master Data CRUD audit for Brand, Supplier and the three price kinds (Lead)
+
+- Read-only audit of create, update, archive, restore, deletion request and the quick-add and bulk paths of Brand, Supplier and Material, Labor and Material+Labor prices. Three bugs and two owner questions recorded in BACKLOG: a price-less SKU can never be restored (and blocks restoring its Brand), a Brand whose owner Supplier was archived cannot be edited, and create paths do not collapse duplicate input items. Found from the code, not run; no code changed.
+- Checked and fine: permissions on every command and quick-add, archive causes and restore checks, partial live-only unique indexes, bulk and compare-grid price creation (all or nothing, duplicates and live conflicts caught per row), price edit unit and link checks, quick-add gating in the screens.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.407 | 2026-10-08 | fix(studioflow): one image batch at a time; external audit of R8.395 checked (Lead)
 
 - **External audit (2026-10-08, written against R8.395) checked against the current code.** P1 "sample holder trusts the browser's project name": not exploitable. The status action's schema accepts only a project id, and `sample-request-coordinator.ts` resolves the name from StudioFlow's non-archived projects (unknown id gives `SAMPLE_PROJECT_NOT_FOUND`, tested). What remains is defense in depth: Master Data's own service still takes the name from its one caller; recorded in BACKLOG [CLEANUP][P3]. The sample-orchestration spread is recorded as [PLANNED][P3], no refactor now.
