@@ -15,6 +15,7 @@ import { createSampleRequestService } from "./services/sample-request.service";
 import { createSampleService } from "./services/sample.service";
 import { createSkuPriceWorkbookService } from "./services/sku-price-workbook.service";
 import { createPriceDatabaseWorkbookService } from "./services/price-database-workbook.service";
+import { createMaterialSkuPriceBulkService } from "./services/material-sku-price-bulk.service";
 
 type PromotionMaterial = Prisma.PriceMaterialGetPayload<{ include: { sku: true; supplier_vendor: true; unit: true } }>;
 type PromotionLabor = Prisma.PriceLaborGetPayload<{ include: { vendor: true; unit: true } }>;
@@ -30,6 +31,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
   const vendorService = createVendorService(db, p);
   const skuService = createSkuService(db, p);
   const pricingService = createPricingService(db, p);
+  const materialSkuPriceBulkService = createMaterialSkuPriceBulkService(db, p, skuService, pricingService);
   const deletionService = createDeletionService(db, p);
   const sampleRequestService = createSampleRequestService(db, p);
   const sampleService = createSampleService(db, p);
@@ -139,6 +141,7 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
     ...vendorService,
     ...skuService,
     ...pricingService,
+    ...materialSkuPriceBulkService,
     ...deletionService,
     ...sampleRequestService,
     ...sampleService,

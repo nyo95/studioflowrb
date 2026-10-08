@@ -43,7 +43,7 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
       await tx.priceMaterial.createMany({ data: initialPrices });
       await writeAudit(ports, tx, { action: "sku.created", entityType: "sku", entityId: skuId, actor: input.actor, metadata: { slug: identity.slug, brand_id: input.brandId, categories: categoryIds.length, prices: input.priceMaterials.length, purchase_to_base_factor: measurement.purchase_to_base_factor, origin } });
       for (const price of initialPrices) await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price.id, actor: input.actor, metadata: { sku_id: skuId, vendor_id: price.supplier_vendor_id } });
-      return { skuId };
+      return { skuId, priceMaterialIds: initialPrices.map((price) => price.id) };
     });
   }
 

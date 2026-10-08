@@ -1485,6 +1485,13 @@ describe("Brand → Supplier → Price chain", () => {
 });
 
 describe("Bulk price entry", () => {
+  async function materialSupplier(name: string) {
+    const supplier = await service.createVendor({ grants: GRANTS, actor: ACTOR, name });
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    await testDb.prisma.vendorVendorType.create({ data: { id: crypto.randomUUID(), vendor_id: supplier.vendorId, vendor_type_id: supplierType.id } });
+    return supplier.vendorId;
+  }
+
   async function workSupplier(name: string) {
     const subcon = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUBCON" } });
     const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name });
@@ -1625,6 +1632,116 @@ describe("Bulk price entry", () => {
     assert.equal(ok.ids.length, 3);
     assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: stranger.brandId, vendor_id: second.vendorId } }), 1);
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-bulk.created", entity_id: second.vendorId } }), 1);
+  });
+
+  it("saves three existing-SKU prices and two new SKUs together in input order", async () => {
+    const context = await createMaterialContext();
+    const supplier = await materialSupplier("Mixed Batch Supplier");
+    const existing = await Promise.all(["Mixed Existing One", "Mixed Existing Two", "Mixed Existing Three"].map((name) => service.createSku({ grants: GRANTS, actor: ACTOR, name, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] })));
+
+    const result = await service.createMaterialSkuPricesBulk({ grants: GRANTS, actor: ACTOR, currency: "IDR", onInvalid: "save-valid", rows: [
+      { kind: "existing", skuId: existing[0].skuId, vendorId: supplier, amount: "10" },
+      { kind: "new", name: "Mixed New One", baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: supplier, amount: "11" },
+      { kind: "existing", skuId: existing[1].skuId, vendorId: supplier, amount: "12" },
+      { kind: "new", name: "Mixed New Two", baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: supplier, amount: "13" },
+      { kind: "existing", skuId: existing[2].skuId, vendorId: supplier, amount: "14" },
+    ] });
+
+    assert.equal(result.ids.length, 5);
+    assert.equal(result.createdSkuIds.length, 2);
+    assert.deepEqual((await testDb.prisma.priceMaterial.findMany({ where: { id: { in: result.ids } }, orderBy: { amount: "asc" }, select: { amount: true } })).map((row) => row.amount.toString()), ["10", "11", "12", "13", "14"]);
+    assert.deepEqual((await Promise.all(result.createdSkuIds.map((id) => testDb.prisma.sku.findUniqueOrThrow({ where: { id }, select: { name: true } })))).map((row) => row.name), ["Mixed New One", "Mixed New Two"]);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "sku.created", entity_id: { in: result.createdSkuIds } } }), 2);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-material.created", entity_id: { in: result.ids } } }), 5);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-sku-bulk.created", entity_id: result.batchId } }), 1);
+  });
+
+  it("creates one normalised new SKU for several suppliers and rejects disagreeing later details", async () => {
+    const context = await createMaterialContext();
+    const firstSupplier = await materialSupplier("Grouped Supplier One");
+    const secondSupplier = await materialSupplier("Grouped Supplier Two");
+    const otherCategory = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Other Product", kind: "PRODUCT" });
+    const result = await service.createMaterialSkuPricesBulk({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows: [
+      { kind: "new", name: "  grouped   board ", baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: firstSupplier, amount: "20" },
+      { kind: "new", name: "GROUPED BOARD", baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: secondSupplier, amount: "21" },
+      { kind: "new", name: "Grouped Board", baseUnitId: context.unit.id, categoryId: otherCategory.categoryId, vendorId: context.vendorId, amount: "22" },
+    ] });
+
+    assert.equal(result.createdSkuIds.length, 1);
+    assert.equal(result.ids.length, 2);
+    assert.deepEqual(result.rejected?.map((row) => [row.index, row.code, row.details?.firstIndex]), [[2, "NEW_SKU_DETAILS_CONFLICT", 0]]);
+    assert.equal(await testDb.prisma.priceMaterial.count({ where: { sku_id: result.createdSkuIds[0] } }), 2);
+  });
+
+  it("keeps valid rows, returns invalid rows, and carries an existing SKU id when a new identity is taken", async () => {
+    const context = await createMaterialContext();
+    const supplier = await materialSupplier("Partial Mixed Supplier");
+    const existing = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Already Catalogued", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    const result = await service.createMaterialSkuPricesBulk({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows: [
+      { kind: "existing", skuId: existing.skuId, vendorId: supplier, amount: "30" },
+      { kind: "existing", skuId: existing.skuId, vendorId: supplier, amount: "31" },
+      { kind: "new", name: "Already Catalogued", baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: supplier, amount: "32" },
+    ] });
+
+    assert.equal(result.ids.length, 1);
+    assert.deepEqual(result.rejected?.map((row) => [row.index, row.code]), [[1, "PRICE_PAIR_CONFLICT"], [2, "NEW_SKU_ALREADY_EXISTS"]]);
+    assert.equal(result.rejected?.[1]?.details?.existingSkuId, existing.skuId);
+
+    await assert.rejects(
+      service.createMaterialSkuPricesBulk({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows: [{ kind: "new", name: "Already Catalogued", baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: supplier, amount: "33" }] }),
+      (error: unknown) => error instanceof AppError && error.code === "BULK_ROWS_INVALID" && (error.details?.rows as Array<{ details?: { existingSkuId?: string } }>)[0]?.details?.existingSkuId === existing.skuId,
+    );
+  });
+
+  it("applies SKU size rules per row and rejects inactive references or a non-material supplier without losing good rows", async () => {
+    const context = await createMaterialContext();
+    const supplier = await materialSupplier("Sized Mixed Supplier");
+    const unsupported = (await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Unsupported Mixed Vendor" })).vendorId;
+    const m2 = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const sheet = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "sheet" } });
+    const mm = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "mm" } });
+    const inactiveCategory = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Inactive Mixed Category", kind: "PRODUCT" });
+    await service.deactivateCategory({ grants: GRANTS, actor: ACTOR, categoryId: inactiveCategory.categoryId });
+    const inactiveBrand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Inactive Mixed Brand" });
+    await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: inactiveBrand.brandId });
+
+    const result = await service.createMaterialSkuPricesBulk({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows: [
+      { kind: "new", name: "Sized Good Board", baseUnitId: m2.id, purchaseUnitId: sheet.id, dimensionLength: "1220", dimensionWidth: "2440", dimensionThickness: "0.7", dimensionUnitId: mm.id, categoryId: context.categoryId, vendorId: supplier, amount: "40" },
+      { kind: "new", name: "Sized Bad Board", baseUnitId: context.unit.id, purchaseUnitId: sheet.id, dimensionLength: "1220", dimensionWidth: "2440", dimensionUnitId: mm.id, categoryId: context.categoryId, vendorId: supplier, amount: "41" },
+      { kind: "new", name: "Inactive Category Board", baseUnitId: context.unit.id, categoryId: inactiveCategory.categoryId, vendorId: supplier, amount: "42" },
+      { kind: "new", name: "Inactive Brand Board", brandId: inactiveBrand.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: supplier, amount: "43" },
+      { kind: "new", name: "Unsupported Supplier Board", baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: unsupported, amount: "44" },
+    ] });
+
+    const sized = await testDb.prisma.sku.findUniqueOrThrow({ where: { id: result.createdSkuIds[0] } });
+    assert.equal(sized.purchase_to_base_factor?.toString(), "2.9768");
+    assert.deepEqual(result.rejected?.map((row) => [row.index, row.code]), [[1, "SKU_DIMENSION_BASE_UNIT_INVALID"], [2, "SKU_CATEGORY_INACTIVE"], [3, "SKU_BRAND_ARCHIVED"], [4, "VENDOR_NOT_MATERIAL_CAPABLE"]]);
+  });
+
+  it("auto-links a new SKU Brand, enforces the permission split, and does not duplicate a partial save on retry", async () => {
+    const context = await createMaterialContext();
+    const supplier = await materialSupplier("Permission Mixed Supplier");
+    const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Mixed Auto-link Brand" });
+    const existing = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Price-only Existing", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    const priceOnly = [MASTERDATA_PERMISSIONS.priceMaterialManage];
+    const priceOnlyResult = await service.createMaterialSkuPricesBulk({ grants: priceOnly, actor: ACTOR, currency: "IDR", rows: [{ kind: "existing", skuId: existing.skuId, vendorId: supplier, amount: "50" }] });
+    assert.equal(priceOnlyResult.ids.length, 1);
+    await assert.rejects(
+      service.createMaterialSkuPricesBulk({ grants: priceOnly, actor: ACTOR, currency: "IDR", rows: [{ kind: "new", name: "Permission New", baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: supplier, amount: "51" }] }),
+      (error: unknown) => error instanceof AppError && error.code === "PERMISSION_DENIED",
+    );
+
+    const unsupported = (await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Retry Unsupported Vendor" })).vendorId;
+    const rows = [
+      { kind: "new" as const, name: "Retry Mixed Board", brandId: brand.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: supplier, amount: "52" },
+      { kind: "new" as const, name: "Retry Mixed Board", brandId: brand.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: unsupported, amount: "53" },
+    ];
+    const first = await service.createMaterialSkuPricesBulk({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows });
+    assert.equal(first.ids.length, 1);
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: brand.brandId, vendor_id: supplier } }), 1);
+    await assert.rejects(service.createMaterialSkuPricesBulk({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows }), (error: unknown) => error instanceof AppError && error.code === "BULK_ROWS_INVALID");
+    assert.equal(await testDb.prisma.sku.count({ where: { slug: "retry-mixed-board", deleted_at: null } }), 1);
+    assert.equal(await testDb.prisma.priceMaterial.count({ where: { sku_id: first.createdSkuIds[0], deleted_at: null } }), 1);
   });
 });
 

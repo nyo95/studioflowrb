@@ -261,6 +261,8 @@ const bulkRowNotes = z.string().max(1000).nullish();
 const AMOUNT_TEXT_MAX = 80;
 type RejectedRow = { rowIndex: number; vendorId?: string; field: string | null; code: string; message: string };
 type GridSaveResult = { batchId: string; ids: string[]; rejected?: RejectedRow[] };
+type MaterialSkuBulkRejectedRow = { index: number; code: string; message: string; details?: Record<string, unknown> };
+type MaterialSkuBulkResult = { batchId: string; ids: string[]; createdSkuIds: string[]; rejected?: MaterialSkuBulkRejectedRow[] };
 
 const bulkWorkInput = z.object({
   kind: z.enum(["labor", "material-labor"]),
@@ -343,6 +345,31 @@ const materialRowsInput = z.object({
   rows: z.array(z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes })).min(1).max(100),
 });
 
+const mixedMaterialRowInput = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("existing"), skuId: z.string().uuid(), vendorId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes }),
+  z.object({
+    kind: z.literal("new"),
+    name: z.string().max(128).optional().nullable(),
+    code: z.string().max(32).optional().nullable(),
+    brandId: z.string().uuid().optional().nullable(),
+    baseUnitId: z.string().uuid(),
+    purchaseUnitId: z.string().uuid().optional().nullable(),
+    dimensionLength: z.string().max(32).optional().nullable(),
+    dimensionWidth: z.string().max(32).optional().nullable(),
+    dimensionThickness: z.string().max(32).optional().nullable(),
+    dimensionUnitId: z.string().uuid().optional().nullable(),
+    categoryId: z.string().uuid(),
+    vendorId: z.string().uuid(),
+    amount: z.string().min(1).max(AMOUNT_TEXT_MAX),
+    notes: bulkRowNotes,
+  }).refine((value) => Boolean(value.name?.trim() || value.code?.trim()), { message: "SKU code or SKU name is required.", path: ["name"] }),
+]);
+
+const mixedMaterialInput = z.object({
+  currency: z.string().length(3).default("IDR"),
+  rows: z.array(mixedMaterialRowInput).min(1).max(100),
+});
+
 /** Saves many material prices where every row names its supplier. Valid rows are saved; failing rows come back in `rejected`. */
 export async function saveMaterialPriceRowsAction(input: unknown): Promise<ActionResult<GridSaveResult>> {
   return runSafeAction(async () => {
@@ -352,6 +379,21 @@ export async function saveMaterialPriceRowsAction(input: unknown): Promise<Actio
     const result = await masterDataService.createMaterialPriceRows({ ...ctx, ...parsed.data, onInvalid: "save-valid" });
     refreshPricing();
     revalidatePath("/masterdata/vendors");
+    return result;
+  });
+}
+
+/** Saves existing-SKU prices and new SKUs with their first prices in one table submission. Valid rows are kept and rejected rows retain their input indexes. */
+export async function saveMaterialSkuPricesBulkAction(input: unknown): Promise<ActionResult<MaterialSkuBulkResult>> {
+  return runSafeAction(async () => {
+    const parsed = mixedMaterialInput.safeParse(input);
+    if (!parsed.success) throw validationError(parsed.error);
+    const ctx = await context();
+    const result = await masterDataService.createMaterialSkuPricesBulk({ ...ctx, ...parsed.data, onInvalid: "save-valid" });
+    refreshPricing();
+    revalidatePath("/masterdata/brands");
+    revalidatePath("/masterdata/vendors");
+    revalidatePath("/masterdata");
     return result;
   });
 }

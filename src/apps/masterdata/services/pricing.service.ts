@@ -410,7 +410,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
      * Creates many material prices (existing SKUs), each row naming its own supplier, all or nothing. A SKU can be priced
      * by several suppliers and one supplier can price many SKUs in the same save. Row problems come back in `details.rows`.
      */
-    async createMaterialPriceRows(input: { grants: PermissionGrants; actor: AuditActor; currency: string; rows: Array<{ skuId: string; vendorId: string; amount: string; notes?: string | null }>; onInvalid?: OnInvalid }) {
+    async createMaterialPriceRows(input: { grants: PermissionGrants; actor: AuditActor; currency: string; rows: Array<{ skuId: string; vendorId: string; amount: string; notes?: string | null }>; onInvalid?: OnInvalid; writeBatchAudit?: boolean }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
@@ -426,7 +426,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
           catch (error) { errors.push(error instanceof AppError ? { rowIndex, field: bulkErrorField(error.code), code: error.code, message: error.safeMessage } : { rowIndex, field: null, code: "PRICE_SAVE_FAILED", message: "This row could not be saved." }); }
         }
         if (ids.length === 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} row(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
-        const single = vendorIds.length === 1; await runTransaction((auditTx: TxClient) => writeAudit(ports, auditTx, { action: "price-bulk.created", entityType: single ? "vendor" : "price_batch", entityId: single ? vendorIds[0]! : batchId, actor: input.actor, metadata: { batch_id: batchId, kind: "material", count: ids.length, rejected_count: errors.length, suppliers: vendorIds.length } }));
+        const single = vendorIds.length === 1; if (input.writeBatchAudit !== false) await runTransaction((auditTx: TxClient) => writeAudit(ports, auditTx, { action: "price-bulk.created", entityType: single ? "vendor" : "price_batch", entityId: single ? vendorIds[0]! : batchId, actor: input.actor, metadata: { batch_id: batchId, kind: "material", count: ids.length, rejected_count: errors.length, suppliers: vendorIds.length } }));
         return { batchId, ids, rejected: errors };
       }
       return runTransaction(async (tx: TxClient) => {
@@ -453,7 +453,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         }
         if (errors.length > 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} row(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
         const single = vendorIds.length === 1;
-        await writeAudit(ports, tx, { action: "price-bulk.created", entityType: single ? "vendor" : "price_batch", entityId: single ? vendorIds[0]! : batchId, actor: input.actor, metadata: { batch_id: batchId, kind: "material", count: ids.length, suppliers: vendorIds.length } });
+        if (input.writeBatchAudit !== false) await writeAudit(ports, tx, { action: "price-bulk.created", entityType: single ? "vendor" : "price_batch", entityId: single ? vendorIds[0]! : batchId, actor: input.actor, metadata: { batch_id: batchId, kind: "material", count: ids.length, suppliers: vendorIds.length } });
         return { batchId, ids };
       });
     },

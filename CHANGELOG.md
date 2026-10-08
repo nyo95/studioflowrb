@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.441 | 2026-10-08 | feat(masterdata): save new SKUs and first prices in mixed bulk rows (Executor)
+
+- Added `createMaterialSkuPricesBulk`: one submission accepts existing-SKU price rows and new-SKU rows, saves valid rows in isolated serializable transactions, and returns ordered price ids, newly created SKU ids, and indexed refusals. A new identity that already exists is refused with the existing SKU id; repeated normalized new names create one SKU and may add several supplier prices, while conflicting SKU details are refused.
+- Reused the existing SKU creation and material-price bulk paths, including dimensions and M² conversion, active Brand/Category/Unit rules, supplier material capability, automatic Brand-to-Supplier linking, permissions, entity audits, and the single-SKU/old bulk entry points. The new server action validates at most 100 mixed rows and refreshes the existing Master Data reads; no screen changed.
+- Added integration coverage for the 3-existing + 2-new acceptance batch, partial saves and all-rejected details, grouped new names, existing identity hints, M² factor and incompatible size, inactive Brand/Category, unsupported suppliers, automatic linking, permission split, audits, and retry after a partial save.
+- **Migrations/dependencies:** none.
+- **Limitation:** the Lead's price-table screen and its browser acceptance remain the next step; this revision provides backend and action wiring only.
+
+**Checks.** `tsc --noEmit`; `npm run lint -- --quiet`; `npm run check:boundaries`; `npm run check:legacy-runtime`; focused Master Data integration 116/116; `npm test` 958/958 (none failed, skipped or cancelled); `npm run build`; staged and unstaged whitespace checks.
+
 ## R8.440 | 2026-10-08 | docs(plan): WO-MD-SKUBULK-01 new SKUs and prices saved together from the price table (Lead)
 
 - Owner approved the inline flow (2026-10-08): the new SKU is created inside the price table row instead of a second form in the same window. `PLAN.md` READY for the Executor: one mixed bulk save (existing and new SKU rows), save-valid-rows, the same new SKU on several rows created once, a "new" name that already exists rejected with its id, reuse of the existing SKU and price rules, no screens. The Lead builds the table screen after.
