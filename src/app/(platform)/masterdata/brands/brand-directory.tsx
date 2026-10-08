@@ -105,6 +105,7 @@ export function BrandDirectory({
   const [createError, setCreateError] = useState<string | null>(null);
   const [createPending, setCreatePending] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+  const [editErrorPrices, setEditErrorPrices] = useState<string | null>(null);
   const [editPending, setEditPending] = useState(false);
   const [createNameWarning, setCreateNameWarning] = useState<string | null>(null);
   const [editNameWarning, setEditNameWarning] = useState<string | null>(null);
@@ -483,6 +484,9 @@ export function BrandDirectory({
                   setEditTarget(null);
                 } else if (res && "ok" in res && res.ok === false) {
                   setEditError(res.error.safeMessage);
+                  // "Still used by N prices" refusals say which Brand and supplier; link to exactly those prices.
+                  const usage = res.error.details as { brand?: { id: string } | null; supplier?: { id: string } | null; livePriceCount?: number } | undefined;
+                  setEditErrorPrices(usage?.brand?.id && usage.supplier?.id && usage.livePriceCount ? `/masterdata/pricing?supplier=${usage.supplier.id}&brand=${usage.brand.id}` : null);
                 }
               } finally {
                 setEditPending(false);
@@ -495,7 +499,7 @@ export function BrandDirectory({
             {editCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
             {editSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
             <input type="hidden" name="hashtags" value={editHashtags.join(" ")} />
-            {editError ? <InlineError>{editError}</InlineError> : null}
+            {editError ? <InlineError>{editError}{editErrorPrices ? <> <a href={editErrorPrices} className="underline">Show those prices</a></> : null}</InlineError> : null}
             <Field label="Brand name" required>
               <Input name="name" textCase="title" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarBrandName(e.target.value, editTarget.id))} />
             </Field>

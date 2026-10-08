@@ -95,7 +95,8 @@ function mapWorkPrice(p: {
   };
 }
 
-export default async function PricingPage() {
+export default async function PricingPage({ searchParams }: { searchParams: Promise<{ supplier?: string; brand?: string }> }) {
+  const filters = await searchParams;
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
@@ -150,6 +151,8 @@ export default async function PricingPage() {
         divider
       />
       <PricingDirectory
+        initialSupplierId={filters.supplier}
+        initialBrandId={filters.brand}
         materialPrices={materialPrices}
         materialLaborPrices={materialLaborPrices}
         laborPrices={laborPrices}

@@ -18,7 +18,7 @@ import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurem
 import { createMoney,currencyPrefix,formatMoney } from "@platform/utilities/money";
 import { CircleHelp, Plus, Trash2 } from "lucide-react";
 import { useEffect,useRef,useState,useTransition,type FormEvent,type ReactNode } from "react";
-import { archivePriceAction,createMaterialSkuAction,linkBrandToSupplierAction,saveBulkWorkPricesAction,saveMaterialPriceRowsAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
+import { archivePriceAction,createMaterialSkuAction,saveBulkWorkPricesAction,saveMaterialPriceRowsAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
 type SkuRef = { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; base_unit: { id: string; code: string; name: string } | null; purchase_unit: { id: string; code: string; name: string } | null; dimension_length: string | null; dimension_width: string | null; dimension_thickness: string | null; dimension_unit: { id: string; code: string; name: string } | null; purchase_to_base_factor: string | null };
@@ -32,13 +32,13 @@ const PRICE_PAGE_SIZE = 25;
 
 
 
-export function PricingDirectory(props: { materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Array<Ref & { brandIds: string[] }>; workVendors: Array<Ref & { categoryIds: string[] }>; materialLaborVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
+export function PricingDirectory(props: { initialSupplierId?: string; initialBrandId?: string; materialPrices: MaterialRow[]; materialLaborPrices: WorkRow[]; laborPrices: WorkRow[]; canManageMaterial: boolean; canManageWork: boolean; canReadMaterial: boolean; canReadWork: boolean; contacts: Record<string, { name: string; phones: string[] }>; canManageVendors: boolean; canManageCategories: boolean; canManageSkus: boolean; canManageBrands: boolean; skus: SkuRef[]; brands: Ref[]; productCategories: Ref[]; vendors: Ref[]; materialVendors: Array<Ref & { brandIds: string[] }>; workVendors: Array<Ref & { categoryIds: string[] }>; materialLaborVendors: Array<Ref & { categoryIds: string[] }>; units: Array<Ref & { code: string }>; workCategories: Ref[]; vendorTypes: Array<Ref & { canSupplyMaterial: boolean; canSupplyLabor: boolean }> }) {
   const { locale } = useDisplaySettings();
   /** A text price or a price on request is shown in italic, muted text instead of a number. */
   const displayPrice = (amount: string, currency: string, label?: string | null) => label
     ? <span className="italic text-ink-secondary" title="Text price">{label}</span>
     : isPriceOnRequest(amount) ? <span className="italic text-ink-secondary">By request</span> : formatMoney(createMoney(amount, currency), { locale });
-  const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState("ALL"); const [brandFilter, setBrandFilter] = useState("ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [matrixKind, setMatrixKind] = useState<"labor" | "material-labor" | null>(null);
+  const [query, setQuery] = useState(""); const [status, setStatus] = useState<DirectoryStatus>("ACTIVE"); const [supplierFilter, setSupplierFilter] = useState(props.initialSupplierId ?? "ALL"); const [brandFilter, setBrandFilter] = useState(props.initialBrandId ?? "ALL"); const [workCategoryFilter, setWorkCategoryFilter] = useState("ALL"); const [productCategoryFilter, setProductCategoryFilter] = useState("ALL"); const [groupByItem, setGroupByItem] = useState(false); const [page, setPage] = useState(1); const [sort, setSort] = useState<{ key: PriceSortKey; direction: SortDirection }>({ key: "name", direction: "asc" }); const [matrixKind, setMatrixKind] = useState<"labor" | "material-labor" | null>(null);
   const [tab, setTab] = useState<Kind>(props.canReadMaterial ? "material" : "material-labor");
   const [editor, setEditor] = useState<Editor | null>(null); const [formError, setFormError] = useState<string | null>(null);
   const [archive, setArchive] = useState<Target | null>(null); const [restore, setRestore] = useState<Target | null>(null); const [deletion, setDeletion] = useState<Target | null>(null); const [reason, setReason] = useState(""); const [rowError, setRowError] = useState<string | null>(null);
@@ -572,10 +572,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   // Material prices are entered brand first: the Brand narrows the SKU list, and every row names its own supplier.
   const [mRows, setMRows] = useState<MaterialBulkRow[]>(() => [emptyMaterialRow(0, "")]);
   const [materialBrandFilter, setMaterialBrandFilter] = useState("ALL");
-  const [linkedPairs, setLinkedPairs] = useState<string[]>([]);
-  const [linkingPair, setLinkingPair] = useState<string | null>(null);
-  const [linkError, setLinkError] = useState<string | null>(null);
-  const brandsOfVendor = (id: string) => [...(vendorOptions.find((vendor) => vendor.id === id)?.brandIds ?? []), ...linkedPairs.filter((pair) => pair.startsWith(`${id}|`)).map((pair) => pair.slice(id.length + 1))];
+  const brandsOfVendor = (id: string) => vendorOptions.find((vendor) => vendor.id === id)?.brandIds ?? [];
   const skuOptionsForTable = refs.skus.filter((sku) => materialBrandFilter === "ALL" || sku.brand?.id === materialBrandFilter).map((sku) => ({
     id: sku.id,
     label: sku.name ?? sku.code ?? "Unnamed SKU",
@@ -587,7 +584,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
     return vendorOptions
       .map((vendor) => ({ vendor, linked: !brandId || brandsOfVendor(vendor.id).includes(brandId) }))
       .sort((left, right) => Number(right.linked) - Number(left.linked))
-      .map(({ vendor, linked }) => ({ id: vendor.id, label: vendor.name, description: linked ? undefined : <span className="text-xs text-ink-secondary">not linked to this brand</span> }));
+      .map(({ vendor, linked }) => ({ id: vendor.id, label: vendor.name, description: linked ? undefined : <span className="text-xs text-ink-secondary">new for this brand</span> }));
   };
   const patchMRow = (key: number, patch: Partial<MaterialBulkRow>) => setMRows((current) => current.map((entry) => entry.key === key ? { ...entry, ...patch } : entry));
   const addMRow = () => {
@@ -599,15 +596,6 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
     setMRows((current) => current.length === 1 ? [emptyMaterialRow(fresh, current[0]?.vendorId ?? "")] : current.filter((entry) => entry.key !== key));
   };
   const filledMRows = mRows.filter((entry) => entry.skuId || entry.amount || entry.notes.trim());
-  const linkBrand = async (brandId: string, forVendorId: string) => {
-    const pair = `${forVendorId}|${brandId}`;
-    setLinkError(null);
-    setLinkingPair(pair);
-    const result = await linkBrandToSupplierAction({ brandId, vendorId: forVendorId });
-    setLinkingPair(null);
-    if (result.ok) setLinkedPairs((current) => [...current, pair]);
-    else if (result.ok === false) setLinkError(result.error.safeMessage);
-  };
   const filledRows = rows.filter((entry) => entry.name.trim() || entry.amount || entry.notes.trim() || entry.scopeNote.trim());
   const filledCount = bulkMaterial ? filledMRows.length : filledRows.length;
   const submitBulk = async (event: FormEvent<HTMLFormElement>) => {
@@ -626,7 +614,18 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
       setBulkPending(true);
       try {
         const result = await saveMaterialPriceRowsAction({ currency, rows: filledMRows.map((entry) => ({ skuId: entry.skuId, vendorId: entry.vendorId, amount: entry.amount, notes: entry.notes.trim() || null })) });
-        if (result.ok) { onCancel(); return; }
+        if (result.ok) {
+          const rejected = result.data.rejected ?? [];
+          if (rejected.length === 0) { onCancel(); return; }
+          // Keep only the rows that failed, with their reasons; the saved ones are already in the list.
+          const problems: Record<number, string> = {};
+          for (const problem of rejected) { const target = filledMRows[problem.rowIndex]; if (target) problems[target.key] = problem.message; }
+          const keep = new Set(Object.keys(problems).map(Number));
+          if (keep.size > 0) setMRows((current) => current.filter((entry) => keep.has(entry.key)));
+          setRowProblems(problems);
+          setBulkError(`${result.data.ids.length} saved. ${rejected.length} row${rejected.length === 1 ? "" : "s"} need fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
+          return;
+        }
         if (result.ok === false) {
           const details = (result.error.details as { rows?: BulkRowProblem[] } | undefined)?.rows ?? [];
           const problems: Record<number, string> = {};
@@ -657,7 +656,17 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
         vendorId, categoryId, currency,
         rows: filledRows.map((entry) => ({ name: entry.name.trim(), unitId: entry.unitId, amount: entry.amount, notes: entry.notes.trim() || null, scopeNote: entry.scopeNote.trim() || null })),
       });
-      if (result.ok) { onCancel(); return; }
+      if (result.ok) {
+        const rejected = result.data.rejected ?? [];
+        if (rejected.length === 0) { onCancel(); return; }
+        const problems: Record<number, string> = {};
+        for (const problem of rejected) { const target = filledRows[problem.rowIndex]; if (target) problems[target.key] = problem.message; }
+        const keep = new Set(Object.keys(problems).map(Number));
+        if (keep.size > 0) setRows((current) => current.filter((entry) => keep.has(entry.key)));
+        setRowProblems(problems);
+        setBulkError(`${result.data.ids.length} saved. ${rejected.length} row${rejected.length === 1 ? "" : "s"} need fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
+        return;
+      }
       if (result.ok === false) {
         const details = (result.error.details as { rows?: BulkRowProblem[] } | undefined)?.rows ?? [];
         const problems: Record<number, string> = {};
@@ -766,19 +775,11 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
                 <IconButton label={`Remove row ${index + 1}`} icon={<Trash2 size={14} />} size="sm" onClick={() => removeMRow(entry.key)} />
               </div>
               {sku ? <SkuMeasurementSummary sku={sku} /> : null}
-              {unlinked && sku?.brand ? (
-                <div className="flex flex-wrap items-center gap-2 px-1 text-xs text-ink-secondary">
-                  <span>This supplier is not linked to {sku.brand.name}, so it cannot be priced yet.</span>
-                  {refs.canManageBrands || refs.canManageVendors
-                    ? <Button type="button" variant="ghost" size="sm" disabled={linkingPair === `${entry.vendorId}|${sku.brand.id}`} onClick={() => void linkBrand(sku.brand!.id, entry.vendorId)}>Link brand to supplier</Button>
-                    : <span>Ask someone who manages Brands or Suppliers to link it.</span>}
-                </div>
-              ) : null}
+              {unlinked && sku?.brand ? <div className="px-1 text-xs text-ink-secondary">This supplier will be added as a supplier of {sku.brand.name} when you save.</div> : null}
               {rowProblems[entry.key] ? <div role="alert" className="px-1 text-xs text-danger">Row {index + 1}: {rowProblems[entry.key]}</div> : null}
             </div>
           );
         })}
-        {linkError ? <InlineError>{linkError}</InlineError> : null}
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="ghost" size="sm" leadingIcon={<Plus />} onClick={addMRow}>Add row</Button>
           {refs.canManageSkus ? <Button type="button" variant="ghost" size="sm" onClick={() => setMaterialEntryMode("new")}>Create a new SKU with its first price</Button> : null}

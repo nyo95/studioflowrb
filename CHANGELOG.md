@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.420 | 2026-10-08 | feat(masterdata): Pricing screens for saving valid rows, automatic Brand links and "show those prices"; review of R8.419 PASS (Lead)
+
+- **Review of group C (R8.419 `ded7359`): PASS.** Each valid row commits in its own transaction; a failure inside one row is reported as that row (`PRICE_SAVE_FAILED` when it is not a known refusal) and later rows go on; duplicate and live-conflict checks are kept; `reject-all` stays the default. Full tests 946/946, re-run by the Lead. Notes (BACKLOG [CLEANUP]): an unexpected error in the several-suppliers grid after earlier suppliers saved is rethrown without the saved list, and the per-row isolation has no fault-injection test.
+- **Grids save what is valid.** The material rows, the labor and Material+Labor rows, and the several-suppliers grid now call the save-valid mode. On a partial save the saved rows leave the grid, the failed rows (or cells, in the several-suppliers grid) stay with their reasons, and a line says how many were saved. A grid where nothing could be saved behaves as before.
+- **No "not linked" blocker.** The supplier picker says "new for this brand" and a calm note under the row says the supplier will be added to the Brand when the row is saved; the "Link brand to supplier" button and its error are gone.
+- **"Show those prices".** The Brand edit dialog turns the "still used by N prices" refusals into a link to the Pricing list filtered by that supplier and Brand (the Pricing page now reads `supplier` and `brand` from the address).
+- WO-MD-ENTRY-01 is BUILT in `PLAN.md`; browser walk is [UNVERIFIED] in BACKLOG.
+
+**Checks.** `tsc --noEmit`, lint (Pricing and Brands screens), `npm test` 946/946 (none failed, skipped or cancelled). Browser not walked: the built-in browser was signed out; the dev server on port 3001 is the owner's own and already running.
+
 ## R8.419 | 2026-10-08 | feat(masterdata): save valid price-grid rows alongside rejected rows (Executor)
 
 - Added `onInvalid: "save-valid"` to material and work price batch commands and the supplier comparison grid. The default remains `reject-all`, preserving the existing all-or-nothing behaviour for callers and workbook imports.

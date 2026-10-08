@@ -259,6 +259,9 @@ export async function requestPriceDeletionAction(kind: PriceKind, id: string, re
 const bulkRowNotes = z.string().max(1000).nullish();
 /** A 64-character text price label plus its two quotation marks, with room to spare (WO-MD-PRICE-LABEL-01). */
 const AMOUNT_TEXT_MAX = 80;
+type RejectedRow = { rowIndex: number; vendorId?: string; field: string | null; code: string; message: string };
+type GridSaveResult = { batchId: string; ids: string[]; rejected?: RejectedRow[] };
+
 const bulkWorkInput = z.object({
   kind: z.enum(["labor", "material-labor"]),
   vendorId: z.string().uuid(),
@@ -272,13 +275,13 @@ const bulkMaterialInput = z.object({
   rows: z.array(z.object({ skuId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes })).min(1).max(100),
 });
 
-/** Saves many labor or material + labor prices for one supplier and category, all or nothing. Row problems come back in `error.details.rows`. */
-export async function saveBulkWorkPricesAction(input: unknown): Promise<ActionResult<{ batchId: string; ids: string[] }>> {
+/** Saves many labor or material + labor prices for one supplier and category. Valid rows are saved; rows that fail come back in `rejected` (or in `error.details.rows` when none could be saved). */
+export async function saveBulkWorkPricesAction(input: unknown): Promise<ActionResult<GridSaveResult>> {
   return runSafeAction(async () => {
     const parsed = bulkWorkInput.safeParse(input);
     if (!parsed.success) throw validationError(parsed.error);
     const ctx = await context();
-    const result = await masterDataService.createWorkPricesBulk({ ...ctx, ...parsed.data });
+    const result = await masterDataService.createWorkPricesBulk({ ...ctx, ...parsed.data, onInvalid: "save-valid" });
     refreshPricing();
     revalidatePath("/masterdata/vendors");
     return result;
@@ -322,13 +325,13 @@ const matrixInput = z.object({
   rows: z.array(z.object({ name: z.string().min(1).max(128), unitId: z.string().uuid(), notes: bulkRowNotes, amounts: z.record(z.string(), z.string().max(AMOUNT_TEXT_MAX).nullish()) })).min(1).max(100),
 });
 
-/** Saves a compare-suppliers grid (one amount per item per supplier), all or nothing. Cell problems come back in `error.details.rows` with their supplier. */
-export async function saveWorkPriceMatrixAction(input: unknown): Promise<ActionResult<{ batchId: string; ids: string[] }>> {
+/** Saves a several-suppliers grid (one amount per item per supplier). Valid cells are saved; failing cells come back in `rejected` with their supplier. */
+export async function saveWorkPriceMatrixAction(input: unknown): Promise<ActionResult<GridSaveResult>> {
   return runSafeAction(async () => {
     const parsed = matrixInput.safeParse(input);
     if (!parsed.success) throw validationError(parsed.error);
     const ctx = await context();
-    const result = await masterDataService.createWorkPriceMatrix({ ...ctx, ...parsed.data });
+    const result = await masterDataService.createWorkPriceMatrix({ ...ctx, ...parsed.data, onInvalid: "save-valid" });
     refreshPricing();
     revalidatePath("/masterdata/vendors");
     return result;
@@ -340,13 +343,13 @@ const materialRowsInput = z.object({
   rows: z.array(z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes })).min(1).max(100),
 });
 
-/** Saves many material prices where every row names its supplier, all or nothing. Row problems come back in `error.details.rows`. */
-export async function saveMaterialPriceRowsAction(input: unknown): Promise<ActionResult<{ batchId: string; ids: string[] }>> {
+/** Saves many material prices where every row names its supplier. Valid rows are saved; failing rows come back in `rejected`. */
+export async function saveMaterialPriceRowsAction(input: unknown): Promise<ActionResult<GridSaveResult>> {
   return runSafeAction(async () => {
     const parsed = materialRowsInput.safeParse(input);
     if (!parsed.success) throw validationError(parsed.error);
     const ctx = await context();
-    const result = await masterDataService.createMaterialPriceRows({ ...ctx, ...parsed.data });
+    const result = await masterDataService.createMaterialPriceRows({ ...ctx, ...parsed.data, onInvalid: "save-valid" });
     refreshPricing();
     revalidatePath("/masterdata/vendors");
     return result;

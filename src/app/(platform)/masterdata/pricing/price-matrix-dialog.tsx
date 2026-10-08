@@ -96,7 +96,27 @@ export function PriceMatrixDialog({ kind, modes, onSwitch, vendors, categories, 
         kind, categoryId, currency: "IDR", vendorIds: chosen.map((vendor) => vendor.id),
         rows: filled.map((row) => ({ name: row.name.trim(), unitId: row.unitId, notes: row.notes.trim() || null, amounts: Object.fromEntries(chosen.map((vendor) => [vendor.id, row.cells[vendor.id]?.value || null])) })),
       });
-      if (result.ok) { onClose(); return; }
+      if (result.ok) {
+        const rejected = result.data.rejected ?? [];
+        if (rejected.length === 0) { onClose(); return; }
+        // Keep only the cells that failed (a row stays while any of its cells did), each with its reason.
+        const failed = new Set<string>(); const next: Record<number, string[]> = {};
+        for (const problem of rejected) {
+          const row = filled[problem.rowIndex];
+          if (!row) continue;
+          if (problem.vendorId) failed.add(`${row.key}|${problem.vendorId}`); else chosen.forEach((vendor) => failed.add(`${row.key}|${vendor.id}`));
+          const supplier = problem.vendorId ? vendors.find((vendor) => vendor.id === problem.vendorId)?.name : null;
+          (next[row.key] ??= []).push(supplier ? `${supplier}: ${problem.message}` : problem.message);
+        }
+        if (failed.size > 0) {
+          setRows((current) => current
+            .filter((row) => chosen.some((vendor) => failed.has(`${row.key}|${vendor.id}`)))
+            .map((row) => ({ ...row, cells: Object.fromEntries(Object.entries(row.cells).filter(([vendorId]) => failed.has(`${row.key}|${vendorId}`))) })));
+        }
+        setProblems(next);
+        setError(`${result.data.ids.length} saved. ${rejected.length} cell${rejected.length === 1 ? "" : "s"} need fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
+        return;
+      }
       if (result.ok === false) {
         const detail = (result.error.details as { rows?: CellProblem[] } | undefined)?.rows ?? [];
         const next: Record<number, string[]> = {};
