@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.423 | 2026-10-08 | fix: tour no longer restarts when the language is switched; refusals scroll into view; supplier archive wording; browser walk part 1 (Lead)
+
+- **Browser walk (part 1), on an isolated server.** Run on a second dev server (port 3101, separate build folder, the disposable test database, the seeded test owner), so the owner's dev database and session were not touched; fixtures named `ZZ-Test …` were created with the service layer. Passed: first-use tour (language pick, 4 steps in English and Indonesian, Done never replays, Help replay, Esc, phone width), auto-link of a supplier to a Brand on price save, the material grid saving the good row and keeping the bad one with its reason, "Show those prices" opening the Pricing list filtered to exactly those prices, Material+Labor and Labor supplier lists, Supplier archive and restore cascading through its owned Brand, SKU and price (and leaving a Brand that only lists it), a price-less SKU and its Brand archiving and restoring.
+- **Bugs found and fixed.** (1) Switching the guide language on step 2 restarted the tour at step 1: saving the language refreshed the page, and the auto-start effect treated it as a new first visit; the start is now remembered only when it really happens. (2) A refusal in the Brand dialogs appeared at the top of a long dialog while Save sits at the bottom, so it was invisible; it now scrolls into view. (3) The partial-save line read "1 row need fixing"; it now says "needs". (4) The Supplier archive and restore confirmations still described the old behaviour (only prices); they now say Brands owned by the supplier, with their SKUs and prices, follow.
+- Not walked: see BACKLOG; the remaining [UNVERIFIED] entries now say exactly what is still open.
+
+**Checks.** `tsc --noEmit`, lint (touched screens), `npm test` 947/947 (none failed, skipped or cancelled).
+
 ## R8.422 | 2026-10-08 | fix(bq): Master Data prices no longer hidden by a big Library; draft label on quotations; typing pause in the source picker (Lead)
 
 - **External BQ estimator audit (against `1d70026`) checked against the current code.** Confirmed and fixed: (1) the source picker put every Library item first and then cut the whole list at 80, so a Library of 80 or more items hid all Master Data prices; each source now has its own share of 30 (`source-actions.ts`). Confirmed and fixed: (2) a printed quotation said nothing about the project being a draft; while the project is not locked the page now carries a boxed "Draft — this project is not locked yet; prices and quantities may still change". Confirmed and fixed: (3) the picker asked the server on every keystroke; it now waits 250 ms after the last key (stale answers were already discarded).

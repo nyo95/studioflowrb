@@ -623,7 +623,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           const keep = new Set(Object.keys(problems).map(Number));
           if (keep.size > 0) setMRows((current) => current.filter((entry) => keep.has(entry.key)));
           setRowProblems(problems);
-          setBulkError(`${result.data.ids.length} saved. ${rejected.length} row${rejected.length === 1 ? "" : "s"} need fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
+          setBulkError(`${result.data.ids.length} saved. ${rejected.length} row${rejected.length === 1 ? "" : "s"} ${rejected.length === 1 ? "needs" : "need"} fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
           return;
         }
         if (result.ok === false) {
@@ -664,7 +664,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
         const keep = new Set(Object.keys(problems).map(Number));
         if (keep.size > 0) setRows((current) => current.filter((entry) => keep.has(entry.key)));
         setRowProblems(problems);
-        setBulkError(`${result.data.ids.length} saved. ${rejected.length} row${rejected.length === 1 ? "" : "s"} need fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
+        setBulkError(`${result.data.ids.length} saved. ${rejected.length} row${rejected.length === 1 ? "" : "s"} ${rejected.length === 1 ? "needs" : "need"} fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
         return;
       }
       if (result.ok === false) {

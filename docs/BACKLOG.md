@@ -216,12 +216,7 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   Before a plan: confirm which file types to add, the folder-watching
   mechanism, and the hardware.
 
-- [ ] [UNVERIFIED] First-use tour (WO-PLAT-TOUR-01, R8.397–R8.398) in the browser (Indonesian path and Help replay walked R8.399; rest open):
-  fresh account sees the language pick then 4 StudioFlow steps; Skip/Escape/Done
-  never replay it, also on another browser; "Help: replay guide" reopens it in
-  the rail and on a phone; a role without project read skips step 2; a phone
-  skips steps whose control is hidden. Re-run the two Playwright full sessions
-  that stalled earlier to completion and the 13 phone layout checks.
+- [ ] [UNVERIFIED] First-use tour, still open after the 2026-10-08 walk (walked: language pick, 4 steps in English and Indonesian, language switch keeps the step, Done never replays after reload, Help replay, Esc, phone width docks the card): another browser or computer for the same account must not replay it; a role without project read skips step 2; the two Playwright full sessions that stalled earlier and the 13 phone layout checks.
 - [ ] [PLANNED] Tours for Master Data and BQ (same registration as
   `STUDIOFLOW_TOUR`), after the owner approves the StudioFlow flow.
 - [ ] [PLANNED][P3] Lead findings of the 2026-10-07 audit: shell polling fires
@@ -244,8 +239,9 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   `masterdata/services/sample.service.ts` and
   `studioflow/public/sample-request-command.ts`. Not a defect; revisit as one
   application-level workflow once two or three more cross-app workflows exist.
-- [ ] [UNVERIFIED] WO-MD-CRUD-01 (R8.412–R8.414 and the Pricing screen wiring) in the browser: restore a price-less sample SKU and its Brand; rename a Brand whose owner Supplier is archived; create a Brand with a link typed twice; Material+Labor price and quick-add supplier from a material-only, a labor-only and a both Supplier; archive and restore a Supplier that owns a Brand (the Brand, its SKUs and prices follow; a Brand that only lists it stays live).
+- [ ] [UNVERIFIED] WO-MD-CRUD-01, still open after the 2026-10-08 walk (walked and passed: Supplier archive archives the Brands it owns with their SKUs and prices and leaves a Brand that only lists it, restore brings them back; a price-less SKU and its Brand archive and restore; Material+Labor shows material-, labor- and both-capable suppliers, Labor only labor-capable): the Material+Labor quick-add supplier form, a hand-archived Brand staying archived through a Supplier restore, a Brand with the same link typed twice. Renaming a Brand whose owner is archived is covered by a test only.
 - [ ] [PLANNED][P3] The workbook imports (SKU prices, price database) still reject the whole file when any row is invalid. Revisit a "apply the valid rows" option once WO-MD-ENTRY-01 has proven the grid version; the import's preview step makes it a separate decision.
-- [ ] [UNVERIFIED] WO-MD-ENTRY-01 (R8.416–R8.419 and the Pricing screens, R8.420) in the browser: price a Brand's SKU from a supplier that is not linked (it saves and the supplier appears on the Brand; the row says "new for this brand" and the note under it); save a material grid, a labor / Material+Labor grid and a several-suppliers grid with two bad rows (the good ones are saved and the bad ones stay with their reasons, and saving again does not duplicate); in a Brand's edit dialog remove a supplier that prices use or change the owner, and follow "Show those prices" (the Pricing list opens filtered by that supplier and Brand).
+- [ ] [UNVERIFIED] WO-MD-ENTRY-01, still open after the 2026-10-08 walk (walked and passed: a price from an unlinked supplier saves and links it, "new for this brand" and its note; a material grid with one duplicate saves the good row and keeps the bad one; removing a supplier that prices use is refused with a visible message and "Show those prices" opens the Pricing list filtered to exactly those prices): the labor / Material+Labor grid and the several-suppliers grid with bad rows, changing a Brand owner while its prices exist.
 - [ ] [UNVERIFIED] The ordered browser walk that closes every [UNVERIFIED] entry above is in `docs/BROWSER-ACCEPTANCE.md` (11 sections, about an hour). Run it once, record PASS/FAIL per section, then remove the entries that passed and file each FAIL as a [BUG].
 - [ ] [CLEANUP][P3] The unexpected-error branch of the several-suppliers grid (R8.421) has no fault-injection test, as the per-row isolation of R8.419 has none.
+- [ ] [UNVERIFIED] Walk 2026-10-08 did not cover: client-note images (a file upload cannot be driven from the built-in browser), formatted notes, Timeline and Schedule, re-layout on real data, the BQ screens, the sample shelf, Dark mode, the 840 px rail. Run them from `docs/BROWSER-ACCEPTANCE.md` sections 6 to 10 on the owner's own browser.

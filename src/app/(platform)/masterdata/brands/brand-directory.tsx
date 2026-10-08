@@ -53,6 +53,9 @@ function DiscoverySummary({ values, limit }: { values: string[]; limit: number }
  return <span className="block max-w-44 truncate text-xs text-ink-secondary" title={values.join(", ")} aria-label={values.join(", ") || "None"}>{values.slice(0, limit).join(", ") || "—"}{values.length > limit ? ` +${values.length - limit}` : ""}</span>;
 }
 
+/** Ref callback: scrolls a newly shown message into view (a refusal at the top of a long dialog is invisible from the Save button). */
+function bringIntoView(node: HTMLElement | null) { node?.scrollIntoView({ block: "nearest" }); }
+
 export function BrandDirectory({
   brands,
   productCategories,
@@ -376,7 +379,7 @@ export function BrandDirectory({
           }}
           className="grid gap-4  pr-1"
         >
-          {createError ? <InlineError>{createError}</InlineError> : null}
+          {createError ? <div key={createError} ref={bringIntoView}><InlineError>{createError}</InlineError></div> : null}
           <Field label="Brand name" required>
             <Input name="name" textCase="title" required maxLength={64} placeholder="e.g. TACO, Blum, Hafele" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarBrandName(e.target.value))} />
           </Field>
@@ -499,7 +502,7 @@ export function BrandDirectory({
             {editCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
             {editSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
             <input type="hidden" name="hashtags" value={editHashtags.join(" ")} />
-            {editError ? <InlineError>{editError}{editErrorPrices ? <> <a href={editErrorPrices} className="underline">Show those prices</a></> : null}</InlineError> : null}
+            {editError ? <div key={editError} ref={bringIntoView}><InlineError>{editError}{editErrorPrices ? <> <a href={editErrorPrices} className="underline">Show those prices</a></> : null}</InlineError></div> : null}
             <Field label="Brand name" required>
               <Input name="name" textCase="title" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarBrandName(e.target.value, editTarget.id))} />
             </Field>

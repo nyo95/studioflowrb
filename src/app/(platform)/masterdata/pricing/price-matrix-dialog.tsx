@@ -114,7 +114,7 @@ export function PriceMatrixDialog({ kind, modes, onSwitch, vendors, categories, 
             .map((row) => ({ ...row, cells: Object.fromEntries(Object.entries(row.cells).filter(([vendorId]) => failed.has(`${row.key}|${vendorId}`))) })));
         }
         setProblems(next);
-        setError(`${result.data.ids.length} saved. ${rejected.length} cell${rejected.length === 1 ? "" : "s"} need fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
+        setError(`${result.data.ids.length} saved. ${rejected.length} cell${rejected.length === 1 ? "" : "s"} ${rejected.length === 1 ? "needs" : "need"} fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
         return;
       }
       if (result.ok === false) {

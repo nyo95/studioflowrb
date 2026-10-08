@@ -52,9 +52,10 @@ export function TourProvider({ tours, grants, language, progress, actions, child
   useEffect(() => {
     if (!tour || startedFor.current === tour.key) return;
     if (seen.has(tour.key) || !shouldAutoShow(tour, progress)) return;
-    startedFor.current = tour.key;
-    const timer = setTimeout(start, AUTO_START_DELAY_MS);
-    return () => { clearTimeout(timer); startedFor.current = null; };
+    // Remember the start only when it really happens. A refresh of the layout while the tour is open (choosing the
+    // language saves it, which revalidates the page) changes `progress`; it must not start the tour over at step 1.
+    const timer = setTimeout(() => { startedFor.current = tour.key; start(); }, AUTO_START_DELAY_MS);
+    return () => clearTimeout(timer);
   }, [tour, progress, seen, start]);
 
   const finish = useCallback((state: "completed" | "dismissed") => {

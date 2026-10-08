@@ -937,7 +937,7 @@ export function VendorDirectory({
             if (!open) setConfirmArchive(null);
           }}
           title={`Archive supplier "${confirmArchive.name}"?`}
-          description="Archiving this supplier cascades archive causes to all its Material, Material+Labor, and Labor unit prices."
+          description="Archiving this supplier also archives all its prices (Material, Material + labor, Labor) and the Brands it owns, with those Brands' SKUs and material prices. A Brand that only lists it as one of its suppliers stays."
           confirmLabel="Archive supplier"
           tone="danger"
           onConfirm={() => {
@@ -956,7 +956,7 @@ export function VendorDirectory({
             if (!open) setConfirmRestore(null);
           }}
           title={`Restore supplier "${confirmRestore.name}"?`}
-          description="Restoring this supplier will restore its unit prices that were archived solely by parent provenance."
+          description="Restoring this supplier brings back what archiving it archived: its prices and the Brands it owns, with their SKUs and prices. Anything archived separately stays archived."
           confirmLabel="Restore supplier"
           onConfirm={() => {
             const target = confirmRestore;
