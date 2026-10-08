@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.442 | 2026-10-08 | feat(masterdata): "Edit SKU" link in the Edit price form (Lead)
+
+- **Owner report (field):** the Edit price form shows Unit and size as read-only, so users could not change them. By rule a price's unit follows its SKU, so the change belongs on the SKU. The form now says "Unit and size follow the SKU" and has an "Edit SKU (size, unit)" link (only for users who may manage SKUs).
+- The link opens the SKU page with that SKU's edit window already open (`/masterdata/skus?edit=<id>`).
+- Also reviewed R8.441 (Executor): PASS on code read; checks as reported by the Executor.
+- **Migrations/dependencies:** none. No browser acceptance done.
+
+**Checks.** `tsc --noEmit`; eslint on the changed folders.
+
 ## R8.441 | 2026-10-08 | feat(masterdata): save new SKUs and first prices in mixed bulk rows (Executor)
 
 - Added `createMaterialSkuPricesBulk`: one submission accepts existing-SKU price rows and new-SKU rows, saves valid rows in isolated serializable transactions, and returns ordered price ids, newly created SKU ids, and indexed refusals. A new identity that already exists is refused with the existing SKU id; repeated normalized new names create one SKU and may add several supplier prices, while conflicting SKU details are refused.

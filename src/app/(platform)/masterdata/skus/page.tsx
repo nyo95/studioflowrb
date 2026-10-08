@@ -25,7 +25,8 @@ import { SkuDirectory } from "./sku-directory";
 
 export const dynamic = "force-dynamic";
 
-export default async function SkusPage() {
+export default async function SkusPage({ searchParams }: { searchParams: Promise<{ edit?: string }> }) {
+  const { edit } = await searchParams;
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
@@ -76,6 +77,7 @@ export default async function SkusPage() {
         units={refs.units}
         productCategories={refs.productCategories}
         canManage={canManage}
+        initialEditId={canManage ? edit : undefined}
       />
     </>
   );

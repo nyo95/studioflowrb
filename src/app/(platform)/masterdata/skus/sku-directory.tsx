@@ -54,12 +54,14 @@ export function SkuDirectory({
   units,
   productCategories,
   canManage,
+  initialEditId,
 }: {
   skus: SkuRow[];
   brands: Option[];
   units: UnitOption[];
   productCategories: Option[];
   canManage: boolean;
+  initialEditId?: string;
 }) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DirectoryStatus>("ACTIVE");
@@ -68,9 +70,10 @@ export function SkuDirectory({
   const [brandFilter, setBrandFilter] = useState<string>("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
 
-  const [editTarget, setEditTarget] = useState<SkuRow | null>(null);
-  const [editBrandId, setEditBrandId] = useState("");
-  const [editCategoryId, setEditCategoryId] = useState("");
+  const deepLinkTarget = initialEditId ? skus.find((sku) => sku.id === initialEditId) ?? null : null;
+  const [editTarget, setEditTarget] = useState<SkuRow | null>(deepLinkTarget);
+  const [editBrandId, setEditBrandId] = useState(deepLinkTarget?.brand?.id ?? "");
+  const [editCategoryId, setEditCategoryId] = useState(deepLinkTarget?.categories[0]?.category.id ?? "");
   const [confirmArchive, setConfirmArchive] = useState<SkuRow | null>(null);
   const [confirmRestore, setConfirmRestore] = useState<SkuRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SkuRow | null>(null);
