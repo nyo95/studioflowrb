@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.440 | 2026-10-08 | docs(plan): WO-MD-SKUBULK-01 new SKUs and prices saved together from the price table (Lead)
+
+- Owner approved the inline flow (2026-10-08): the new SKU is created inside the price table row instead of a second form in the same window. `PLAN.md` READY for the Executor: one mixed bulk save (existing and new SKU rows), save-valid-rows, the same new SKU on several rows created once, a "new" name that already exists rejected with its id, reuse of the existing SKU and price rules, no screens. The Lead builds the table screen after.
+- Recorded in BACKLOG.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.439 | 2026-10-08 | fix(masterdata): base unit locks to M² while a size is set; the SKU picker no longer says "no code" (Lead)
 
 - **Owner review of the new-SKU form.** The base unit is not always M²: it is pcs, m, kg and so on for materials without a sheet size, so it stays a normal choice. It is M² only when a size is typed, so the select is now locked (and saved as M²) while a size is set and unlocks when the size is cleared. This answers "why is Base/BQ unit not with the size section" without removing the choice for non-sheet materials.
