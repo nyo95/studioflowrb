@@ -12,7 +12,9 @@ import { phaseSkipReason } from "../domain/phase-display";
 import {
   canActivatePhase,
   isLegacySupervisionDefinition,
+  defaultIterationName,
   isPhaseModifiable,
+  iterationShortName,
   revisionLabel,
   waitingDays,
   type PhaseSeat,
@@ -152,7 +154,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
             await tx.sfRevision.update({ where: { id: current.id }, data: { status: "DONE", done_at: nowOf(ports) } });
           }
         } else if (phase.status === "PENDING") {
-          const created = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, major: 1, name: `${phase.name_snapshot} 1`, status: "DONE", done_at: nowOf(ports) } });
+          const created = await tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, major: 1, name: defaultIterationName(project.name, phase.prefix_snapshot, { major: 1 }), status: "DONE", done_at: nowOf(ports) } });
           createdIteration = iterationUndo(created);
         }
         await setPhase(tx, phase, { status: target, is_locked: true });
@@ -175,7 +177,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         }
       }
       const reset = await runTransaction(async (tx) => {
-        const { phase } = await loadPhase(tx, input.projectId, input.phaseId, input);
+        const { phase, project } = await loadPhase(tx, input.projectId, input.phaseId, input);
         const revisions = await tx.sfRevision.findMany({
           where: { phase_id: phase.id },
           orderBy: { major: "asc" },
@@ -202,13 +204,13 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         if (input.mode === "HARD_RESET_ACTIVE") {
           target = "ACTIVE";
           revisionId = randomUUID();
-          await tx.sfRevision.create({ data: { id: revisionId, phase_id: phase.id, major: input.major!, name: `${phase.name_snapshot} ${input.major}`, status: "NOT_SENT" } });
+          await tx.sfRevision.create({ data: { id: revisionId, phase_id: phase.id, major: input.major!, name: defaultIterationName(project.name, phase.prefix_snapshot, { major: input.major! }), status: "NOT_SENT" } });
         }
         await setPhase(tx, phase, { status: target, is_locked: false });
         await audit(tx, input.actor, "revision-overridden", phase, from, target, {
           mode: input.mode,
           note,
-          targetRevision: input.mode === "HARD_RESET_ACTIVE" ? `${phase.name_snapshot} ${input.major}` : null,
+          targetRevision: input.mode === "HARD_RESET_ACTIVE" ? defaultIterationName(project.name, phase.prefix_snapshot, { major: input.major! }) : null,
           history,
           deliverableSnapshot,
         });
@@ -275,7 +277,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   async function createIteration(tx: TxClient, phase: PhaseRow, kind?: string | null, visit?: { date: Date; note: string | null }) {
     const latest = await latestRevision(tx, phase.id);
     const major = (latest?.major ?? 0) + 1;
-    return tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, major, name: kind ?? `${phase.name_snapshot} ${major}`, status: "NOT_SENT", visit_date: visit?.date, note: visit?.note } });
+    const name = kind ?? defaultIterationName((await tx.sfProject.findUniqueOrThrow({ where: { id: phase.project_id }, select: { name: true } })).name, phase.prefix_snapshot, { major });
+    return tx.sfRevision.create({ data: { id: randomUUID(), phase_id: phase.id, major, name, status: "NOT_SENT", visit_date: visit?.date, note: visit?.note } });
   }
   function iterationUndo(row: { id: string; phase_id: string; major: number; name: string; status: string; sent_at: Date | null; answered_at: Date | null; done_at: Date | null; visit_date: Date | null; note: string | null }) {
     return { id: row.id, phaseId: row.phase_id, major: row.major, name: row.name, status: row.status, sentAt: row.sent_at?.toISOString() ?? null, answeredAt: row.answered_at?.toISOString() ?? null, doneAt: row.done_at?.toISOString() ?? null, visitDate: row.visit_date?.toISOString() ?? null, note: row.note };
@@ -459,8 +462,11 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       });
     },
     async renameIteration(input: PhaseCommandInput & { iterationId: string; name: string }) {
-      const name = requiredText(input.name, "ITERATION_NAME_REQUIRED", "Iteration name", 200);
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!iteration) throw iterationNotFound(); if (iteration.name === name) return { iterationId: iteration.id };
+      const typed = input.name.trim() === "" ? null : requiredText(input.name, "ITERATION_NAME_REQUIRED", "Iteration name", 200);
+      return runTransaction(async (tx) => { const { phase, project } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!iteration) throw iterationNotFound();
+        // An empty name resets to the default (project name + prefix + the iteration's own number).
+        const name = typed ?? defaultIterationName(project.name, phase.prefix_snapshot, iteration);
+        if (iteration.name === name) return { iterationId: iteration.id };
         // A two-step phase knows its step by the iteration name (`isCdMall`): renaming "CD Mall" would let OK close the
         // phase without CD Final, and naming another iteration "CD Mall" would fake the step. Those names stay put.
         const definition = await tx.sfPhaseDefinition.findUnique({ where: { id: phase.definition_id }, select: { default_iteration_kinds: true } });
@@ -634,6 +640,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           plannedDatesManual: phase.planned_dates_manual,
           activeRevision: phase.revisions[0] ? revisionLabel(phase.revisions[0], snap.prefixSnapshot) : null,
           iterationName: phase.revisions[0]?.name ?? null,
+          iterationShortName: phase.revisions[0] ? iterationShortName(phase.revisions[0].name, snap.prefixSnapshot, phase.revisions[0]) : null,
           iterationState: phase.revisions[0]?.status ?? null,
           openRootChecklist: counts.openRootChecklistItems,
           blockers: fullBlockers(counts),
@@ -697,6 +704,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const active = phase.revisions.find((rev) => OPEN_ITERATION_STATES.includes(rev.status as "NOT_SENT" | "SENT" | "ANSWERED")) ?? null;
       const archived = phase.project.archived_at !== null;
       const snap = phaseSnapshot(phase);
+      const kindNames = iterationKinds(phase.definition.default_iteration_kinds);
       const isSupervision = isLegacySupervisionDefinition(phase.definition_id);
       const imagesByIteration = new Map(await Promise.all(phase.revisions.map(async (rev) => [rev.id, await signIterationImages(rev.images)] as const)));
       const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
@@ -731,7 +739,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         canStart: status === "PENDING" && phase.project.status === "ACTIVE" && canStart,
         /** The open iteration with the next steps the server will accept (the same choices the project card shows). */
         currentIteration: active ? {
-          id: active.id, name: active.name, state: active.status, sentAt: active.sent_at, visitDate: dateToDateOnly(active.visit_date),
+          id: active.id, name: active.name, shortName: iterationShortName(active.name, snap.prefixSnapshot, active, kindNames.includes(active.name)), state: active.status, sentAt: active.sent_at, visitDate: dateToDateOnly(active.visit_date),
           waitingDays: active.status === "SENT" ? waitingDays(active.sent_at, nowOf(ports)) : null,
           choices: iterationChoices({ state: active.status, phaseStatus: status, iterationName: active.name, kinds: iterationKinds(phase.definition.default_iteration_kinds), supervision: isSupervision }),
           /** The outcomes offered once the client has answered (Revision / Done, or Continue to CD Final on CD Mall). */
@@ -742,17 +750,18 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         /** The iteration before the open one: its notes are the brief for the open iteration. */
         previousIteration: (() => {
           const before = active ? phase.revisions.find((rev) => rev.major < active.major) : null;
-          return before ? { id: before.id, name: before.name, state: before.status, note: before.note, images: imagesByIteration.get(before.id) ?? [] } : null;
+          return before ? { id: before.id, name: before.name, shortName: iterationShortName(before.name, snap.prefixSnapshot, before, kindNames.includes(before.name)), state: before.status, note: before.note, images: imagesByIteration.get(before.id) ?? [] } : null;
         })(),
         iterations: phase.revisions.map((rev) => ({
-          id: rev.id, name: rev.name, state: rev.status, createdAt: rev.created_at, sentAt: rev.sent_at, answeredAt: rev.answered_at, doneAt: rev.done_at,
+          id: rev.id, name: rev.name, shortName: iterationShortName(rev.name, snap.prefixSnapshot, rev, kindNames.includes(rev.name)), state: rev.status, createdAt: rev.created_at, sentAt: rev.sent_at, answeredAt: rev.answered_at, doneAt: rev.done_at,
           visitDate: dateToDateOnly(rev.visit_date), note: rev.note, images: imagesByIteration.get(rev.id) ?? [],
         })),
-        activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), name: active.name, state: active.status, sentAt: active.sent_at, createdAt: active.created_at, note: active.note, images: imagesByIteration.get(active.id) ?? [] } : null,
+        activeRevision: active ? { id: active.id, label: revisionLabel(active, snap.prefixSnapshot), name: active.name, shortName: iterationShortName(active.name, snap.prefixSnapshot, active, kindNames.includes(active.name)), state: active.status, sentAt: active.sent_at, createdAt: active.created_at, note: active.note, images: imagesByIteration.get(active.id) ?? [] } : null,
         history: phase.revisions.filter((rev) => !OPEN_ITERATION_STATES.includes(rev.status as "NOT_SENT" | "SENT" | "ANSWERED")).map((rev) => ({
           id: rev.id,
           label: revisionLabel(rev, snap.prefixSnapshot),
           name: rev.name,
+          shortName: iterationShortName(rev.name, snap.prefixSnapshot, rev, kindNames.includes(rev.name)),
           state: rev.status,
           createdAt: rev.created_at,
           closedAt: rev.done_at ?? rev.answered_at,

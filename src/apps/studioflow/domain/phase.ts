@@ -118,6 +118,17 @@ export function revisionLabel(revision: RevisionNumber, prefix = "v"): string {
   return `${prefix}${revision.major}`;
 }
 
+/** The default iteration name: project name + phase prefix + number (owner, 2026-10-08), e.g. "2026-474 Sociolla SBW R1 D1". */
+export function defaultIterationName(projectName: string, prefix: string, revision: RevisionNumber): string {
+  return `${projectName.trim()} ${revisionLabel(revision, prefix)}`;
+}
+
+/** "D1" for a default-like name (survives a project rename), otherwise the name itself (kinds, typed names). */
+export function iterationShortName(name: string, prefix: string, revision: RevisionNumber, isKind = false): string {
+  const label = revisionLabel(revision, prefix);
+  return !isKind && (name === label || name.endsWith(` ${label}`)) ? label : name;
+}
+
 /** The next iteration number for a phase (1 when it has none). */
 export function nextRevision(current: RevisionNumber | null): RevisionNumber {
   return { major: (current?.major ?? 0) + 1 };

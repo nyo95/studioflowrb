@@ -27,7 +27,7 @@ export type ProjectCardPhase = {
   skipped_reason: string | null;
   can_add_round: boolean;
   last_visit_days_ago: number | null;
-  current_iteration: { id: string; name: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[]; note: string | null; images?: readonly IterationImage[] } | null;
+  current_iteration: { id: string; name: string; short_name?: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[]; note: string | null; images?: readonly IterationImage[] } | null;
 };
 
 export type ProjectCardData = {
@@ -69,7 +69,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
   const steps = card.phases.map((phase, index) => {
     const current = phase.current_iteration;
     const view: PhaseView = { id: phase.id, name: phase.name, status: phase.status, isSupervision: phase.is_supervision, canStart: phase.can_start };
-    const iteration: IterationView | null = current ? { id: current.id, name: current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices, note: current.note, images: current.images ?? [] } : null;
+    const iteration: IterationView | null = current ? { id: current.id, name: current.short_name ?? current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices, note: current.note, images: current.images ?? [] } : null;
     const canAct = !completed && projectActive && viewer.canWork && seatOwner(phase);
     const display = phaseStepPresentation({
       phaseName: phase.name,
@@ -79,11 +79,11 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
       isSupervision: phase.is_supervision,
       iterationCount: phase.iteration_count,
       skippedReason: phase.skipped_reason,
-      iteration: current ? { name: current.name, state: current.state, waitingDays: current.waiting_days } : null,
+      iteration: current ? { name: current.short_name ?? current.name, state: current.state, waitingDays: current.waiting_days } : null,
     });
     const phaseMenu: RowActionItem[] = [
       { label: "Open phase", onSelect: () => router.push(`/studioflow/projects/${card.id}?phase=${phase.id}`) },
-      ...(current && current.state !== "SENT" && canAct ? [{ label: "Client notes…", onSelect: () => { setNotesFor({ phaseId: phase.id, phaseName: phase.name, iterationId: current.id, iterationName: current.name, note: current.note }); setNotesDraft(current.note ?? ""); } }] : []),
+      ...(current && current.state !== "SENT" && canAct ? [{ label: "Client notes…", onSelect: () => { setNotesFor({ phaseId: phase.id, phaseName: phase.name, iterationId: current.id, iterationName: current.short_name ?? current.name, note: current.note }); setNotesDraft(current.note ?? ""); } }] : []),
       ...(phase.can_add_round && canAct ? [{ label: "+ New iteration", onSelect: () => void commands.exec(`${phase.id}:add`, { command: "addIteration", phaseId: phase.id }, `New ${phase.name} iteration added`) }] : []),
       ...((phase.status === "PENDING" || phase.status === "ACTIVE") && !completed && projectActive && viewer.canReview && seatOwner(phase) ? [{ label: "Skip phase…", separatorBefore: true, onSelect: () => { setSkipPhase({ id: phase.id, name: phase.name }); setSkipReason(""); } }] : []),
     ];

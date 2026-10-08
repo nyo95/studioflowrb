@@ -849,7 +849,7 @@ describe("WO-BE-01 backend regressions", () => {
     const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
     assert.equal(detail.currentIteration?.note, "- Live remark");
     assert.deepEqual(detail.currentIteration?.answerChoices, ["revision", "done"]);
-    assert.deepEqual(detail.previousIteration, { id: closed.id, name: "Moodboard 2", state: "REVISED", note: "- Warmer palette\n- Keep the marble", images: [] });
+    assert.deepEqual(detail.previousIteration, { id: closed.id, name: "Moodboard 2", shortName: "Moodboard 2", state: "REVISED", note: "- Warmer palette\n- Keep the marble", images: [] });
     assert.deepEqual(detail.history.map((r) => [r.name, r.note]), [["Moodboard 2", "- Warmer palette\n- Keep the marble"], ["Moodboard 1", null]]);
   });
 });
@@ -1024,7 +1024,7 @@ describe("Iteration workflow (WO-SF-ITER-01)", () => {
     await sf.phases.recordClientAnswer({ ...base, iterationId: first.id, note: "- Warmer palette\n- Keep the marble at reception" });
     const revised = await sf.phases.chooseIterationOutcome({ ...base, iterationId: first.id, outcome: "REVISION" });
     assert.ok("nextIterationId" in revised);
-    assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Moodboard 2:NOT_SENT"]);
+    assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Heloskin Cimanggu MB2:NOT_SENT"]);
     // The notes stay on the iteration they belong to; nothing is copied into requirements or to-dos.
     assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: first.id } })).note, "- Warmer palette\n- Keep the marble at reception");
     assert.deepEqual((await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: phase.id })).map((item) => item.label), ["Draft board"]);
@@ -1042,14 +1042,14 @@ describe("Iteration workflow (WO-SF-ITER-01)", () => {
     await sf.phases.sendIteration({ ...base, iterationId: second.id });
     await sf.phases.recordClientAnswer({ ...base, iterationId: second.id, note: "Client wants marble" });
     await sf.phases.chooseIterationOutcome({ ...base, iterationId: second.id, outcome: "REVISION" });
-    assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Moodboard 2:REVISED", "Moodboard 3:NOT_SENT"]);
+    assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Heloskin Cimanggu MB2:REVISED", "Heloskin Cimanggu MB3:NOT_SENT"]);
 
     clock = new Date("2026-09-18T03:00:00Z");
     await clientRound(base, "DONE");
     const after = await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: phase.id } });
     assert.equal(after.status, "DONE");
     assert.equal(after.is_locked, true);
-    assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Moodboard 2:REVISED", "Moodboard 3:DONE"]);
+    assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Heloskin Cimanggu MB2:REVISED", "Heloskin Cimanggu MB3:DONE"]);
     assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE", "finishing a phase never completes the project");
     assert.deepEqual((await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: phase.id })).map((item) => item.label), ["Draft board"], "Done adds nothing to the requirements");
 
@@ -1124,15 +1124,15 @@ describe("Iteration workflow (WO-SF-ITER-01)", () => {
     const base = { ...as(designer), projectId, phaseId: phase.id };
     await clientRound(base, "DONE");
     const reopened = await sf.phases.addIteration(base);
-    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: reopened.iterationId } })).name, "Moodboard 2");
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: reopened.iterationId } })).name, "Heloskin Cimanggu MB2");
     assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: phase.id } })).status, "ACTIVE");
     await rejectsWith(sf.phases.overrideRevision({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: phase.id, mode: "HARD_RESET_PENDING", note: "x" }), "PERMISSION_DENIED");
     await sf.phases.setIterationNote({ ...base, iterationId: reopened.iterationId, note: "Client remark kept in the snapshot" });
     await sf.phases.overrideRevision({ ...base, mode: "HARD_RESET_ACTIVE", major: 3, note: "Align with client numbering" });
-    assert.deepEqual(await revisions(phase.id), ["Moodboard 3:NOT_SENT"]);
+    assert.deepEqual(await revisions(phase.id), ["Heloskin Cimanggu MB3:NOT_SENT"]);
     const event = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { entity_id: phase.id, action: "studioflow.phase.revision-overridden" } });
     const history = (event.metadata as { history: Array<{ version: string; note: string | null }> }).history;
-    assert.deepEqual(history.map((h) => [h.version, h.note]), [["Moodboard 1", null], ["Moodboard 2", "Client remark kept in the snapshot"]]);
+    assert.deepEqual(history.map((h) => [h.version, h.note]), [["Moodboard 1", null], ["Heloskin Cimanggu MB2", "Client remark kept in the snapshot"]]);
   });
 });
 
@@ -2326,7 +2326,7 @@ describe("SF-V2-E phase definitions", () => {
     assert.deepEqual((await detail(concept.id)).currentIteration?.choices, ["revision", "done"]);
     const revised = await sf.phases.chooseIterationOutcome({ ...run, phaseId: concept.id, iterationId: first.id, outcome: "REVISION" });
     assert.ok("nextIterationId" in revised);
-    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: revised.nextIterationId } })).name, "Concept 2");
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: revised.nextIterationId } })).name, "Heloskin Cimanggu CN2");
     await clientRound({ ...run, phaseId: concept.id }, "DONE");
     assert.equal((await detail(concept.id)).status, "DONE");
 
@@ -2339,7 +2339,7 @@ describe("SF-V2-E phase definitions", () => {
     assert.equal((await detail(documentation.id)).status, "DONE");
 
     const again = await sf.phases.addIteration({ ...run, phaseId: concept.id });
-    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: again.iterationId } })).name, "Concept 3");
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: again.iterationId } })).name, "Heloskin Cimanggu CN3");
   });
 
   it("gives site visits only to the legacy Supervision definition", async () => {
@@ -2682,6 +2682,24 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     await sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: layout.id, iterationId: added.iterationId });
     await undo(projectId);
     assert.equal(await testDb.prisma.sfRevision.count({ where: { id: added.iterationId } }), 1);
+  });
+
+  it("names iterations after the project and phase prefix, keeps counting after a custom name, and resets an empty name", async () => {
+    const { projectId } = await newProject("2026-474 Sociolla SBW R1");
+    const d3 = await phaseOf(projectId, "design3d");
+    const name = async (id: string) => (await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id } })).name;
+    const first = await sf.phases.addIteration({ ...as(designer), projectId, phaseId: d3.id });
+    assert.equal(await name(first.iterationId), "2026-474 Sociolla SBW R1 D1");
+    await sf.phases.renameIteration({ ...as(designer), projectId, phaseId: d3.id, iterationId: first.iterationId, name: "Lobby option" });
+    const base = { ...as(designer), projectId, phaseId: d3.id, iterationId: first.iterationId };
+    await sf.phases.sendIteration(base);
+    await sf.phases.recordClientAnswer(base);
+    const second = await sf.phases.chooseIterationOutcome({ ...base, outcome: "REVISION" }) as { nextIterationId: string };
+    assert.equal(await name(second.nextIterationId), "2026-474 Sociolla SBW R1 D2", "the number continues, whatever the first one is called");
+    await sf.phases.renameIteration({ ...as(designer), projectId, phaseId: d3.id, iterationId: first.iterationId, name: "   " });
+    assert.equal(await name(first.iterationId), "2026-474 Sociolla SBW R1 D1", "an empty name resets to the default");
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: d3.id });
+    assert.deepEqual(detail.iterations.map((it) => it.shortName).sort(), ["D1", "D2"]);
   });
 
   it("chains CD Mall to CD Final using the migrated data shape and undoes the continuation", async () => {

@@ -50,7 +50,7 @@ export default async function ProjectOverviewPage({
       canStart: phase.status === "PENDING" && !phase.startBlockedReason,
       isSupervision: phase.definitionId === LEGACY_PHASE_DEFINITION_IDS.supervision,
       skippedReason: phase.skippedReason,
-      iteration: phase.iterationName && phase.iterationState ? { name: phase.iterationName, state: phase.iterationState, waitingDays: phase.waitingDays } : null,
+      iteration: phase.iterationName && phase.iterationState ? { name: phase.iterationShortName ?? phase.iterationName, state: phase.iterationState, waitingDays: phase.waitingDays } : null,
     });
     return {
       id: phase.id,

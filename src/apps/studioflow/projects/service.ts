@@ -14,7 +14,7 @@ import { fwd } from "../domain/working-time";
 import { LEGACY_PHASE_DEFINITION_IDS } from "../domain/phase";
 import { iterationChoices, iterationKinds } from "../domain/iteration-kinds";
 import { phaseSkipReason } from "../domain/phase-display";
-import { waitingDays, type PhaseStatus } from "../domain/phase";
+import { iterationShortName, waitingDays, type PhaseStatus } from "../domain/phase";
 import {
   P,
   conflict,
@@ -768,7 +768,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           const choices = !current ? (phase.status === "DONE" || (phase.status === "ACTIVE" && !isSupervision) ? ["add_iteration"] : []) : iterationChoices({ state: current.status, phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision });
           return {
             id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,
-            current_iteration: current ? { id: current.id, name: current.name, state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices, answer_choices: iterationChoices({ state: "ANSWERED", phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision }), note: current.note, images: signed.get(current.id) ?? [] } : null,
+            current_iteration: current ? { id: current.id, name: current.name, short_name: iterationShortName(current.name, phase.prefix_snapshot, current, kinds.includes(current.name)), state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices, answer_choices: iterationChoices({ state: "ANSWERED", phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision }), note: current.note, images: signed.get(current.id) ?? [] } : null,
             iteration_count: phase.revisions.length, has_note: Boolean(phase.note?.trim()),
             skipped_reason: phaseSkipReason(phase.events[0]),
             can_add_round: choices.includes("add_iteration"),

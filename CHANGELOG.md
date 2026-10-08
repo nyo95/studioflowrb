@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.431 | 2026-10-08 | feat(studioflow): iteration names built from the project name, phase letter and number (Lead)
+
+- **Owner decision 2026-10-08, built by the Lead** (the owner asked for it to run in parallel with Codex's schedule work; `PLAN.md` WO-SF-ITERNAME-01 is superseded by this commit). A new iteration is named `<project name> <prefix><number>`, for example "2026-474 Sociolla SBW R1 D1". Kinds (CD Mall, CD Final) keep their locked names. Rename stays as an override: the next iteration still continues the number, and saving an empty name resets the iteration to its default.
+- **Short label.** Reads return `shortName` ("D1" for default-like names, the stored name for kinds and typed names): phase detail (current, previous, earlier, history, active), the project card and the pipeline. Tabs, card titles, toasts and the earlier-iterations list show it; the full name is the tooltip. The Rename dialog says an empty name uses the default.
+- **Data.** Migration `20261008100000_sf_iteration_default_names` rewrites names equal to the old default ("<phase name> <number>") to the new one; idempotent; applied to the rebuild dev and test databases only. The admin reset and the skip-a-pending-phase path use the new default too.
+- **Tests.** Old-default expectations updated (service integration); new tests for creation, custom-then-next numbering, empty-name reset, `shortName` and the domain helpers.
+
+**Checks.** `tsc --noEmit`, lint, boundaries, legacy-runtime, `npm test` 948/948 (none failed, skipped or cancelled), `npm run build`. Browser pass not done.
+
 ## R8.430 | 2026-10-08 | docs(plan): WO-SF-ITERNAME-01 iteration names from project name, prefix and number (Lead)
 
 - Owner (2026-10-08): "R1" in the example is part of the project's own name; Rename stays as an override and the next iteration continues with the next number (D1 then custom, next D2); existing names are replaced. `PLAN.md` READY for the Executor: default name `<project name> <prefix><number>`, `shortName` on iteration reads ("D1" for default-like names, the name itself for kinds and custom names), empty rename resets to default, one idempotent data migration for names that equal the old default. CD Mall and CD Final keep their names. The Lead moves the screens to the short label afterwards.

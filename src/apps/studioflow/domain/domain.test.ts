@@ -23,6 +23,8 @@ import {
   nextRevision,
   phaseAccentDotClass,
   phaseStatusDisplay,
+  defaultIterationName,
+  iterationShortName,
   revisionLabel,
   waitingDays,
 } from "./phase";
@@ -84,6 +86,11 @@ describe("phase policy (legacy parity)", () => {
     assert.deepEqual(nextRevision({ major: 4 }), { major: 5 });
     assert.deepEqual(nextRevision(null), { major: 1 });
     assert.equal(revisionLabel({ major: 2 }), "v2");
+    assert.equal(defaultIterationName(" 2026-474 Sociolla SBW R1 ", "D", { major: 1 }), "2026-474 Sociolla SBW R1 D1");
+    assert.equal(iterationShortName("2026-474 Sociolla SBW R1 D1", "D", { major: 1 }), "D1");
+    assert.equal(iterationShortName("Old project name D1", "D", { major: 1 }), "D1", "survives a project rename");
+    assert.equal(iterationShortName("Lobby option", "D", { major: 1 }), "Lobby option");
+    assert.equal(iterationShortName("CD Mall", "CD", { major: 1 }, true), "CD Mall");
   });
 
   it("reports waiting days, never negative, unknown as null", () => {
