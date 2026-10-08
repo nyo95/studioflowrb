@@ -9,7 +9,7 @@ import { titleCaseWords } from "@platform/utilities/text-case";
 
 import type { createCategoryService } from "./category.service";
 import type { createPricingService } from "./pricing.service";
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredPriceAmount } from "./shared";
+import { asPrismaClient, MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, requiredPriceAmount } from "./shared";
 import type { createVendorService } from "./vendor.service";
 
 /** The Master Data commands an import runs inside its own transaction (typed, instead of any-keyed). */
@@ -202,7 +202,7 @@ function parseWorkbook(workbook: Workbook): Parsed {
 export function createPriceDatabaseWorkbookService(
   db: PrismaClient,
   ports: MasterDataServicePorts,
-  createScopedService: (tx: unknown) => PriceWorkbookScopedService,
+  createScopedService: (tx: TxClient) => PriceWorkbookScopedService,
 ) {
   async function load(file: WorkbookFile): Promise<{ data: Buffer; parsed: Parsed }> {
     const { data, name } = bytesOf(file);
@@ -322,8 +322,9 @@ export function createPriceDatabaseWorkbookService(
       if (new Set(places).size === group.length) group.forEach((cell, index) => { cell.name = `${cell.item.name} (${places[index]})`; });
       else if (specs.every(Boolean) && new Set(specs).size === group.length) group.forEach((cell, index) => { cell.name = `${cell.item.name} (${specs[index]})`; });
     }
-    const priceTable: any = options.priceKind === "labor" ? tx.priceLabor : tx.priceMaterialLabor;
-    const existing: Array<any> = cells.length ? await priceTable.findMany({ where: { deleted_at: null, vendor_id: { in: [...new Set(cells.map((cell) => cell.vendorId))] } } }) : [];
+    const existing = !cells.length ? [] : options.priceKind === "labor"
+      ? await tx.priceLabor.findMany({ where: { deleted_at: null, vendor_id: { in: [...new Set(cells.map((cell) => cell.vendorId))] } } })
+      : await tx.priceMaterialLabor.findMany({ where: { deleted_at: null, vendor_id: { in: [...new Set(cells.map((cell) => cell.vendorId))] } } });
     const existingByKey = new Map(existing.map((price) => [`${price.vendor_id}|${key(price.name)}`, price] as const));
     const toCreate = new Map<string, Cell[]>(); // category|vendor -> cells
     for (const cell of cells) {
@@ -335,7 +336,7 @@ export function createPriceDatabaseWorkbookService(
       try {
         const common = { grants, actor, name: found.name, categoryId: cell.categoryId, vendorId: cell.vendorId, unitId: cell.unitId, amount: amountInput(cell), currency: found.currency, notes };
         if (options.priceKind === "labor") await s.updatePriceLabor({ ...common, priceLaborId: found.id });
-        else await s.updatePriceMaterialLabor({ ...common, priceMaterialLaborId: found.id, scopeNote: found.scope_note });
+        else await s.updatePriceMaterialLabor({ ...common, priceMaterialLaborId: found.id, scopeNote: "scope_note" in found && typeof found.scope_note === "string" ? found.scope_note : null });
         totals.pricesUpdated += 1;
       } catch (error) {
         if (!(error instanceof AppError)) throw error;
@@ -426,7 +427,7 @@ export function createPriceDatabaseWorkbookService(
       const { data, parsed } = await load(input.file);
       let result: RunResult | null = null;
       try {
-        await ports.runTransaction(async (tx) => { throw new DryRun(await run(tx as PrismaClient, input.grants, input.actor, parsed, options)); });
+        await ports.runTransaction(async (tx) => { throw new DryRun(await run(asPrismaClient(tx), input.grants, input.actor, parsed, options)); });
       } catch (error) {
         if (error instanceof DryRun) result = error.result; else throw error;
       }
@@ -440,9 +441,9 @@ export function createPriceDatabaseWorkbookService(
       const actual = hashOf(data, options);
       if (actual !== input.hash) throw new AppError("CONFLICT", "PRICE_DATABASE_WORKBOOK_CHANGED", "The workbook or options changed after the preview. Preview it again.");
       return ports.runTransaction(async (tx) => {
-        const result = await run(tx as PrismaClient, input.grants, input.actor, parsed, options);
+        const result = await run(asPrismaClient(tx), input.grants, input.actor, parsed, options);
         if (result.errors.length) throw new AppError("VALIDATION", "PRICE_DATABASE_IMPORT_ERRORS", "Fix the workbook problems before applying. Nothing was saved.", { details: { errors: result.errors.slice(0, 200) } });
-        await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "price-database-workbook.applied", entityType: "price_database_workbook", entityId: actual, actor: input.actor, metadata: { ...result.totals, price_kind: options.priceKind } }), tx as any);
+        await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "price-database-workbook.applied", entityType: "price_database_workbook", entityId: actual, actor: input.actor, metadata: { ...result.totals, price_kind: options.priceKind } }), tx);
         return { totals: result.totals, messages: result.messages };
       });
     },

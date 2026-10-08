@@ -16,6 +16,15 @@ import { parsePriceAmount } from "../domain/price-amount";
 export { hasPermission };
 export type TxClient = Prisma.TransactionClient;
 
+/**
+ * Workbook and nested-service factories accept PrismaClient even though they only
+ * use the query surface also present on an interactive transaction. Keep this
+ * one boundary cast here so transaction callers stay typed everywhere else.
+ */
+export function asPrismaClient(tx: TxClient): PrismaClient {
+  return tx as unknown as PrismaClient;
+}
+
 export function actorIsUsable(actor: AuditActor): void {
   if (actor.kind !== "USER" || !actor.userId) {
     throw new AppError("UNAUTHENTICATED", "ACTOR_REQUIRED", "An authenticated staff member is required.");
@@ -113,7 +122,7 @@ export function resolveSkuIdentity(nameValue?: string | null, codeValue?: string
 type SkuMeasurementInput = { dimensionLength?: string | null; dimensionWidth?: string | null; dimensionThickness?: string | null; dimensionUnitId?: string | null; };
 const LENGTH_TO_METRE: Readonly<Record<string, string>> = { MM: "0.001", CM: "0.01", M: "1" };
 
-export async function resolveSkuMeasurement(tx: TxClient, input: SkuMeasurementInput, baseUnit: { code: string }, purchaseUnit: { code: string; status: string } | null) {
+export async function resolveSkuMeasurement(tx: TxClient | PrismaClient, input: SkuMeasurementInput, baseUnit: { code: string }, purchaseUnit: { code: string; status: string } | null) {
   const length = input.dimensionLength?.trim() || null; const width = input.dimensionWidth?.trim() || null; const thickness = input.dimensionThickness?.trim() || null; const dimensionUnitId = input.dimensionUnitId?.trim() || null;
   if (!length && !width && !thickness && !dimensionUnitId) return { dimension_length: null, dimension_width: null, dimension_thickness: null, dimension_unit_id: null, purchase_to_base_factor: null };
   if (!length || !width || !dimensionUnitId) throw new AppError("VALIDATION", "SKU_DIMENSION_INCOMPLETE", "Length, width, and dimension unit must be filled together.");
@@ -157,7 +166,7 @@ export async function pruneOriginlessBrandCategories(tx: TxClient, brandCategory
   for (const brandCategoryId of new Set(brandCategoryIds)) { const remaining = await tx.brandCategoryOrigin.count({ where: { brand_category_id: brandCategoryId } }); if (remaining === 0) await tx.brandCategory.delete({ where: { id: brandCategoryId } }); }
 }
 
-export async function assertVendorMaterialCapable(tx: TxClient, vendorId: string): Promise<void> {
+export async function assertVendorMaterialCapable(tx: TxClient | PrismaClient, vendorId: string): Promise<void> {
   const capable = await tx.vendorVendorType.findFirst({ where: { vendor_id: vendorId, vendor: { deleted_at: null }, vendor_type: { deleted_at: null, can_supply_material: true } } });
   if (!capable) throw new AppError("VALIDATION", "VENDOR_NOT_MATERIAL_CAPABLE", "Supplier is not eligible to supply material.");
 }

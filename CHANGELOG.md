@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.409 | 2026-10-08 | refactor(masterdata): type service transactions and rows (Executor)
+
+- Replaced production `any` in the Master Data service, deletion, pricing, workbook, and vendor paths with Prisma transaction, query, and JSON types. One documented helper holds the unavoidable transaction-client boundary used by nested service factories. Behaviour is unchanged.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`, `check:legacy-runtime`, `npm test` 938/938 (none failed, skipped or cancelled), and `npm run build` pass. Browser not required.
+
 ## R8.408 | 2026-10-08 | docs(backlog): Master Data CRUD audit for Brand, Supplier and the three price kinds (Lead)
 
 - Read-only audit of create, update, archive, restore, deletion request and the quick-add and bulk paths of Brand, Supplier and Material, Labor and Material+Labor prices. Three bugs and two owner questions recorded in BACKLOG: a price-less SKU can never be restored (and blocks restoring its Brand), a Brand whose owner Supplier was archived cannot be edited, and create paths do not collapse duplicate input items. Found from the code, not run; no code changed.

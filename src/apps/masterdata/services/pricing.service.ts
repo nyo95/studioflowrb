@@ -6,7 +6,7 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
 import { parsePriceAmount } from "../domain/price-amount";
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredPriceAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, asPrismaClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredPriceAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 /** A grid cell that is blank, "-" or "n/a" is not offered and skipped; unreadable text stays so its row reports the problem. */
 function isOffered(text: string): boolean {
@@ -30,7 +30,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
   const { runTransaction } = ports;
 
   // Saving a price files the supplier under that price's category, so a supplier's categories grow with real use.
-  async function linkVendorCategories(tx: any, actor: AuditActor, vendorId: string, categoryIds: readonly string[]) {
+  async function linkVendorCategories(tx: TxClient, actor: AuditActor, vendorId: string, categoryIds: readonly string[]) {
     const added: string[] = [];
     for (const categoryId of new Set(categoryIds)) if (await ensureVendorCategory(tx, vendorId, categoryId)) added.push(categoryId);
     if (added.length > 0) await writeAudit(ports, tx, { action: "vendor.categories-linked", entityType: "vendor", entityId: vendorId, actor, metadata: { category_ids: added, via: "price" } });
@@ -57,7 +57,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       actorIsUsable(input.actor);
       const currency = requiredCurrency(input.currency);
       const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const sku = await tx.sku.findUniqueOrThrow({ where: { id: input.skuId } });
         if (sku.deleted_at !== null) throw new AppError("VALIDATION", "SKU_ARCHIVED", "SKU is archived.");
         const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.supplierVendorId } });
@@ -69,7 +69,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         let price;
         try { price = await tx.priceMaterial.create({ data: { id: randomUUID(), sku_id: input.skuId, supplier_vendor_id: input.supplierVendorId, amount, amount_label: amountLabel, currency, unit_id: unitId, source_link_id: input.sourceLinkId || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price!.id, actor: input.actor, metadata: { sku_id: input.skuId, vendor_id: input.supplierVendorId } });
-        await linkVendorCategories(tx, input.actor, input.supplierVendorId, (await tx.skuCategory.findMany({ where: { sku_id: input.skuId }, select: { category_id: true } })).map((row: any) => row.category_id));
+        await linkVendorCategories(tx, input.actor, input.supplierVendorId, (await tx.skuCategory.findMany({ where: { sku_id: input.skuId }, select: { category_id: true } })).map((row) => row.category_id));
         return { priceMaterialId: price!.id };
       });
     },
@@ -79,7 +79,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       actorIsUsable(input.actor);
       const currency = requiredCurrency(input.currency);
       const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const existing = await tx.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId }, include: { sku: true } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ARCHIVED", "Cannot update an archived price.");
         await assertPriceMaterialBrandSupplierChain(tx, existing.sku_id, existing.supplier_vendor_id);
@@ -106,7 +106,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async archivePriceMaterial(input: { grants: PermissionGrants; actor: AuditActor; priceMaterialId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const price = await tx.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId } });
         if (price.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ALREADY_ARCHIVED", "Price is already archived.");
         const sku = await tx.sku.findUniqueOrThrow({ where: { id: price.sku_id }, select: { deleted_at: true } });
@@ -121,7 +121,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async restorePriceMaterial(input: { grants: PermissionGrants; actor: AuditActor; priceMaterialId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const price = await tx.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId } });
         if (price.deleted_at === null) throw new AppError("CONFLICT", "PRICE_NOT_ARCHIVED", "Price is not archived.");
         await removeDirectCause(tx, "price_material", input.priceMaterialId);
@@ -137,7 +137,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async requestPriceMaterialDeletion(input: { grants: PermissionGrants; actor: AuditActor; priceMaterialId: string; reason?: string; notes?: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const price = await tx.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId } });
         if (price.deleted_at === null) throw new AppError("VALIDATION", "PRICE_NOT_ARCHIVED", "Only archived prices may be submitted for deletion.");
         const requestId = await createDeletionRequest(tx, { targetType: "price_material", targetId: input.priceMaterialId, actor: input.actor, reason: input.reason, notes: input.notes });
@@ -168,7 +168,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
         if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
         if (category.kind !== "WORK") throw new AppError("VALIDATION", "CATEGORY_NOT_WORK", "Category must be of kind WORK.");
@@ -192,7 +192,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const existing = await tx.priceMaterialLabor.findUniqueOrThrow({ where: { id: input.priceMaterialLaborId } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ARCHIVED", "Cannot update an archived price.");
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
@@ -224,7 +224,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async archivePriceMaterialLabor(input: { grants: PermissionGrants; actor: AuditActor; priceMaterialLaborId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const price = await tx.priceMaterialLabor.findUniqueOrThrow({ where: { id: input.priceMaterialLaborId } });
         if (price.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ALREADY_ARCHIVED", "Price is already archived.");
         await addDirectCause(tx, "price_material_labor", input.priceMaterialLaborId);
@@ -237,7 +237,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async restorePriceMaterialLabor(input: { grants: PermissionGrants; actor: AuditActor; priceMaterialLaborId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const price = await tx.priceMaterialLabor.findUniqueOrThrow({ where: { id: input.priceMaterialLaborId } });
         if (price.deleted_at === null) throw new AppError("CONFLICT", "PRICE_NOT_ARCHIVED", "Price is not archived.");
         await removeDirectCause(tx, "price_material_labor", input.priceMaterialLaborId);
@@ -253,7 +253,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async requestPriceMaterialLaborDeletion(input: { grants: PermissionGrants; actor: AuditActor; priceMaterialLaborId: string; reason?: string; notes?: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const price = await tx.priceMaterialLabor.findUniqueOrThrow({ where: { id: input.priceMaterialLaborId } });
         if (price.deleted_at === null) throw new AppError("VALIDATION", "PRICE_NOT_ARCHIVED", "Only archived prices may be submitted for deletion.");
         const requestId = await createDeletionRequest(tx, { targetType: "price_material_labor", targetId: input.priceMaterialLaborId, actor: input.actor, reason: input.reason, notes: input.notes });
@@ -287,12 +287,14 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       actorIsUsable(input.actor);
       if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
       if (input.rows.length > BULK_PRICE_ROW_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_ROWS", `A batch holds at most ${BULK_PRICE_ROW_LIMIT} rows.`);
-      return runTransaction(async (tx: any) => {
-        const inner = createPricingService(tx as PrismaClient, { ...ports, runTransaction: async (work) => work(tx) });
+      return runTransaction(async (tx: TxClient) => {
+        const inner = createPricingService(asPrismaClient(tx), { ...ports, runTransaction: async (work) => work(tx) });
         const errors: BulkRowError[] = [];
         const batchId = randomUUID();
         const seen = new Map<string, number>();
-        const existing = await (input.kind === "labor" ? tx.priceLabor : tx.priceMaterialLabor).findMany({ where: { vendor_id: input.vendorId, deleted_at: null }, select: { name: true, slug: true } });
+        const existing = input.kind === "labor"
+          ? await tx.priceLabor.findMany({ where: { vendor_id: input.vendorId, deleted_at: null }, select: { name: true, slug: true } })
+          : await tx.priceMaterialLabor.findMany({ where: { vendor_id: input.vendorId, deleted_at: null }, select: { name: true, slug: true } });
         const liveNames = new Set<string>(existing.flatMap((row: { name: string; slug: string }) => [row.name.trim().toLowerCase(), row.slug]));
         const ids: string[] = [];
         for (const [rowIndex, row] of input.rows.entries()) {
@@ -331,8 +333,8 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       if (vendorIds.length > MATRIX_SUPPLIER_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_SUPPLIERS", `A grid compares at most ${MATRIX_SUPPLIER_LIMIT} suppliers.`);
       if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
       if (input.rows.length > BULK_PRICE_ROW_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_ROWS", `A batch holds at most ${BULK_PRICE_ROW_LIMIT} rows.`);
-      return runTransaction(async (tx: any) => {
-        const inner = createPricingService(tx as PrismaClient, { ...ports, runTransaction: async (work) => work(tx) });
+      return runTransaction(async (tx: TxClient) => {
+        const inner = createPricingService(asPrismaClient(tx), { ...ports, runTransaction: async (work) => work(tx) });
         const errors: Array<BulkRowError & { vendorId: string }> = [];
         const ids: string[] = [];
         const batchId = randomUUID();
@@ -368,8 +370,8 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       actorIsUsable(input.actor);
       if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
       if (input.rows.length > BULK_PRICE_ROW_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_ROWS", `A batch holds at most ${BULK_PRICE_ROW_LIMIT} rows.`);
-      return runTransaction(async (tx: any) => {
-        const inner = createPricingService(tx as PrismaClient, { ...ports, runTransaction: async (work) => work(tx) });
+      return runTransaction(async (tx: TxClient) => {
+        const inner = createPricingService(asPrismaClient(tx), { ...ports, runTransaction: async (work) => work(tx) });
         const errors: BulkRowError[] = [];
         const batchId = randomUUID();
         const vendorIds = [...new Set(input.rows.map((row) => row.vendorId))];
@@ -409,7 +411,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
         if (category.status !== "ACTIVE") throw new AppError("VALIDATION", "CATEGORY_INACTIVE", "Category is not active.");
         if (category.kind !== "WORK") throw new AppError("VALIDATION", "CATEGORY_NOT_WORK", "Category must be of kind WORK.");
@@ -433,7 +435,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       const slug = requiredSlug(name);
       const currency = requiredCurrency(input.currency);
       const { amount, label: amountLabel } = requiredPriceAmount(input.amount);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const existing = await tx.priceLabor.findUniqueOrThrow({ where: { id: input.priceLaborId } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ARCHIVED", "Cannot update an archived price.");
         const category = await tx.category.findUniqueOrThrow({ where: { id: input.categoryId } });
@@ -464,7 +466,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async archivePriceLabor(input: { grants: PermissionGrants; actor: AuditActor; priceLaborId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const price = await tx.priceLabor.findUniqueOrThrow({ where: { id: input.priceLaborId } });
         if (price.deleted_at !== null) throw new AppError("CONFLICT", "PRICE_ALREADY_ARCHIVED", "Price is already archived.");
         await addDirectCause(tx, "price_labor", input.priceLaborId);
@@ -477,7 +479,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async restorePriceLabor(input: { grants: PermissionGrants; actor: AuditActor; priceLaborId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const price = await tx.priceLabor.findUniqueOrThrow({ where: { id: input.priceLaborId } });
         if (price.deleted_at === null) throw new AppError("CONFLICT", "PRICE_NOT_ARCHIVED", "Price is not archived.");
         await removeDirectCause(tx, "price_labor", input.priceLaborId);
@@ -493,7 +495,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     async requestPriceLaborDeletion(input: { grants: PermissionGrants; actor: AuditActor; priceLaborId: string; reason?: string; notes?: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx: TxClient) => {
         const price = await tx.priceLabor.findUniqueOrThrow({ where: { id: input.priceLaborId } });
         if (price.deleted_at === null) throw new AppError("VALIDATION", "PRICE_NOT_ARCHIVED", "Only archived prices may be submitted for deletion.");
         const requestId = await createDeletionRequest(tx, { targetType: "price_labor", targetId: input.priceLaborId, actor: input.actor, reason: input.reason, notes: input.notes });

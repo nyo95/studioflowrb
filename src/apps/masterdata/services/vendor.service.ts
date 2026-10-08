@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { type PrismaClient } from "@/generated/prisma/client";
+import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
@@ -223,7 +223,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
           let snapshotChanged = false;
           if (input.linkReviewSnapshot !== undefined) { const existingSnapshot = Array.isArray(existing.link_review_snapshot) ? existing.link_review_snapshot : []; snapshotChanged = JSON.stringify(existingSnapshot) !== JSON.stringify(input.linkReviewSnapshot); }
           if (linksChanged || snapshotChanged) {
-            await tx.vendor.update({ where: { id: input.vendorId }, data: { ...(linksChanged ? { info_links: normalizedLinks as any } : {}), ...(snapshotChanged ? { link_review_snapshot: input.linkReviewSnapshot as any } : {}) } });
+            await tx.vendor.update({ where: { id: input.vendorId }, data: { ...(linksChanged ? { info_links: normalizedLinks as Prisma.InputJsonArray } : {}), ...(snapshotChanged ? { link_review_snapshot: input.linkReviewSnapshot as Prisma.InputJsonArray } : {}) } });
             if (linksChanged) changes.info_links = { from: `${existingLinks.length} links`, to: `${normalizedLinks.length} links` };
             if (snapshotChanged) { const prevLen = Array.isArray(existing.link_review_snapshot) ? (existing.link_review_snapshot as unknown[]).length : 0; const nextLen = (input.linkReviewSnapshot as unknown[]).length; changes.link_review_snapshot = { from: prevLen > 0 ? `${prevLen} pending` : "none", to: nextLen === 0 ? "cleared" : `${nextLen} pending` }; }
           }

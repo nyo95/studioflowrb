@@ -9,7 +9,7 @@ import { buildImportTemplate, exportTable, parseTabularFile, type FileResult, ty
 
 import type { createPricingService } from "./pricing.service";
 import type { createSkuService } from "./sku.service";
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, requiredPriceAmount, requiredCurrency, resolveSkuMeasurement, assertVendorMaterialCapable } from "./shared";
+import { asPrismaClient, MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, requiredPriceAmount, requiredCurrency, resolveSkuMeasurement, assertVendorMaterialCapable } from "./shared";
 
 const SHEET = "SKU Prices";
 /** True when a stored price already holds the typed amount: same number and same text label. */
@@ -48,7 +48,7 @@ export type SkuWorkbookScopedService = Pick<ReturnType<typeof createSkuService>,
 export function createSkuPriceWorkbookService(
   db: PrismaClient,
   ports: MasterDataServicePorts,
-  createScopedService: (tx: unknown) => SkuWorkbookScopedService,
+  createScopedService: (tx: TxClient) => SkuWorkbookScopedService,
 ) {
   async function readRows(file: WorkbookFile): Promise<{ data: Buffer; rows: ParsedRow[] }> {
     const input = bytesOf(file);
@@ -109,8 +109,8 @@ export function createSkuPriceWorkbookService(
         try {
           const baseUnit = await client.unit.findUniqueOrThrow({ where: { id: baseUnitId! } });
           const purchaseUnit = purchaseUnitId ? await client.unit.findUniqueOrThrow({ where: { id: purchaseUnitId } }) : null;
-          await resolveSkuMeasurement(client as any, { dimensionLength: source.Length || null, dimensionWidth: source.Width || null, dimensionThickness: source.Thickness || null, dimensionUnitId }, baseUnit, purchaseUnit);
-          if (supplierId) await assertVendorMaterialCapable(client as any, supplierId);
+          await resolveSkuMeasurement(client, { dimensionLength: source.Length || null, dimensionWidth: source.Width || null, dimensionThickness: source.Thickness || null, dimensionUnitId }, baseUnit, purchaseUnit);
+          if (supplierId) await assertVendorMaterialCapable(client, supplierId);
         } catch (error) {
           if (error instanceof AppError) add(error.code.startsWith("SKU_DIMENSION") ? "Dimension unit" : "Supplier", error.safeMessage);
           else throw error;
@@ -182,7 +182,7 @@ export function createSkuPriceWorkbookService(
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage); requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       const parsed = await readRows(input.file); const actual = createHash("sha256").update(parsed.data).digest("hex"); if (actual !== input.hash) throw new AppError("CONFLICT", "SKU_PRICE_WORKBOOK_CHANGED", "The workbook changed after preview. Preview it again before applying.");
       return ports.runTransaction(async (tx) => {
-        const check = await validate(parsed.rows, tx as PrismaClient); if (check.errors.length) throw new AppError("VALIDATION", "SKU_PRICE_IMPORT_ERRORS", "Fix the workbook errors before applying.", { details: { errors: check.errors } });
+        const check = await validate(parsed.rows, asPrismaClient(tx)); if (check.errors.length) throw new AppError("VALIDATION", "SKU_PRICE_IMPORT_ERRORS", "Fix the workbook errors before applying.", { details: { errors: check.errors } });
         const service = createScopedService(tx); let created = 0; let updated = 0;
         const newRows = new Map<string, ValidRow[]>();
         for (const row of check.valid) if (!row.sku) { const group = `${key(row.Code)}:${key(row.Name)}`; newRows.set(group, [...(newRows.get(group) ?? []), row]); }
@@ -195,7 +195,7 @@ export function createSkuPriceWorkbookService(
           if (row.Supplier && !row.price) { await service.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId, supplierVendorId: row.supplierId!, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || undefined }); if (before.outcome !== "update") updated += 1; }
           else if (row.price && (!samePriceAmount(row.price, row.Amount) || row.price.currency !== requiredCurrency(row.Currency) || !same(row.price.notes, row["Price notes"] || null))) await service.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: row.price.id, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || null });
         }
-        await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "sku-price-workbook.applied", entityType: "sku_price_workbook", entityId: actual, actor: input.actor, metadata: { created, updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length } }), tx as any);
+        await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "sku-price-workbook.applied", entityType: "sku_price_workbook", entityId: actual, actor: input.actor, metadata: { created, updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length } }), tx);
         return { totals: { create: created, update: updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length, error: 0 } };
       });
     },

@@ -2,7 +2,7 @@ import { type Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts } from "./services/shared";
+import { asPrismaClient, MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient } from "./services/shared";
 import { createUnitService } from "./services/unit.service";
 import { createCategoryService } from "./services/category.service";
 import { createVendorTypeService } from "./services/vendor-type.service";
@@ -33,14 +33,14 @@ export function createMasterDataService(db: PrismaClient, ports: MasterDataServi
   const deletionService = createDeletionService(db, p);
   const sampleRequestService = createSampleRequestService(db, p);
   const sampleService = createSampleService(db, p);
-  const skuPriceWorkbookService = createSkuPriceWorkbookService(db, p, (tx) => createMasterDataService(tx as PrismaClient, {
+  const skuPriceWorkbookService = createSkuPriceWorkbookService(db, p, (tx: TxClient) => createMasterDataService(asPrismaClient(tx), {
     ...p,
-    runTransaction: async (work) => work(tx as any),
+    runTransaction: async (work) => work(tx),
   }));
 
-  const priceDatabaseWorkbookService = createPriceDatabaseWorkbookService(db, p, (tx) => createMasterDataService(tx as PrismaClient, {
+  const priceDatabaseWorkbookService = createPriceDatabaseWorkbookService(db, p, (tx: TxClient) => createMasterDataService(asPrismaClient(tx), {
     ...p,
-    runTransaction: async (work) => work(tx as any),
+    runTransaction: async (work) => work(tx),
   }));
 
   return {

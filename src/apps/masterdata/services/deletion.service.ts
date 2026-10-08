@@ -1,9 +1,9 @@
-import { type PrismaClient } from "@/generated/prisma/client";
+import { type Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, hasPermission, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, hasPermission, createDeletionRequest, writeAudit } from "./shared";
 import { MASTERDATA_DELETION_TARGET_TYPES } from "./polymorphic-registry";
 
 export function createDeletionService(db: PrismaClient, ports: MasterDataServicePorts) {
@@ -12,16 +12,16 @@ export function createDeletionService(db: PrismaClient, ports: MasterDataService
   function directDeleteOrNull(input: { grants: PermissionGrants; actor: AuditActor; targetType: string; targetId: string }) {
     if (!hasPermission(input.grants, MASTERDATA_PERMISSIONS.deletionApprove)) return null;
     actorIsUsable(input.actor);
-    return runTransaction(async (tx: any) => {
+    return runTransaction(async (tx) => {
       const pending = await tx.deletionRequest.findMany({ where: { target_type: input.targetType, target_id: input.targetId, status: "PENDING" } });
       const targetType = await hardDeleteMasterDataTarget(tx, input.targetType, input.targetId);
       if (pending.length > 0) {
         await tx.deletionRequest.updateMany({
-          where: { id: { in: pending.map((r: any) => r.id) } },
+          where: { id: { in: pending.map((r) => r.id) } },
           data: { status: "APPROVED", approver_user_id: input.actor.userId, approver_label: input.actor.label, decided_at: new Date() },
         });
       }
-      await writeAudit(ports, tx, { action: `${targetType.replace(/_/g, "-")}.deleted`, entityType: targetType, entityId: input.targetId, actor: input.actor, metadata: { deletion_mode: "direct", approver_user_id: input.actor.userId, approver_label: input.actor.label, ...(pending.length > 0 ? { resolved_pending_request_ids: pending.map((r: any) => r.id) } : {}) } });
+      await writeAudit(ports, tx, { action: `${targetType.replace(/_/g, "-")}.deleted`, entityType: targetType, entityId: input.targetId, actor: input.actor, metadata: { deletion_mode: "direct", approver_user_id: input.actor.userId, approver_label: input.actor.label, ...(pending.length > 0 ? { resolved_pending_request_ids: pending.map((r) => r.id) } : {}) } });
       return { targetType, targetId: input.targetId, direct: true as const };
     });
   }
@@ -30,7 +30,7 @@ export function createDeletionService(db: PrismaClient, ports: MasterDataService
     async listDeletionRequests(input: { grants: PermissionGrants; status?: string; targetType?: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.access);
       return db.deletionRequest.findMany({
-        where: { ...(input.status ? { status: input.status as string } : {}), ...(input.targetType ? { target_type: input.targetType } : {}) } as any,
+        where: { ...(input.status ? { status: input.status as Prisma.DeletionRequestWhereInput["status"] } : {}), ...(input.targetType ? { target_type: input.targetType } : {}) },
         orderBy: { requested_at: "desc" },
       });
     },
@@ -38,7 +38,7 @@ export function createDeletionService(db: PrismaClient, ports: MasterDataService
     async rejectDeletion(input: { grants: PermissionGrants; actor: AuditActor; requestId: string; reason?: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.deletionApprove);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx) => {
         const request = await tx.deletionRequest.findFirst({ where: { id: input.requestId, status: "PENDING" } });
         if (!request) throw new AppError("NOT_FOUND", "DELETION_REQUEST_NOT_FOUND", "Pending deletion request not found.");
         const rejectionReason = input.reason?.trim() || null;
@@ -57,7 +57,7 @@ export function createDeletionService(db: PrismaClient, ports: MasterDataService
     async approveDeletion(input: { grants: PermissionGrants; actor: AuditActor; requestId: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.deletionApprove);
       actorIsUsable(input.actor);
-      return runTransaction(async (tx: any) => {
+      return runTransaction(async (tx) => {
         const request = await tx.deletionRequest.findFirst({ where: { id: input.requestId, status: "PENDING" } });
         if (!request) throw new AppError("NOT_FOUND", "DELETION_REQUEST_NOT_FOUND", "Pending deletion request not found.");
         const { target_type: targetType, target_id: targetId } = request;
@@ -73,7 +73,7 @@ export function createDeletionService(db: PrismaClient, ports: MasterDataService
   };
 }
 
-async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId: string): Promise<string> {
+async function hardDeleteMasterDataTarget(tx: TxClient, targetType: string, targetId: string): Promise<string> {
   if (!(MASTERDATA_DELETION_TARGET_TYPES as readonly string[]).includes(targetType)) throw new AppError("VALIDATION", "UNKNOWN_TARGET_TYPE", `Unknown deletion target type: ${targetType}`);
   if (targetType === "brand") {
     const brand = await tx.brand.findUniqueOrThrow({ where: { id: targetId } });
@@ -83,11 +83,11 @@ async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId:
     if (await tx.vendorContact.count({ where: { brand_id: targetId } }) > 0) throw new AppError("CONFLICT", "BRAND_HAS_CONTACTS", "Brand still has scoped contacts. Remove them first.");
     const activeSkuCount = await tx.sku.count({ where: { brand_id: targetId, deleted_at: null } });
     if (activeSkuCount > 0) throw new AppError("CONFLICT", "BRAND_HAS_ACTIVE_SKUS", "Brand still has active SKUs. Archive them before permanent deletion.");
-    const skuIds = await tx.sku.findMany({ where: { brand_id: targetId }, select: { id: true } }).then((rows: any) => rows.map((r: any) => r.id));
-    const priceIds = skuIds.length === 0 ? [] : await tx.priceMaterial.findMany({ where: { sku_id: { in: skuIds } }, select: { id: true } }).then((rows: any) => rows.map((r: any) => r.id));
+    const skuIds = await tx.sku.findMany({ where: { brand_id: targetId }, select: { id: true } }).then((rows) => rows.map((r) => r.id));
+    const priceIds = skuIds.length === 0 ? [] : await tx.priceMaterial.findMany({ where: { sku_id: { in: skuIds } }, select: { id: true } }).then((rows) => rows.map((r) => r.id));
     if (priceIds.length > 0) { await tx.archiveCause.deleteMany({ where: { entity_type: "price_material", entity_id: { in: priceIds } } }); await tx.priceMaterial.deleteMany({ where: { id: { in: priceIds } } }); }
     if (skuIds.length > 0) { await tx.archiveCause.deleteMany({ where: { entity_type: "sku", entity_id: { in: skuIds } } }); await tx.skuCategory.deleteMany({ where: { sku_id: { in: skuIds } } }); await tx.brandCategoryOrigin.deleteMany({ where: { source_sku_id: { in: skuIds } } }); await tx.sku.deleteMany({ where: { id: { in: skuIds } } }); }
-    const bcIds = await tx.brandCategory.findMany({ where: { brand_id: targetId }, select: { id: true } }).then((rows: any) => rows.map((r: any) => r.id));
+    const bcIds = await tx.brandCategory.findMany({ where: { brand_id: targetId }, select: { id: true } }).then((rows) => rows.map((r) => r.id));
     if (bcIds.length > 0) { await tx.brandCategoryOrigin.deleteMany({ where: { brand_category_id: { in: bcIds } } }); await tx.brandCategory.deleteMany({ where: { id: { in: bcIds } } }); }
     await tx.brandHashtag.deleteMany({ where: { brand_id: targetId } });
     await tx.brandLink.deleteMany({ where: { brand_id: targetId } });
@@ -110,7 +110,7 @@ async function hardDeleteMasterDataTarget(tx: any, targetType: string, targetId:
   } else if (targetType === "sku") {
     const sku = await tx.sku.findUniqueOrThrow({ where: { id: targetId } });
     if (sku.deleted_at === null) throw new AppError("CONFLICT", "SKU_NOT_ARCHIVED", "SKU must be archived before permanent deletion.");
-    const priceIds = await tx.priceMaterial.findMany({ where: { sku_id: targetId }, select: { id: true } }).then((rows: any) => rows.map((r: any) => r.id));
+    const priceIds = await tx.priceMaterial.findMany({ where: { sku_id: targetId }, select: { id: true } }).then((rows) => rows.map((r) => r.id));
     if (priceIds.length > 0) { await tx.archiveCause.deleteMany({ where: { entity_type: "price_material", entity_id: { in: priceIds } } }); await tx.priceMaterial.deleteMany({ where: { id: { in: priceIds } } }); }
     await tx.skuCategory.deleteMany({ where: { sku_id: targetId } });
     await tx.brandCategoryOrigin.deleteMany({ where: { source_sku_id: targetId } });
