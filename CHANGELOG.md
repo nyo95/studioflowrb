@@ -1,5 +1,18 @@
 # Changelog
 
+## R8.447 | 2026-10-08 | fix: bulk new SKUs group by brand, Client answered keeps failed screenshots (Lead)
+
+- **External audit 2026-10-08 (R8.446), checked against the code; only the confirmed findings are fixed.**
+- **Master Data bulk SKU+price (R8.441 defect):** new-SKU rows were grouped by slug alone, so "Classic White" under Brand A and Brand B in one batch became one group and the second row was refused with `NEW_SKU_DETAILS_CONFLICT`. Grouping now uses (brand, slug), the same identity as the live unique index `sku_live_identity_unique`. Integration test added (fails on the old code).
+- **Client answered with screenshots (R8.446 defect):** when an image failed to upload the dialog still cleared the draft, applied Revision/Done and closed, so the screenshot was lost without notice; a screenshots-only answer whose images all failed left an empty message. Now the answer is recorded once; on an image failure the dialog stays open with only the failed images (none is uploaded twice on retry), says the answer is saved, and the outcome is applied only after everything got through. Text typed after the answer was saved is posted as its own client-feedback message. An empty screenshots-only message is deleted when its images are removed or the dialog is closed. `uploadNoteImages` now returns `{ problems, failed }`; the Notes composer also keeps failed images in its draft (and does not close its host) instead of dropping them.
+- **Not changed (audit claims that do not hold):**
+  - Duplicate requirement race (R8.444): production runs every StudioFlow command through `runSerializableTransaction`, so two concurrent creates conflict and the retry sees the first. Proved with a new test: 4 concurrent creates under the serializable runner keep 1 active template; the same test under a read-committed runner fails (control). No schema change.
+  - Sample holder project name: already tracked in `docs/BACKLOG.md` as `[CLEANUP][P3]`; the only caller resolves the name server-side from the id.
+  - R8.443/R8.444 used twice: already recorded in R8.445; history is not renumbered.
+- **Migrations/dependencies:** none.
+
+**Checks.** On a disposable local `studioflow_rebuild_test` (migrations applied from scratch): `tsc --noEmit`; eslint on `src/apps/masterdata`, `src/apps/studioflow` and the StudioFlow routes (only the existing `<img>` warning); `npm test` 965/965 (none failed, skipped or cancelled); `npm run build` passes. No browser check of the Client answered failure path (it needs a forced upload failure). Home DB migration for R8.446 is still the owner's step.
+
 ## R8.446 | 2026-10-08 | feat(studioflow): phase notes become a chat-style message stream (Lead)
 
 - **Owner request (2026-10-08):** Notes should work like sending WhatsApp messages to yourself: drop info, client feedback and screenshots in one place, star what matters, and no Undo bar for notes. Built by the Lead end to end at the owner's request (no Executor hand-off); WO-SF-NOTEFEED-01 in PLAN.md.

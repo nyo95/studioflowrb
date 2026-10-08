@@ -74,6 +74,12 @@ function definition(row: NewSkuRow): NewSkuDefinition {
   };
 }
 
+// A new SKU's identity is (brand, slug), matching the live unique index, so the same
+// product name under two brands is two SKUs, not one disagreeing group.
+function groupKey(value: NewSkuDefinition): string {
+  return JSON.stringify([value.brandId, value.identity.slug]);
+}
+
 function definitionKey(value: NewSkuDefinition): string {
   return JSON.stringify({
     identity: value.identity.slug,
@@ -124,9 +130,8 @@ export function createMaterialSkuPriceBulkService(
         if (row.kind !== "new") continue;
         try {
           const rowDefinition = definition(row);
-          const groupKey = rowDefinition.identity.slug;
-          const existing = groups.get(groupKey);
-          if (!existing) groups.set(groupKey, { firstIndex: index, definition: rowDefinition, key: definitionKey(rowDefinition) });
+          const key = groupKey(rowDefinition);
+          if (!groups.has(key)) groups.set(key, { firstIndex: index, definition: rowDefinition, key: definitionKey(rowDefinition) });
         } catch (error) {
           rejected.push(rejection(index, error));
         }
@@ -147,7 +152,7 @@ export function createMaterialSkuPriceBulkService(
         }
 
         const rowDefinition = definition(row);
-        const group = groups.get(rowDefinition.identity.slug)!;
+        const group = groups.get(groupKey(rowDefinition))!;
         if (definitionKey(rowDefinition) !== group.key) {
           rejected.push({ index, code: "NEW_SKU_DETAILS_CONFLICT", message: `This row disagrees with row ${group.firstIndex + 1} about the new SKU details.`, details: { firstIndex: group.firstIndex } });
           continue;

@@ -187,7 +187,7 @@ function NoteBubble({ note, projectId, phaseId, canEdit, locale, timezone, busy,
     disabled: !editing,
     onFiles: async (files, refused) => {
       setUploading(files.length);
-      const failed = await uploadNoteImages(projectId, phaseId, note.id, files);
+      const { problems: failed } = await uploadNoteImages(projectId, phaseId, note.id, files);
       setUploading(0);
       setProblems([...(refused.length ? ["Only PNG, JPEG or WebP images can be added."] : []), ...failed]);
       router.refresh();

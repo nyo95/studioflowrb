@@ -2773,6 +2773,19 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     assert.ok(again.templateId);
   });
 
+  it("keeps one requirement when the same text is submitted twice at once (production serializable runner)", async () => {
+    const db = testDb.prisma;
+    const serial = createStudioFlowService(db, {
+      runTransaction: (work) => runSerializableTransaction(db, work),
+      auditWriter: createAuditEventWriter(), people: createPeopleDirectory(db), storage,
+      notificationWriter: createNotificationWriter(), masterData: createMasterDataPublicRead(db), now: () => clock,
+    });
+    const submit = () => serial.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "Double Submit" });
+    const results = await Promise.allSettled(Array.from({ length: 4 }, submit));
+    assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+    assert.equal(await db.sfChecklistTemplate.count({ where: { definition_id: LEGACY.moodboard, label: "Double Submit", is_active: true } }), 1);
+  });
+
   it("chains CD Mall to CD Final using the migrated data shape and undoes the continuation", async () => {
     const { projectId } = await newProject("CD chain");
     const cd = await phaseOf(projectId, "cd");

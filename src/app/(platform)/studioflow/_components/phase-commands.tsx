@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { currentDateOnly } from "@platform/utilities/date";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
@@ -152,6 +152,8 @@ const OUTCOME: Record<string, { label: string; outcome: "REVISION" | "DONE" | "C
   continue_cd_final: { label: "Continue to CD Final", outcome: "CONTINUE_CD_FINAL", primary: true, summary: (name) => `${name} done, CD Final opened` },
 };
 
+const RETRY = "The answer is saved. Press the button again to retry the images left here, or remove them to go on.";
+
 /**
  * "Client answered" (owner, 2026-10-05): what the client said is written here (text, pasted screenshots), then the
  * outcome — OK, or a Revision. It is posted to the phase notes as client feedback on this iteration
@@ -163,23 +165,54 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
   const [problems, setProblems] = useState<string[]>([]);
   const choices = (iteration.answerChoices ?? ["revision", "done"]).filter((choice) => OUTCOME[choice]);
   const it = { phaseId: phase.id, iterationId: iteration.id };
+  // Once the answer is recorded it is never recorded again: a retry after an image failed only finishes what did
+  // not get through (the remaining images, then the outcome). `empty` marks a screenshots-only message that has
+  // no image yet, which must not be left behind as an empty bubble.
+  const saved = useRef<{ noteId: string | null; empty: boolean } | null>(null);
+  const dropEmptyNote = async () => {
+    const note = saved.current;
+    if (note?.noteId && note.empty) {
+      await phaseNoteAction({ command: "delete", projectId: commands.projectId, phaseId: phase.id, noteId: note.noteId });
+      saved.current = { noteId: null, empty: false };
+    }
+  };
+  const close = () => { void dropEmptyNote().finally(onClose); };
   const answer = async (choice: string | null) => {
     setBusyKey(choice ?? "later");
     setProblems([]);
     try {
       const text = draft.text.trim();
       const files = draft.files;
-      let noteId: string | null = null;
-      const answered = await commands.exec(`${phase.id}:answer`, { ...it, command: "recordClientAnswer", note: text || null }, `${iteration.name}: client answered`, (result) => { noteId = (result as { noteId?: string | null } | null)?.noteId ?? null; });
-      if (!answered) return;
+      if (!saved.current) {
+        let noteId: string | null = null;
+        const answered = await commands.exec(`${phase.id}:answer`, { ...it, command: "recordClientAnswer", note: text || null }, `${iteration.name}: client answered`, (result) => { noteId = (result as { noteId?: string | null } | null)?.noteId ?? null; });
+        if (!answered) return;
+        saved.current = { noteId, empty: false };
+        draft.keepOnly(files);
+      } else if (text) {
+        // Written after the answer was saved: its own client-feedback message, so nothing typed is lost.
+        const posted = await phaseNoteAction({ command: "post", projectId: commands.projectId, phaseId: phase.id, body: text, clientFeedback: true });
+        if (!posted.ok) { setProblems([posted.error.safeMessage]); return; }
+        draft.keepOnly(files);
+      }
+      const note = saved.current;
       if (files.length > 0) {
         // Screenshots only: they still need a client-feedback message to sit on.
-        if (!noteId) {
+        if (!note.noteId) {
           const posted = await phaseNoteAction({ command: "post", projectId: commands.projectId, phaseId: phase.id, body: null, clientFeedback: true, withImages: true });
-          if (posted.ok) noteId = posted.data.noteId; else setProblems([posted.error.safeMessage]);
+          if (!posted.ok) { setProblems([posted.error.safeMessage, RETRY]); return; }
+          note.noteId = posted.data.noteId; note.empty = true;
         }
-        if (noteId) setProblems(await uploadNoteImages(commands.projectId, phase.id, noteId, files));
+        const { problems: failed, failed: left } = await uploadNoteImages(commands.projectId, phase.id, note.noteId, files);
+        if (left.length < files.length) note.empty = false;
+        if (left.length > 0) {
+          // Keep the dialog open with only the images that failed, so they are not lost and none is added twice.
+          draft.keepOnly(left);
+          setProblems([...failed, RETRY]);
+          return;
+        }
       }
+      await dropEmptyNote();
       draft.clear();
       if (choice) {
         const picked = OUTCOME[choice]!;
@@ -193,7 +226,7 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
   return (
     <Dialog
       open
-      onOpenChange={(open) => { if (!open && !busyKey) onClose(); }}
+      onOpenChange={(open) => { if (!open && !busyKey) close(); }}
       title={`${iteration.name}: the client answered`}
       description="Write what the client said, or paste their screenshots. It goes to the phase notes as client feedback."
       dismissible={!busyKey}

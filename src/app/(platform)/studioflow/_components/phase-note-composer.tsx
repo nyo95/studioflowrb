@@ -16,9 +16,14 @@ const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
 
 export type NoteImage = { id: string; url: string | null; contentType: string; bytes: number };
 
-/** Uploads images onto one message, one at a time so the order holds and each request stays small. Returns the problems. */
-export async function uploadNoteImages(projectId: string, phaseId: string, noteId: string, files: readonly File[]): Promise<string[]> {
+/**
+ * Uploads images onto one message, one at a time so the order holds and each request stays small. Returns the
+ * problems and the files that did not get through, so only those are offered again (a retry never repeats a
+ * file that was already added).
+ */
+export async function uploadNoteImages(projectId: string, phaseId: string, noteId: string, files: readonly File[]): Promise<{ problems: string[]; failed: File[] }> {
   const problems: string[] = [];
+  const failed: File[] = [];
   for (const file of files) {
     try {
       const prepared = await shrinkImageFile(file, { maxBytes: NOTE_IMAGE_BYTES });
@@ -28,12 +33,13 @@ export async function uploadNoteImages(projectId: string, phaseId: string, noteI
       form.set("noteId", noteId);
       form.set("file", prepared);
       const result = await addPhaseNoteImageAction(form);
-      if (!result.ok) problems.push(result.error.safeMessage);
+      if (!result.ok) { problems.push(result.error.safeMessage); failed.push(file); }
     } catch {
       problems.push(`${file.name || "An image"} could not be added.`);
+      failed.push(file);
     }
   }
-  return problems;
+  return { problems, failed };
 }
 
 type Attachment = { file: File; url: string };
@@ -65,8 +71,14 @@ export function useNoteDraft(disabled = false) {
     for (const item of attachments) URL.revokeObjectURL(item.url);
     setAttachments([]); setText(""); setProblem(null);
   };
+  /** After a send: the text went, so it is cleared; only the images that did not get through stay. */
+  const keepOnly = (files: readonly File[]) => {
+    const kept = new Set(files);
+    for (const item of attachments) if (!kept.has(item.file)) URL.revokeObjectURL(item.url);
+    setAttachments((current) => current.filter((item) => kept.has(item.file))); setText(""); setProblem(null);
+  };
   const intake = useFileIntake({ accept: ACCEPTED.join(","), multiple: true, disabled, onFiles: add });
-  return { text, setText, files: attachments.map((item) => item.file), attachments, add, remove, clear, intake, problem, setProblem, empty: !text.trim() && attachments.length === 0 };
+  return { text, setText, files: attachments.map((item) => item.file), attachments, add, remove, clear, keepOnly, intake, problem, setProblem, empty: !text.trim() && attachments.length === 0 };
 }
 
 export type NoteDraft = ReturnType<typeof useNoteDraft>;
@@ -121,12 +133,15 @@ export function NoteComposer({ projectId, phaseId, autoFocus = false, onSent }: 
     try {
       const posted = await phaseNoteAction({ command: "post", projectId, phaseId, body: body || null, clientFeedback, withImages: files.length > 0 });
       if (!posted.ok) { setErrors([posted.error.safeMessage]); return; }
-      const problems = await uploadNoteImages(projectId, phaseId, posted.data.noteId, files);
+      const { problems, failed } = await uploadNoteImages(projectId, phaseId, posted.data.noteId, files);
       // An image-only message whose images all failed would be an empty bubble.
-      if (!body && files.length > 0 && problems.length === files.length) await phaseNoteAction({ command: "delete", projectId, phaseId, noteId: posted.data.noteId });
-      draft.clear(); setClientFeedback(false); setErrors(problems);
+      if (!body && files.length > 0 && failed.length === files.length) await phaseNoteAction({ command: "delete", projectId, phaseId, noteId: posted.data.noteId });
+      // Images that did not get through stay in the draft, so Send tries them again instead of losing them.
+      draft.keepOnly(failed);
+      if (failed.length === 0) setClientFeedback(false);
+      setErrors(problems);
       router.refresh();
-      onSent?.();
+      if (failed.length === 0) onSent?.();
     } catch {
       setErrors(["The note could not be sent. Please try again."]);
     } finally {

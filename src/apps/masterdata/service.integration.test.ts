@@ -1696,6 +1696,22 @@ describe("Bulk price entry", () => {
     assert.equal(await testDb.prisma.priceMaterial.count({ where: { sku_id: result.createdSkuIds[0] } }), 2);
   });
 
+  it("creates two new SKUs when two brands share a product name in one batch", async () => {
+    const context = await createMaterialContext();
+    const otherBrand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Second Panel Brand" });
+    await linkBrand(otherBrand.brandId, context.vendorId);
+    const result = await service.createMaterialSkuPricesBulk({ grants: GRANTS, actor: ACTOR, currency: "IDR", rows: [
+      { kind: "new", name: "Classic White", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: context.vendorId, amount: "30" },
+      { kind: "new", name: "Classic White", brandId: otherBrand.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, vendorId: context.vendorId, amount: "31" },
+    ] });
+
+    assert.equal(result.rejected, undefined);
+    assert.equal(result.createdSkuIds.length, 2);
+    const skus = await testDb.prisma.sku.findMany({ where: { id: { in: result.createdSkuIds } }, select: { brand_id: true, slug: true } });
+    assert.deepEqual(new Set(skus.map((sku) => sku.brand_id)), new Set([context.brandId, otherBrand.brandId]));
+    assert.equal(new Set(skus.map((sku) => sku.slug)).size, 1);
+  });
+
   it("keeps valid rows, returns invalid rows, and carries an existing SKU id when a new identity is taken", async () => {
     const context = await createMaterialContext();
     const supplier = await materialSupplier("Partial Mixed Supplier");
