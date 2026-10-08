@@ -255,21 +255,4 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   `masterdata/services/sample.service.ts` and
   `studioflow/public/sample-request-command.ts`. Not a defect; revisit as one
   application-level workflow once two or three more cross-app workflows exist.
-- [ ] [BUG][P2] Price-less SKU cannot be restored (Master Data CRUD audit
-  2026-10-08, from reading the code; not yet reproduced by a test): a SKU made
-  through the sample shelf has no price. Archiving it works, but
-  `assertSkuRestorable` (`services/shared.ts`) throws `SKU_NO_RESTORABLE_PRICE`
-  when no price row would come back with it, so `restoreSku` fails for good, and
-  `restoreBrand` fails as a whole whenever one of the Brand's SKUs is price-less.
-  Fix: allow a SKU with no archived-with-it prices to restore.
-- [ ] [BUG][P2] A live Brand whose owner Supplier was archived cannot be edited:
-  `updateBrand` rejects `BRAND_OWNER_ARCHIVED` on every save that still names that
-  owner, even when only the name or notes change. Check the owner only when it is
-  being changed (the restore path keeps its own check).
-- [ ] [BUG][P3] Creating a Brand, Supplier or SKU with the same item twice in the
-  input (the same link URL, category, supplier or Supplier Type) hits a unique index outside
-  `mapWriteError` and returns a generic error. The update paths already collapse
-  duplicates with a Map; make the create paths do the same (`createBrand` links,
-  categories, suppliers and hashtags; `createVendor` supplier types). A SKU takes
-  one category only, so it is not affected.
 - [ ] [PLANNED][P2] WO-MD-CRUD-01 (owner decisions 2026-10-08): the three [BUG] entries above, Material+Labor prices from a material, a labor or a both-capable Supplier, and archiving a Supplier also archives the Brands it owns with their SKUs and prices. Plan in `PLAN.md`; the Lead then updates the Pricing pickers and the quick-add supplier form.

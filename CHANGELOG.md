@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.412 | 2026-10-08 | fix(masterdata): restore price-less catalog records and normalize create input (Executor)
+
+- A price-less SKU now restores normally, including when it returns through its Brand; existing archive-cause safeguards still refuse a SKU whose prices remain held elsewhere.
+- A live Brand can be edited when its unchanged owner Supplier is archived, while assigning an archived Supplier as a new owner remains refused.
+- Brand creation now collapses repeated categories, normalized hashtags, trimmed link URLs, and Suppliers; Supplier creation also collapses repeated types, avoiding generic database uniqueness errors.
+- Added integration coverage for all group-A outcomes and closed the three matching Master Data audit bugs.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm test` 941/941, and `npm run build` pass. Browser not required.
+
 ## R8.411 | 2026-10-08 | docs(plan): WO-MD-CRUD-01 A3 no longer names SKU categories (Lead)
 
 - The Executor stopped (BLOCKED / CONFLICT): the plan asked `createSku` to collapse repeated categories, but a SKU takes exactly one `categoryId` (checked in `sku.service.ts`). Accepted its recommendation A: A3 now covers Brand (links, categories, suppliers, hashtags) and Supplier (types) only; the plan's acceptance line and the BACKLOG [BUG] entry are corrected. Nothing else in the plan changes.

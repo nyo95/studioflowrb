@@ -106,24 +106,28 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
       actorIsUsable(input.actor);
       const name = requiredTitleName(input.name, "BRAND_NAME_REQUIRED");
       const slug = requiredSlug(name);
+      const categoryIds = [...new Set(input.categoryIds ?? [])];
+      const hashtags = normalizeHashtags(input.hashtags ?? []);
+      const links = [...new Map((input.links ?? []).map((link) => ({ ...link, url: link.url.trim() })).filter((link) => link.url.length > 0).map((link) => [link.url, link] as const)).values()];
+      const suppliers = [...new Map((input.suppliers ?? []).map((supplier) => [supplier.vendorId, supplier] as const)).values()];
       return runTransaction(async (tx) => {
         if (input.ownerVendorId) { const owner = await tx.vendor.findUniqueOrThrow({ where: { id: input.ownerVendorId } }); if (owner.deleted_at !== null) throw new AppError("VALIDATION", "BRAND_OWNER_ARCHIVED", "Owner Supplier is archived."); }
         let brand;
         try { brand = await tx.brand.create({ data: { id: randomUUID(), name, slug, owner_vendor_id: input.ownerVendorId || null, notes: input.notes?.trim() || null } }); } catch (error) { mapWriteError(error); }
         const brandId = brand!.id;
-        if (input.categoryIds && input.categoryIds.length > 0) {
-          await assertLiveProductCategories(tx, input.categoryIds);
-          for (const categoryId of input.categoryIds) {
+        if (categoryIds.length > 0) {
+          await assertLiveProductCategories(tx, categoryIds);
+          for (const categoryId of categoryIds) {
             const bc = await tx.brandCategory.create({ data: { id: randomUUID(), brand_id: brandId, category_id: categoryId } });
             await tx.brandCategoryOrigin.create({ data: { id: randomUUID(), brand_category_id: bc.id, kind: "MANUAL", actor_user_id: input.actor.userId, actor_label: input.actor.label } });
           }
         }
-        if (input.hashtags && input.hashtags.length > 0) { const normalizedTags = normalizeHashtags(input.hashtags); await tx.brandHashtag.createMany({ data: normalizedTags.map((tag) => ({ id: randomUUID(), brand_id: brandId, label: tag.label, normalized: tag.normalized })) }); }
-        if (input.links && input.links.length > 0) { await tx.brandLink.createMany({ data: input.links.map((link) => ({ id: randomUUID(), brand_id: brandId, kind: link.kind, url: link.url.trim(), label: link.label?.trim() || null })) }); }
-        if (input.suppliers && input.suppliers.length > 0) {
-          for (const s of input.suppliers) { await assertVendorMaterialCapable(tx, s.vendorId); await tx.brandSupplier.create({ data: { id: randomUUID(), brand_id: brandId, vendor_id: s.vendorId, is_authorized: s.isAuthorized ?? false, notes: s.notes?.trim() || null } }); }
+        if (hashtags.length > 0) await tx.brandHashtag.createMany({ data: hashtags.map((tag) => ({ id: randomUUID(), brand_id: brandId, label: tag.label, normalized: tag.normalized })) });
+        if (links.length > 0) await tx.brandLink.createMany({ data: links.map((link) => ({ id: randomUUID(), brand_id: brandId, kind: link.kind, url: link.url, label: link.label?.trim() || null })) });
+        if (suppliers.length > 0) {
+          for (const supplier of suppliers) { await assertVendorMaterialCapable(tx, supplier.vendorId); await tx.brandSupplier.create({ data: { id: randomUUID(), brand_id: brandId, vendor_id: supplier.vendorId, is_authorized: supplier.isAuthorized ?? false, notes: supplier.notes?.trim() || null } }); }
         }
-        if (input.contacts && input.contacts.length > 0) await syncBrandContacts(tx, brandId, input.contacts, { ownerVendorId: input.ownerVendorId ?? null, supplierIds: (input.suppliers ?? []).map((s) => s.vendorId) });
+        if (input.contacts && input.contacts.length > 0) await syncBrandContacts(tx, brandId, input.contacts, { ownerVendorId: input.ownerVendorId ?? null, supplierIds: suppliers.map((supplier) => supplier.vendorId) });
         await writeAudit(ports, tx, { action: "brand.created", entityType: "brand", entityId: brandId, actor: input.actor, metadata: { slug, owner_vendor_id: input.ownerVendorId ?? null, contacts: input.contacts?.length ?? 0 } });
         return { brandId };
       });
@@ -137,8 +141,9 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
       return runTransaction(async (tx) => {
         const existing = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId }, include: { categories: { include: { origins: true } }, hashtags: true, links: true, suppliers: true } });
         if (existing.deleted_at !== null) throw new AppError("CONFLICT", "BRAND_ARCHIVED", "Cannot update an archived brand.");
-        if (input.ownerVendorId) { const owner = await tx.vendor.findUniqueOrThrow({ where: { id: input.ownerVendorId } }); if (owner.deleted_at !== null) throw new AppError("VALIDATION", "BRAND_OWNER_ARCHIVED", "Owner Supplier is archived."); }
-        if (input.ownerVendorId !== undefined && existing.owner_vendor_id && (input.ownerVendorId || null) !== existing.owner_vendor_id) {
+        const nextOwnerVendorId = input.ownerVendorId === undefined ? existing.owner_vendor_id : input.ownerVendorId || null;
+        if (nextOwnerVendorId && nextOwnerVendorId !== existing.owner_vendor_id) { const owner = await tx.vendor.findUniqueOrThrow({ where: { id: nextOwnerVendorId } }); if (owner.deleted_at !== null) throw new AppError("VALIDATION", "BRAND_OWNER_ARCHIVED", "Owner Supplier is archived."); }
+        if (existing.owner_vendor_id && nextOwnerVendorId !== existing.owner_vendor_id) {
           // A former owner priced the Brand without needing a supplier link; losing ownership must not strand those prices.
           const formerOwnerId = existing.owner_vendor_id;
           const stillSupplier = input.suppliers !== undefined ? input.suppliers.some((entry) => entry.vendorId === formerOwnerId) : existing.suppliers.some((entry) => entry.vendor_id === formerOwnerId);
@@ -149,9 +154,9 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
         }
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
-        if ((existing.owner_vendor_id || null) !== (input.ownerVendorId || null)) changes.owner_vendor_id = { from: existing.owner_vendor_id, to: input.ownerVendorId || null };
+        if ((existing.owner_vendor_id || null) !== nextOwnerVendorId) changes.owner_vendor_id = { from: existing.owner_vendor_id, to: nextOwnerVendorId };
         if ((existing.notes || null) !== (input.notes?.trim() || null)) changes.notes = { from: existing.notes, to: input.notes?.trim() || null };
-        if (Object.keys(changes).length > 0) { try { await tx.brand.update({ where: { id: input.brandId }, data: { name, slug, owner_vendor_id: input.ownerVendorId || null, notes: input.notes?.trim() || null } }); } catch (error) { mapWriteError(error); } }
+        if (Object.keys(changes).length > 0) { try { await tx.brand.update({ where: { id: input.brandId }, data: { name, slug, owner_vendor_id: nextOwnerVendorId, notes: input.notes?.trim() || null } }); } catch (error) { mapWriteError(error); } }
         if (input.categoryIds !== undefined) {
           await assertLiveProductCategories(tx, input.categoryIds);
           const requestedCategorySet = new Set(input.categoryIds);

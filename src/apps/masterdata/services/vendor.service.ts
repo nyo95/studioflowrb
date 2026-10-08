@@ -96,9 +96,10 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
         try { vendor = await tx.vendor.create({ data: { id: randomUUID(), name, slug, legal_name: optionalTitleName(input.legalName), address: input.address?.trim() || null, notes: input.notes?.trim() || null } }); } catch (error) { mapWriteError(error); }
         const vendorId = vendor!.id;
         if (input.vendorTypeIds && input.vendorTypeIds.length > 0) {
-          const vendorTypes = await tx.vendorType.findMany({ where: { id: { in: input.vendorTypeIds }, deleted_at: null }, select: { id: true } });
-          if (vendorTypes.length !== new Set(input.vendorTypeIds).size) throw new AppError("VALIDATION", "VENDOR_TYPE_INVALID", "Every selected Supplier Type must be active.");
-          await tx.vendorVendorType.createMany({ data: input.vendorTypeIds.map((vendorTypeId) => ({ id: randomUUID(), vendor_id: vendorId, vendor_type_id: vendorTypeId })) });
+          const vendorTypeIds = [...new Set(input.vendorTypeIds)];
+          const vendorTypes = await tx.vendorType.findMany({ where: { id: { in: vendorTypeIds }, deleted_at: null }, select: { id: true } });
+          if (vendorTypes.length !== vendorTypeIds.length) throw new AppError("VALIDATION", "VENDOR_TYPE_INVALID", "Every selected Supplier Type must be active.");
+          await tx.vendorVendorType.createMany({ data: vendorTypeIds.map((vendorTypeId) => ({ id: randomUUID(), vendor_id: vendorId, vendor_type_id: vendorTypeId })) });
         }
         if (input.categoryIds && input.categoryIds.length > 0) {
           const categoryIds = [...new Set(input.categoryIds)];

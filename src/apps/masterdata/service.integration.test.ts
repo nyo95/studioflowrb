@@ -1273,6 +1273,54 @@ describe("Master Data service", () => {
     const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Archived vendor" }); await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: vendor.vendorId });
     await assert.rejects(service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: vendor.vendorId, name: "Changed" }), (error: unknown) => error instanceof AppError && error.code === "VENDOR_ARCHIVED");
   });
+
+  it("restores price-less SKUs directly and through their Brand while keeping other price causes guarded", async () => {
+    const context = await createMaterialContext();
+    const shelfSku = await service.createSkuForSampleShelf({ grants: GRANTS, actor: ACTOR, name: "Price-less shelf SKU", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId });
+    await service.archiveSku({ grants: GRANTS, actor: ACTOR, skuId: shelfSku.skuId });
+    await service.restoreSku({ grants: GRANTS, actor: ACTOR, skuId: shelfSku.skuId });
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: shelfSku.skuId } })).deleted_at, null);
+
+    await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
+    await service.restoreBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId });
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: shelfSku.skuId } })).deleted_at, null);
+  });
+
+  it("allows editing a Brand with an archived current owner but still rejects an archived replacement", async () => {
+    const context = await createMaterialContext();
+    const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Owned Brand", ownerVendorId: context.vendorId });
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId });
+    await service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: brand.brandId, name: "Renamed Owned Brand", ownerVendorId: context.vendorId });
+    assert.equal((await testDb.prisma.brand.findUniqueOrThrow({ where: { id: brand.brandId } })).name, "Renamed Owned Brand");
+
+    const other = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Other archived owner" });
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: other.vendorId });
+    await assert.rejects(
+      service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: brand.brandId, name: "Renamed Owned Brand", ownerVendorId: other.vendorId }),
+      (error: unknown) => error instanceof AppError && error.code === "BRAND_OWNER_ARCHIVED",
+    );
+  });
+
+  it("collapses repeated Brand and Supplier create input before database writes", async () => {
+    const context = await createMaterialContext();
+    const brand = await service.createBrand({
+      grants: GRANTS,
+      actor: ACTOR,
+      name: "Deduplicated Brand",
+      categoryIds: [context.categoryId, context.categoryId],
+      hashtags: ["#Finish", "finish"],
+      links: [{ kind: "CATALOG", url: " https://example.com/catalog " }, { kind: "CATALOG", url: "https://example.com/catalog" }],
+      suppliers: [{ vendorId: context.vendorId, isAuthorized: false }, { vendorId: context.vendorId, isAuthorized: true }],
+    });
+    assert.equal(await testDb.prisma.brandCategory.count({ where: { brand_id: brand.brandId } }), 1);
+    assert.equal(await testDb.prisma.brandHashtag.count({ where: { brand_id: brand.brandId } }), 1);
+    assert.equal(await testDb.prisma.brandLink.count({ where: { brand_id: brand.brandId } }), 1);
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: brand.brandId } }), 1);
+
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Deduplicated Supplier", vendorTypeIds: [supplierType.id, supplierType.id] });
+    assert.equal(await testDb.prisma.vendorVendorType.count({ where: { vendor_id: vendor.vendorId } }), 1);
+  });
 });
 
 describe("Brand → Supplier → Price chain", () => {

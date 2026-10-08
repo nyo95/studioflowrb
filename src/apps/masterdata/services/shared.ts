@@ -250,7 +250,7 @@ export async function assertSkuRestorable(tx: TxClient, skuId: string): Promise<
     where: { entity_type: "price_material", kind: "PARENT", parent_type: "sku", parent_id: skuId },
     select: { entity_id: true },
   });
-  if (candidatePriceCauses.length === 0) throw new AppError("CONFLICT", "SKU_NO_RESTORABLE_PRICE", "SKU cannot be restored because no PriceMaterial would be restored with it.");
+  if (candidatePriceCauses.length === 0) return;
   const candidatePriceIds = candidatePriceCauses.map((c) => c.entity_id);
   const stillCausedPrices = await tx.archiveCause.findMany({
     where: { entity_type: "price_material", entity_id: { in: candidatePriceIds }, NOT: [{ kind: "PARENT", parent_type: "sku", parent_id: skuId }] },
