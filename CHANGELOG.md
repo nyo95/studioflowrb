@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.439 | 2026-10-08 | fix(masterdata): base unit locks to M² while a size is set; the SKU picker no longer says "no code" (Lead)
+
+- **Owner review of the new-SKU form.** The base unit is not always M²: it is pcs, m, kg and so on for materials without a sheet size, so it stays a normal choice. It is M² only when a size is typed, so the select is now locked (and saved as M²) while a size is set and unlocks when the size is cleared. This answers "why is Base/BQ unit not with the size section" without removing the choice for non-sheet materials.
+- **"no code" removed.** The SKU picker's second line showed "no code · Taco" for SKUs without an article code; with the single product-name line most SKUs have none. It now shows the code only when there is one, then the brand.
+- **Not changed, owner question:** the "new SKU" form is the same dialog switching view (a new SKU needs units, size and a category, which do not fit a table row), but it resizes and retitles, so it reads as a second pop-up. Left for the owner's choice (see the reply).
+- Checked in a browser: locked with a size, unlocked after clearing, the SKU still saves as m2 with factor 2,9768, picker line shows brand only.
+
+**Checks.** `tsc --noEmit`, lint, `npm test` (full, none failed, skipped or cancelled).
+
 ## R8.438 | 2026-10-08 | docs(backlog): browser acceptance of iteration names, Notes and the new-SKU form (Lead)
 
 - Owner asked for an acceptance test after the push. Run on an isolated server and its own database (not the shared test database, which Codex's test runs wipe).

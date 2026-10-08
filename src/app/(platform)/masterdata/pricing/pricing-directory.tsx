@@ -348,6 +348,8 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
       areaPreview = null;
     }
   }
+  // With a size the base unit is M² by rule; the select is locked until the size is cleared.
+  const sizeLocksBase = Boolean(areaPreview) && selectedBaseUnit?.code.toUpperCase() === "M2";
 
   const createBrand = async (name: string) => {
     setBrandCreateError(null);
@@ -480,7 +482,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
       {brandCreateError ? <InlineError>{brandCreateError}</InlineError> : null}
     </div>
     <div className="grid grid-cols-2 gap-3">
-      <Field label={<span className="inline-flex items-center gap-1">Base / BQ unit <FieldHelp label="base / BQ unit" content="The unit used to compare and calculate material usage." /></span>} required><Select name="baseUnitId" value={baseUnitId} onChange={(event) => setBaseUnitId(event.target.value)} required><option value="">Select base unit...</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}</Select></Field>
+      <Field label={<span className="inline-flex items-center gap-1">Base / BQ unit <FieldHelp label="base / BQ unit" content="The unit used to compare and calculate material usage." /></span>} required><Select name={sizeLocksBase ? undefined : "baseUnitId"} value={baseUnitId} onChange={(event) => setBaseUnitId(event.target.value)} required disabled={sizeLocksBase}><option value="">Select base unit...</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}</Select></Field>{sizeLocksBase ? <input type="hidden" name="baseUnitId" value={baseUnitId} /> : null}
       <Field label={<span className="inline-flex items-center gap-1">Purchase unit <FieldHelp label="purchase unit" content="The unit quoted by the supplier." /></span>}><Select name="purchaseUnitId" value={purchaseUnitId} onChange={(event) => setPurchaseUnitId(event.target.value)}><option value="">Same as base unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}</Select></Field>
     </div>
     <SectionCard>
@@ -592,7 +594,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const skuOptionsForTable = refs.skus.filter((sku) => materialBrandFilter === "ALL" || sku.brand?.id === materialBrandFilter).map((sku) => ({
     id: sku.id,
     label: sku.name ?? sku.code ?? "Unnamed SKU",
-    description: <span className="text-xs"><span className="font-ui-mono">{sku.code ?? "no code"}</span> · {sku.brand?.name ?? "No brand"}</span>,
+    description: <span className="text-xs">{sku.code ? <><span className="font-ui-mono">{sku.code}</span> · </> : null}{sku.brand?.name ?? "No brand"}</span>,
     keywords: [sku.code ?? "", sku.brand?.name ?? ""],
   }));
   const supplierOptionsFor = (sku: SkuRef | undefined) => {
