@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.417 | 2026-10-08 | feat(masterdata): return used-price details for Brand and capability guards (Executor)
+
+- Brand owner and supplier-link removal refusals now return safe structured details for the affected Brand and Supplier (id and name) plus the live material-price count, while preserving their human-readable messages and existing behaviour.
+- Supplier capability and Supplier Type capability guards now return the same Supplier, related Brand where applicable, and live price count. Supplier Type archive preserves those details when it wraps the underlying guard.
+- Added integration coverage for Brand owner and supplier-link guards, Supplier capability removal, and Supplier Type material-capability removal.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm test` 944/944, and `npm run build` pass. Browser not required.
+
 ## R8.416 | 2026-10-08 | feat(masterdata): link Brand suppliers when material prices are created (Executor)
 
 - Creating a material price for a branded SKU now creates the missing Brand–Supplier link in the same transaction when the capable, live Supplier is neither the Brand owner nor already linked. The new link is unauthorised, has no notes, and is audited as `brand.supplier-linked` with `reason: "price"`.

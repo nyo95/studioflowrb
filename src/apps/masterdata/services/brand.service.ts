@@ -149,7 +149,7 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
           const stillSupplier = input.suppliers !== undefined ? input.suppliers.some((entry) => entry.vendorId === formerOwnerId) : existing.suppliers.some((entry) => entry.vendor_id === formerOwnerId);
           if (!stillSupplier) {
             const priceCount = await tx.priceMaterial.count({ where: { deleted_at: null, supplier_vendor_id: formerOwnerId, sku: { brand_id: input.brandId } } });
-            if (priceCount > 0) throw new AppError("CONFLICT", "BRAND_OWNER_IN_USE", `The current owner has ${priceCount} live material price(s) for this Brand. Keep it as a supplier of the Brand before changing the owner.`);
+            if (priceCount > 0) { const supplier = await tx.vendor.findUniqueOrThrow({ where: { id: formerOwnerId }, select: { id: true, name: true } }); throw new AppError("CONFLICT", "BRAND_OWNER_IN_USE", `The current owner has ${priceCount} live material price(s) for this Brand. Keep it as a supplier of the Brand before changing the owner.`, { details: { brand: { id: input.brandId, name: existing.name }, supplier, livePriceCount: priceCount } }); }
           }
         }
         const changes: Record<string, { from: unknown; to: unknown }> = {};
@@ -195,7 +195,7 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
           for (const removed of removedSuppliers) {
             if (existing.owner_vendor_id === removed.vendor_id) continue;
             const priceCount = await tx.priceMaterial.count({ where: { deleted_at: null, supplier_vendor_id: removed.vendor_id, sku: { brand_id: input.brandId } } });
-            if (priceCount > 0) throw new AppError("CONFLICT", "BRAND_SUPPLIER_IN_USE", `Supplier link cannot be removed while ${priceCount} live material price(s) use this Brand.`);
+            if (priceCount > 0) { const supplier = await tx.vendor.findUniqueOrThrow({ where: { id: removed.vendor_id }, select: { id: true, name: true } }); throw new AppError("CONFLICT", "BRAND_SUPPLIER_IN_USE", `Supplier link cannot be removed while ${priceCount} live material price(s) use this Brand.`, { details: { brand: { id: input.brandId, name: existing.name }, supplier, livePriceCount: priceCount } }); }
           }
           if (removedSuppliers.length > 0) await tx.brandSupplier.deleteMany({ where: { id: { in: removedSuppliers.map((s) => s.id) } } });
           for (const existingSupplier of existing.suppliers) { const wanted = desiredSuppliers.get(existingSupplier.vendor_id); if (!wanted) continue; desiredSuppliers.delete(existingSupplier.vendor_id); const isAuthorized = wanted.isAuthorized ?? false; const supplierNotes = wanted.notes?.trim() || null; if (existingSupplier.is_authorized !== isAuthorized || existingSupplier.notes !== supplierNotes) await tx.brandSupplier.update({ where: { id: existingSupplier.id }, data: { is_authorized: isAuthorized, notes: supplierNotes } }); }

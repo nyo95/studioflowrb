@@ -215,12 +215,28 @@ export async function assertVendorWorkCapable(tx: TxClient, vendorId: string): P
   if (!capable) throw new AppError("VALIDATION", "VENDOR_NOT_WORK_CAPABLE", "Supplier is not eligible to provide material or labor.");
 }
 
+export async function vendorCapabilityInUseDetails(tx: TxClient, vendorId: string, capability: "material" | "labor" | "work") {
+  const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: vendorId }, select: { id: true, name: true } });
+  if (capability === "material") {
+    const [livePriceCount, price, relation] = await Promise.all([
+      tx.priceMaterial.count({ where: { supplier_vendor_id: vendorId, deleted_at: null } }),
+      tx.priceMaterial.findFirst({ where: { supplier_vendor_id: vendorId, deleted_at: null }, select: { sku: { select: { brand: { select: { id: true, name: true } } } } } }),
+      tx.brandSupplier.findFirst({ where: { vendor_id: vendorId }, select: { brand: { select: { id: true, name: true } } } }),
+    ]);
+    return { brand: price?.sku.brand ?? relation?.brand ?? null, supplier: vendor, livePriceCount };
+  }
+  const livePriceCount = capability === "labor"
+    ? await tx.priceLabor.count({ where: { vendor_id: vendorId, deleted_at: null } })
+    : await tx.priceMaterialLabor.count({ where: { vendor_id: vendorId, deleted_at: null } });
+  return { brand: null, supplier: vendor, livePriceCount };
+}
+
 export async function assertVendorTypeRemovalSafe(tx: TxClient, vendorId: string, remainingTypeIds: string[]): Promise<void> {
   const remainingTypes = await tx.vendorType.findMany({ where: { id: { in: remainingTypeIds }, deleted_at: null } });
   const hasMaterial = remainingTypes.some((t) => t.can_supply_material); const hasLabor = remainingTypes.some((t) => t.can_supply_labor);
-  if (!hasMaterial) { const [priceCount, supplierCount] = await Promise.all([tx.priceMaterial.count({ where: { supplier_vendor_id: vendorId, deleted_at: null } }), tx.brandSupplier.count({ where: { vendor_id: vendorId } })]); if (priceCount > 0 || supplierCount > 0) throw new AppError("CONFLICT", "VENDOR_MATERIAL_CAPABILITY_IN_USE", "Cannot remove material supply capability while live material prices or brand supplier relations exist."); }
-  if (!hasLabor) { const laborCount = await tx.priceLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }); if (laborCount > 0) throw new AppError("CONFLICT", "VENDOR_LABOR_CAPABILITY_IN_USE", "Cannot remove labor provision capability while live labor prices exist."); }
-  if (!hasMaterial && !hasLabor) { const mlCount = await tx.priceMaterialLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }); if (mlCount > 0) throw new AppError("CONFLICT", "VENDOR_LABOR_CAPABILITY_IN_USE", "Cannot remove every work capability while live material and labor prices exist."); }
+  if (!hasMaterial) { const [priceCount, supplierCount] = await Promise.all([tx.priceMaterial.count({ where: { supplier_vendor_id: vendorId, deleted_at: null } }), tx.brandSupplier.count({ where: { vendor_id: vendorId } })]); if (priceCount > 0 || supplierCount > 0) throw new AppError("CONFLICT", "VENDOR_MATERIAL_CAPABILITY_IN_USE", "Cannot remove material supply capability while live material prices or brand supplier relations exist.", { details: await vendorCapabilityInUseDetails(tx, vendorId, "material") }); }
+  if (!hasLabor) { const laborCount = await tx.priceLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }); if (laborCount > 0) throw new AppError("CONFLICT", "VENDOR_LABOR_CAPABILITY_IN_USE", "Cannot remove labor provision capability while live labor prices exist.", { details: await vendorCapabilityInUseDetails(tx, vendorId, "labor") }); }
+  if (!hasMaterial && !hasLabor) { const mlCount = await tx.priceMaterialLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }); if (mlCount > 0) throw new AppError("CONFLICT", "VENDOR_LABOR_CAPABILITY_IN_USE", "Cannot remove every work capability while live material and labor prices exist.", { details: await vendorCapabilityInUseDetails(tx, vendorId, "work") }); }
 }
 
 /** Blocks a deactivation that would hide a category still used by live data. */

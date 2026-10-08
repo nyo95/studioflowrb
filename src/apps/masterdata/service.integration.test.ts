@@ -792,7 +792,11 @@ describe("Master Data service", () => {
           name: "Supplier One",
           vendorTypeIds: [vendorTypeService.id],
         }),
-      (error: unknown) => error instanceof AppError && error.code === "VENDOR_MATERIAL_CAPABILITY_IN_USE",
+      (error: unknown) => {
+        assert.ok(error instanceof AppError && error.code === "VENDOR_MATERIAL_CAPABILITY_IN_USE");
+        assert.deepEqual(error.details, { brand: { id: context.brandId, name: "Panel Brand" }, supplier: { id: context.vendorId, name: "Supplier One" }, livePriceCount: 1 });
+        return true;
+      },
     );
 
     // Keeping SUPPLIER type succeeds
@@ -1301,6 +1305,11 @@ describe("Master Data service", () => {
     const context = await createMaterialContext();
     const materialType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
     await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Type guard SKU", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    await assert.rejects(service.updateVendorType({ grants: GRANTS, actor: ACTOR, vendorTypeId: materialType.id, name: materialType.name, canSupplyMaterial: false, canSupplyLabor: materialType.can_supply_labor }), (error: unknown) => {
+      assert.ok(error instanceof AppError && error.code === "VENDOR_TYPE_MATERIAL_CAPABILITY_IN_USE");
+      assert.deepEqual(error.details, { brand: { id: context.brandId, name: "Panel Brand" }, supplier: { id: context.vendorId, name: "Supplier One" }, livePriceCount: 1 });
+      return true;
+    });
     await assert.rejects(service.archiveVendorType({ grants: GRANTS, actor: ACTOR, vendorTypeId: materialType.id }), (error: unknown) => error instanceof AppError && error.code === "VENDOR_MATERIAL_CAPABILITY_IN_USE");
     const unused = await service.createVendorType({ grants: GRANTS, actor: ACTOR, code: "UNUSED_TEST", name: "Unused type", canSupplyMaterial: true });
     await service.archiveVendorType({ grants: GRANTS, actor: ACTOR, vendorTypeId: unused.vendorTypeId });
@@ -1437,7 +1446,11 @@ describe("Brand → Supplier → Price chain", () => {
     const second = await unlinkedSupplier("Chain Second Supplier");
     await service.linkBrandToSupplier({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, vendorId: second });
     const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Unlink SKU", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "10", currency: "IDR" }, { supplierVendorId: second, amount: "12", currency: "IDR" }] });
-    await rejectsWith(() => service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, name: "Panel Brand", suppliers: [{ vendorId: second }] }), "BRAND_SUPPLIER_IN_USE");
+    await assert.rejects(() => service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, name: "Panel Brand", suppliers: [{ vendorId: second }] }), (error: unknown) => {
+      assert.ok(error instanceof AppError && error.code === "BRAND_SUPPLIER_IN_USE");
+      assert.deepEqual(error.details, { brand: { id: context.brandId, name: "Panel Brand" }, supplier: { id: context.vendorId, name: "Supplier One" }, livePriceCount: 1 });
+      return true;
+    });
 
     const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId, supplier_vendor_id: context.vendorId } });
     await service.archivePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id });
@@ -1453,7 +1466,11 @@ describe("Brand → Supplier → Price chain", () => {
     const successor = await unlinkedSupplier("Chain Successor");
     const owned = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Chain Handover Brand", ownerVendorId: owner });
     await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Handover SKU", brandId: owned.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: owner, amount: "1", currency: "IDR" }] });
-    await rejectsWith(() => service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: owned.brandId, name: "Chain Handover Brand", ownerVendorId: successor }), "BRAND_OWNER_IN_USE");
+    await assert.rejects(() => service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: owned.brandId, name: "Chain Handover Brand", ownerVendorId: successor }), (error: unknown) => {
+      assert.ok(error instanceof AppError && error.code === "BRAND_OWNER_IN_USE");
+      assert.deepEqual(error.details, { brand: { id: owned.brandId, name: "Chain Handover Brand" }, supplier: { id: owner, name: "Chain Former Owner" }, livePriceCount: 1 });
+      return true;
+    });
     await service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: owned.brandId, name: "Chain Handover Brand", ownerVendorId: successor, suppliers: [{ vendorId: owner }] });
   });
 

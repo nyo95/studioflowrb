@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, assertVendorTypeRemovalSafe, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, assertVendorTypeRemovalSafe, vendorCapabilityInUseDetails, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 export function createVendorTypeService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;
@@ -62,7 +62,7 @@ export function createVendorTypeService(db: PrismaClient, ports: MasterDataServi
             if (!otherTypes.some((o) => o.vendor_type.can_supply_material)) {
               const priceCount = await tx.priceMaterial.count({ where: { supplier_vendor_id: a.vendor_id, deleted_at: null } });
               const supplierCount = await tx.brandSupplier.count({ where: { vendor_id: a.vendor_id } });
-              if (priceCount > 0 || supplierCount > 0) throw new AppError("CONFLICT", "VENDOR_TYPE_MATERIAL_CAPABILITY_IN_USE", "Cannot disable material capability while live Suppliers depend on this type for material pricing.");
+              if (priceCount > 0 || supplierCount > 0) throw new AppError("CONFLICT", "VENDOR_TYPE_MATERIAL_CAPABILITY_IN_USE", "Cannot disable material capability while live Suppliers depend on this type for material pricing.", { details: await vendorCapabilityInUseDetails(tx, a.vendor_id, "material") });
             }
           }
         }
@@ -73,7 +73,7 @@ export function createVendorTypeService(db: PrismaClient, ports: MasterDataServi
             if (!otherTypes.some((o) => o.vendor_type.can_supply_labor)) {
               const mlCount = await tx.priceMaterialLabor.count({ where: { vendor_id: a.vendor_id, deleted_at: null } });
               const laborCount = await tx.priceLabor.count({ where: { vendor_id: a.vendor_id, deleted_at: null } });
-              if (mlCount > 0 || laborCount > 0) throw new AppError("CONFLICT", "VENDOR_TYPE_LABOR_CAPABILITY_IN_USE", "Cannot disable labor capability while live Suppliers depend on this type for labor pricing.");
+              if (mlCount > 0 || laborCount > 0) throw new AppError("CONFLICT", "VENDOR_TYPE_LABOR_CAPABILITY_IN_USE", "Cannot disable labor capability while live Suppliers depend on this type for labor pricing.", { details: await vendorCapabilityInUseDetails(tx, a.vendor_id, laborCount > 0 ? "labor" : "work") });
             }
           }
         }
@@ -96,7 +96,7 @@ export function createVendorTypeService(db: PrismaClient, ports: MasterDataServi
             await assertVendorTypeRemovalSafe(tx, assignment.vendor_id, remaining.map((row) => row.vendor_type_id));
           } catch (error) {
             if (error instanceof AppError && (error.code === "VENDOR_MATERIAL_CAPABILITY_IN_USE" || error.code === "VENDOR_LABOR_CAPABILITY_IN_USE")) {
-              throw new AppError("CONFLICT", error.code, `Cannot archive this Supplier Type because Supplier ${assignment.vendor.name} still depends on that capability.`);
+              throw new AppError("CONFLICT", error.code, `Cannot archive this Supplier Type because Supplier ${assignment.vendor.name} still depends on that capability.`, { details: error.details });
             }
             throw error;
           }
