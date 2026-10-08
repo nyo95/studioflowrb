@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.451 | 2026-10-08 | fix(studioflow): note image retry stays on one message, Cancel undoes image edits, reset text (Lead)
+
+- **External audit 2026-10-08, checked against the code.**
+- **Notes composer:** when some images of a sent message failed, Send now retries them on that same message instead of posting a new one (new text typed meanwhile is still its own message). An image-only message whose images all failed is still removed.
+- **Editing a note:** images pasted, dropped or removed while editing are a draft; Save applies them (new images first, then removals), Cancel drops them. Before, a dropped image was saved at once and Cancel did not undo it. Failed images stay in the editor with the reason.
+- **Admin reset dialog:** said it deletes the iterations' client notes; since R8.446 notes are kept without their round label. The text now says so.
+- **Audit items not changed here:** the bulk SKU+price table screen (R8.441 backend) is the open `[PLANNED]` step 2 in BACKLOG, next for the Lead; the "batch audit fails after rows saved" case needs a database failure between the row saves and the summary audit row, every row already has its own audit, so no code was added for it.
+- **Migrations/dependencies:** none.
+
+**Checks.** `tsc --noEmit`; eslint on the StudioFlow routes (only the existing `<img>` warning). No browser check; `npm run build` runs with the next revision.
+
 ## R8.450 | 2026-10-08 | feat(studioflow): personal Ideas board backend, used in a schedule as a snapshot (Lead)
 
 - **Owner request:** build WO-SF-IDEAS-01 directly ("kamu eksekusi aja"), no Executor hand-off.

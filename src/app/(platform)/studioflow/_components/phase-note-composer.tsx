@@ -125,17 +125,34 @@ export function NoteComposer({ projectId, phaseId, autoFocus = false, onSent }: 
   const [sending, setSending] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
+  // A sent message whose images did not all get through: Send retries those images on it, so one message stays
+  // one message. It is forgotten once nothing waits to be retried.
+  const pending = useRef<string | null>(null);
+  useEffect(() => { if (draft.attachments.length === 0) pending.current = null; }, [draft.attachments.length]);
+
   const send = async () => {
     if (sending || draft.empty) return;
     const body = draft.text.trim();
     const files = draft.files;
     setSending(true); setErrors([]);
     try {
-      const posted = await phaseNoteAction({ command: "post", projectId, phaseId, body: body || null, clientFeedback, withImages: files.length > 0 });
-      if (!posted.ok) { setErrors([posted.error.safeMessage]); return; }
-      const { problems, failed } = await uploadNoteImages(projectId, phaseId, posted.data.noteId, files);
-      // An image-only message whose images all failed would be an empty bubble.
-      if (!body && files.length > 0 && failed.length === files.length) await phaseNoteAction({ command: "delete", projectId, phaseId, noteId: posted.data.noteId });
+      let target = pending.current;
+      let created: string | null = null;
+      // New text is always its own message; images being retried still go to the message they were sent with.
+      if (!target || body) {
+        const posted = await phaseNoteAction({ command: "post", projectId, phaseId, body: body || null, clientFeedback, withImages: !target && files.length > 0 });
+        if (!posted.ok) { setErrors([posted.error.safeMessage]); return; }
+        created = posted.data.noteId;
+        target ??= created;
+      }
+      const { problems, failed } = await uploadNoteImages(projectId, phaseId, target, files);
+      if (target === created && !body && files.length > 0 && failed.length === files.length) {
+        // An image-only message whose images all failed would be an empty bubble.
+        await phaseNoteAction({ command: "delete", projectId, phaseId, noteId: created });
+        pending.current = null;
+      } else {
+        pending.current = failed.length > 0 ? target : null;
+      }
       // Images that did not get through stay in the draft, so Send tries them again instead of losing them.
       draft.keepOnly(failed);
       if (failed.length === 0) setClientFeedback(false);

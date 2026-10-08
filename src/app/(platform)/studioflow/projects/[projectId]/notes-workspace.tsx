@@ -8,7 +8,7 @@ import { currentDateOnly, formatInstant } from "@platform/utilities/date";
 import { Badge, Button, FormattedInstant, FormattedText, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, SectionCard, Text, useConfirm, useFileIntake } from "@/platform/ui_engine";
 
 import { phaseNoteAction, type PhaseNoteCommandInput } from "../../actions";
-import { NOTE_MAX, NoteComposer, uploadNoteImages, type NoteImage } from "../../_components/phase-note-composer";
+import { NOTE_MAX, NoteComposer, uploadNoteImages, useNoteDraft, type NoteImage } from "../../_components/phase-note-composer";
 import type { IterationView } from "../../_components/phase-commands";
 
 export type IterationRow = { id: string; name: string; shortName: string; state: IterationView["state"]; createdAt: Date; sentAt: Date | null; answeredAt: Date | null; doneAt: Date | null; visitDate: string | null };
@@ -177,25 +177,32 @@ function NoteBubble({ note, projectId, phaseId, canEdit, locale, timezone, busy,
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
-  const [uploading, setUploading] = useState(0);
+  const [saving, setSaving] = useState(false);
   const [problems, setProblems] = useState<string[]>([]);
+  // Images pasted, dropped or removed while editing are only a draft: Save applies them, Cancel drops them.
+  const added = useNoteDraft(!editing);
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(new Set());
 
-  // While editing, a pasted or dropped image is added to this message straight away.
-  const intake = useFileIntake({
-    accept: ACCEPTED,
-    multiple: true,
-    disabled: !editing,
-    onFiles: async (files, refused) => {
-      setUploading(files.length);
-      const { problems: failed } = await uploadNoteImages(projectId, phaseId, note.id, files);
-      setUploading(0);
-      setProblems([...(refused.length ? ["Only PNG, JPEG or WebP images can be added."] : []), ...failed]);
-      router.refresh();
-    },
-  });
+  const startEdit = () => { setDraft(note.body); setProblems([]); added.clear(); setRemoved(new Set()); setEditing(true); };
+  const cancel = () => { added.clear(); setRemoved(new Set()); setProblems([]); setEditing(false); };
 
   const save = async () => {
-    if (await run(`edit:${note.id}`, { command: "edit", noteId: note.id, body: draft.trim() || null })) setEditing(false);
+    setSaving(true); setProblems([]);
+    try {
+      if (!(await run(`edit:${note.id}`, { command: "edit", noteId: note.id, body: draft.trim() || null }))) return;
+      // New images first, so removing the last old image never leaves the message empty on the way.
+      const { problems: failed, failed: left } = await uploadNoteImages(projectId, phaseId, note.id, added.files);
+      for (const imageId of removed) {
+        if (!(await run(`image:${imageId}`, { command: "removeImage", imageId }))) { failed.push("An image could not be removed."); break; }
+      }
+      setRemoved(new Set());
+      router.refresh();
+      if (failed.length > 0) { added.keepOnly(left); setProblems(failed); return; }
+      added.clear();
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -223,7 +230,7 @@ function NoteBubble({ note, projectId, phaseId, canEdit, locale, timezone, busy,
               label="Note actions"
               pending={busy === `delete:${note.id}` || busy === `client:${note.id}`}
               items={[
-                { label: "Edit", onSelect: () => { setDraft(note.body); setProblems([]); setEditing(true); } },
+                { label: "Edit", onSelect: startEdit },
                 { label: note.clientFeedback ? "Not client feedback" : "Mark as client feedback", onSelect: () => void run(`client:${note.id}`, { command: "flags", noteId: note.id, clientFeedback: !note.clientFeedback }) },
                 { label: "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(note) },
               ]}
@@ -233,14 +240,22 @@ function NoteBubble({ note, projectId, phaseId, canEdit, locale, timezone, busy,
       </div>
 
       {editing ? (
-        <div className={`grid gap-2 rounded-control ${intake.active ? "outline-2 outline-dashed outline-offset-4 outline-line-focus" : ""}`} {...intake.target}>
+        <div className={`grid gap-2 rounded-control ${added.intake.active ? "outline-2 outline-dashed outline-offset-4 outline-line-focus" : ""}`} {...added.intake.target}>
           <RichTextEditor aria-label="Edit note" maxLength={NOTE_MAX} value={draft} autoFocus onChange={setDraft} />
-          <ImageGallery images={note.images} size="sm" onRemove={(image) => void run(`image:${image.id}`, { command: "removeImage", imageId: image.id })} removingId={busy?.startsWith("image:") ? busy.slice(6) : null} />
+          <ImageGallery
+            images={[...note.images.filter((image) => !removed.has(image.id)), ...added.attachments.map((item) => ({ id: item.url, url: item.url }))]}
+            size="sm"
+            onRemove={(image) => {
+              const index = added.attachments.findIndex((item) => item.url === image.id);
+              if (index >= 0) added.remove(index); else setRemoved((current) => new Set(current).add(image.id));
+            }}
+          />
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="primary" pending={busy === `edit:${note.id}`} disabled={uploading > 0} onClick={() => void save()}>Save</Button>
-            <Button size="sm" variant="ghost" disabled={busy === `edit:${note.id}`} onClick={() => setEditing(false)}>Cancel</Button>
-            <Text size="sm" tone="tertiary">{uploading > 0 ? `Adding ${uploading} image${uploading === 1 ? "" : "s"}…` : "Paste or drop an image to add it."}</Text>
+            <Button size="sm" variant="primary" pending={saving} onClick={() => void save()}>Save</Button>
+            <Button size="sm" variant="ghost" disabled={saving} onClick={cancel}>Cancel</Button>
+            <Text size="sm" tone="tertiary">Paste or drop an image to add it; Save keeps the changes.</Text>
           </div>
+          {added.problem ? <InlineError>{added.problem}</InlineError> : null}
           {problems.length > 0 ? <InlineError>{problems.join(" ")}</InlineError> : null}
         </div>
       ) : (
