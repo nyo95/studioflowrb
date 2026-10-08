@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.444 | 2026-10-08 | fix(studioflow): a phase cannot get two active requirements with the same text (Lead)
+
+- **Owner's screenshot: "Ukuran Videotron" twice in Requirements.** Checked in the rebuild dev database: it is real data, not a display bug. Two checklist templates with the same text and phase (Design 3D) were created 3 seconds apart on 2026-09-23 (a double submit), and every project created since copied both (3 projects so far).
+- **Prevention.** Creating, renaming or re-activating a requirement template is refused with "This phase already has a requirement with that text" when an active one with the same text (ignoring case and spacing) exists on that phase. The same text on another phase is allowed. Test added.
+- **Not done (needs the owner's yes):** switching off the duplicate template and dismissing the duplicate row in the 3 existing projects. No data was changed.
+
+**Checks.** `tsc --noEmit`, lint, `npm test` (full, none failed, skipped or cancelled), `npm run build`.
+
 ## R8.443 | 2026-10-08 | feat(studioflow): one Notes workspace with a tab per iteration (Lead)
 
 - **Owner mockup 2026-10-08, pinned per phase.** The empty area under the iteration card is now the phase's notes workspace. The pinned note ("Pinned for this phase", one per phase) is on top; below it a tab per iteration (running one first, marked "now"). Each tab shows the dates, outcome, client notes and photos of that iteration; the editor is in place (no window), Save notes appears only when the text changed, and a tab with unsaved text has a dot. A new iteration shows the previous one's notes as a Brief. Notes of an iteration that is with the client wait for the reply, as before.

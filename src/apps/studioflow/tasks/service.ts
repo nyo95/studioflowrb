@@ -85,6 +85,10 @@ export { ITEM_SELECT };
 
 export function createTaskService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction } = ports;
+  async function assertTemplateLabelFree(tx: TxClient, definitionId: string | null, label: string, exceptId?: string) {
+    const clash = await tx.sfChecklistTemplate.findFirst({ where: { definition_id: definitionId, is_active: true, label: { equals: label, mode: "insensitive" }, ...(exceptId ? { id: { not: exceptId } } : {}) }, select: { id: true } });
+    if (clash) throw conflict("TEMPLATE_LABEL_DUPLICATE", "This phase already has a requirement with that text.");
+  }
 
   /** `allowLocked`: ticking a requirement stays possible after its phase is done (WO-SF-ITER-01 decision 4). */
   async function loadItem(tx: TxClient, projectId: string, itemId: string, access?: CommandContext, options: { allowLocked?: boolean } = {}) {
@@ -230,6 +234,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
     },
 
     /** `definitionId` null = general (project-level); otherwise the template seeds phases created from that definition. */
+    /** Two active requirements with the same text on one phase would be copied twice into every new project. */
     async createTemplate(input: CommandContext & { definitionId: string | null; label: string; isBlocking?: boolean }) {
       requireCommand(input, P.settingsManage);
       const label = requiredText(input.label, "TEMPLATE_LABEL_REQUIRED", "Checklist item", CHECKLIST_LABEL_MAX_LENGTH);
@@ -237,6 +242,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         if (input.definitionId !== null && !(await tx.sfPhaseDefinition.findUnique({ where: { id: input.definitionId }, select: { id: true } }))) {
           throw invalid("PHASE_DEFINITION_INVALID", "Unknown phase.");
         }
+        await assertTemplateLabelFree(tx, input.definitionId, label);
         const last = await tx.sfChecklistTemplate.findFirst({ where: { definition_id: input.definitionId }, orderBy: { sort_order: "desc" }, select: { sort_order: true } });
         const id = randomUUID();
         await tx.sfChecklistTemplate.create({ data: { id, definition_id: input.definitionId, label, is_blocking: input.isBlocking ?? true, sort_order: (last?.sort_order ?? 0) + CHECKLIST_SORT_STEP } });
@@ -260,6 +266,7 @@ export function createTaskService(db: Db, ports: StudioFlowPorts) {
         if (input.isActive !== undefined && input.isActive !== template.is_active) { data.is_active = input.isActive; changes.isActive = { from: template.is_active, to: input.isActive }; }
         if (input.isBlocking !== undefined && input.isBlocking !== template.is_blocking) { data.is_blocking = input.isBlocking; changes.isBlocking = { from: template.is_blocking, to: input.isBlocking }; }
         if (Object.keys(changes).length === 0) return { templateId: template.id };
+        if ((data.label !== undefined || data.is_active === true) && (data.is_active ?? template.is_active)) await assertTemplateLabelFree(tx, template.definition_id, data.label ?? template.label, template.id);
         await tx.sfChecklistTemplate.update({ where: { id: template.id }, data });
         await writeAudit(ports, tx, { action: "studioflow.checklist-template.updated", entityType: "checklist-template", entityId: template.id, actor: input.actor, changes });
         return { templateId: template.id };

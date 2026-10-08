@@ -2752,6 +2752,20 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: mb.id } })).note, null, "a blank note clears the pin");
   });
 
+  it("refuses a second active requirement with the same text on one phase", async () => {
+    const first = await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "Ukuran Videotron" });
+    await rejectsWith(sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "  ukuran   videotron " }), "TEMPLATE_LABEL_DUPLICATE");
+    // The same text on another phase is a different requirement.
+    await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.layout, label: "Ukuran Videotron" });
+    const other = await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "Logo Project" });
+    await rejectsWith(sf.tasks.updateTemplate({ ...as(designer), templateId: other.templateId, label: "Ukuran Videotron" }), "TEMPLATE_LABEL_DUPLICATE");
+    // A switched-off template does not count, and may not be switched back on while the text is taken.
+    await sf.tasks.updateTemplate({ ...as(designer), templateId: first.templateId, isActive: false });
+    const again = await sf.tasks.createTemplate({ ...as(designer), definitionId: LEGACY.moodboard, label: "Ukuran Videotron" });
+    await rejectsWith(sf.tasks.updateTemplate({ ...as(designer), templateId: first.templateId, isActive: true }), "TEMPLATE_LABEL_DUPLICATE");
+    assert.ok(again.templateId);
+  });
+
   it("chains CD Mall to CD Final using the migrated data shape and undoes the continuation", async () => {
     const { projectId } = await newProject("CD chain");
     const cd = await phaseOf(projectId, "cd");
