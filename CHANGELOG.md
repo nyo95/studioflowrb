@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.418 | 2026-10-08 | docs(plan): review of R8.416 and R8.417 PASS; WO-MD-ENTRY-01 narrowed to group C (Lead)
+
+- **Review of group A (R8.416 `6bc45c0`): PASS.** One helper, `ensurePriceMaterialBrandSupplierLink`, replaces the "not linked" refusal in the single create and the SKU-with-prices create (the bulk, grid and workbook paths go through them); it runs after the live and material-capable checks, so an archived or non-material supplier is still refused; owner and already-linked suppliers add nothing; the link is audited as `brand.supplier-linked`.
+- **Review of group B (R8.417 `a2572e3`): PASS.** `BRAND_OWNER_IN_USE`, `BRAND_SUPPLIER_IN_USE` and the capability-in-use refusals now carry the Brand, the Supplier and the live price count in `details`; messages unchanged. Lead re-ran the full tests: 944/944.
+- `PLAN.md` now asks the Executor for group C only (save-the-valid-rows mode for the price grids).
+- **Environment.** The unused test container `studioflowrb-cost02-test-db` was removed (it held only an empty test database); the owner's `studioflowrb-gateb-test-db` serves port 5433 with the dev and test databases. The dev server is started after group C lands.
+
+**Checks.** `npm test` 944/944 (none failed, skipped or cancelled). Docs only otherwise.
+
 ## R8.417 | 2026-10-08 | feat(masterdata): return used-price details for Brand and capability guards (Executor)
 
 - Brand owner and supplier-link removal refusals now return safe structured details for the affected Brand and Supplier (id and name) plus the live material-price count, while preserving their human-readable messages and existing behaviour.

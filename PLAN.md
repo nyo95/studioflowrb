@@ -3,7 +3,7 @@
 Plan ID: WO-MD-ENTRY-01 (data entry that does not fight the person: auto-link on price save, "still used by N prices" details, save-the-valid-rows in the price grids)
 Scope: Master Data backend for the three owner-approved recommendations of the 2026-10-08 data-entry review. The Lead changes the Pricing screens afterwards.
 Target revisions: next unused revision at commit time; one commit per group, in order A, B, C. Stopping after any committed group is a valid result (report the rest as not started); never commit a half-done group.
-Status: READY
+Status: READY for group C only (A built at R8.416 and B at R8.417, both reviewed PASS)
 Priority: P2
 Owner: Product Owner. Decisions confirmed in chat on 2026-10-08 (kantor): "ikut rekomendasi".
 Last updated: 2026-10-08
@@ -113,15 +113,15 @@ leave a half-saved row; the "database error mid-batch" test is the guard.
 ## Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and `PLAN.md`, then implement WO-MD-ENTRY-01 as three
-separately verified and committed groups in the order A, B, C (each takes the
-next unused revision from `CHANGELOG.md` at commit time), and nothing beyond
-them. Stopping after any committed group is valid; never commit a half-done
-group. Edit only `src/apps/masterdata/**`, `CHANGELOG.md` and `docs/BACKLOG.md`.
-The Lead may edit other areas in parallel, so stage only your own files. Run the
-long checks (`npm test`, `npm run build`) as background jobs and finish them
-before each commit. Do not stop, remove or recreate any Docker container: use
-the reachable rebuild-only database on port 5433 as is, and tell the Lead if it
-is not reachable. Stop only for a material locked-decision conflict or unsafe
-boundary, using the BLOCKED / CONFLICT report; otherwise report each commit,
-checks, limitations, and remaining unrelated dirty files.
+`docs/agent/EXECUTOR.md`, and `PLAN.md`, then implement group C only of
+WO-MD-ENTRY-01 (groups A and B are already committed as R8.416 and R8.417; do not
+touch them), verified and committed on its own with the next unused revision from
+`CHANGELOG.md`, and nothing beyond it. Never commit a half-done group. Edit only
+`src/apps/masterdata/**`, `CHANGELOG.md` and `docs/BACKLOG.md`. The Lead may edit
+other areas in parallel, so stage only your own files. Run the long checks
+(`npm test`, `npm run build`) as background jobs and finish them before the
+commit. Do not stop, remove or recreate any Docker container: use the reachable
+rebuild-only database on port 5433 as is, and tell the Lead if it is not
+reachable. Stop only for a material locked-decision conflict or unsafe boundary,
+using the BLOCKED / CONFLICT report; otherwise report the commit, checks,
+limitations, and remaining unrelated dirty files.
