@@ -324,7 +324,7 @@ const PhaseCommand = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("chooseOutcome"), projectId: Id, phaseId: Id, iterationId: Id, outcome: z.enum(["REVISION", "DONE", "CONTINUE_CD_FINAL"]) }),
   z.strictObject({ command: z.literal("renameIteration"), projectId: Id, phaseId: Id, iterationId: Id, name: z.string().max(200) }),
   z.strictObject({ command: z.literal("deleteIteration"), projectId: Id, phaseId: Id, iterationId: Id }),
-  z.strictObject({ command: z.literal("setPhaseNote"), projectId: Id, phaseId: Id, note: z.string().max(2000).nullable() }),
+  z.strictObject({ command: z.literal("setPhaseNote"), projectId: Id, phaseId: Id, note: z.string().max(4000).nullable() }),
   z.strictObject({ command: z.literal("dismissRequirement"), projectId: Id, phaseId: Id, itemId: Id }),
   z.strictObject({ command: z.literal("createVisit"), projectId: Id, phaseId: Id, visitDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), note: z.string().max(2000).nullish() }),
   z.strictObject({ command: z.literal("chooseVisit"), projectId: Id, phaseId: Id, iterationId: Id, outcome: z.enum(["NEXT_VISIT", "DONE"]) }),

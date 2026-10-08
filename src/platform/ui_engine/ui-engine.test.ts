@@ -83,6 +83,8 @@ describe("UI Engine foundation", () => {
       // R7.48 — canonical copy-to-clipboard button; no StudioFlow vocabulary.
       "CopyButton",
       "SimpleTextEditor",
+      // Notes (owner, 2026-10-08): Tiptap editor that stores the same text dialect FormattedText shows.
+      "RichTextEditor",
       "FormattedText",
       "shrinkImageFile",
       // R7.52 — activated by the project MOM image consumer.

@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.435 | 2026-10-08 | feat(studioflow,ui-engine): one Notes card with a what-you-see editor (Tiptap) (Lead)
+
+- **Owner decision 2026-10-08: option B, Tiptap approved, built by the Lead.** New `RichTextEditor` in the UI Engine (loaded on demand): bold, italic, heading, bullet, numbered and check lists, with a toolbar. The stored value stays plain text in the same dialect (`**bold**`, `## heading`, `- `, `1. `, `- [ ]`), so notes written before open unchanged, stay searchable and printable, and need no converter or migration. `FormattedText` now also shows headings and check items.
+- **One Notes card.** The "Pinned note" card and the two client-notes notices became one "Notes" card on the phase page: Pinned on top, then the brief (client notes from the previous iteration) and the open iteration's client notes, each with its own Edit/Add. The pinned note, the client-notes dialog on the phase page and the one on the project card use the new editor.
+- **Bug found on the way: the pinned note lost its line breaks.** `setPhaseNote` ran the text through a helper that folds every whitespace run into one space, so lists in a pinned note collapsed into one line. It now keeps line breaks (blank still clears the pin) and the limit is 4000 characters like client notes.
+- Dependencies (owner-approved): `@tiptap/react`, `@tiptap/pm`, `@tiptap/core`, `@tiptap/starter-kit`, `@tiptap/markdown`, `@tiptap/extension-list`, all 3.31.4, exact.
+- **Checked in a browser** (isolated server and its own database): typed a heading, a check list, bold text and a numbered client note; both saved as plain text and showed back correctly; no page errors. Not checked: dark mode, narrow widths, paste from outside.
+- Not built: annotated images and images inside the text (see BACKLOG).
+
+**Checks.** `tsc --noEmit`, lint, boundaries, legacy-runtime, `npm test` 953/953 (none failed, skipped or cancelled), `npm run build`. The browser run used its own database (`studioflow_rebuild_test_lead`) because Codex's test runs wipe the shared test database.
+
 ## R8.434 | 2026-10-08 | feat(studioflow): seed the legacy Material Product Schedule defaults
 
 - New projects now receive 14 empty Material reserve rows in the verified legacy export order: Paint (`PT`), Spray Paint (`SPR`), Wood (`WD`), High Pressure Laminate (`PL`), Solid Surface (`SO`), Stone (`ST`), Terrazzo (`TER`), Ceramic Tile (`CT`), Homogeneous Tile (`HT`), Glass (`GL`), Metal (`MT`), Acrylic (`ACR`), Fabric (`F`), and Miscellaneous (`MSC`). Fixture remains empty.

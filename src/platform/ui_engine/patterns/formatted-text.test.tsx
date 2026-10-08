@@ -26,6 +26,15 @@ describe("FormattedText", () => {
     assert.match(out, /<ol start="3"[^>]*><li>Glassblock<\/li><li>Convex mirror<\/li><\/ol>/);
   });
 
+  it("shows headings and check items from the rich editor", () => {
+    const out = html("## Plan\n\n- [ ] Check marble\n- [x] Order sample\n- plain bullet");
+    assert.match(out, /<p class="m-0 font-semibold">Plan<\/p>/);
+    assert.match(out, /<input[^>]*type="checkbox"[^>]*\/><span>Check marble<\/span>/);
+    assert.match(out, /checked=""[^>]*\/><span class="text-ink-tertiary line-through">Order sample<\/span>/);
+    assert.match(out, /<ul[^>]*><li>plain bullet<\/li><\/ul>/);
+    assert.doesNotMatch(out, /\[ \]|\[x\]|##/);
+  });
+
   it("never renders typed HTML", () => {
     const out = html("<script>alert(1)</script> **<b>x</b>**");
     assert.doesNotMatch(out, /<script>|<b>/);

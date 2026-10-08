@@ -9,6 +9,7 @@ export * from "./hooks";
 export * from "./image-workspace";
 export * from "./inline-edit";
 export * from "./pagination";
+export * from "./rich-text-editor";
 export * from "./simple-text-editor";
 export * from "./formatted-text";
 export * from "./image-prepare";

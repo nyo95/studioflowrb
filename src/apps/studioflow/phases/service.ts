@@ -61,6 +61,7 @@ export const UNDO_WINDOW_MS = 300_000;
 
 /** Notes per iteration: what the client said, kept as one text (owner, 2026-10-05). */
 export const ITERATION_NOTE_MAX = 4000;
+export const PHASE_NOTE_MAX = 4000;
 
 /** A file dropped, pasted or picked into an iteration's client notes. */
 export type IterationImageUpload = { body: Uint8Array; contentType: string };
@@ -481,7 +482,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       if (iteration._count.activities + iteration._count.deliverables + iteration._count.images > 0) throw conflict("ITERATION_HAS_ATTACHED_WORK", "This iteration has files, images or notes attached. Remove them first, then delete the iteration."); const snapshot = { iteration: iterationUndo(iteration) }; await tx.sfRevision.delete({ where: { id: iteration.id } }); await recordEvent(tx, input, phase, null, "NOT_SENT", "DELETED", { deletedIteration: snapshot }); await audit(tx, input.actor, "iteration-deleted", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async setPhaseNote(input: PhaseCommandInput & { note: string | null }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const note = input.note === null ? null : requiredText(input.note, "PHASE_NOTE_REQUIRED", "Note", 2000); if (phase.note === note) return { phaseId: phase.id }; await tx.sfPhase.update({ where: { id: phase.id }, data: { note } }); await recordEvent(tx, input, phase, null, phase.note, note ?? "", { phaseNoteBefore: phase.note }); await audit(tx, input.actor, "note-set", phase, phase.status as PhaseStatus, phase.status as PhaseStatus); return { phaseId: phase.id }; });
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); // Line breaks are kept: the note carries lists, headings and check items (requiredText would fold them into spaces).
+      const note = optionalText(input.note, PHASE_NOTE_MAX); if (phase.note === note) return { phaseId: phase.id }; await tx.sfPhase.update({ where: { id: phase.id }, data: { note } }); await recordEvent(tx, input, phase, null, phase.note, note ?? "", { phaseNoteBefore: phase.note }); await audit(tx, input.actor, "note-set", phase, phase.status as PhaseStatus, phase.status as PhaseStatus); return { phaseId: phase.id }; });
     },
     async dismissRequirement(input: PhaseCommandInput & { itemId: string }) {
       return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const item = await tx.sfChecklistItem.findFirst({ where: { id: input.itemId, phase_id: phase.id } }); if (!item) throw notFound("requirement"); if (item.dismissed_at) return { itemId: item.id }; await tx.sfChecklistItem.update({ where: { id: item.id }, data: { dismissed_at: nowOf(ports) } }); await recordEvent(tx, input, phase, null, "VISIBLE", "DISMISSED", { requirementId: item.id, dismissedAtBefore: null }); await audit(tx, input.actor, "requirement-dismissed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { requirementId: item.id }); return { itemId: item.id }; });

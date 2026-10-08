@@ -2742,6 +2742,16 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     assert.deepEqual(detail.iterations.map((it) => it.shortName).sort(), ["D1", "D2"]);
   });
 
+  it("keeps the line breaks of a pinned note (lists, headings and check items)", async () => {
+    const { projectId } = await newProject("Pinned lists");
+    const mb = await phaseOf(projectId, "moodboard");
+    const text = "## Plan\n\n- [ ] Check marble\n- [x] Order sample\n\n1. First\n2. Second";
+    await sf.phases.setPhaseNote({ ...as(designer), projectId, phaseId: mb.id, note: text });
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: mb.id } })).note, text);
+    await sf.phases.setPhaseNote({ ...as(designer), projectId, phaseId: mb.id, note: "   " });
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: mb.id } })).note, null, "a blank note clears the pin");
+  });
+
   it("chains CD Mall to CD Final using the migrated data shape and undoes the continuation", async () => {
     const { projectId } = await newProject("CD chain");
     const cd = await phaseOf(projectId, "cd");
