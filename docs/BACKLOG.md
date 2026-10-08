@@ -144,10 +144,11 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
     fetched by the server.
   - Not in this item: drag a card onto a schedule tab, cards shared between
     users, SketchUp/companion "unresolved material" intake (D-SF-06 stands).
-  - Backend built in R8.450 (WO-SF-IDEAS-01, by the Lead at the owner's
-    request). Remaining: the board page, card UI and "Use in schedule" dialog
-    (Lead), reusing the UI Engine image intake/gallery from Notes, then
-    browser acceptance.
+  - Backend R8.450, board page R8.452 (`/studioflow/ideas`). [UNVERIFIED]
+    owner walk on real data: paste from Pinterest, drop a download, edit
+    details, Replace image, Use in schedule as a new item and as an option,
+    the "Used" labels, delete a used card. Run the migration at home and at
+    the office first.
 
 - [ ] [UNVERIFIED] Client-note images R8.394–R8.395 in the browser: drop,
   paste a screenshot (Ctrl+V) and pick several images in the answer dialog and

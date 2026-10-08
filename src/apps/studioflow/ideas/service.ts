@@ -148,6 +148,24 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
         .map((project) => ({ id: project.id, name: project.name }));
     },
 
+    /** The items of one held project, for "extra option on an existing item": code, category and the product shown on it. */
+    async listIdeaTargetEntries(input: CommandContext & { projectId: string }) {
+      await schedule.requireAccess(input);
+      const entries = await db.sfScheduleEntry.findMany({
+        where: { project_id: input.projectId },
+        orderBy: [{ section: "asc" }, { category_key: "asc" }, { increment: "asc" }],
+        select: { id: true, section: true, category: true, prefix: true, increment: true, options: { select: { label: true, product_name: true, is_final: true }, orderBy: { label: "asc" } } },
+      });
+      return entries.map((entry) => ({
+        id: entry.id,
+        section: entry.section,
+        category: entry.category,
+        code: scheduleCode(entry.prefix, entry.increment),
+        productName: (entry.options.find((option) => option.is_final) ?? entry.options[0])?.product_name ?? null,
+        options: entry.options.length,
+      }));
+    },
+
     /** A card needs only its image; the text may stay empty forever. The object is written first and discarded if the row fails. */
     async createIdeaCard(input: CommandContext & IdeaCardText & { file: IdeaImageUpload }) {
       const userId = requireCommand(input, P.access);

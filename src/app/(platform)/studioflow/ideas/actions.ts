@@ -54,6 +54,18 @@ export async function listIdeaTargetsAction(): Promise<ActionResult<Array<{ id: 
   return runSafeAction(async () => studioFlow.ideas.listIdeaTargets(await context()));
 }
 
+export async function listIdeaTargetEntriesAction(projectId: string): Promise<ActionResult<Awaited<ReturnType<typeof studioFlow.ideas.listIdeaTargetEntries>>>> {
+  return runSafeAction(async () => studioFlow.ideas.listIdeaTargetEntries({ ...(await context()), projectId: parse(Id, projectId) }));
+}
+
+/** Categories the studio already knows per section, for the new-item category field. */
+export async function listIdeaCategoryChoicesAction(): Promise<ActionResult<Array<{ section: string; category: string }>>> {
+  return runSafeAction(async () => {
+    const { grants } = await context();
+    return (await studioFlow.schedule.listCategoryChoices({ grants })).map(({ section, category }) => ({ section, category }));
+  });
+}
+
 const CreateForm = z.strictObject({ title: Text(160), sourceUrl: Text(2000), note: Text(2000) });
 /** FormData: `file` (required), optional `title`, `sourceUrl`, `note`. */
 export async function createIdeaCardAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
@@ -106,7 +118,7 @@ const UseInput = z.strictObject({
 });
 export type UseIdeaInput = z.infer<typeof UseInput>;
 
-export async function useIdeaInScheduleAction(input: UseIdeaInput): Promise<ActionResult<{ projectId: string; entryId: string; optionId: string; code: string; label: string }>> {
+export async function applyIdeaToScheduleAction(input: UseIdeaInput): Promise<ActionResult<{ projectId: string; entryId: string; optionId: string; code: string; label: string }>> {
   return runSafeAction(async () => {
     const ctx = await context();
     const data = parse(UseInput, input);

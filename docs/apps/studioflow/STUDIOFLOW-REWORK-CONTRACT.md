@@ -831,8 +831,14 @@ The card's image is copied into a new object under the project's schedule
 prefix (Core `ObjectStorage.copy`), so the card and the option are independent
 afterwards. `SfIdeaUsage` records the use (card and option FKs, both cascade)
 and is read live, so it shows the current code and disappears with the option.
-Not built: drag onto a schedule tab, sharing cards, several images per card,
-SketchUp intake (D-SF-06).
+Screen (R8.452): `/studioflow/ideas` in the StudioFlow rail. Paste anywhere on
+the page outside a text field, drop on the board, or "Add images"; each image
+becomes a card at once. Filters All / Not used yet / Used. A card's menu: Use
+in schedule…, Edit details, Replace image, Delete. The use dialog picks a held
+project, then a new item (section + category) or an existing item, prefills
+the product name and notes from the card, and reports the code and option it
+created. Not built: drag onto a schedule tab, sharing cards, several images per
+card, SketchUp intake (D-SF-06).
 
 ## 12. Foundation centralization map
 

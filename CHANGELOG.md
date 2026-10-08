@@ -1,5 +1,17 @@
 # Changelog
 
+## R8.452 | 2026-10-08 | feat(studioflow): Ideas board page (Lead)
+
+- **Owner decision (2026-10-08):** a free page to drop images from Pinterest or anywhere, linked to a project's schedule when used (WO-SF-IDEAS-01; backend R8.450).
+- **Ideas page (`/studioflow/ideas`, "Ideas" in the StudioFlow rail):** paste a screenshot (Ctrl+V) anywhere outside a text field, drop images on the board, or "Add images"; each becomes a card at once (large photos are shrunk first). Cards newest first in a grid; filters All / Not used yet / Used. A card shows its image (opens large), title or "Untitled", the source site as a link, the note, and where it is used ("ST-01 A" + project, linking to the schedule).
+- **Card menu:** Use in schedule… (only when the user holds at least one open project), Edit details (title, link, note), Replace image, Delete (with confirm; says the schedule keeps what was used).
+- **Use in schedule dialog:** project (held projects only), New item (section + category with the studio's categories suggested) or Option on an existing item (code · category · product), product name and notes prefilled from the card; the result names the code and option and offers "Open schedule". The option is a draft, never final.
+- **Backend addition:** `listIdeaTargetEntries` (items of one held project for the option picker, same access check as use) and two read actions.
+- **Browser check (local disposable database, seeded owner):** added two images by picker and one by paste, edited a card, used it as a new item (ST-01 A) and another card as option ST-01 B; database shows both options draft with their own image objects and 2 usages; schedule page shows ST-01 with the copied image; 390 px wide: no sideways scroll; no page errors.
+- **Migrations/dependencies:** none (migration from R8.450).
+
+**Checks.** `tsc --noEmit`; eslint on `src/apps/studioflow` and the StudioFlow routes (only the existing `<img>` warning); boundary check OK; `npm test` 973/973 (none failed, skipped or cancelled); `npm run build` passes (also covers R8.451).
+
 ## R8.451 | 2026-10-08 | fix(studioflow): note image retry stays on one message, Cancel undoes image edits, reset text (Lead)
 
 - **External audit 2026-10-08, checked against the code.**

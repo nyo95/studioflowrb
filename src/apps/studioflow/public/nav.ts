@@ -20,6 +20,7 @@ export const STUDIOFLOW_ROUTES = {
   clients: "/studioflow/clients",
   client: (clientId: string) => `/studioflow/clients/${clientId}`,
   library: "/studioflow/library",
+  ideas: "/studioflow/ideas",
   settings: "/studioflow/settings",
   scheduleTemplates: "/studioflow/settings/schedule",
 } as const;
@@ -36,6 +37,7 @@ export const STUDIOFLOW_NAV_LINKS: {
     { href: "/studioflow/timeline", label: "Timeline" },
     { href: "/studioflow/clients", label: "Clients" },
     { href: "/studioflow/library", label: "Library" },
+    { href: "/studioflow/ideas", label: "Ideas" },
   ],
   utility: [{ href: "/studioflow/settings", label: "Settings" }],
 };
