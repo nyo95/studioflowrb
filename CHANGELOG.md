@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.455 | 2026-10-09 | docs(plan): lock integration permissions (Lead)
+
+- Executor BLOCKED report on WO-PLAT-INTEGRATIONS-01 (no permission locked for token management or `ping`) answered with option A: new Platform permissions `platform.integration.manage` (own tokens), `platform.integration.admin` (list/revoke anyone's), `platform.integration.ping`. Recorded as Locked Decision 12 in `PLAN.md`; Executor target moves to R8.456.
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.454 | 2026-10-09 | docs(agent): extension harness and integration foundation plan (Lead)
 
 - **New `docs/agent/EXTENSIONS.md`:** how Codex builds companion apps (SketchUp plugin sync, AI chatbot, others) without touching the finished apps: two doors (token API route kit, inside session), folder template, hard rules, protected-core list, definition of done.

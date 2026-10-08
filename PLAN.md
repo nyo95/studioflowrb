@@ -2,7 +2,7 @@
 
 Plan ID: WO-PLAT-INTEGRATIONS-01 (integration foundation for companion apps)
 Scope: Platform capability that lets outside clients (SketchUp Ruby plugin first) call a versioned HTTP API with a revocable access token, safely and retry-proof. No SketchUp feature in this plan.
-Target revision: R8.455 (one Executor commit). R8.454 is this plan plus `docs/agent/EXTENSIONS.md`.
+Target revision: R8.456 (one Executor commit). R8.454 is this plan plus `docs/agent/EXTENSIONS.md`; R8.455 locks the permission decision (Locked Decision 12).
 Status: READY
 Priority: P2
 Owner: Product Owner (2026-10-09: "Codex yang atur, kamu siapkan dasarnya").
@@ -92,6 +92,22 @@ Orders (SketchUp sync, others) build only on this kit.
     or outbound calls; a public developer portal; CORS for browsers (clients are
     native tools).
 
+12. **Permissions (Lead decision on the Executor's BLOCKED report, option A).** Add
+    three Platform permissions to the RBAC registry, in the existing registry/seed
+    pattern, with registry tests:
+    - `platform.integration.manage` — create, list and revoke **one's own** tokens.
+      Granted to no role by default except the existing top administrator role
+      (follow how `platform.settings.manage` is seeded); owners assign it to other
+      roles in the existing role screen.
+    - `platform.integration.admin` — list and revoke **anyone's** tokens (never
+      create for someone else, never see secrets). Same default seeding.
+    - `platform.integration.ping` — lets a user's token call `ping`. Seeded like
+      `.manage`; the owner assigns it to other roles.
+    A route's required grant is declared in the route and checked with the user's
+    live grants in addition to the token scope. `ping` requires scope
+    `integration:ping` and grant `platform.integration.ping`. Token creation may only
+    request scopes whose matching grant the creator holds at creation time.
+
 ## Business Rules and Architecture Constraints
 
 Capability classification: auth/RBAC/audit/errors/db runtime = **REUSE**; token +
@@ -157,7 +173,7 @@ You are the Backend Executor. Location: rumah. Read `AGENTS.md`,
 implement the entire READY backend outcome and nothing beyond it. Inspect current
 repository evidence, preserve unrelated owner work, make sound in-scope
 implementation decisions, run the required checks, update `CHANGELOG.md`, and
-create the target local revision commit R8.455. Stop only for a material
+create the target local revision commit R8.456. Stop only for a material
 locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report;
 otherwise finish the coherent outcome and report the commit, checks, limitations,
 and remaining unrelated dirty files.
