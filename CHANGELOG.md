@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.444 | 2026-10-08 | fix(masterdata): the SKU list no longer repeats the name as a slug line (Lead)
+
+- **Owner review:** under each SKU name the list showed the internal slug (the name in lowercase with dashes), which tells nothing the name does not. It now shows only the article code when the SKU has one; otherwise just the name. Search by slug still works.
+- **Migrations/dependencies:** none. No browser check.
+
+**Checks.** `tsc --noEmit`; eslint on the SKU folder.
+
 ## R8.443 | 2026-10-08 | fix(masterdata): a SKU's size can be corrected while it has live prices (Lead)
 
 - **Owner decision (2026-10-08):** editing a SKU's size when it was entered wrong is fine, because BQ lines keep their own snapshot; the estimator is simply told. No notification feature.

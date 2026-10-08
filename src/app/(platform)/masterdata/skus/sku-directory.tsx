@@ -167,12 +167,7 @@ export function SkuDirectory({
                       tone={isArchived ? "danger" : "success"}
                       statusLabel={isArchived ? "Archived" : "Active"}
                       name={sku.name ?? sku.code ?? "Unnamed SKU"}
-                      secondary={
-                        <div className="text-xs text-ink-secondary">
-                          {sku.code ? <span className="font-ui-mono">{sku.code} • </span> : null}
-                          <span className="font-ui-mono">{sku.slug}</span>
-                        </div>
-                      }
+                      secondary={sku.code ? <div className="text-xs text-ink-secondary font-ui-mono">{sku.code}</div> : undefined}
                     />
                   </TableCell>
                   <TableCell>
