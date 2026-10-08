@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.443 | 2026-10-08 | feat(studioflow): one Notes workspace with a tab per iteration (Lead)
+
+- **Owner mockup 2026-10-08, pinned per phase.** The empty area under the iteration card is now the phase's notes workspace. The pinned note ("Pinned for this phase", one per phase) is on top; below it a tab per iteration (running one first, marked "now"). Each tab shows the dates, outcome, client notes and photos of that iteration; the editor is in place (no window), Save notes appears only when the text changed, and a tab with unsaved text has a dot. A new iteration shows the previous one's notes as a Brief. Notes of an iteration that is with the client wait for the reply, as before.
+- **Replaced:** the "Earlier iterations" card, the Notes card in the right column (Requirements and Deliverables stay there), the notes dialog and "Add/Edit client notes" in the More menu on the phase page. The project card keeps its own notes dialog.
+- Heading uses the short label ("D2") with the full name as tooltip; Rename sits in the tab's menu and in More.
+- Checked in a browser: typed and saved a client note, sent, answered, Revision: tabs "MB2 now" and the earlier one, brief filled, earlier tab shows its note; no page errors. Not checked: photos on an earlier tab and the project-card dialog.
+
+**Checks.** `tsc --noEmit`, lint, `npm test` 958/958 (none failed, skipped or cancelled), `npm run build`.
+
 ## R8.442 | 2026-10-08 | feat(masterdata): "Edit SKU" link in the Edit price form (Lead)
 
 - **Owner report (field):** the Edit price form shows Unit and size as read-only, so users could not change them. By rule a price's unit follows its SKU, so the change belongs on the SKU. The form now says "Unit and size follow the SKU" and has an "Edit SKU (size, unit)" link (only for users who may manage SKUs).
