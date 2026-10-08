@@ -319,7 +319,7 @@ export function BrandDirectory({
 <TableHead style={{ width: 150 }} sortable sortDirection={sortKey === "Suppliers" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Suppliers"); setSortDirection(direction); }}>Supplied by</TableHead>
 <TableHead style={{ width: 84 }} sortable sortDirection={sortKey === "Resources" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Resources"); setSortDirection(direction); }}>Links</TableHead>
 <TableHead style={{ width: 64 }} align="end" sortable sortDirection={sortKey === "SKUs" ? sortDirection : null} onSortChange={(direction) => { setSortKey("SKUs"); setSortDirection(direction); }}>SKUs</TableHead>
-<TableHead style={{ width: 150 }}>Updated</TableHead>
+<TableHead style={{ width: 156 }}>Updated</TableHead>
 <RowActionsHead /></TableRow>
           </TableHeader>
           <TableBody>

@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.428 | 2026-10-08 | fix(masterdata): the Updated column no longer cuts the date (Lead)
+
+- **Owner report (screenshot of Brands).** The "Updated" column cut the end of the time ("30 Sep 2026, 13.4") while the Brand column kept half the table's width. The shared `UpdatedCell` (Brands, Suppliers, Pricing) now shows the date only ("8 Okt 2026") with the user under it, and the exact date and time as the tooltip; the Brands column is 156 px.
+- **Checked in the browser** at 1000 px and 1400 px: no horizontal scroll, no cell whose content runs past its box, and a 21-character email ("ferdaus.rdt@gmail.com") fits with 8 px to spare. The test database had no long updater label, so the email was set in the page for the measurement only.
+- Not measured: the owner's own 14 brands (their server and session are separate from the test server).
+
+**Checks.** `tsc --noEmit`, lint (Master Data screens), `npm test` 947/947 (none failed, skipped or cancelled).
+
 ## R8.427 | 2026-10-08 | fix(ui-engine,masterdata): table cell "wrap" now works; long labels truncate inside buttons; browser walk part 5 - the sample shelf (Lead)
 
 - **Walk (isolated server):** add a sample (SKU picker, typed new rack, box), Change status to Borrowed with who has it and a StudioFlow project (the shelf row reads "Dina · project · since date"), "Remove" disabled with "(return it first)" while the sample is out, History lists "Went out" and "Put on the shelf" with who and when, return to the shelf; then a StudioFlow sample request: Sample requests lists it, "Put on shelf" (SKU, new rack R3, box B9) shows "On the shelf at R3 / B9. The designer now sees it as received.", the designer's Schedule card reads "Sample received" and the requester's bell carries "Your sample is on the shelf … R3 / B9".
