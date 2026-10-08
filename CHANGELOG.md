@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.426 | 2026-10-08 | docs(backlog): browser walk part 4 - the BQ estimator flow (Lead)
+
+- **Walk (isolated test server, seeded BQ project).** Passed: new section, Work Item (inline "Nama Work Item"), expand, "Tambah Cost Component" with the picker (tabs All, Material, Labor, Material + Labor, BQ Library) listing Master Data prices with supplier and unit; picking one copies a snapshot ("Snapshot Master Data"), rate and totals update and the footer reads "1 dari 1 Cost Component sudah ada harga"; overriding the rate shows the "Harga diubah" badge and a revert button that restores the snapshot; after the Master Data price was raised to 150.000 (and 90 BQ Library items were added) the project still showed Rp.100.000, and the picker still listed the Master Data items beside the first 30 Library items (the R8.422 fix); the printed quotation shows a boxed DRAFT line while the project is active and none once it is locked; Lock (type LOCK) leaves "Locked — read only", no edit controls and an Unlock button.
+- **Recorded, not changed (BACKLOG):** BQ mixes Indonesian and English labels; a new Work Item's default unit "ls" shows as "(inactive snapshot)" when Master Data has no such active unit; the lock asks to type LOCK although it can be undone.
+- No code changed in this revision.
+
+**Checks.** Docs only.
+
 ## R8.425 | 2026-10-08 | fix(studioflow): Gantt "Today" label no longer hides a week number; browser walk part 3 - phase flow, Timeline, Schedule (Lead)
 
 - **Walk part 3** (isolated test server, seeded project): send an iteration to the client, record the answer with a bulleted note (bullet button on the selected lines, Enter continues the list), choose Revision: the next iteration "Moodboard 2" shows the brief "Client notes from Moodboard 1" as a list with "Add to notes", the earlier iteration is listed as "Revision asked" with its dates, and the undo bar counts down. "Edit dates and plan" opens the Timeline dialog with the lead times loaded; "Save and apply plan" computed Design Final, CD Mall, CD Final, END, Fit Out Start, Handover and Opening forecast correctly (checked by counting working days) and reported "Plan applied to 3 phases". The Product Schedule loads, creates a typed new category with its first item and offers Open / Delete on right-click. The Timeline is readable in Dark at Week and Month zoom.
