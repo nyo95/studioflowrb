@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.443 | 2026-10-08 | fix(masterdata): a SKU's size can be corrected while it has live prices (Lead)
+
+- **Owner decision (2026-10-08):** editing a SKU's size when it was entered wrong is fine, because BQ lines keep their own snapshot; the estimator is simply told. No notification feature.
+- Editing a SKU (and the SKU+price workbook import) no longer refuses a size change when live prices exist. The price amounts stay as they are and the sheet-to-M² conversion is recalculated.
+- **Still locked while live prices exist:** the base unit and the purchase unit (a price is quoted in that unit). The message now says the size can still be corrected.
+- Integration test added: size corrected with a live price (price unchanged, factor 2,9768), purchase unit change still rejected.
+- **Migrations/dependencies:** none. No browser check.
+
+**Checks.** `tsc --noEmit`; eslint on `src/apps/masterdata`; `npm test` 960/960 (none failed, skipped or cancelled).
+
 ## R8.444 | 2026-10-08 | fix(studioflow): a phase cannot get two active requirements with the same text (Lead)
 
 - **Owner's screenshot: "Ukuran Videotron" twice in Requirements.** Checked in the rebuild dev database: it is real data, not a display bug. Two checklist templates with the same text and phase (Design 3D) were created 3 seconds apart on 2026-09-23 (a double submit), and every project created since copied both (3 projects so far).

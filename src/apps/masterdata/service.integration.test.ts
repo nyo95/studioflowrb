@@ -406,6 +406,29 @@ describe("Master Data service", () => {
     assert.equal(preserved.purchase_to_base_factor?.toString(), "2.88");
   });
 
+  it("lets a SKU size be corrected while live prices exist, but never its base or purchase unit", async () => {
+    const context = await createMaterialContext();
+    const [m2, sheet, mm] = await Promise.all([
+      testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } }),
+      testDb.prisma.unit.findUniqueOrThrow({ where: { code: "sheet" } }),
+      testDb.prisma.unit.findUniqueOrThrow({ where: { code: "mm" } }),
+    ]);
+    const base = { grants: GRANTS, actor: ACTOR, name: "Size Fix SKU", brandId: context.brandId, baseUnitId: m2.id, purchaseUnitId: sheet.id, dimensionUnitId: mm.id, categoryId: context.categoryId };
+    const { skuId } = await service.createSku({ ...base, dimensionLength: "1220", dimensionWidth: "3660", dimensionThickness: "0.7", priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1829", currency: "IDR" }] });
+
+    await service.updateSku({ ...base, skuId, dimensionLength: "1220", dimensionWidth: "2440", dimensionThickness: "0.7" });
+    const fixed = await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } });
+    assert.equal(fixed.dimension_width?.toString(), "2440");
+    assert.equal(fixed.purchase_to_base_factor?.toString(), "2.9768");
+    const price = await testDb.prisma.priceMaterial.findFirstOrThrow({ where: { sku_id: skuId } });
+    assert.equal(price.amount.toString(), "1829");
+
+    await assert.rejects(
+      () => service.updateSku({ ...base, skuId, purchaseUnitId: m2.id, dimensionLength: "1220", dimensionWidth: "2440", dimensionThickness: "0.7" }),
+      (error: unknown) => error instanceof AppError && error.code === "SKU_MEASUREMENT_LOCKED_BY_PRICES",
+    );
+  });
+
   it("rejects incomplete or semantically incompatible SKU dimensions", async () => {
     const context = await createMaterialContext();
     const [baseUnit, purchaseUnit, dimensionUnit] = await Promise.all([

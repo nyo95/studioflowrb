@@ -121,8 +121,8 @@ export function createSkuPriceWorkbookService(
       if (price && supplierId && price.supplier_vendor_id !== supplierId) add("Supplier", "Supplier cannot be changed for an existing price.");
       if (sku && !sku.deleted_at) {
         const livePrices = await client.priceMaterial.count({ where: { sku_id: sku.id, deleted_at: null } });
-        const measurementChanged = sku.base_unit_id !== baseUnitId || sku.purchase_unit_id !== purchaseUnitId || !same(sku.dimension_length?.toString() ?? null, source.Length || null) || !same(sku.dimension_width?.toString() ?? null, source.Width || null) || !same(sku.dimension_thickness?.toString() ?? null, source.Thickness || null) || sku.dimension_unit_id !== dimensionUnitId;
-        if (livePrices > 0 && measurementChanged) add("Base unit", "SKU measurement and unit layout cannot change while live material prices exist.");
+        const measurementChanged = sku.base_unit_id !== baseUnitId || sku.purchase_unit_id !== purchaseUnitId;
+        if (livePrices > 0 && measurementChanged) add("Base unit", "Base unit and purchase unit cannot change while live material prices exist. The size can still be corrected.");
         if (sku.brand_id !== brandId && await client.priceMaterial.count({ where: { sku_id: sku.id, deleted_at: null, source_link_id: { not: null } } }) > 0) add("Brand", "Brand cannot change while live material prices have source links.");
       }
       const duplicate = skuId ? `${skuId}:${priceId || supplierId || "sku"}` : `${key(source.Code)}:${key(source.Name)}:${supplierId || ""}`;
