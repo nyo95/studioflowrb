@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.414 | 2026-10-08 | fix(masterdata): cascade owned Brands through Supplier archive (Executor)
+
+- Archiving a Supplier now also archives each live Brand it owns, its SKUs, and their material prices using the same recorded cause chain as a direct Brand archive; Brands that only list that Supplier stay live.
+- Restoring the Supplier restores only records caused by that Supplier, preserves independently archived Brands, and rolls back the whole restore when a dependent Brand, SKU, price, category, unit, or identity check fails.
+- Audit metadata now records the additional Brand, SKU, and owned-Brand price counts. Added integration coverage for cascade, independent archive preservation, and atomic blocked restore.
+- Updated one group-A regression setup to model an already archived legacy owner directly, because archiving an owner Supplier now correctly archives its owned Brand.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm test` 944/944, and `npm run build` pass. Browser not required.
+
 ## R8.413 | 2026-10-08 | fix(masterdata): allow either capability for Material+Labor prices (Executor)
 
 - Material+Labor prices, including bulk, matrix, restore, and type-removal safeguards, now accept a Supplier with material capability, labor capability, or both; a Supplier must retain at least one of those capabilities while such a price is live.

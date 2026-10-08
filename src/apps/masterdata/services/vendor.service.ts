@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, optionalTitleName, requiredSlug, assertVendorTypeRemovalSafe, assertVendorCategoryRemovalSafe, assertVendorMaterialCapable, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertPriceMaterialRestorable, assertWorkPriceRestorable } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, optionalTitleName, requiredSlug, assertVendorTypeRemovalSafe, assertVendorCategoryRemovalSafe, assertVendorMaterialCapable, latestAuditActorLabels, createDeletionRequest, writeAudit, archiveBrandCascade, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertSkuRestorable, assertPriceMaterialRestorable, assertWorkPriceRestorable } from "./shared";
 
 import { type ContactInput, contactColumns, ensureVendorBrandRelation, sameContactColumns } from "./vendor-contact";
 
@@ -254,7 +254,10 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
         const laborPrices = await tx.priceLabor.findMany({ where: { vendor_id: input.vendorId }, select: { id: true, deleted_at: true } });
         const laborIds = laborPrices.map((price) => price.id);
         if (laborIds.length > 0) { await addParentCauses(tx, "price_labor", "vendor", input.vendorId, laborIds); await tx.priceLabor.updateMany({ where: { id: { in: laborIds }, deleted_at: null }, data: { deleted_at: now } }); }
-        await writeAudit(ports, tx, { action: "vendor.archived", entityType: "vendor", entityId: input.vendorId, actor: input.actor, metadata: { material_prices_archived: materialPrices.filter((price) => price.deleted_at === null).length, ml_prices_archived: mlPrices.filter((price) => price.deleted_at === null).length, labor_prices_archived: laborPrices.filter((price) => price.deleted_at === null).length } });
+        const ownedBrandIds = await tx.brand.findMany({ where: { owner_vendor_id: input.vendorId, deleted_at: null }, select: { id: true } }).then((rows) => rows.map((row) => row.id));
+        let ownedSkuCount = 0; let ownedPriceCount = 0;
+        for (const brandId of ownedBrandIds) { const cascade = await archiveBrandCascade(tx, { brandId, now, cause: { kind: "PARENT", parentType: "vendor", parentId: input.vendorId } }); ownedSkuCount += cascade.skuIds.length; ownedPriceCount += cascade.priceIds.length; }
+        await writeAudit(ports, tx, { action: "vendor.archived", entityType: "vendor", entityId: input.vendorId, actor: input.actor, metadata: { material_prices_archived: materialPrices.filter((price) => price.deleted_at === null).length, ml_prices_archived: mlPrices.filter((price) => price.deleted_at === null).length, labor_prices_archived: laborPrices.filter((price) => price.deleted_at === null).length, brands_archived: ownedBrandIds.length, skus_archived: ownedSkuCount, owned_brand_prices_archived: ownedPriceCount } });
         return { vendorId: input.vendorId };
       });
     },
@@ -281,7 +284,27 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
         if (restoredMlIds.length > 0) { for (const priceId of restoredMlIds) await assertWorkPriceRestorable(tx, "material-labor", priceId); await tx.priceMaterialLabor.updateMany({ where: { id: { in: restoredMlIds } }, data: { deleted_at: null } }); }
         const restoredLaborIds = await removeParentCausesAndFindRestored(tx, "price_labor", "vendor", input.vendorId);
         if (restoredLaborIds.length > 0) { for (const priceId of restoredLaborIds) await assertWorkPriceRestorable(tx, "labor", priceId); await tx.priceLabor.updateMany({ where: { id: { in: restoredLaborIds } }, data: { deleted_at: null } }); }
-        await writeAudit(ports, tx, { action: "vendor.restored", entityType: "vendor", entityId: input.vendorId, actor: input.actor, metadata: { material_prices_restored: restoredMaterialIds.length, ml_prices_restored: restoredMlIds.length, labor_prices_restored: restoredLaborIds.length } });
+        const restoredBrandIds = await removeParentCausesAndFindRestored(tx, "brand", "vendor", input.vendorId);
+        let restoredSkuCount = 0; let restoredOwnedPriceCount = 0;
+        for (const brandId of restoredBrandIds) {
+          const brand = await tx.brand.findUniqueOrThrow({ where: { id: brandId } });
+          const [identityConflict, ownerVendor, supplierRelations, categoryRelations] = await Promise.all([
+            tx.brand.findFirst({ where: { id: { not: brandId }, deleted_at: null, OR: [{ slug: brand.slug }, { name: { equals: brand.name, mode: "insensitive" } }] }, select: { id: true } }),
+            brand.owner_vendor_id ? tx.vendor.findUniqueOrThrow({ where: { id: brand.owner_vendor_id } }) : null,
+            tx.brandSupplier.findMany({ where: { brand_id: brandId }, select: { vendor_id: true } }),
+            tx.brandCategory.findMany({ where: { brand_id: brandId }, include: { category: true } }),
+          ]);
+          if (identityConflict) throw new AppError("CONFLICT", "BRAND_IDENTITY_CONFLICT", `Brand ${brand.name} cannot be restored because a live Brand already uses this identity.`);
+          if (ownerVendor?.deleted_at) throw new AppError("CONFLICT", "BRAND_OWNER_ARCHIVED", `Brand ${brand.name} cannot be restored while its owner Supplier is archived.`);
+          if (categoryRelations.some((row) => row.category.status !== "ACTIVE" || row.category.kind !== "PRODUCT")) throw new AppError("CONFLICT", "BRAND_CATEGORY_INACTIVE", `Brand ${brand.name} has an invalid or inactive Category relation.`);
+          for (const relation of supplierRelations) await assertVendorMaterialCapable(tx, relation.vendor_id);
+          await tx.brand.update({ where: { id: brandId }, data: { deleted_at: null } });
+          const restoredSkuIds = await removeParentCausesAndFindRestored(tx, "sku", "brand", brandId);
+          if (restoredSkuIds.length > 0) { for (const skuId of restoredSkuIds) await assertSkuRestorable(tx, skuId); await tx.sku.updateMany({ where: { id: { in: restoredSkuIds } }, data: { deleted_at: null } }); }
+          restoredSkuCount += restoredSkuIds.length;
+          for (const skuId of restoredSkuIds) { const restoredPriceIds = await removeParentCausesAndFindRestored(tx, "price_material", "sku", skuId); if (restoredPriceIds.length > 0) { for (const priceId of restoredPriceIds) await assertPriceMaterialRestorable(tx, priceId); await tx.priceMaterial.updateMany({ where: { id: { in: restoredPriceIds } }, data: { deleted_at: null } }); restoredOwnedPriceCount += restoredPriceIds.length; } }
+        }
+        await writeAudit(ports, tx, { action: "vendor.restored", entityType: "vendor", entityId: input.vendorId, actor: input.actor, metadata: { material_prices_restored: restoredMaterialIds.length, ml_prices_restored: restoredMlIds.length, labor_prices_restored: restoredLaborIds.length, brands_restored: restoredBrandIds.length, skus_restored: restoredSkuCount, owned_brand_prices_restored: restoredOwnedPriceCount } });
         return { vendorId: input.vendorId };
       });
     },

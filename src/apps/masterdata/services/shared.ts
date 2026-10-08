@@ -162,6 +162,22 @@ export async function removeParentCausesAndFindRestored(tx: TxClient, entityType
   const stillCausedSet = new Set(stillCaused.map((c) => c.entity_id)); return affectedIds.filter((id) => !stillCausedSet.has(id));
 }
 
+/** Archives a Brand and the catalog it owns with one recorded parent cause per descendant. */
+export async function archiveBrandCascade(tx: TxClient, input: { brandId: string; now: Date; cause: { kind: "DIRECT" } | { kind: "PARENT"; parentType: MasterDataArchiveEntityType; parentId: string } }): Promise<{ skuIds: string[]; priceIds: string[] }> {
+  if (input.cause.kind === "DIRECT") await addDirectCause(tx, "brand", input.brandId);
+  else await addParentCauses(tx, "brand", input.cause.parentType, input.cause.parentId, [input.brandId]);
+  await tx.brand.update({ where: { id: input.brandId }, data: { deleted_at: input.now } });
+  const skuIds = await tx.sku.findMany({ where: { brand_id: input.brandId }, select: { id: true } }).then((rows) => rows.map((row) => row.id));
+  await addParentCauses(tx, "sku", "brand", input.brandId, skuIds);
+  if (skuIds.length === 0) return { skuIds, priceIds: [] };
+  await tx.sku.updateMany({ where: { id: { in: skuIds } }, data: { deleted_at: input.now } });
+  const prices = await tx.priceMaterial.findMany({ where: { sku_id: { in: skuIds } }, select: { id: true, sku_id: true } });
+  for (const skuId of skuIds) await addParentCauses(tx, "price_material", "sku", skuId, prices.filter((price) => price.sku_id === skuId).map((price) => price.id));
+  const priceIds = prices.map((price) => price.id);
+  if (priceIds.length > 0) await tx.priceMaterial.updateMany({ where: { id: { in: priceIds } }, data: { deleted_at: input.now } });
+  return { skuIds, priceIds };
+}
+
 export async function pruneOriginlessBrandCategories(tx: TxClient, brandCategoryIds: readonly string[]): Promise<void> {
   for (const brandCategoryId of new Set(brandCategoryIds)) { const remaining = await tx.brandCategoryOrigin.count({ where: { brand_category_id: brandCategoryId } }); if (remaining === 0) await tx.brandCategory.delete({ where: { id: brandCategoryId } }); }
 }

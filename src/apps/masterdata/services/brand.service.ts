@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, normalizeHashtags, assertVendorMaterialCapable, assertLiveProductCategories, latestAuditActorLabels, createDeletionRequest, writeAudit, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertSkuRestorable, assertPriceMaterialRestorable } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, normalizeHashtags, assertVendorMaterialCapable, assertLiveProductCategories, latestAuditActorLabels, createDeletionRequest, writeAudit, archiveBrandCascade, removeDirectCause, removeParentCausesAndFindRestored, assertSkuRestorable, assertPriceMaterialRestorable } from "./shared";
 
 import { type ContactInput, contactColumns, sameContactColumns } from "./vendor-contact";
 
@@ -237,17 +237,8 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
         const brand = await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } });
         if (brand.deleted_at !== null) throw new AppError("CONFLICT", "BRAND_ALREADY_ARCHIVED", "Brand is already archived.");
         const now = new Date();
-        await addDirectCause(tx, "brand", input.brandId);
-        await tx.brand.update({ where: { id: input.brandId }, data: { deleted_at: now } });
-        const skuIds = await tx.sku.findMany({ where: { brand_id: input.brandId }, select: { id: true } }).then((rows) => rows.map((row) => row.id));
-        await addParentCauses(tx, "sku", "brand", input.brandId, skuIds);
-        if (skuIds.length > 0) {
-          await tx.sku.updateMany({ where: { id: { in: skuIds } }, data: { deleted_at: now } });
-          const prices = await tx.priceMaterial.findMany({ where: { sku_id: { in: skuIds } }, select: { id: true, sku_id: true } });
-          for (const skuId of skuIds) await addParentCauses(tx, "price_material", "sku", skuId, prices.filter((price) => price.sku_id === skuId).map((price) => price.id));
-          if (prices.length > 0) await tx.priceMaterial.updateMany({ where: { id: { in: prices.map((price) => price.id) } }, data: { deleted_at: now } });
-        }
-        await writeAudit(ports, tx, { action: "brand.archived", entityType: "brand", entityId: input.brandId, actor: input.actor, metadata: { skus_archived: skuIds.length } });
+        const cascade = await archiveBrandCascade(tx, { brandId: input.brandId, now, cause: { kind: "DIRECT" } });
+        await writeAudit(ports, tx, { action: "brand.archived", entityType: "brand", entityId: input.brandId, actor: input.actor, metadata: { skus_archived: cascade.skuIds.length } });
         return { brandId: input.brandId };
       });
     },

@@ -1330,7 +1330,7 @@ describe("Master Data service", () => {
   it("allows editing a Brand with an archived current owner but still rejects an archived replacement", async () => {
     const context = await createMaterialContext();
     const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Owned Brand", ownerVendorId: context.vendorId });
-    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId });
+    await testDb.prisma.vendor.update({ where: { id: context.vendorId }, data: { deleted_at: new Date() } });
     await service.updateBrand({ grants: GRANTS, actor: ACTOR, brandId: brand.brandId, name: "Renamed Owned Brand", ownerVendorId: context.vendorId });
     assert.equal((await testDb.prisma.brand.findUniqueOrThrow({ where: { id: brand.brandId } })).name, "Renamed Owned Brand");
 
@@ -1361,6 +1361,37 @@ describe("Master Data service", () => {
     const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
     const vendor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Deduplicated Supplier", vendorTypeIds: [supplierType.id, supplierType.id] });
     assert.equal(await testDb.prisma.vendorVendorType.count({ where: { vendor_id: vendor.vendorId } }), 1);
+  });
+
+  it("cascades an owned Brand through Supplier archive and restores only the Vendor's causes", async () => {
+    const context = await createMaterialContext();
+    const owned = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Supplier-owned Brand", ownerVendorId: context.vendorId });
+    const ownedSku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Supplier-owned SKU", brandId: owned.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "100", currency: "IDR" }] });
+    const linked = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Supplier-linked Brand", suppliers: [{ vendorId: context.vendorId }] });
+    const linkedSku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Supplier-linked SKU", brandId: linked.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "110", currency: "IDR" }] });
+    const held = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Directly archived Brand", ownerVendorId: context.vendorId });
+    await service.archiveBrand({ grants: GRANTS, actor: ACTOR, brandId: held.brandId });
+
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId });
+    assert.notEqual((await testDb.prisma.brand.findUniqueOrThrow({ where: { id: owned.brandId } })).deleted_at, null);
+    assert.notEqual((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: ownedSku.skuId } })).deleted_at, null);
+    assert.equal((await testDb.prisma.brand.findUniqueOrThrow({ where: { id: linked.brandId } })).deleted_at, null);
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: linkedSku.skuId } })).deleted_at, null);
+
+    await service.restoreVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId });
+    assert.equal((await testDb.prisma.brand.findUniqueOrThrow({ where: { id: owned.brandId } })).deleted_at, null);
+    assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: ownedSku.skuId } })).deleted_at, null);
+    assert.notEqual((await testDb.prisma.brand.findUniqueOrThrow({ where: { id: held.brandId } })).deleted_at, null);
+  });
+
+  it("rolls a Supplier restore back when one owned Brand cannot be restored", async () => {
+    const context = await createMaterialContext();
+    const owned = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Blocked owned Brand", ownerVendorId: context.vendorId, categoryIds: [context.categoryId] });
+    await service.archiveVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId });
+    await service.deactivateCategory({ grants: GRANTS, actor: ACTOR, categoryId: context.categoryId });
+    await assert.rejects(service.restoreVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId }), (error: unknown) => error instanceof AppError && error.code === "BRAND_CATEGORY_INACTIVE");
+    assert.notEqual((await testDb.prisma.vendor.findUniqueOrThrow({ where: { id: context.vendorId } })).deleted_at, null);
+    assert.notEqual((await testDb.prisma.brand.findUniqueOrThrow({ where: { id: owned.brandId } })).deleted_at, null);
   });
 });
 
