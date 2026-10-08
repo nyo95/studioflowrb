@@ -6,7 +6,7 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
 import { parsePriceAmount } from "../domain/price-amount";
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, asPrismaClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredPriceAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, asPrismaClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredPriceAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertVendorWorkCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 /** A grid cell that is blank, "-" or "n/a" is not offered and skipped; unreadable text stays so its row reports the problem. */
 function isOffered(text: string): boolean {
@@ -176,7 +176,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if (unit.status !== "ACTIVE") throw new AppError("VALIDATION", "UNIT_INACTIVE", "Unit is not active.");
         const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId } });
         if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier is archived.");
-        await assertVendorLaborCapable(tx, input.vendorId);
+        await assertVendorWorkCapable(tx, input.vendorId);
         let price;
         try { price = await tx.priceMaterialLabor.create({ data: { id: randomUUID(), name, slug, category_id: input.categoryId, vendor_id: input.vendorId, unit_id: input.unitId, amount, amount_label: amountLabel, currency, scope_note: input.scopeNote?.trim() || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-material-labor.created", entityType: "price_material_labor", entityId: price!.id, actor: input.actor, metadata: { vendor_id: input.vendorId, category_id: input.categoryId } });
@@ -202,7 +202,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         if (unit.status !== "ACTIVE") throw new AppError("VALIDATION", "UNIT_INACTIVE", "Unit is not active.");
         const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.vendorId } });
         if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier is archived.");
-        await assertVendorLaborCapable(tx, input.vendorId);
+        await assertVendorWorkCapable(tx, input.vendorId);
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.name !== name) { changes.name = { from: existing.name, to: name }; changes.slug = { from: existing.slug, to: slug }; }
         if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };

@@ -184,11 +184,17 @@ export async function assertVendorLaborCapable(tx: TxClient, vendorId: string): 
   if (!capable) throw new AppError("VALIDATION", "VENDOR_NOT_LABOR_CAPABLE", "Supplier is not eligible to provide labor.");
 }
 
+export async function assertVendorWorkCapable(tx: TxClient, vendorId: string): Promise<void> {
+  const capable = await tx.vendorVendorType.findFirst({ where: { vendor_id: vendorId, vendor: { deleted_at: null }, vendor_type: { deleted_at: null, OR: [{ can_supply_material: true }, { can_supply_labor: true }] } } });
+  if (!capable) throw new AppError("VALIDATION", "VENDOR_NOT_WORK_CAPABLE", "Supplier is not eligible to provide material or labor.");
+}
+
 export async function assertVendorTypeRemovalSafe(tx: TxClient, vendorId: string, remainingTypeIds: string[]): Promise<void> {
   const remainingTypes = await tx.vendorType.findMany({ where: { id: { in: remainingTypeIds }, deleted_at: null } });
   const hasMaterial = remainingTypes.some((t) => t.can_supply_material); const hasLabor = remainingTypes.some((t) => t.can_supply_labor);
   if (!hasMaterial) { const [priceCount, supplierCount] = await Promise.all([tx.priceMaterial.count({ where: { supplier_vendor_id: vendorId, deleted_at: null } }), tx.brandSupplier.count({ where: { vendor_id: vendorId } })]); if (priceCount > 0 || supplierCount > 0) throw new AppError("CONFLICT", "VENDOR_MATERIAL_CAPABILITY_IN_USE", "Cannot remove material supply capability while live material prices or brand supplier relations exist."); }
-  if (!hasLabor) { const [mlCount, laborCount] = await Promise.all([tx.priceMaterialLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }), tx.priceLabor.count({ where: { vendor_id: vendorId, deleted_at: null } })]); if (mlCount > 0 || laborCount > 0) throw new AppError("CONFLICT", "VENDOR_LABOR_CAPABILITY_IN_USE", "Cannot remove labor provision capability while live work prices exist."); }
+  if (!hasLabor) { const laborCount = await tx.priceLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }); if (laborCount > 0) throw new AppError("CONFLICT", "VENDOR_LABOR_CAPABILITY_IN_USE", "Cannot remove labor provision capability while live labor prices exist."); }
+  if (!hasMaterial && !hasLabor) { const mlCount = await tx.priceMaterialLabor.count({ where: { vendor_id: vendorId, deleted_at: null } }); if (mlCount > 0) throw new AppError("CONFLICT", "VENDOR_LABOR_CAPABILITY_IN_USE", "Cannot remove every work capability while live material and labor prices exist."); }
 }
 
 /** Blocks a deactivation that would hide a category still used by live data. */
@@ -279,7 +285,7 @@ export async function assertWorkPriceRestorable(tx: TxClient, table: "material-l
   if (category.status !== "ACTIVE" || category.kind !== "WORK") throw new AppError("CONFLICT", "PRICE_CATEGORY_INACTIVE", "Work price requires an active WORK Category.");
   if (vendor.deleted_at) throw new AppError("CONFLICT", "PRICE_VENDOR_ARCHIVED", "Price cannot be restored while its Supplier is archived.");
   if (unit.status !== "ACTIVE") throw new AppError("CONFLICT", "PRICE_UNIT_INACTIVE", "Price cannot be restored while its Unit is archived.");
-  await assertVendorLaborCapable(tx, vendor.id); if (conflict) throw new AppError("CONFLICT", "PRICE_IDENTITY_CONFLICT", "A live work price already uses this Supplier identity.");
+  if (table === "material-labor") await assertVendorWorkCapable(tx, vendor.id); else await assertVendorLaborCapable(tx, vendor.id); if (conflict) throw new AppError("CONFLICT", "PRICE_IDENTITY_CONFLICT", "A live work price already uses this Supplier identity.");
 }
 
 export async function createDeletionRequest(tx: TxClient, input: { targetType: MasterDataDeletionTargetType; targetId: string; actor: AuditActor; reason?: string; notes?: string }): Promise<string> {

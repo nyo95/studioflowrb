@@ -960,6 +960,47 @@ describe("Master Data service", () => {
     assert.equal(await testDb.prisma.vendor.count({ where: { name: "Wrong Capability Vendor" } }), 0);
   });
 
+  it("accepts every work-capable Supplier for Material+Labor while Labor stays labor-only", async () => {
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Work capability category", kind: "WORK" });
+    const materialType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const laborType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SERVICE" } });
+    const bothType = await service.createVendorType({ grants: GRANTS, actor: ACTOR, code: "WORK_BOTH", name: "Work Both", canSupplyMaterial: true, canSupplyLabor: true });
+    const neitherType = await service.createVendorType({ grants: GRANTS, actor: ACTOR, code: "WORK_NEITHER", name: "Work Neither", canSupplyMaterial: false, canSupplyLabor: false });
+    const material = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Material work vendor", vendorTypeIds: [materialType.id] });
+    const labor = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Labor work vendor", vendorTypeIds: [laborType.id] });
+    const both = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Both work vendor", vendorTypeIds: [bothType.vendorTypeId] });
+    const neither = await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Neither work vendor", vendorTypeIds: [neitherType.vendorTypeId] });
+    const create = (name: string, vendorId: string) => service.createPriceMaterialLabor({ grants: GRANTS, actor: ACTOR, name, categoryId: category.categoryId, vendorId, unitId: unit.id, amount: "100", currency: "IDR" });
+
+    const materialPrice = await create("Material-only scope", material.vendorId);
+    await create("Labor-only scope", labor.vendorId);
+    await create("Both-capable scope", both.vendorId);
+    await assert.rejects(create("Neither-capable scope", neither.vendorId), (error: unknown) => error instanceof AppError && error.code === "VENDOR_NOT_WORK_CAPABLE");
+    await assert.rejects(service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Labor must stay labor", categoryId: category.categoryId, vendorId: material.vendorId, unitId: unit.id, amount: "100", currency: "IDR" }), (error: unknown) => error instanceof AppError && error.code === "VENDOR_NOT_LABOR_CAPABLE");
+
+    await service.updatePriceMaterialLabor({ grants: GRANTS, actor: ACTOR, priceMaterialLaborId: materialPrice.priceMaterialLaborId, name: "Material-only scope updated", categoryId: category.categoryId, vendorId: material.vendorId, unitId: unit.id, amount: "110", currency: "IDR" });
+    await service.archivePriceMaterialLabor({ grants: GRANTS, actor: ACTOR, priceMaterialLaborId: materialPrice.priceMaterialLaborId });
+    await service.restorePriceMaterialLabor({ grants: GRANTS, actor: ACTOR, priceMaterialLaborId: materialPrice.priceMaterialLaborId });
+
+    await service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: both.vendorId, name: "Both work vendor", vendorTypeIds: [materialType.id] });
+    await assert.rejects(service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: both.vendorId, name: "Both work vendor", vendorTypeIds: [] }), (error: unknown) => error instanceof AppError && error.code === "VENDOR_LABOR_CAPABILITY_IN_USE");
+
+    const bulk = await service.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "material-labor", vendorId: material.vendorId, categoryId: category.categoryId, currency: "IDR", rows: [{ name: "Bulk material scope", unitId: unit.id, amount: "120" }] });
+    assert.equal(bulk.ids.length, 1);
+    const matrix = await service.createWorkPriceMatrix({ grants: GRANTS, actor: ACTOR, kind: "material-labor", categoryId: category.categoryId, currency: "IDR", vendorIds: [material.vendorId, labor.vendorId], rows: [{ name: "Matrix scope", unitId: unit.id, amounts: { [material.vendorId]: "130", [labor.vendorId]: "140" } }] });
+    assert.equal(matrix.ids.length, 2);
+
+    const refs = await service.listPricingWorkRefs({ grants: GRANTS });
+    assert.equal(refs.laborVendors.some((vendor) => vendor.id === material.vendorId), false);
+    assert.equal(refs.materialLaborVendors.some((vendor) => vendor.id === material.vendorId), true);
+    assert.equal(refs.materialLaborVendors.some((vendor) => vendor.id === labor.vendorId), true);
+
+    await service.createPricingVendorQuick({ grants: GRANTS, actor: ACTOR, name: "Quick material work vendor", vendorTypeId: materialType.id, capability: "WORK" });
+    await service.createPricingVendorQuick({ grants: GRANTS, actor: ACTOR, name: "Quick labor work vendor", vendorTypeId: laborType.id, capability: "WORK" });
+    await assert.rejects(service.createPricingVendorQuick({ grants: GRANTS, actor: ACTOR, name: "Quick neither work vendor", vendorTypeId: neitherType.vendorTypeId, capability: "WORK" }), (error: unknown) => error instanceof AppError && error.code === "VENDOR_TYPE_CAPABILITY_REQUIRED");
+  });
+
   it("allows Vendor managers to load assignment options without dictionary or Brand read grants", async () => {
     const brand = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Assignment Brand" });
     const vendorOnlyGrants = [MASTERDATA_PERMISSIONS.vendorManage];

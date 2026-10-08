@@ -70,12 +70,14 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
 
     async listPricingWorkRefs(input: { grants: PermissionGrants }) {
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceWorkRead, MASTERDATA_PERMISSIONS.priceWorkManage], "You do not have permission to view work price references.");
-      const [workCategories, vendors, units] = await Promise.all([
+      const [workCategories, laborVendors, materialLaborVendors, units] = await Promise.all([
         db.category.findMany({ where: { status: "ACTIVE", kind: "WORK" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
         db.vendor.findMany({ where: { deleted_at: null, types: { some: { vendor_type: { can_supply_labor: true, deleted_at: null } } } }, orderBy: { name: "asc" }, select: { id: true, name: true, categories: { select: { category_id: true } } } }),
+        db.vendor.findMany({ where: { deleted_at: null, types: { some: { vendor_type: { deleted_at: null, OR: [{ can_supply_material: true }, { can_supply_labor: true }] } } } }, orderBy: { name: "asc" }, select: { id: true, name: true, categories: { select: { category_id: true } } } }),
         db.unit.findMany({ where: { status: "ACTIVE" }, orderBy: [{ name: "asc" }, { code: "asc" }], select: { id: true, code: true, name: true } }),
       ]);
-      return { workCategories, vendors: vendors.map((vendor) => ({ id: vendor.id, name: vendor.name, categoryIds: vendor.categories.map((entry) => entry.category_id) })), units };
+      const mapVendor = (vendor: typeof laborVendors[number]) => ({ id: vendor.id, name: vendor.name, categoryIds: vendor.categories.map((entry) => entry.category_id) });
+      return { workCategories, vendors: laborVendors.map(mapVendor), laborVendors: laborVendors.map(mapVendor), materialLaborVendors: materialLaborVendors.map(mapVendor), units };
     },
 
     async getVendor(input: { grants: PermissionGrants; vendorId: string }) {
@@ -130,7 +132,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
       });
     },
 
-    async createPricingVendorQuick(input: { grants: PermissionGrants; actor: AuditActor; name: string; vendorTypeId: string; capability: "MATERIAL" | "LABOR" }) {
+    async createPricingVendorQuick(input: { grants: PermissionGrants; actor: AuditActor; name: string; vendorTypeId: string; capability: "MATERIAL" | "LABOR" | "WORK" }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorManage);
       actorIsUsable(input.actor);
       const name = requiredTitleName(input.name, "VENDOR_NAME_REQUIRED");
@@ -138,8 +140,8 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
       return runTransaction(async (tx) => {
         const vendorType = await tx.vendorType.findUnique({ where: { id: input.vendorTypeId } });
         if (!vendorType || vendorType.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_TYPE_INVALID", "Choose an active Supplier Type.");
-        const capable = input.capability === "MATERIAL" ? vendorType.can_supply_material : vendorType.can_supply_labor;
-        if (!capable) throw new AppError("VALIDATION", "VENDOR_TYPE_CAPABILITY_REQUIRED", input.capability === "MATERIAL" ? "Choose a Supplier Type that can supply material." : "Choose a Supplier Type that can provide labor.");
+        const capable = input.capability === "MATERIAL" ? vendorType.can_supply_material : input.capability === "LABOR" ? vendorType.can_supply_labor : vendorType.can_supply_material || vendorType.can_supply_labor;
+        if (!capable) throw new AppError("VALIDATION", "VENDOR_TYPE_CAPABILITY_REQUIRED", input.capability === "MATERIAL" ? "Choose a Supplier Type that can supply material." : input.capability === "LABOR" ? "Choose a Supplier Type that can provide labor." : "Choose a Supplier Type that can supply material or provide labor.");
         let vendor;
         try { vendor = await tx.vendor.create({ data: { id: randomUUID(), name, slug, legal_name: null, address: null, notes: null } }); await tx.vendorVendorType.create({ data: { id: randomUUID(), vendor_id: vendor.id, vendor_type_id: vendorType.id } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "vendor.created", entityType: "vendor", entityId: vendor!.id, actor: input.actor, metadata: { slug, quick_entry: "pricing", vendor_type_id: vendorType.id, capability: input.capability } });

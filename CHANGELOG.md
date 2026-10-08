@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.413 | 2026-10-08 | fix(masterdata): allow either capability for Material+Labor prices (Executor)
+
+- Material+Labor prices, including bulk, matrix, restore, and type-removal safeguards, now accept a Supplier with material capability, labor capability, or both; a Supplier must retain at least one of those capabilities while such a price is live.
+- Labor prices remain restricted to labor-capable Suppliers. Pricing references now expose separate labor and Material+Labor Supplier lists while retaining the existing labor list for the Lead's screen follow-up.
+- Quick Supplier creation accepts the new WORK capability only for a type that supplies material or labor. Added integration coverage across create, update, restore, type removal, bulk, matrix, references, and quick creation.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm test` 942/942, and `npm run build` pass. Browser not required.
+
 ## R8.412 | 2026-10-08 | fix(masterdata): restore price-less catalog records and normalize create input (Executor)
 
 - A price-less SKU now restores normally, including when it returns through its Brand; existing archive-cause safeguards still refuse a SKU whose prices remain held elsewhere.
