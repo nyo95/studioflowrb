@@ -81,6 +81,11 @@ export default async function BqQuotationPrintPage({
           </>
         }
       >
+        {project.status !== "LOCKED" ? (
+          <p className="mb-3 border-2 border-black px-3 py-1.5 text-center text-sm font-black uppercase tracking-[0.2em]">
+            Draft — this project is not locked yet; prices and quantities may still change
+          </p>
+        ) : null}
         <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
           <div className="flex min-w-0 items-start gap-3">
             {settings.brandMarkUrl ? (

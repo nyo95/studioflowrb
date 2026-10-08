@@ -123,6 +123,8 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   buttons; source picker initial-search race; project list reading every tree
   (pagination, aggregates); fewer `any` and implicit transactions; XLSX output,
   a readiness indicator and currency on the estimate.
+- [ ] [PLANNED][P3] BQ estimator audit (external, 2026-10-08, checked against the code; three findings were wrong, see CHANGELOG): "Recommended Items" can be made in a template and the Library but the project editor never shows them, so an estimator searches the whole catalogue again. Show a template's recommendations in the project's source picker (own small work order, after the estimator has used BQ for a real project).
+- [ ] [PLANNED][P3] BQ and Excel (owner, 2026-10-08): do not build an importer for the estimator's own workbook. If old data must come across, use a flat sheet (Section, Item, Unit, Qty, SKU or work-price code) with no prices; prices always come from Master Data. XLSX *output* for the client stays in the list above, waiting for the estimator.
 - [ ] [PLANNED] Rate Library after enough project-line evidence exists.
 - [ ] [PLANNED] Formal StudioFlow linking through a stable external reference.
 - [ ] [PLANNED] A unit-conversion helper for `purchase_to_base_factor`.

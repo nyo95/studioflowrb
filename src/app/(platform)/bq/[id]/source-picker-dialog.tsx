@@ -50,10 +50,18 @@ export function ImportDialog({
   const [showOtherCosts, setShowOtherCosts] = useState(false);
   const [loading, startTransition] = useTransition();
   const request = useRef(0);
+  const typing = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (typing.current) clearTimeout(typing.current); }, []);
 
+  // Asks the server 250 ms after the last keystroke, not on every key; an older answer never replaces a newer one.
   const search = (nextQuery: string) => {
     setQuery(nextQuery);
     const requestId = ++request.current;
+    if (typing.current) clearTimeout(typing.current);
+    typing.current = setTimeout(() => runSearch(nextQuery, requestId), 250);
+  };
+
+  const runSearch = (nextQuery: string, requestId: number) => {
     startTransition(async () => {
       const result = await listLineItemSourcesAction(nextQuery);
       if (requestId !== request.current) return;

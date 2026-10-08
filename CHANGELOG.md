@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.422 | 2026-10-08 | fix(bq): Master Data prices no longer hidden by a big Library; draft label on quotations; typing pause in the source picker (Lead)
+
+- **External BQ estimator audit (against `1d70026`) checked against the current code.** Confirmed and fixed: (1) the source picker put every Library item first and then cut the whole list at 80, so a Library of 80 or more items hid all Master Data prices; each source now has its own share of 30 (`source-actions.ts`). Confirmed and fixed: (2) a printed quotation said nothing about the project being a draft; while the project is not locked the page now carries a boxed "Draft — this project is not locked yet; prices and quantities may still change". Confirmed and fixed: (3) the picker asked the server on every keystroke; it now waits 250 ms after the last key (stale answers were already discarded).
+- **Two P1 findings were wrong.** "Lock is not atomic with edits" and "deletion approval is not one transaction": `service.ts` wraps every non-read BQ operation in `ctx.runTransaction`, which is the platform serializable runner with retry, and the editable-project check and the write run inside that same transaction (the nested `runTransaction` reuses it); a lock committing between them forces a retry that then refuses. The deletion approval also runs in that wrapper (its audit write would throw outside one). No change.
+- **Recorded, not built:** recommendations not shown in the project editor; no importer for the estimator's Excel (a flat sheet without prices if ever needed); XLSX output stays waiting for the estimator.
+
+**Checks.** `tsc --noEmit`, lint (BQ screens). `npm test` 947/947 (none failed, skipped or cancelled). Browser not walked.
+
 ## R8.421 | 2026-10-08 | fix: flaky workbook test root-caused; four small cleanups; ordered browser walk (Lead)
 
 - **Flaky test fixed (not just retried).** "round-trips SKU material prices through the workbook…" failed about one run in six and passed 20 of 20 after the fix. Cause: the test serialized the same invalid workbook twice (once for the preview, once for the apply) and `writeBuffer()` is not byte-identical across seconds, so the preview hash no longer matched and the apply refused with "The workbook changed after preview" instead of the expected error. The test now serializes once. No product code was involved; the hash check is working as intended.

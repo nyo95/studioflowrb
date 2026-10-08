@@ -30,6 +30,9 @@ export type LineItemSourceOption = {
   kategori: string;
 };
 
+/** How many options each source (Library, Master Data materials, Master Data work prices) may add to the picker. */
+const SOURCE_SHARE = 30;
+
 /**
  * Composes the two source catalogues for the picker. Master Data is reached only
  * through its published read contract; the BQ Library is BQ's own.
@@ -39,11 +42,15 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
     const { grants } = await authorize();
     const search = query.trim();
     const options: LineItemSourceOption[] = [];
+    // Each source gets its own share of the list. One shared cut-off used to fill with the Library first, so a Library of
+    // 80 or more items hid every Master Data price (the estimator's main source).
+    const libraryOptions: LineItemSourceOption[] = [];
 
     const library = await bqPublicRead.listLibraryItems();
     for (const item of library) {
       if (search && !item.name.toLowerCase().includes(search.toLowerCase())) continue;
-      options.push({
+      if (libraryOptions.length >= SOURCE_SHARE) break;
+      libraryOptions.push({
         id: item.id,
         sourceType: "BQ_LIBRARY",
         sourceKind: "library",
@@ -56,10 +63,12 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
       });
     }
 
+    options.push(...libraryOptions);
+
     /* Master Data access is a separate grant: an estimator without it still gets
        the Library, rather than an error that hides the half they may use. */
     if (hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) {
-      const materials = await masterDataRead.listMaterialPriceOptions({ search, limit: 50 });
+      const materials = await masterDataRead.listMaterialPriceOptions({ search, limit: SOURCE_SHARE });
       for (const option of materials) {
         if (option.currency.trim().toUpperCase() !== "IDR") continue;
         options.push({
@@ -77,7 +86,7 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
     }
 
     if (hasPermission(grants, MASTERDATA_PERMISSIONS.priceWorkRead)) {
-      const works = await masterDataRead.listWorkPricesRead({ search, limit: 80 });
+      const works = await masterDataRead.listWorkPricesRead({ search, limit: SOURCE_SHARE });
       for (const option of works) {
         if (option.currency.trim().toUpperCase() !== "IDR") continue;
         options.push({
@@ -94,7 +103,7 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
       }
     }
 
-    return options.slice(0, 80);
+    return options;
   });
 }
 
