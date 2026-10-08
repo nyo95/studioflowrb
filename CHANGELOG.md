@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.457 | 2026-10-09 | docs(review): R8.456 verdict CORRECTION REQUIRED, correction plan, backlog (Lead)
+
+- **Review of R8.456 (`11f471a`, WO-PLAT-INTEGRATIONS-01):** the design is right (hash-only token, scope ∩ live grant, ledger, route-import rule, permissions seeded to `platform-owner` only). Verdict **CORRECTION REQUIRED**, not BLOCKED. Findings: (1) no tests for the token service or route kit although the plan required them; (2) a handler failure is stored as a completed response, so a transient 5xx is replayed for 24 h; (3) an `IN_PROGRESS` ledger row from a crash blocks its key until cleanup; (4) the handler cannot join the ledger transaction, so work and ledger can commit separately; (5) the request body is read unbounded; (6) `next-env.d.ts`, an owner-preserved file, was committed.
+- **Repaired now:** `next-env.d.ts` restored to its pre-R8.456 content. **Returned to the Executor:** items 1–5 as `PLAN.md` WO-PLAT-INTEGRATIONS-01b (READY, target R8.458, location kantor).
+- **Backlog:** new "Companion apps and integrations" section in `docs/BACKLOG.md` (correction pass, token page for the Lead, SketchUp sync with the legacy evidence, rate limit, AI gateway, events).
+- **Dev server note:** the background dev server from earlier today was stopped by its time limit; restart with `npm run dev` (location rumah/kantor env set).
+- **Migrations/dependencies:** none in this revision. Documentation and one file restore; no code checks needed.
+- **Published:** `main` pushed to GitHub with R8.454–R8.457 at the owner's request, so work continues from the office.
+
 ## R8.456 | 2026-10-09 | feat(platform): add personal integration-token foundation (Executor)
 
 - Added personal, revocable, hash-only integration tokens with scoped creation, expiry, own-token management, separately authorized administration, and audit history that never records the secret.

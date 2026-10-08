@@ -33,6 +33,39 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## Platform Foundation
 
+### Companion apps and integrations (owner, 2026-10-09: Codex builds them in isolation)
+
+Harness: `agent/EXTENSIONS.md`. Foundation: `apps/platform/INTEGRATIONS.md`.
+Order matters; each item is its own Work Order.
+
+- [ ] [PLANNED][P2] Integration foundation correction pass (`PLAN.md`,
+  WO-PLAT-INTEGRATIONS-01b, target R8.458, Executor): the R8.456 review found no
+  service/route tests, failed writes cached for 24 h, a stuck in-progress key, a
+  handler that cannot join the ledger transaction, and no body-size cap.
+- [ ] [PLANNED][P2] Token management page (Lead, after R8.458): create (shown once),
+  list, revoke on the account page; admin list/revoke for `platform.integration.admin`;
+  assign the three `platform.integration.*` permissions in the role screen. Service
+  API already exists (`integrationTokens`, `requireIntegrationManager`).
+- [ ] [PLANNED][P2] SketchUp plugin sync as the first extension (D-SF-06 lifted
+  for this work by the owner's 2026-10-09 request; needs its own plan and the
+  owner's answers on: project binding in the URL vs token, what the schedule gets
+  from a pushed material, and the merge-queue behaviour). Legacy evidence
+  (read-only, legacy HEAD `102ff85`): `src/app/api/sketchup/sync/route.ts` (GET
+  pending merge actions; POST `{materials[], ffes[], full_snapshot}` with
+  duplicate-identity hard stop, rename reconciliation, anti-wipe guard on
+  `full_snapshot`), `api/sketchup/merge/confirm/route.ts` (`{actionIds[]}`),
+  `extensions/sketchup/utils/merge-queue.ts`, `catalog-ownership.ts`. Keep the
+  wire shape and those safeguards; purge the anonymous per-project key and direct
+  Prisma in routes. The Ruby plugin source is outside that repository.
+- [ ] [PLANNED][P3] Per-token rate limit for `/api/integrations/**` (none exists in
+  Platform; do not invent one inside an extension).
+- [ ] [PLANNED][P3] Chatbot / AI gateway: a provider-neutral port with the key in
+  local env, tools limited to public read contracts and the asking user's grants,
+  audited. Blocked on the owner choosing a provider and approving an SDK; see also
+  the AI file filing entry (`[BLOCKED]`).
+- [ ] [PLANNED][P3] Outbound webhooks / events for extensions: not built; add only
+  when an extension proves the need (MODULE-BOUNDARIES: no events yet).
+
 - [ ] [PLANNED] Asset storage: phases 1–4 of
   `apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md` are delivered; future file
   consumers (Master Data media, sample photos) each need their own Work Order.
