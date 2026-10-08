@@ -79,13 +79,6 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## Master Data
 
-- [ ] [BUG][P2] Flaky test: "round-trips SKU material prices through the
-  workbook and rejects all invalid rows before apply"
-  (`src/apps/masterdata/service.integration.test.ts`) failed once in a full
-  `npm test` run on 2026-10-07 (920/921) and passed in every other run (alone
-  3/3, its file 2/2, full suite 2/2). The failure message was not captured;
-  next time keep the full log and look for order- or time-dependent data.
-
 - [ ] [UNVERIFIED] Sample shelf R8.386–R8.390 in the browser (WO-MD-SAMPLE-01
   "Reviewer Acceptance"): add, move, lend with a project, send to a client,
   mark lost, return, the remove refusal while out, history, right-click menu;
@@ -142,10 +135,6 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   13th image and a PDF are refused with a message; thumbnails in the next
   iteration's brief, the answered note and earlier iterations; large view with
   previous/next; remove with confirmation.
-- [ ] [CLEANUP][P3] Home cards sign the current iteration's images one at a
-  time (`projects/service.ts`, R8.394); sign them in parallel (or only when a
-  card shows them) before many projects carry images.
-
 - [ ] [UNVERIFIED] Formatted notes R8.392 in the browser: bold, italic, bullets,
   numbering and Enter-continues-the-list in client notes, pinned notes, visit
   notes and MOM; the brief, earlier iterations, MOM read-only and MOM print show
@@ -231,8 +220,6 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   the rail and on a phone; a role without project read skips step 2; a phone
   skips steps whose control is hidden. Re-run the two Playwright full sessions
   that stalled earlier to completion and the 13 phone layout checks.
-- [ ] [CLEANUP] Tour validator: refuse duplicate step ids and a tour with zero
-  steps; check a step's `requires` against the permission registry.
 - [ ] [PLANNED] Tours for Master Data and BQ (same registration as
   `STUDIOFLOW_TOUR`), after the owner approves the StudioFlow flow.
 - [ ] [PLANNED][P3] Lead findings of the 2026-10-07 audit: shell polling fires
@@ -258,4 +245,5 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 - [ ] [UNVERIFIED] WO-MD-CRUD-01 (R8.412–R8.414 and the Pricing screen wiring) in the browser: restore a price-less sample SKU and its Brand; rename a Brand whose owner Supplier is archived; create a Brand with a link typed twice; Material+Labor price and quick-add supplier from a material-only, a labor-only and a both Supplier; archive and restore a Supplier that owns a Brand (the Brand, its SKUs and prices follow; a Brand that only lists it stays live).
 - [ ] [PLANNED][P3] The workbook imports (SKU prices, price database) still reject the whole file when any row is invalid. Revisit a "apply the valid rows" option once WO-MD-ENTRY-01 has proven the grid version; the import's preview step makes it a separate decision.
 - [ ] [UNVERIFIED] WO-MD-ENTRY-01 (R8.416–R8.419 and the Pricing screens, R8.420) in the browser: price a Brand's SKU from a supplier that is not linked (it saves and the supplier appears on the Brand; the row says "new for this brand" and the note under it); save a material grid, a labor / Material+Labor grid and a several-suppliers grid with two bad rows (the good ones are saved and the bad ones stay with their reasons, and saving again does not duplicate); in a Brand's edit dialog remove a supplier that prices use or change the owner, and follow "Show those prices" (the Pricing list opens filtered by that supplier and Brand).
-- [ ] [CLEANUP][P3] `createWorkPriceMatrix` in save-valid mode rethrows an unexpected (non-AppError) failure after earlier suppliers' rows were already committed, so the caller sees an error without the list of what was saved; collect it as rejected cells instead. The per-row transaction isolation of a database error has no fault-injection test.
+- [ ] [UNVERIFIED] The ordered browser walk that closes every [UNVERIFIED] entry above is in `docs/BROWSER-ACCEPTANCE.md` (11 sections, about an hour). Run it once, record PASS/FAIL per section, then remove the entries that passed and file each FAIL as a [BUG].
+- [ ] [CLEANUP][P3] The unexpected-error branch of the several-suppliers grid (R8.421) has no fault-injection test, as the per-row isolation of R8.419 has none.

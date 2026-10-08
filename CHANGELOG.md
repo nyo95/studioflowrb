@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.421 | 2026-10-08 | fix: flaky workbook test root-caused; four small cleanups; ordered browser walk (Lead)
+
+- **Flaky test fixed (not just retried).** "round-trips SKU material prices through the workbook…" failed about one run in six and passed 20 of 20 after the fix. Cause: the test serialized the same invalid workbook twice (once for the preview, once for the apply) and `writeBuffer()` is not byte-identical across seconds, so the preview hash no longer matched and the apply refused with "The workbook changed after preview" instead of the expected error. The test now serializes once. No product code was involved; the hash check is working as intended.
+- **Tour validator** refuses a repeated step id and an empty tour (new test).
+- **Home cards** sign every card's images together instead of one iteration after another (same results).
+- **Several-suppliers grid, save-valid mode:** an unexpected failure for one supplier is reported as that supplier's rejected cells (`PRICE_SAVE_FAILED`) instead of being thrown after earlier suppliers were saved. No fault-injection test (BACKLOG).
+- **`docs/BROWSER-ACCEPTANCE.md`:** one ordered walk (11 sections) that closes the [UNVERIFIED] entries: tour, material price and Brand links, labor and Material+Labor and the several-suppliers grid, duplicate input, archive and restore cascades, price-less SKU and the sample shelf, client-note images and formatted text, Timeline and Schedule, older Master Data items, phone, 840 px and Dark, and clean-up.
+
+**Checks.** `tsc --noEmit`, lint (touched files), `npm test` 947/947 (none failed, skipped or cancelled). Browser not walked.
+
 ## R8.420 | 2026-10-08 | feat(masterdata): Pricing screens for saving valid rows, automatic Brand links and "show those prices"; review of R8.419 PASS (Lead)
 
 - **Review of group C (R8.419 `ded7359`): PASS.** Each valid row commits in its own transaction; a failure inside one row is reported as that row (`PRICE_SAVE_FAILED` when it is not a known refusal) and later rows go on; duplicate and live-conflict checks are kept; `reject-all` stays the default. Full tests 946/946, re-run by the Lead. Notes (BACKLOG [CLEANUP]): an unexpected error in the several-suppliers grid after earlier suppliers saved is rethrown without the saved list, and the per-row isolation has no fault-injection test.

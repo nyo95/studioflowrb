@@ -33,11 +33,14 @@ function toProgress(row: { tour_key: string; version: number; state: string; upd
 export function validateAppTutorial(tour: AppTutorial): AppTutorial {
   requireTourKey(tour.key);
   requireVersion(tour.version);
-  if (!Array.isArray(tour.steps) || tour.steps.length > 4) invalid("TUTORIAL_STEPS", "A tour can have at most 4 steps.");
+  if (!Array.isArray(tour.steps) || tour.steps.length < 1 || tour.steps.length > 4) invalid("TUTORIAL_STEPS", "A tour needs 1 to 4 steps.");
+  const stepIds = new Set<string>();
   for (const step of tour.steps) {
     if (!step || typeof step.id !== "string" || step.id.trim() === "" || typeof step.anchor !== "string" || step.anchor.trim() === "") {
       invalid("TUTORIAL_STEP", "Each tour step needs an id and screen anchor.");
     }
+    if (stepIds.has(step.id)) invalid("TUTORIAL_STEP", "Each tour step needs its own id.");
+    stepIds.add(step.id);
     for (const text of [step.title, step.body]) {
       if (!text || typeof text.id !== "string" || text.id.trim() === "" || typeof text.en !== "string" || text.en.trim() === "") {
         invalid("TUTORIAL_TEXT", "Each tour step needs Indonesian and English text.");

@@ -364,9 +364,14 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
             const result = await createPricingService(db, ports).createWorkPricesBulk({ grants: input.grants, actor: input.actor, kind: input.kind, vendorId, categoryId: input.categoryId, currency: input.currency, onInvalid: "save-valid", writeBatchAudit: false, rows: picked.map(({ row }) => ({ name: row.name, unitId: row.unitId, amount: row.amounts[vendorId]!, notes: row.notes ?? undefined })) });
             ids.push(...result.ids); for (const row of ("rejected" in result ? result.rejected : [])) rejected.push({ ...row, rowIndex: picked[row.rowIndex]?.rowIndex ?? row.rowIndex, vendorId });
           } catch (error) {
-            if (!(error instanceof AppError) || error.code !== "BULK_ROWS_INVALID") throw error;
-            const rows = (error.details as { rows?: BulkRowError[] } | undefined)?.rows ?? [];
-            for (const row of rows) rejected.push({ ...row, rowIndex: picked[row.rowIndex]?.rowIndex ?? row.rowIndex, vendorId });
+            if (error instanceof AppError && error.code === "BULK_ROWS_INVALID") {
+              const rows = (error.details as { rows?: BulkRowError[] } | undefined)?.rows ?? [];
+              for (const row of rows) rejected.push({ ...row, rowIndex: picked[row.rowIndex]?.rowIndex ?? row.rowIndex, vendorId });
+            } else {
+              // Earlier suppliers are already saved: report this supplier's cells instead of failing the whole call.
+              const known = error instanceof AppError;
+              for (const { rowIndex } of picked) rejected.push({ rowIndex, vendorId, field: null, code: known ? error.code : "PRICE_SAVE_FAILED", message: known ? error.safeMessage : "These prices could not be saved." });
+            }
           }
         }
         if (ids.length === 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${rejected.length} cell(s) need fixing. Nothing was saved.`, { details: { rows: rejected } });

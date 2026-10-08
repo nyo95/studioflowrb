@@ -27,3 +27,11 @@ it("refuses a tour with too many steps, missing language, or empty text", () => 
     assert.throws(() => validateAppTutorial(tour), (error: unknown) => error instanceof AppError && ["TUTORIAL_STEPS", "TUTORIAL_TEXT"].includes(error.code));
   }
 });
+
+it("refuses a repeated step id and an empty tour", () => {
+  const text = { id: "a", en: "a" };
+  const stepOf = (id: string) => ({ id, anchor: "center", title: text, body: text });
+  assert.throws(() => validateAppTutorial({ key: "demo", version: 1, steps: [stepOf("one"), stepOf("one")] }), (error: unknown) => error instanceof AppError && error.code === "TUTORIAL_STEP");
+  assert.throws(() => validateAppTutorial({ key: "demo", version: 1, steps: [] }), (error: unknown) => error instanceof AppError && error.code === "TUTORIAL_STEPS");
+  assert.doesNotThrow(() => validateAppTutorial({ key: "demo", version: 1, steps: [stepOf("one"), stepOf("two")] }));
+});

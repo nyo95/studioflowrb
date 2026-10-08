@@ -147,12 +147,14 @@ describe("Master Data service", () => {
     invalidSheet.addRow([crypto.randomUUID(), "", "Bad", "", "Unknown category", "pcs", "", "", "", "", "", "", crypto.randomUUID(), "Unknown supplier", "bad", "IDR", ""]);
     invalidSheet.addRow([skuId, "", "Workbook SKU edited", "", "Panel", "pcs", "", "", "", "", "", "", "", context.vendorId, "1", "IDR", ""]);
     invalidSheet.addRow([skuId, "", "Workbook SKU edited", "", "Panel", "pcs", "", "", "", "", "", "", "", context.vendorId, "1", "IDR", ""]);
-    const invalidPreview = await service.previewSkuPriceImport({ grants: GRANTS, file: Buffer.from(await invalid.xlsx.writeBuffer()) });
+    // Serialize once: a second writeBuffer() can differ by a timestamp, which changes the preview hash (the flaky failure of 2026-10-07).
+    const invalidFile = Buffer.from(await invalid.xlsx.writeBuffer());
+    const invalidPreview = await service.previewSkuPriceImport({ grants: GRANTS, file: invalidFile });
     assert.ok(invalidPreview.errors.some((error) => error.column === "SKU ID"));
     assert.ok(invalidPreview.errors.some((error) => error.column === "Supplier"));
     assert.ok(invalidPreview.errors.some((error) => error.column === "Amount"));
     assert.ok(invalidPreview.errors.some((error) => error.column === "Price ID" || error.column === "Supplier"));
-    await assert.rejects(service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file: Buffer.from(await invalid.xlsx.writeBuffer()), hash: invalidPreview.hash }), (error: unknown) => error instanceof AppError && error.code === "SKU_PRICE_IMPORT_ERRORS");
+    await assert.rejects(service.applySkuPriceImport({ grants: GRANTS, actor: ACTOR, file: invalidFile, hash: invalidPreview.hash }), (error: unknown) => error instanceof AppError && error.code === "SKU_PRICE_IMPORT_ERRORS");
   });
 
   it("keeps the single category, groups new supplier rows, and reports workbook limits before parsing", async () => {

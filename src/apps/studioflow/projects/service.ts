@@ -744,17 +744,19 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const now = nowOf(ports);
       // Only the current iteration of each phase is signed: the card shows nothing older.
       const signed = new Map<string, Array<{ id: string; url: string | null; contentType: string; bytes: number }>>();
+      const signing: Array<Promise<void>> = [];
       for (const project of rows) {
         for (const phase of project.phases) {
           const current = phase.revisions.find((iteration) => ["NOT_SENT", "SENT", "ANSWERED"].includes(iteration.status));
           if (!current) continue;
-          signed.set(current.id, await Promise.all(current.images.map(async (image) => {
+          signing.push(Promise.all(current.images.map(async (image) => {
             let url: string | null = null;
             try { url = await ports.storage.createSignedReadUrl(image.storage_key, 15 * 60); } catch { /* one thumbnail stays blank; the card still renders */ }
             return { id: image.id, url, contentType: image.content_type, bytes: image.bytes };
-          })));
+          })).then((images) => { signed.set(current.id, images); }));
         }
       }
+      await Promise.all(signing);
       return rows.map((project) => {
         const phases = project.phases.map((phase, index) => {
           const previous = index > 0 ? project.phases[index - 1]! : null;
