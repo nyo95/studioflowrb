@@ -33,16 +33,18 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## Platform Foundation
 
+- [ ] [UNVERIFIED] Add item "From a past project" (R8.458): the search box, the empty result and the toggle were walked in the browser on the local database, which has one project, so no hit could be chosen. Still to walk with two projects: pick a hit (section and category switch to the hit's, the product shows as a summary, Remove returns to the normal fields), Save creates the item and copies the product with its photo and notes, and a failure after the item is created leaves the item without the copy.
+
 ### Companion apps and integrations (owner, 2026-10-09: Codex builds them in isolation)
 
 Harness: `agent/EXTENSIONS.md`. Foundation: `apps/platform/INTEGRATIONS.md`.
 Order matters; each item is its own Work Order.
 
 - [ ] [PLANNED][P2] Integration foundation correction pass (`PLAN.md`,
-  WO-PLAT-INTEGRATIONS-01b, target R8.458, Executor): the R8.456 review found no
+  WO-PLAT-INTEGRATIONS-01b, target R8.459, Executor): the R8.456 review found no
   service/route tests, failed writes cached for 24 h, a stuck in-progress key, a
   handler that cannot join the ledger transaction, and no body-size cap.
-- [ ] [PLANNED][P2] Token management page (Lead, after R8.458): create (shown once),
+- [ ] [PLANNED][P2] Token management page (Lead, after R8.459): create (shown once),
   list, revoke on the account page; admin list/revoke for `platform.integration.admin`;
   assign the three `platform.integration.*` permissions in the role screen. Service
   API already exists (`integrationTokens`, `requireIntegrationManager`).

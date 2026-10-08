@@ -2,7 +2,7 @@
 
 Plan ID: WO-PLAT-INTEGRATIONS-01b (correction pass on R8.456)
 Scope: finish WO-PLAT-INTEGRATIONS-01 — tests the first pass did not include, plus three defects found in review. Nothing new beyond this.
-Target revision: R8.458 (one Executor commit). R8.457 is the Lead's review record.
+Target revision: R8.459 (one Executor commit). R8.457 is the Lead's review record.
 Status: READY
 Priority: P2
 Owner: Product Owner. Lead verdict on R8.456 (`11f471a`): CORRECTION REQUIRED.
@@ -69,5 +69,5 @@ implement the whole correction pass and nothing beyond it. Before editing, pull
 `origin/main`, run `npm install`, apply migrations to the dev and test databases
 (`docs/agent/README.md`, "Local database sync"), and regenerate the Prisma client.
 Preserve unrelated owner work, never stage `next-env.d.ts`, run the required checks,
-update `CHANGELOG.md`, and create the local commit R8.458. Stop only with a
+update `CHANGELOG.md`, and create the local commit R8.459. Stop only with a
 BLOCKED / CONFLICT report for a locked-decision conflict or unsafe boundary.

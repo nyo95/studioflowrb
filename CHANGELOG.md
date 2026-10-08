@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.458 | 2026-10-09 | feat(studioflow): Add item can start from a past project's product (Lead)
+
+- **Owner question 2026-10-09:** "From past project" only existed inside an existing item, so a new item could not start from another project's product. The Add item panel now has a "From a past project" box at the top: Search (2+ letters, all sections), "Use as start" on a hit. Choosing a hit switches the section and category to the hit's, shows the product as a summary with Remove, and keeps only Location (and Qty/Unit for Fixture). Save creates the item and then copies the product whole (photo and notes included) through the existing copy command; Remove returns to the normal fields.
+- **Shared search:** the search and result list moved into one `ReuseSearch` used by both the item panel and Add item. No backend change; `ReuseHit` now carries `section`, which the search already returned.
+- **Revision note:** Executor target of WO-PLAT-INTEGRATIONS-01b moved from R8.458 to R8.459 in `PLAN.md` and `docs/BACKLOG.md`.
+- **Browser check (local database, one project):** panel opens, the box toggles, a search returns "No matching products in other projects". Picking a hit and saving could not be walked (no second project); recorded as `[UNVERIFIED]` in `docs/BACKLOG.md`. Console errors seen were stale (Prisma regenerated while the dev server ran, then the server restart).
+- **Migrations/dependencies:** none.
+
+**Checks.** `tsc --noEmit` clean; eslint on the schedule folder clean. `npm test` and `npm run build` not run for this UI-only change.
+
 ## R8.457 | 2026-10-09 | docs(review): R8.456 verdict CORRECTION REQUIRED, correction plan, backlog (Lead)
 
 - **Review of R8.456 (`11f471a`, WO-PLAT-INTEGRATIONS-01):** the design is right (hash-only token, scope ∩ live grant, ledger, route-import rule, permissions seeded to `platform-owner` only). Verdict **CORRECTION REQUIRED**, not BLOCKED. Findings: (1) no tests for the token service or route kit although the plan required them; (2) a handler failure is stored as a completed response, so a transient 5xx is replayed for 24 h; (3) an `IN_PROGRESS` ledger row from a crash blocks its key until cleanup; (4) the handler cannot join the ledger transaction, so work and ledger can commit separately; (5) the request body is read unbounded; (6) `next-env.d.ts`, an owner-preserved file, was committed.

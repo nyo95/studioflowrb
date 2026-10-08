@@ -90,6 +90,7 @@ type CategoryChoice = { section: Section; category: string; prefix: string | nul
 
 type ReuseHit = {
   optionId: string;
+  section: Section;
   sourceProjectName: string;
   category: string;
   brandName: string | null;
@@ -830,10 +831,22 @@ function AddItemDrawer({ projectId, section, categoriesBySection, categoryChoice
   const [qty, setQty] = useState({ qty: "", unit: "", location: "" });
   const [cardFields, setCardFields] = useState<string[] | null>(null);
   const [preparedPhoto, setPreparedPhoto] = useState<File | null>(null);
+  // A product picked from another project: Save copies it whole (photo and notes included), so the product fields give way to a summary.
+  const [reuseHit, setReuseHit] = useState<ReuseHit | null>(null);
+  const [searchingPast, setSearchingPast] = useState(false);
   const isFixture = targetSection === "FIXTURE";
   const pending = command.isPending("add-item");
-  const hasProduct = preparedPhoto !== null || Object.entries(product).some(([key, value]) => key === "extra" ? (value as ScheduleExtraField[]).length > 0 : String(value).trim().length > 0);
-  const canSave = Boolean(category.trim()) && (!hasProduct || Boolean(product.productName.trim()));
+  const hasProduct = reuseHit !== null || preparedPhoto !== null || Object.entries(product).some(([key, value]) => key === "extra" ? (value as ScheduleExtraField[]).length > 0 : String(value).trim().length > 0);
+  const canSave = Boolean(category.trim()) && (!hasProduct || reuseHit !== null || Boolean(product.productName.trim()));
+  const pickReuse = (hit: ReuseHit) => {
+    setTargetSection(hit.section);
+    setCategory(hit.category);
+    setProduct(EMPTY_PRODUCT);
+    setPreparedPhoto(null);
+    setCardFields(null);
+    setReuseHit(hit);
+    setSearchingPast(false);
+  };
   const extraKeys = product.extra.map((field) => extraFieldKey(field.label));
   const displayed = resolveCardFields(cardFields, extraKeys);
   const toggle = (key: string) => setCardFields(displayed.includes(key) ? displayed.filter((field) => field !== key) : [...displayed, key]);
@@ -866,7 +879,10 @@ function AddItemDrawer({ projectId, section, categoriesBySection, categoryChoice
       snapshot: null,
     }), (data) => { if (data && typeof data === "object" && "entryId" in data && typeof data.entryId === "string") entryId = data.entryId; });
     if (!ok || !entryId) return;
-    if (hasProduct) {
+    if (reuseHit) {
+      const reuseOk = await command.run("add-item-option", () => copyReusableScheduleOptionAction({ projectId, entryId: entryId!, sourceOptionId: reuseHit.optionId }));
+      if (!reuseOk) return;
+    } else if (hasProduct) {
       const optionOk = await command.run("add-item-option", () => createScheduleOptionAction({ projectId, entryId: entryId!, snapshot: toSnapshot(product) }), (data) => { if (data && typeof data === "object" && "optionId" in data && typeof data.optionId === "string") optionId = data.optionId; });
       if (!optionOk) return;
     }
@@ -914,6 +930,32 @@ function AddItemDrawer({ projectId, section, categoriesBySection, categoryChoice
             />
           </Field>
         </div>
+        <div className="grid gap-3 rounded-control border border-line-subtle bg-surface-muted p-3">
+          <div className="flex items-start justify-between gap-2">
+            <div><Text weight="semibold">From a past project</Text><Text size="sm" tone="tertiary">Start from a product another project already uses. It is copied, so the other project never changes.</Text></div>
+            {!reuseHit ? <Button size="sm" variant="secondary" leadingIcon={<History className="h-3.5 w-3.5" />} onClick={() => setSearchingPast(!searchingPast)} disabled={pending}>{searchingPast ? "Close" : "Search"}</Button> : null}
+          </div>
+          {reuseHit ? (
+            <div className="flex items-center gap-3 rounded-control border border-line bg-surface px-3 py-2">
+              <div className="grid min-w-0 flex-1 gap-0.5">
+                <span className="truncate text-sm font-medium">{reuseHit.productName}{reuseHit.brandName ? <span className="font-normal text-ink-secondary"> · ex. {reuseHit.brandName}</span> : null}</span>
+                <span className="truncate text-xs text-ink-tertiary">{[specLine(reuseHit), `${reuseHit.sourceProjectName} · ${reuseHit.category}`].filter(Boolean).join(" — ")}</span>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => setReuseHit(null)} disabled={pending}>Remove</Button>
+            </div>
+          ) : null}
+          {searchingPast && !reuseHit ? <ReuseSearch projectId={projectId} useLabel="Use as start" onUse={pickReuse} /> : null}
+        </div>
+        {reuseHit ? (
+          <div className="grid gap-3 border-t border-line-subtle pt-4">
+            <Text weight="semibold">Item details</Text>
+            <Text size="sm" tone="tertiary">The product, photo and notes come from the past project. Edit them on the card after saving.</Text>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Location"><Input value={qty.location} onChange={(event) => setQty({ ...qty, location: event.target.value })} maxLength={160} /></Field>
+              {isFixture ? <Field label="Qty and unit"><div className="grid grid-cols-2 gap-2"><Input aria-label="Qty" inputMode="decimal" value={qty.qty} onChange={(event) => setQty({ ...qty, qty: event.target.value })} maxLength={20} /><Input aria-label="Unit" value={qty.unit} onChange={(event) => setQty({ ...qty, unit: event.target.value })} maxLength={40} placeholder="Unit" /></div></Field> : null}
+            </div>
+          </div>
+        ) : (
         <div className="grid gap-3 border-t border-line-subtle pt-4">
           <Text weight="semibold">Product and card fields</Text>
           <Text size="sm" tone="tertiary">The eye controls what appears on the card. Hidden fields stay editable.</Text>
@@ -932,7 +974,8 @@ function AddItemDrawer({ projectId, section, categoriesBySection, categoryChoice
           {cardFields !== null ? <Button size="sm" variant="ghost" className="justify-self-start" onClick={() => setCardFields(null)}>Use default</Button> : null}
           <div className="grid gap-2"><Text weight="semibold">Photo</Text><ImageWorkspace label="Schedule option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={setPreparedPhoto} disabled={pending} />{preparedPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedPhoto.name}</Text> : null}</div>
         </div>
-        {hasProduct && !product.productName.trim() ? <InlineError>Enter a Type, or clear the product fields to only reserve the code.</InlineError> : null}
+        )}
+        {hasProduct && !reuseHit && !product.productName.trim() ? <InlineError>Enter a Type, or clear the product fields to only reserve the code.</InlineError> : null}
         {command.error ? <InlineError>{command.error}</InlineError> : null}
       </div>
     </Drawer>
@@ -1390,8 +1433,9 @@ function EntryDrawer({
   );
 }
 
-function InlineReuse({ projectId, entry, command, onClose }: { projectId: string; entry: ScheduleEntryView; command: Command; onClose: () => void }) {
-  const [query, setQuery] = useState(entry.category);
+/** Search the other projects' products. Shared by the entry panel (copy into an item) and Add item (start an item from one). */
+function ReuseSearch({ projectId, section, initialQuery = "", useLabel = "Use", pendingFor, onUse }: { projectId: string; section?: Section; initialQuery?: string; useLabel?: string; pendingFor?: (hit: ReuseHit) => boolean; onUse: (hit: ReuseHit) => void }) {
+  const [query, setQuery] = useState(initialQuery);
   const [hits, setHits] = useState<ReuseHit[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
@@ -1401,7 +1445,7 @@ function InlineReuse({ projectId, entry, command, onClose }: { projectId: string
     setSearching(true);
     setSearchError(null);
     try {
-      const result = await searchReusableScheduleOptionsAction({ projectId, query: query.trim(), section: entry.section });
+      const result = await searchReusableScheduleOptionsAction({ projectId, query: query.trim(), ...(section ? { section } : {}) });
       if (result.ok) setHits(result.data as ReuseHit[]);
       else setSearchError(result.error.safeMessage);
     } catch {
@@ -1411,37 +1455,45 @@ function InlineReuse({ projectId, entry, command, onClose }: { projectId: string
     }
   };
 
+  return (
+    <div className="grid gap-3">
+      <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void search(); }}>
+        <Input aria-label="Search products" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Brand, product, SKU, color…" maxLength={120} />
+        <Button type="submit" variant="secondary" leadingIcon={<Search className="h-3.5 w-3.5" />} pending={searching} disabled={query.trim().length < 2}>Search</Button>
+      </form>
+      {searchError ? <InlineError>{searchError}</InlineError> : null}
+      {hits === null ? null : hits.length === 0 ? (
+        <Text tone="tertiary" size="sm">No matching products in other projects.</Text>
+      ) : (
+        <ul className="m-0 grid max-h-[50vh] list-none gap-1 overflow-y-auto p-0">
+          {hits.map((hit) => (
+            <li key={hit.optionId} className="flex items-center gap-3 rounded-control border border-line px-3 py-2">
+              <div className="grid min-w-0 flex-1 gap-0.5">
+                <span className="truncate text-sm font-medium">{hit.productName}{hit.brandName ? <span className="font-normal text-ink-secondary"> · ex. {hit.brandName}</span> : null}</span>
+                <span className="truncate text-xs text-ink-tertiary">{[specLine(hit), `${hit.sourceProjectName} · ${hit.category}`].filter(Boolean).join(" — ")}</span>
+              </div>
+              {hit.isFinal ? <Badge tone="success">Final there</Badge> : null}
+              <Button size="sm" variant="primary" pending={pendingFor?.(hit)} onClick={() => onUse(hit)}>{useLabel}</Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function InlineReuse({ projectId, entry, command, onClose }: { projectId: string; entry: ScheduleEntryView; command: Command; onClose: () => void }) {
   const use = async (hit: ReuseHit) => {
     const ok = await command.run(`${entry.id}-reuse-${hit.optionId}`, () => copyReusableScheduleOptionAction({ projectId, entryId: entry.id, sourceOptionId: hit.optionId }));
     if (ok) onClose();
   };
 
   return (
-      <div className="grid gap-3 rounded-control border border-line-subtle bg-surface-muted p-3">
-        <div className="flex items-start justify-between gap-2"><div><Text weight="semibold">From past project</Text><Text size="sm" tone="tertiary">Copy a product into {entry.code} as a new option.</Text></div><Button size="sm" variant="ghost" onClick={onClose}>Close</Button></div>
-        <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void search(); }}>
-          <Input aria-label="Search products" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Brand, product, SKU, color…" maxLength={120} />
-          <Button type="submit" variant="secondary" leadingIcon={<Search className="h-3.5 w-3.5" />} pending={searching} disabled={query.trim().length < 2}>Search</Button>
-        </form>
-        {searchError ? <InlineError>{searchError}</InlineError> : null}
-        {hits === null ? null : hits.length === 0 ? (
-          <Text tone="tertiary" size="sm">No matching products in other projects.</Text>
-        ) : (
-          <ul className="m-0 grid max-h-[50vh] list-none gap-1 overflow-y-auto p-0">
-            {hits.map((hit) => (
-              <li key={hit.optionId} className="flex items-center gap-3 rounded-control border border-line px-3 py-2">
-                <div className="grid min-w-0 flex-1 gap-0.5">
-                  <span className="truncate text-sm font-medium">{hit.productName}{hit.brandName ? <span className="font-normal text-ink-secondary"> · ex. {hit.brandName}</span> : null}</span>
-                  <span className="truncate text-xs text-ink-tertiary">{[specLine(hit), `${hit.sourceProjectName} · ${hit.category}`].filter(Boolean).join(" — ")}</span>
-                </div>
-                {hit.isFinal ? <Badge tone="success">Final there</Badge> : null}
-                <Button size="sm" variant="primary" pending={command.isPending(`${entry.id}-reuse-${hit.optionId}`)} onClick={() => void use(hit)}>Use</Button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {command.error ? <InlineError>{command.error}</InlineError> : null}
-      </div>
+    <div className="grid gap-3 rounded-control border border-line-subtle bg-surface-muted p-3">
+      <div className="flex items-start justify-between gap-2"><div><Text weight="semibold">From past project</Text><Text size="sm" tone="tertiary">Copy a product into {entry.code} as a new option.</Text></div><Button size="sm" variant="ghost" onClick={onClose}>Close</Button></div>
+      <ReuseSearch projectId={projectId} section={entry.section as Section} initialQuery={entry.category} pendingFor={(hit) => command.isPending(`${entry.id}-reuse-${hit.optionId}`)} onUse={(hit) => void use(hit)} />
+      {command.error ? <InlineError>{command.error}</InlineError> : null}
+    </div>
   );
 }
 
