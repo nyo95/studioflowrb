@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.448 | 2026-10-08 | docs(studioflow): Ideas board recorded as planned work (Lead)
+
+- **Owner decisions (2026-10-08):** a personal Ideas board per user, spanning the projects that user holds; drop or paste any image as a card with no form; "Use in schedule" turns a card into a new schedule item or an extra option on an existing one, copying the image and labelling the card where it is used. StudioFlow stays independent of Master Data (read-only for the Library only). Recorded in `docs/BACKLOG.md` as `[PLANNED][P2]`; no code yet, a `PLAN.md` slice follows.
+- **Migrations/dependencies:** none.
+
+**Checks.** Documentation only; `git diff --check`.
+
 ## R8.447 | 2026-10-08 | fix: bulk new SKUs group by brand, Client answered keeps failed screenshots (Lead)
 
 - **External audit 2026-10-08 (R8.446), checked against the code; only the confirmed findings are fixed.**

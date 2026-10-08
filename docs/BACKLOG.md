@@ -126,6 +126,28 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## StudioFlow
 
+- [ ] [PLANNED][P2] Ideas board (owner, 2026-10-08): a personal page where a
+  user drops any image (Ctrl+V screenshot, a dropped download, picked files)
+  and it becomes a card at once; title, source link and note are optional and
+  may stay empty. No code, category or qty; no commitment. **Locked:**
+  - One private board per user (others do not see it); it spans every project
+    the user holds, i.e. projects where the user may edit the schedule
+    (assigned designer/drafter, or a manager override; project not completed).
+  - "Use in schedule": pick one of those projects, then a new item (only then
+    does it get a code such as ST-04) or an extra option on an existing item
+    (e.g. ST-02 option B). The image is copied into the option, so deleting the
+    card never touches the schedule. The card stays on the board labelled
+    "Used in: <project> <code><option>"; one card may be used in several
+    projects.
+  - StudioFlow-owned only: no Master Data link or write (Master Data stays
+    read-only for the Library). A source URL is stored as text and never
+    fetched by the server.
+  - Not in this item: drag a card onto a schedule tab, cards shared between
+    users, SketchUp/companion "unresolved material" intake (D-SF-06 stands).
+  - Split: backend (cards, images on storage with retention, use-in-schedule
+    command, owner-only access) for the Executor; board UI for the Lead. Reuse
+    the UI Engine image intake/gallery from Notes. Needs a `PLAN.md` slice.
+
 - [ ] [UNVERIFIED] Client-note images R8.394–R8.395 in the browser: drop,
   paste a screenshot (Ctrl+V) and pick several images in the answer dialog and
   both client-notes dialogs; a large phone photo is shrunk and accepted; the
