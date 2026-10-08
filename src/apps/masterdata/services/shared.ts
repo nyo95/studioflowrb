@@ -195,6 +195,16 @@ export async function assertPriceMaterialBrandSupplierChain(tx: TxClient, skuId:
   throw new AppError("VALIDATION", "PRICE_BRAND_SUPPLIER_NOT_LINKED", `Supplier ${vendor.name} is not linked to Brand ${sku.brand.name}.`);
 }
 
+/** A new material price makes its capable supplier a Brand supplier in the same transaction. */
+export async function ensurePriceMaterialBrandSupplierLink(tx: TxClient, ports: MasterDataServicePorts, actor: AuditActor, skuId: string, vendorId: string): Promise<void> {
+  const sku = await tx.sku.findUniqueOrThrow({ where: { id: skuId }, select: { brand_id: true, brand: { select: { owner_vendor_id: true } } } });
+  if (!sku.brand_id || !sku.brand || sku.brand.owner_vendor_id === vendorId) return;
+  const existing = await tx.brandSupplier.findFirst({ where: { brand_id: sku.brand_id, vendor_id: vendorId }, select: { id: true } });
+  if (existing) return;
+  await tx.brandSupplier.create({ data: { id: randomUUID(), brand_id: sku.brand_id, vendor_id: vendorId, is_authorized: false, notes: null } });
+  await writeAudit(ports, tx, { action: "brand.supplier-linked", entityType: "brand", entityId: sku.brand_id, actor, metadata: { vendor_id: vendorId, reason: "price" } });
+}
+
 export async function assertVendorLaborCapable(tx: TxClient, vendorId: string): Promise<void> {
   const capable = await tx.vendorVendorType.findFirst({ where: { vendor_id: vendorId, vendor: { deleted_at: null }, vendor_type: { deleted_at: null, can_supply_labor: true } } });
   if (!capable) throw new AppError("VALIDATION", "VENDOR_NOT_LABOR_CAPABLE", "Supplier is not eligible to provide labor.");

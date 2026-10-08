@@ -6,7 +6,7 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
 import { parsePriceAmount } from "../domain/price-amount";
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, asPrismaClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredPriceAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertVendorWorkCapable, assertPriceMaterialBrandSupplierChain, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, asPrismaClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredPriceAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertVendorWorkCapable, assertPriceMaterialBrandSupplierChain, ensurePriceMaterialBrandSupplierLink, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 /** A grid cell that is blank, "-" or "n/a" is not offered and skipped; unreadable text stays so its row reports the problem. */
 function isOffered(text: string): boolean {
@@ -63,7 +63,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const vendor = await tx.vendor.findUniqueOrThrow({ where: { id: input.supplierVendorId } });
         if (vendor.deleted_at !== null) throw new AppError("VALIDATION", "VENDOR_ARCHIVED", "Supplier is archived.");
         await assertVendorMaterialCapable(tx, input.supplierVendorId);
-        await assertPriceMaterialBrandSupplierChain(tx, input.skuId, input.supplierVendorId);
+        await ensurePriceMaterialBrandSupplierLink(tx, ports, input.actor, input.skuId, input.supplierVendorId);
         if (input.sourceLinkId) { const link = await tx.brandLink.findUniqueOrThrow({ where: { id: input.sourceLinkId } }); if (!sku.brand_id) throw new AppError("VALIDATION", "LINK_BRAND_REQUIRED", "Source link requires a SKU Brand."); if (link.brand_id !== sku.brand_id) throw new AppError("VALIDATION", "LINK_BRAND_MISMATCH", "Source link must belong to the SKU's Brand."); }
         const unitId = sku.purchase_unit_id ?? sku.base_unit_id;
         let price;

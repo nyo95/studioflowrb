@@ -1404,19 +1404,23 @@ describe("Brand → Supplier → Price chain", () => {
   }
   const rejectsWith = (work: () => Promise<unknown>, code: string) => assert.rejects(work, (error: unknown) => error instanceof AppError && error.code === code);
 
-  it("prices a branded SKU only for a supplier that carries the Brand, and linking is idempotent and audited", async () => {
+  it("automatically links a capable supplier when a branded SKU receives its first price, and manual linking stays idempotent", async () => {
     const context = await createMaterialContext();
     const other = await unlinkedSupplier("Chain Other Supplier");
     const { skuId } = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Chain SKU", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "10", currency: "IDR" }] });
 
-    await rejectsWith(() => service.createPriceMaterial({ grants: GRANTS, actor: ACTOR, skuId, supplierVendorId: other, amount: "11", currency: "IDR" }), "PRICE_BRAND_SUPPLIER_NOT_LINKED");
-    await rejectsWith(() => service.createSku({ grants: GRANTS, actor: ACTOR, name: "Chain SKU Two", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: other, amount: "5", currency: "IDR" }] }), "PRICE_BRAND_SUPPLIER_NOT_LINKED");
+    await service.createPriceMaterial({ grants: GRANTS, actor: ACTOR, skuId, supplierVendorId: other, amount: "11", currency: "IDR" });
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: context.brandId, vendor_id: other } }), 1);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "brand.supplier-linked", entity_id: context.brandId, metadata: { path: ["reason"], equals: "price" } } }), 1);
+
+    const another = await unlinkedSupplier("Chain Another Supplier");
+    await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Chain SKU Two", brandId: context.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: another, amount: "5", currency: "IDR" }] });
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: context.brandId, vendor_id: another } }), 1);
 
     await service.linkBrandToSupplier({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, vendorId: other });
     await service.linkBrandToSupplier({ grants: GRANTS, actor: ACTOR, brandId: context.brandId, vendorId: other });
     assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: context.brandId, vendor_id: other } }), 1);
-    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "brand.supplier-linked", entity_id: context.brandId } }), 1, "the second call changes nothing and writes nothing");
-    await service.createPriceMaterial({ grants: GRANTS, actor: ACTOR, skuId, supplierVendorId: other, amount: "11", currency: "IDR" });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "brand.supplier-linked", entity_id: context.brandId } }), 2, "the second manual call changes nothing and writes nothing");
   });
 
   it("lets a Brand's owner and any supplier of an unbranded SKU price without a link", async () => {
@@ -1573,7 +1577,7 @@ describe("Bulk price entry", () => {
     await assert.rejects(() => service.createWorkPricesBulk({ ...base, rows: many }), (error: unknown) => error instanceof AppError && error.code === "BULK_TOO_MANY_ROWS");
   });
 
-  it("creates many material prices for existing SKUs and applies the supplier chain rule per row", async () => {
+  it("creates many material prices for existing SKUs and links suppliers to each SKU Brand", async () => {
     const context = await createMaterialContext();
     const stranger = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Bulk Stranger Brand" });
     const mk = (name: string, brandId?: string) => service.createSku({ grants: GRANTS, actor: ACTOR, name, ...(brandId ? { brandId } : {}), baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
@@ -1583,23 +1587,11 @@ describe("Bulk price entry", () => {
     await linkBrand(context.brandId, second.vendorId);
     const linked = await mk("Bulk linked SKU", context.brandId);
     const unbranded = await mk("Bulk unbranded SKU");
-    const unlinked = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Bulk unlinked SKU", brandId: stranger.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] }).catch(() => null);
-    assert.equal(unlinked, null, "the context supplier is not linked to the stranger Brand");
-    await linkBrand(stranger.brandId, context.vendorId);
     const strangerSku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Bulk stranger SKU", brandId: stranger.brandId, baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
 
-    await assert.rejects(
-      () => service.createMaterialPricesBulk({ grants: GRANTS, actor: ACTOR, vendorId: second.vendorId, currency: "IDR", rows: [{ skuId: linked.skuId, amount: "10" }, { skuId: strangerSku.skuId, amount: "11" }, { skuId: unbranded.skuId, amount: "12" }] }),
-      (error: unknown) => {
-        assert.ok(error instanceof AppError && error.code === "BULK_ROWS_INVALID");
-        assert.deepEqual(bulkRows(error).map((row) => [row.rowIndex, row.code]), [[1, "PRICE_BRAND_SUPPLIER_NOT_LINKED"]]);
-        return true;
-      },
-    );
-    assert.equal(await testDb.prisma.priceMaterial.count({ where: { supplier_vendor_id: second.vendorId } }), 0);
-
-    const ok = await service.createMaterialPricesBulk({ grants: GRANTS, actor: ACTOR, vendorId: second.vendorId, currency: "IDR", rows: [{ skuId: linked.skuId, amount: "10" }, { skuId: unbranded.skuId, amount: "12", notes: "bulk" }] });
-    assert.equal(ok.ids.length, 2);
+    const ok = await service.createMaterialPricesBulk({ grants: GRANTS, actor: ACTOR, vendorId: second.vendorId, currency: "IDR", rows: [{ skuId: linked.skuId, amount: "10" }, { skuId: strangerSku.skuId, amount: "11" }, { skuId: unbranded.skuId, amount: "12", notes: "bulk" }] });
+    assert.equal(ok.ids.length, 3);
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: stranger.brandId, vendor_id: second.vendorId } }), 1);
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "price-bulk.created", entity_id: second.vendorId } }), 1);
   });
 });

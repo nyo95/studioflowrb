@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.416 | 2026-10-08 | feat(masterdata): link Brand suppliers when material prices are created (Executor)
+
+- Creating a material price for a branded SKU now creates the missing Brand–Supplier link in the same transaction when the capable, live Supplier is neither the Brand owner nor already linked. The new link is unauthorised, has no notes, and is audited as `brand.supplier-linked` with `reason: "price"`.
+- Applied the rule to individual material prices, material price rows and their one-supplier wrapper, and SKU creation with initial prices; workbook imports inherit the same service paths. Updating and restoring material prices still enforce the existing link rule.
+- Replaced expectations for the former `PRICE_BRAND_SUPPLIER_NOT_LINKED` create-path refusal with coverage for automatic, idempotent linking and price batch behaviour.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm test` 944/944, and `npm run build` pass. Browser not required.
+
 ## R8.415 | 2026-10-08 | feat(masterdata): Material+Labor supplier lists on screen; review of R8.412-R8.414 PASS; WO-MD-ENTRY-01 (Lead)
 
 - **Review of WO-MD-CRUD-01 (R8.412 `fe7eddc`, R8.413 `937ddf4`, R8.414 `1f6dbd8`): PASS.** Read the cascade diff (one shared `archiveBrandCascade`, owned Brands archived with a parent cause, restore checks run per Brand and the whole restore rolls back on a failed check, a hand-archived Brand keeps its own cause). Lead re-ran `tsc --noEmit` and the full tests: 944/944. The Executor finished all three groups.
