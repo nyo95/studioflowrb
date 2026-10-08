@@ -44,6 +44,8 @@ implementation. Model or tool choice never widens authority beyond the lane.
   needed to exercise the backend, and the changelog. It owns no product behavior,
   UX, visual design, or new architecture.
 
+Companion apps and injected features (SketchUp plugin, AI chatbot, and the like) are built as isolated extensions under `docs/agent/EXTENSIONS.md`.
+
 Read `docs/agent/README.md` to select scoped context. Never load every app contract, roadmap section, or legacy artifact merely because it exists.
 
 ## Lead-led execution

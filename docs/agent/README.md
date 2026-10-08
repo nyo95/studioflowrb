@@ -56,6 +56,12 @@ unless the active plan explicitly needs browser work to finish or diagnose the
 implementation. This keeps execution moving while preserving an independent
 user-facing gate before PASS.
 
+## Extensions (companion apps)
+
+Work that adds a companion app or injected feature (SketchUp plugin sync, AI
+chatbot, mobile) follows `docs/agent/EXTENSIONS.md` in addition to the Executor
+contract: own folder and schema, only public doors, protected core untouched.
+
 ## Scope reading matrix
 
 | Lane | Always after bootstrap | Add only when relevant | Do not load automatically |

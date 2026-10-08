@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.454 | 2026-10-09 | docs(agent): extension harness and integration foundation plan (Lead)
+
+- **New `docs/agent/EXTENSIONS.md`:** how Codex builds companion apps (SketchUp plugin sync, AI chatbot, others) without touching the finished apps: two doors (token API route kit, inside session), folder template, hard rules, protected-core list, definition of done.
+- **`PLAN.md` replaced with WO-PLAT-INTEGRATIONS-01 (READY, target R8.455):** personal access token (hashed, scoped, revocable), versioned `/api/integrations/v1` route kit, idempotency ledger, reference `ping` endpoint, boundary rule for integration routes. No SketchUp feature yet.
+- **Legacy evidence recorded (read-only, legacy HEAD `102ff85`, branch main, dirty only `next.config.ts`):** SketchUp bridge = `api/sketchup/sync` (GET pending merge actions; POST materials/ffes/full_snapshot) and `api/sketchup/merge/confirm`; legacy auth was one anonymous per-project key. The Ruby plugin source is not in that repository. The pinned commit `c4b0c46` of the Rework Contract is not in that clone.
+- **Pointers added** in `AGENTS.md` and `docs/agent/README.md`.
+- **Migrations/dependencies:** none. No code changed; checks not applicable (documentation only).
+
 ## R8.453 | 2026-10-08 | feat(masterdata): new SKUs are added inside the price table (Lead)
 
 - **WO-MD-SKUBULK-01 step 2 (owner flow 2026-10-08; backend R8.441).** In New price → Material, typing a SKU name that does not exist and choosing "Create SKU" turns that row into a new SKU instead of switching to a separate form. The row shows a "New SKU" panel: category (searchable, can add a category; the last one chosen is used for the next new row) and an optional size. Brand is the one chosen above the table (none on All brands). Units: pcs; with a size such as 1220 × 2440 × 0.7 the base unit is M², the supplier unit is the sheet and the panel shows "1 sheet = 2,9768 M²". An X turns the row back into a SKU search.
