@@ -1,5 +1,15 @@
 # Changelog
 
+## R8.438 | 2026-10-08 | docs(backlog): browser acceptance of iteration names, Notes and the new-SKU form (Lead)
+
+- Owner asked for an acceptance test after the push. Run on an isolated server and its own database (not the shared test database, which Codex's test runs wipe).
+- **PASS, new-SKU form:** testers' exact input (base sheet, 1220 × 2440 × 0.7 mm) turns into base m2 / purchase sheet / mm; saved through the form with a new product category and supplier; stored factor 2.9768, thickness 0.7, name kept as typed.
+- **PASS, iteration names:** rename to "Lobby option", send, client answered, Revision: the next iteration is MB2 (the number continues after a custom name), the earlier one keeps "Lobby option"; empty rename resets (R8.431 run); no page errors.
+- **PASS, Notes:** the checklist editor in dark mode at 800 px width; the card moves below the iteration and stays usable.
+- **Not covered:** the migration's rewrite of real existing names, paste into the editor from outside, a real phone.
+
+**Checks.** Browser only; no code changed.
+
 ## R8.437 | 2026-10-08 | fix(masterdata): one Size field that sets M² itself, and one product name field in the new-SKU form (Lead)
 
 - **Staff report (two testers).** Entering 1220 × 2440 mm with Base unit "sheet" failed on save with "Rectangular dimensions require M2 as the base measurement unit", and the form asked for a SKU code and a SKU name that the testers wanted as one line.
