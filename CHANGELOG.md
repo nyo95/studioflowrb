@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.437 | 2026-10-08 | fix(masterdata): one Size field that sets M² itself, and one product name field in the new-SKU form (Lead)
+
+- **Staff report (two testers).** Entering 1220 × 2440 mm with Base unit "sheet" failed on save with "Rectangular dimensions require M2 as the base measurement unit", and the form asked for a SKU code and a SKU name that the testers wanted as one line.
+- **Size.** The new-SKU form has one "Size" field ("1220 × 2440 × 0.7", x, × or * accepted). Typing a length and width makes M² the base unit (the old base, e.g. the sheet, becomes the purchase unit when it was empty), picks mm when no unit was chosen, and shows "1 sheet = 2,9768 M²". If the base is changed away from M² afterwards, the form says a size needs M² instead of failing on save. The stored fields and the BQ link are unchanged.
+- **Product name / SKU.** One required line; the article code moved under "Add an article code (optional)". Old data and imports are unchanged (the backend still stores both).
+- Checked in a browser with the testers' exact input: base became m2, purchase stayed sheet, unit mm, preview 2,9768 M². Saving the form was not exercised end to end.
+
+**Checks.** `tsc --noEmit`, lint, `npm test` 953/953 (none failed, skipped or cancelled), `npm run build`.
+
 ## R8.436 | 2026-10-08 | fix(masterdata): the supplier search says when filters hide a match (Lead)
 
 - **Staff report.** Searching "Ikaya" showed nothing because that supplier is a Subcon and the type filter said Supplier; the search itself works. The supplier directory now shows "1 more supplier matches ... but is hidden by the filters", the names, and a "Show them (clear the filters)" button. Filters are never cleared without the person asking.

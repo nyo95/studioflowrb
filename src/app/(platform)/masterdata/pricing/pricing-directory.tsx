@@ -311,6 +311,21 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const [dimensionWidth, setDimensionWidth] = useState("");
   const [dimensionThickness, setDimensionThickness] = useState("");
   const [dimensionUnitId, setDimensionUnitId] = useState(defaultDimensionUnit?.id ?? "");
+  const [sizeText, setSizeText] = useState("");
+  /** "1220 × 2440 × 0.7": fills length, width and thickness; a size makes M² the base unit (the supplier unit keeps the old base, e.g. the sheet). */
+  const applySize = (text: string) => {
+    setSizeText(text);
+    const parts = text.split(/s*[x×*]s*/i).map((part) => part.trim().replace(",", ".")).filter(Boolean);
+    const [length = "", width = "", thickness = ""] = parts;
+    setDimensionLength(length); setDimensionWidth(width); setDimensionThickness(thickness);
+    if (!length || !width) return;
+    const m2 = refs.units.find((unit) => unit.code.toUpperCase() === "M2");
+    if (m2 && baseUnitId !== m2.id) {
+      if (!purchaseUnitId && baseUnitId) setPurchaseUnitId(baseUnitId);
+      setBaseUnitId(m2.id);
+    }
+    if (!dimensionUnitId && defaultDimensionUnit) setDimensionUnitId(defaultDimensionUnit.id);
+  };
   const needsMaterial = material;
   // Material+Labor accepts a Supplier that supplies material, provides labor, or both (owner, 2026-10-08).
   const eligibleTypes = refs.vendorTypes.filter((type) => needsMaterial ? type.canSupplyMaterial : editor.kind === "material-labor" ? type.canSupplyMaterial || type.canSupplyLabor : type.canSupplyLabor);
@@ -442,8 +457,10 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
 
   const newMaterialFields = newMaterialSku ? <>
     <div className="grid grid-cols-2 gap-3">
-      <Field label="SKU code / Article #"><Input name="code" maxLength={32} placeholder="KPF 2005" autoFocus /></Field>
-      <Field label="SKU name"><Input name="name" textCase="title" value={skuName} onChange={(event) => setSkuName(event.target.value)} maxLength={128} placeholder="Optional product name" /></Field>
+      <div className="col-span-2 grid gap-1.5">
+        <Field label="Product name / SKU" required description="One line is enough, e.g. the model and colour: HPL Taco TI Y8012 MC - Platinum Cliff."><Input name="name" textCase="title" value={skuName} onChange={(event) => setSkuName(event.target.value)} maxLength={128} placeholder="HPL Taco TI Y8012 MC - Platinum Cliff" autoFocus required /></Field>
+        <details className="text-sm"><summary className="cursor-pointer text-ink-secondary">Add an article code (optional)</summary><div className="pt-2"><Field label="Article code"><Input name="code" maxLength={32} placeholder="KPF 2005" /></Field></div></details>
+      </div>
       <input type="hidden" name="brandId" value={brandId} />
       <Field label="Brand" description="Optional. Leave empty for an unbranded SKU.">
         <CreatableSearch
@@ -468,16 +485,15 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
     </div>
     <SectionCard>
       <div className="mb-3 flex items-center gap-2"><Text weight="semibold">Dimensions and BQ conversion</Text><Tooltip content="Optional for sheet materials. Enter length and width to calculate the BQ area contained in one purchase unit."><IconButton label="About dimensions and BQ conversion" icon={<CircleHelp size={14} />} size="sm" className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink" /></Tooltip></div>
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(145px,1.4fr)]">
-        <Field label="Length"><Input name="dimensionLength" value={dimensionLength} onChange={(event) => setDimensionLength(event.target.value)} inputMode="decimal" placeholder="1200" /></Field>
-        <Field label="Width"><Input name="dimensionWidth" value={dimensionWidth} onChange={(event) => setDimensionWidth(event.target.value)} inputMode="decimal" placeholder="2400" /></Field>
-        <Field label={<span className="inline-flex items-center gap-1">Thickness <FieldHelp label="thickness" content="Optional and excluded from area calculation." /></span>}><Input name="dimensionThickness" value={dimensionThickness} onChange={(event) => setDimensionThickness(event.target.value)} inputMode="decimal" placeholder="0.8" /></Field>
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(145px,1fr)]">
+        <Field label={<span className="inline-flex items-center gap-1">Size <FieldHelp label="size" content="Length × width, and thickness if you want it noted: 1220 × 2440 × 0.7. Thickness is not used for the area. A size makes the base unit M² and the supplier unit stays the sheet." /></span>}><Input value={sizeText} onChange={(event) => applySize(event.target.value)} placeholder="1220 × 2440 × 0.7" inputMode="text" autoComplete="off" /></Field>
+        <input type="hidden" name="dimensionLength" value={dimensionLength} /><input type="hidden" name="dimensionWidth" value={dimensionWidth} /><input type="hidden" name="dimensionThickness" value={dimensionThickness} />
         <Field label={<span className="inline-flex items-center gap-1">Dimension unit <FieldHelp label="dimension unit" content="The unit used for length, width, and thickness." /></span>}><Select name="dimensionUnitId" value={dimensionUnitId} onChange={(event) => setDimensionUnitId(event.target.value)}><option value="">Select unit</option>{refs.units.filter((unit) => ["MM", "CM", "M"].includes(unit.code.toUpperCase())).map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}</Select></Field>
       </div>
       <div className="mt-3 rounded border border-line-subtle bg-surface-muted/40 px-3 py-2 text-sm">
       {areaPreview && selectedBaseUnit?.code.toUpperCase() === "M2" && selectedPurchaseUnit
           ? <><span className="font-medium">Conversion preview:</span> 1 {selectedPurchaseUnit.code} = {formatDecimal(areaPreview)} M²</>
-          : null}
+          : areaPreview && selectedBaseUnit?.code.toUpperCase() !== "M2" ? <span className="text-danger">A size needs M² as the base unit. Choose M2, or clear the size.</span> : null}
       </div>
     </SectionCard>
     <Field label="Product categories" required description="At least one category is required.">
