@@ -137,24 +137,9 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   13th image and a PDF are refused with a message; thumbnails in the next
   iteration's brief, the answered note and earlier iterations; large view with
   previous/next; remove with confirmation.
-- [ ] [UNVERIFIED] Formatted notes R8.392 in the browser: bold, italic, bullets,
-  numbering and Enter-continues-the-list in client notes, pinned notes, visit
-  notes and MOM; the brief, earlier iterations, MOM read-only and MOM print show
-  them formatted; "Add to notes" on the brief; renaming CD Mall is refused with
-  a clear message.
-
-- [ ] [UNVERIFIED] Timeline R8.384 in the browser: "Dates & plan" dialog (lead
-  times load, Save, Save and apply plan, Back to the plan, suggested Fit Out
-  Start), "Edit dates and plan" from a project's read-only Timeline tab opening
-  the dialog, and the "Today · date" label at Week and Month zoom (it must not
-  hide a week number that matters, and must read in Dark).
-
-- [ ] [UNVERIFIED] Product Schedule R8.382–R8.383 in the browser: right-click Open/Delete
-  on a board card, the "New category" picker (studio categories, typing a new
-  one, also in an empty section, the "already in this project" hint), studio
-  categories in the Add item category picker, "Unset final" in the option menu, "Apply studio
-  templates" confirm and its count, a new option staying selected after Save,
-  and a re-import of a real Google Sheets export.
+- [ ] [UNVERIFIED] Formatted notes R8.392, still open after the 2026-10-08 walk (passed: the bullet button on selected lines, Enter continuing a list, and the brief of the next iteration showing the notes as a list with "Add to notes"): bold and italic, numbering, pinned notes, visit notes, MOM and MOM print, earlier iterations as formatted text, renaming CD Mall refused. A bullet click on an empty note adds nothing (BACKLOG [CLEANUP]).
+- [ ] [UNVERIFIED] Timeline R8.384, still open after the 2026-10-08 walk (passed: "Edit dates and plan" from a project's Timeline tab opens the dialog on the Timeline page with the lead times loaded; "Save and apply plan" computed the phase dates correctly and showed them; Today label at Week and Month zoom, also in Dark, now clear of the week numbers): "Back to the plan" and the suggested Fit Out Start.
+- [ ] [UNVERIFIED] Product Schedule R8.382-R8.383, still open after the 2026-10-08 walk (passed: the page loads, the New category picker with a typed new category creates it and its first item, right-click Open / Delete on a board card): the studio-categories list and the "already in this project" hint, Add item picker, "Unset final", "Apply studio templates", a new option staying selected after Save, a re-import of a real Google Sheets export.
 - [ ] [BLOCKED] Rows made Final automatically before R8.382 (typed product on
   add, template seeding, import) are still Final in existing projects. They can
   be told apart: a real decision has a `studioflow.schedule.option-finalized`
@@ -245,3 +230,4 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 - [ ] [UNVERIFIED] The ordered browser walk that closes every [UNVERIFIED] entry above is in `docs/BROWSER-ACCEPTANCE.md` (11 sections, about an hour). Run it once, record PASS/FAIL per section, then remove the entries that passed and file each FAIL as a [BUG].
 - [ ] [CLEANUP][P3] The unexpected-error branch of the several-suppliers grid (R8.421) has no fault-injection test, as the per-row isolation of R8.419 has none.
 - [ ] [UNVERIFIED] Walk 2026-10-08 did not cover: client-note images (a file upload cannot be driven from the built-in browser), formatted notes, Timeline and Schedule, re-layout on real data, the BQ screens, the sample shelf, Dark mode, the 840 px rail. Run them from `docs/BROWSER-ACCEPTANCE.md` sections 6 to 10 on the owner's own browser.
+- [ ] [CLEANUP][P3] The bullet and numbering buttons in the notes editor do nothing when the note is empty (they work on selected or typed lines); with an empty note they should insert the first marker.

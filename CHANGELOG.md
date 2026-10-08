@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.425 | 2026-10-08 | fix(studioflow): Gantt "Today" label no longer hides a week number; browser walk part 3 - phase flow, Timeline, Schedule (Lead)
+
+- **Walk part 3** (isolated test server, seeded project): send an iteration to the client, record the answer with a bulleted note (bullet button on the selected lines, Enter continues the list), choose Revision: the next iteration "Moodboard 2" shows the brief "Client notes from Moodboard 1" as a list with "Add to notes", the earlier iteration is listed as "Revision asked" with its dates, and the undo bar counts down. "Edit dates and plan" opens the Timeline dialog with the lead times loaded; "Save and apply plan" computed Design Final, CD Mall, CD Final, END, Fit Out Start, Handover and Opening forecast correctly (checked by counting working days) and reported "Plan applied to 3 phases". The Product Schedule loads, creates a typed new category with its first item and offers Open / Delete on right-click. The Timeline is readable in Dark at Week and Month zoom.
+- **Found and fixed.** The "Today · date" pill sat on the same row as the week numbers and hid one of them (the 5 on the week view); the axis header is now 58 px, with the pill on a row of its own between the month names and the week numbers. Checked at Week and Month zoom, light and dark.
+- **Found, recorded:** the bullet and numbering buttons add nothing when the note is empty (BACKLOG [CLEANUP]). On a fresh account the first-use tour also opens on a project deep link and can sit on top of the first click; Esc closes it.
+- Not walked: see BACKLOG (client-note images need a file upload; MOM and Presentation editors; BQ; sample shelf; the 840 px rail).
+
+**Checks.** `tsc --noEmit`, lint (StudioFlow components). Full tests not re-run: one presentation constant changed.
+
 ## R8.424 | 2026-10-08 | fix(masterdata): directory tables fit a 1000 px window without a scrollbar; browser walk part 2 - the labor grids (Lead)
 
 - **Tables (owner request).** The Brands table lost its Owner column (the owner already heads "Supplied by", marked "(owner)"), has a flexible Brand column, narrower fixed columns, half the side padding between columns, and short link labels (Web, IG, Catalog; the full text is the tooltip); the Pricing tables get the same padding and a lower minimum width. The main cause of the scrollbar was the shared "Actions" header: its label needed about 65 px in a 48 px column and spilled out of the table in every directory; it is now screen-reader text only. Measured in the browser at 1000 px: Brands, Suppliers and Material prices have no horizontal scroll (before: 904 px of content in an 886 px box on Brands, 1,180 px minimum on Pricing).

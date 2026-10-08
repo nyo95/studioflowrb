@@ -97,7 +97,7 @@ export function GanttChart({ rows, today, zoom, label }: { rows: GanttRowData[];
 
 function AxisHeader({ axis }: { axis: GanttAxis }) {
   return (
-    <div className="flex bg-surface-raised" style={{ height: 40 }}>
+    <div className="flex bg-surface-raised" style={{ height: 58 }}>
       <div className="sticky left-0 z-20 shrink-0 border-r border-line bg-surface-raised" style={{ width: LABEL_WIDTH }} />
       <div className="relative shrink-0" style={{ width: axis.widthPx }}>
         {axis.months.map((month) => (
