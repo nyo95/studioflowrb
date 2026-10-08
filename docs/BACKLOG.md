@@ -235,15 +235,6 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   steps; check a step's `requires` against the permission registry.
 - [ ] [PLANNED] Tours for Master Data and BQ (same registration as
   `STUDIOFLOW_TOUR`), after the owner approves the StudioFlow flow.
-- [ ] [PLANNED][P2] WO-PLAT-COST-01 item B (from the 2026-10-07 audit, split off
-  after the Executor's BLOCKED report): split `apps/studioflow/phases/service.ts`
-  (1,210 lines: phase workflow, phase-template administration ~L798–L1076,
-  deliverables ~L1077–end) into three files behind the same
-  `studioFlow.phases.*` surface; a pure move, own work order and commit.
-- [ ] [PLANNED][P2] WO-PLAT-COST-01 item C: remove the ~40 `any` (`tx as any`,
-  `rows: any`) from `apps/masterdata` services with the real Prisma transaction
-  and row types; own work order, own commit. Do it before WO-MD-SCALE-01 touches
-  the same services.
 - [ ] [PLANNED][P3] Lead findings of the 2026-10-07 audit: shell polling fires
   twice on first load (mount effect and pathname effect), hard-coded "five
   phases" copy (new-project dialog, Projects header) although phase templates
@@ -280,10 +271,4 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   `mapWriteError` and returns a generic error. The update paths already collapse
   duplicates with a Map; make the create paths do the same (`createBrand` links
   and categories, `createVendor` supplier types, `createSku` categories).
-- [ ] [PLANNED][P3] Owner decision: "a live SKU keeps at least one live material
-  price" is enforced when one price is archived (`SKU_PRICE_REQUIRED`) but not
-  when its Supplier is archived (the cascade archives every price), and price-less
-  SKUs now exist on purpose. Keep the rule, drop it, or apply it to the cascade.
-- [ ] [PLANNED][P3] Owner decision: a Material+Labor price needs a labor-capable
-  Supplier only (`assertVendorLaborCapable`). Should it also require the Supplier
-  to supply material?
+- [ ] [PLANNED][P2] WO-MD-CRUD-01 (owner decisions 2026-10-08): the three [BUG] entries above, Material+Labor prices from a material, a labor or a both-capable Supplier, and archiving a Supplier also archives the Brands it owns with their SKUs and prices. Plan in `PLAN.md`; the Lead then updates the Pricing pickers and the quick-add supplier form.

@@ -1,103 +1,145 @@
 # Active Plan
 
-Plan ID: WO-PLAT-COST-02 (split the phase service; type the Master Data services — items B and C of the 2026-10-07 audit)
-Scope: Two independent, behaviour-preserving refactors, each its own commit. No product change, no schema change, no new dependency.
-Target revisions: not fixed in advance. The Lead and the Executor commit in parallel, so each takes the next unused revision from `CHANGELOG.md` at commit time (item B first, then item C).
+Plan ID: WO-MD-CRUD-01 (Master Data CRUD audit fixes: restore, brand edit, duplicates, supplier archive cascade, Material+Labor supplier rule)
+Scope: Master Data service fixes found by the Lead's read-only audit of 2026-10-08, with two owner decisions. Backend only; the Lead adjusts the supplier pickers and the quick-add supplier form afterwards.
+Target revisions: next unused revision at commit time; one commit per item group, in order A, B, C. Stopping after any committed group is a valid result (report the rest as not started); never commit a half-done group.
+
+Previous plan WO-PLAT-COST-02 is BUILT (items B and C at R8.406 and R8.409).
 Status: READY
 Priority: P2
-Owner: Product Owner ("paralel", 2026-10-07).
-Last updated: 2026-10-07
-
-Previous plan WO-PLAT-COST-01 (items A and D) is BUILT at R8.402.
+Owner: Product Owner. Decisions confirmed in chat on 2026-10-08 (kantor).
+Last updated: 2026-10-08
 
 ## Outcome
 
-Easier-to-change code with exactly the same behaviour: the 1,210-line phase
-service is three files by job, and the Master Data services stop bypassing the
-type checker.
-
-## Parallel-work rule (owner override of serial work, 2026-10-07)
-
-The Lead edits only these areas while the Executor runs: `src/platform/authenticated-shell`,
-`src/platform/ui_engine`, `src/proxy.ts`, `src/app/(platform)/studioflow/**`
-(screens), `src/app/(document)/**`, `src/app/(platform)/bq/**` (screens), and
-docs. The Executor must not edit those. The Executor edits only
-`src/apps/studioflow/phases/**` (item B) and `src/apps/masterdata/**` (item C).
-Both stage only their own files and never run `git add -A`, `git stash`, `git
-checkout`, or reformat files they do not own. If a check fails in a file the
-other lane is editing, report it instead of fixing it.
+Master Data behaves the same on every path to the same state: a price-less SKU
+and its Brand can be restored, a Brand can be edited while its owner is archived,
+duplicate input never produces a generic error, archiving a Supplier archives
+what depends on it, and a Material+Labor price can come from a material
+supplier, a labor supplier or one that is both.
 
 ## Locked Decisions
 
-1. **Behaviour must not change.** The existing tests are the safety net.
-2. **Item B.** Split `apps/studioflow/phases/service.ts` by job into
-   three files: the phase workflow (commands and reads, incl. iterations,
-   notes, images, outcomes, undo, completion), phase-template administration
-   (templates and definitions, currently ~L798–L1076) and deliverables
-   (currently ~L1077–end, incl. the expiry sweep). `createPhaseService` keeps its
-   name, signature and the exact same members, composed from the three parts, so
-   no caller outside `phases/` changes. A pure move: no logic edit, rename or
-   reformat mixed in. Add a test that lists the members of `studioFlow.phases`
-   and compares them with the list before the split (capture it first).
-3. **Item C.** Remove `any` from the Master Data services by using the
-   real Prisma transaction and row types. Files with `any` today: `service.ts`
-   (2), `services/deletion.service.ts` (11), `services/pricing.service.ts` (20),
-   `services/sku-price-workbook.service.ts` (3),
-   `services/price-database-workbook.service.ts` (2), `services/vendor.service.ts`
-   (1). Where a cast is truly unavoidable (for example giving a service a
-   transaction as its client), keep one commented, typed helper in
-   `services/shared.ts` instead of scattered casts.
-4. **Stopping rule.** Each item is verified and committed on its own. If the
-   run window ends after B, stop with B committed and report C as not started;
-   that is a valid result, not a failure. Never commit a half-done item.
+Owner (2026-10-08):
+
+1. **Supplier archive cascade.** Archiving a Supplier archives every price of it
+   (Material, Labor, Material+Labor, as today) **and every Brand it owns**
+   (`Brand.owner_vendor_id`), each Brand with its SKUs and their material prices
+   exactly as `archiveBrand` does. A Brand that merely lists the Supplier as one
+   of its suppliers stays live (other suppliers may still carry it). Restoring
+   the Supplier restores what it caused, with the existing restore checks.
+   The Brand-archived-by-Supplier uses the existing archive-cause model: a
+   `PARENT` cause (`parent_type: "vendor"`) on the Brand; a Brand that was also
+   archived by hand keeps its own direct cause and stays archived after the
+   Supplier is restored.
+2. **The "keep one live price" rule.** Archiving a single price by hand still
+   refuses to archive a live SKU's last live price (`SKU_PRICE_REQUIRED`).
+   Cascades (Supplier, Brand, SKU) are exempt, as they are today for Brand and
+   SKU. No change to that rule's code beyond not applying it to cascades.
+3. **Material+Labor supplier.** A Material+Labor price accepts a Supplier that
+   can supply material, or can provide labor, or both. A Labor price still needs
+   a labor-capable Supplier; a Material price still needs a material-capable one.
+
+## Backend Contract
+
+**Item group A — restore and edit bugs** (BACKLOG [BUG] entries of 2026-10-08):
+- A1. A SKU with no archived-with-it prices restores. `assertSkuRestorable`
+  (`services/shared.ts`) must stop demanding a restorable price when the SKU
+  had none; it keeps every other check. `restoreSku` and `restoreBrand` both
+  succeed for a price-less SKU. A SKU whose prices exist but are all still held
+  by another archive cause keeps the current refusal.
+- A2. `updateBrand` checks the owner Supplier only when the owner is being
+  changed to a new one. Saving a live Brand whose current owner is archived
+  works for every other field; setting an archived Supplier as the owner is
+  still refused; `restoreBrand` keeps its own owner check.
+- A3. Create paths collapse duplicate input like the update paths do: link
+  URLs (trimmed, case as the unique index sees them), category ids, supplier
+  ids and hashtags in `createBrand`; supplier type ids in `createVendor`;
+  category ids in `createSku`. No generic error from a unique index for input
+  the caller repeated.
+
+**Item group B — Material+Labor capability** (decision 3):
+- `createPriceMaterialLabor`, `updatePriceMaterialLabor`, the bulk/matrix
+  creation for kind `material-labor`, `assertWorkPriceRestorable` for
+  `material-labor`, and `assertVendorTypeRemovalSafe` use a new check
+  "material-capable or labor-capable" for Material+Labor prices only.
+  Removing a Supplier Type is blocked for Material+Labor prices only when the
+  Supplier would end up with neither capability.
+- `listPricingWorkRefs` returns the Suppliers a Labor price may use and
+  separately the Suppliers a Material+Labor price may use (material- or
+  labor-capable), so the screens can offer the right list. `createPricingVendorQuick`
+  accepts capability `WORK` (either capability) for Material+Labor, still
+  refusing a Supplier Type that supplies neither.
+- The Lead then updates the pickers and the quick-add form; do not change screens.
+
+**Item group C — supplier archive cascade** (decision 1):
+- `archiveVendor` additionally archives the Brands it owns that are live, each
+  with the same cascade `archiveBrand` runs (extract one shared helper; no
+  second copy of that logic), records the audit counts for brands, SKUs and
+  prices, and `restoreVendor` restores those Brands and their SKUs and prices
+  through the existing cause bookkeeping, running the existing restore checks
+  (identity conflict, archived category, archived unit, and so on); a failed
+  check names the Brand and refuses the whole restore.
 
 ## Boundaries and Non-goals
 
-No schema or migration change; no change to permissions or results; no new
-abstraction beyond the single typed helper in item C; no work on the Lead's
-areas above; no push, tag, PR or release.
+No schema change expected (the cause table already carries parent type and id);
+if one proves necessary, stop with BLOCKED / CONFLICT. No screen changes. No
+change to the deletion-request workflow, to who may do what, or to SKU, unit,
+category and workbook code except where an item names it. No push, tag, PR or
+release.
 
 ## Acceptance Criteria
 
-1. B: `studioFlow.phases` has the same members as before; `phases/service.ts`
-   no longer contains template or deliverable code; every existing phase,
-   template and deliverable test passes unchanged.
-2. C: `grep -rnE ": any\b|as any\b" src/apps/masterdata --include=*.ts` returns
-   no match outside tests, or only the one documented helper; Master Data tests
-   pass unchanged.
-3. `tsc --noEmit` reports no new error in either item.
+1. A: archive then restore a price-less SKU works; archive then restore a Brand
+   holding a price-less SKU works; a SKU with prices still held by another cause
+   still refuses; renaming a Brand whose owner is archived works; making an
+   archived Supplier the owner is refused; creating a Brand with the same link
+   URL, category, supplier or hashtag twice succeeds once each; the same for a
+   Supplier's types and a SKU's categories.
+2. B: Material+Labor price accepted for a material-only, a labor-only and a
+   both-capable Supplier, refused for one with neither; Labor price still needs
+   labor; restore and Supplier-Type removal follow the new rule; the matrix and
+   bulk paths accept the same Suppliers as the single create.
+3. C: archiving a Supplier archives its prices and the Brands it owns with their
+   SKUs and prices, and not a Brand that only lists it as a supplier; restoring
+   it brings back exactly what it caused; a Brand also archived by hand stays
+   archived; a restore blocked by a check leaves everything unchanged.
+4. Each group has its own integration tests in the existing style, and the
+   existing suites pass unchanged except where a test asserted the old behaviour
+   (name each changed expectation in the changelog).
 
 ## Verification
 
-For each item, before its commit: `tsc --noEmit`, `npm run lint -- --quiet`,
-`check:boundaries`, `check:legacy-runtime`, `npm test` (full; report any
-failed, skipped or cancelled, and name the known flaky workbook test in BACKLOG
-if it is the only failure and passes on one re-run), `npm run build`. Run
-long checks as background jobs so the run window is not the limit. Verify the
-database target is rebuild-only before any database command. Browser not
-required.
+Per commit: `tsc --noEmit`, `npm run lint -- --quiet`, `check:boundaries`,
+`check:legacy-runtime`, `npm test` (full), `npm run build`; run the long ones in
+the background and finish them before the commit. Verify the database target is
+rebuild-only before any database command. Browser not required.
 
 ## Reviewer Acceptance
 
-Lead reads each commit as a diff (moves only for B; type-only for C) and
-re-runs the full gates.
+The Lead walks the Pricing screen (Material+Labor supplier lists and the quick
+add), archives and restores a test Supplier that owns a Brand, and restores a
+price-less sample SKU, in the browser.
 
 ## Regression Risks and Recovery
 
-B can break an import cycle or drop a member from the composed service: the
-member-list test guards it. C can change inferred types in a way that hides a
-real bug: if a typed version exposes an actual defect, record it as `[BUG]` in
-BACKLOG and keep behaviour. Each item reverts as one commit.
+The cascade touches every archive and restore path, so the existing archive
+cause tests are the guard; item group C can be reverted alone as one commit. The
+capability rule changes who may be picked for Material+Labor prices, never what
+is stored.
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and `PLAN.md`, then implement item B (target
-revision: next unused) and then item C (next unused after B) of WO-PLAT-COST-02, each verified and
-committed on its own, and nothing beyond them. The Lead is editing other areas
-in parallel; follow the Parallel-work rule in `PLAN.md` exactly and stage only
-your own files. Run the long checks (`npm test`, `npm run build`) as background
-jobs. Update `CHANGELOG.md` for each revision. Stop only for a material
-locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT
-report; otherwise report each commit, checks, limitations, and remaining
-unrelated dirty files.
+`docs/agent/EXECUTOR.md`, and `PLAN.md`, then implement WO-MD-CRUD-01 as three
+separately verified and committed groups in the order A, B, C (each takes the
+next unused revision from `CHANGELOG.md` at commit time), and nothing beyond
+them. Edit only `src/apps/masterdata/**`, `CHANGELOG.md` and `docs/BACKLOG.md`;
+close the matching BACKLOG [BUG] entries only after their group is verified.
+The Lead may edit other areas in parallel, so stage only your own files. Run the
+long checks (`npm test`, `npm run build`) as background jobs and finish them
+before each commit; never commit a half-done group. Stop only for a material
+locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report;
+otherwise report each commit, checks, limitations, and remaining unrelated dirty
+files.

@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.410 | 2026-10-08 | docs(plan): WO-MD-CRUD-01; review of R8.409 PASS (Lead)
+
+- **Review of R8.409 (`adddd07`, WO-PLAT-COST-02 item C): PASS.** The diff is type-only: `as any` replaced by `TxClient`, `Prisma.InputJsonArray` and one documented `asPrismaClient` helper in `services/shared.ts`. Lead re-ran `tsc --noEmit` and the full tests: 938/938. Items B (R8.406) and C (R8.409) of the 2026-10-07 audit are closed; their BACKLOG entries are removed.
+- **Environment note.** The earlier test database container (`studioflowrb-gateb-test-db`, port 5433) is stopped (exit 255, likely a Docker restart), so the Executor started `studioflowrb-cost02-test-db` on the same port with a fresh, empty rebuild database. Anything that lived only in the old container (including the dev server's data) is not served until it is started again; the two cannot run together on 5433.
+- **PLAN.md READY: WO-MD-CRUD-01** with the owner's two decisions: Material+Labor prices accept a material-, labor- or both-capable Supplier, and archiving a Supplier also archives the Brands it owns with their SKUs and prices. Three groups for the Executor (restore and edit bugs plus duplicate input; Material+Labor capability; supplier archive cascade).
+
+**Checks.** `tsc --noEmit`, `npm test` 938/938 (none failed, skipped or cancelled). Docs only otherwise.
+
 ## R8.409 | 2026-10-08 | refactor(masterdata): type service transactions and rows (Executor)
 
 - Replaced production `any` in the Master Data service, deletion, pricing, workbook, and vendor paths with Prisma transaction, query, and JSON types. One documented helper holds the unavoidable transaction-client boundary used by nested service factories. Behaviour is unchanged.
