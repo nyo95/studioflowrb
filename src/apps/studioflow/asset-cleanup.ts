@@ -36,7 +36,7 @@ async function isReferenced(db: Db | TxClient, key: string): Promise<boolean> {
   const references = await Promise.all([
     db.sfDeliverable.count({ where: { storage_key: key } }),
     db.sfMomImage.count({ where: { storage_key: key } }),
-    db.sfIterationImage.count({ where: { storage_key: key } }),
+    db.sfPhaseNoteImage.count({ where: { storage_key: key } }),
     db.sfScheduleOption.count({ where: { image_key: key } }),
     db.sfScheduleTemplateItem.count({ where: { image_key: key } }),
     db.sfClient.count({ where: { logo_storage_key: key } }),

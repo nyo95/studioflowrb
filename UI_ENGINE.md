@@ -965,6 +965,14 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   no text field; one mounted intake per page may ask for it. `FileDropZone`,
   `ImageWorkspace`, the StudioFlow notes images, and the quick messenger all
   take files through it; no app or shell keeps its own drop/paste handlers.
+- `ImageGallery` (R8.446) owns thumbnails that open large in a viewer with
+  Previous/Next and the arrow keys, and an optional remove button per image.
+  It takes consumer URLs (often short-lived signed links) and owns no storage
+  or removal policy.
+- `RichTextEditor` keeps notes in the `FormattedText` dialect. With
+  `onSubmit` it sends chat-style (R8.446): Enter submits, Shift+Enter starts a
+  new line, Enter inside a list adds the next item, Ctrl/Cmd+Enter always
+  submits. `compact` gives a short composer box that grows with its text.
 - `ImageWorkspace` owns browser selection (picker, drop, paste, or an
   `initialFile` handed over by the consumer), preview, crop through zoom/focus
   (optionally locked to an `aspect`), freehand annotation, PNG or JPEG output

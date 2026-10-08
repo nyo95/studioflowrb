@@ -125,6 +125,11 @@ describe("formatInstant display styles (shared by app directories)", () => {
     );
   });
 
+  it("'time' renders only the short time, in the display timezone", () => {
+    assert.equal(formatInstant(instant, { locale: "en-US", timeZone: "UTC", style: "time" }), "6:30 PM");
+    assert.equal(formatInstant(instant, { locale: "id-ID", timeZone: "Asia/Jakarta", style: "time" }), "01.30");
+  });
+
   it("keeps timezone conversion identical to the pre-consolidation raw formatter", () => {
     assert.equal(formatInstant(instant, { locale: "en-US", timeZone: "UTC", style: "datetime" }),
       new Intl.DateTimeFormat("en-US", { timeZone: "UTC", dateStyle: "medium", timeStyle: "short" }).format(new Date(instant)));

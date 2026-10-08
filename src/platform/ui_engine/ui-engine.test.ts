@@ -92,6 +92,8 @@ describe("UI Engine foundation", () => {
       "shrinkImageFile",
       // R7.52 — activated by the project MOM image consumer.
       "ImageWorkspace",
+      // Thumbnails that open large; first consumers are the StudioFlow phase notes (WO-SF-NOTEFEED-01).
+      "ImageGallery",
       "useDebouncedValue",
       "useOptionOverlay",
       "useConfirm",

@@ -20,7 +20,7 @@ export function FormattedInstant({
   value: Date | string;
   locale: string;
   timeZone: string;
-  style?: "date" | "datetime";
+  style?: "date" | "datetime" | "time";
 }) {
   const iso = typeof value === "string" ? value : value.toISOString();
   return <time dateTime={iso}>{formatInstant(iso, { locale, timeZone, style })}</time>;

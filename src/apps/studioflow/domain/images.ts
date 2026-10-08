@@ -21,6 +21,6 @@ export function sniffImage(body: Uint8Array, contentType: string): boolean {
   return false;
 }
 
-/** Images on one iteration's client notes (WO-SF-NOTE-IMG-01): size matches MOM/Schedule photos. */
-export const ITERATION_IMAGE_BYTES = 3 * 1024 * 1024;
-export const ITERATION_IMAGE_LIMIT = 12;
+/** Images on one phase note message (WO-SF-NOTEFEED-01): size matches MOM/Schedule photos. */
+export const NOTE_IMAGE_BYTES = 3 * 1024 * 1024;
+export const NOTE_IMAGE_LIMIT = 12;

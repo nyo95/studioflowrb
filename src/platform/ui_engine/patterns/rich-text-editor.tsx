@@ -14,6 +14,13 @@ export type RichTextEditorProps = {
   placeholder?: string;
   "aria-label"?: string;
   className?: string;
+  /**
+   * Chat-style sending: Enter calls this, Shift+Enter starts a new line, and Enter inside a list still adds the next
+   * item (Ctrl/Cmd+Enter sends from there). Without it, Enter starts a new line as usual.
+   */
+  onSubmit?: () => void;
+  /** A short box that grows with its text, for a composer; the default is a note-sized box. */
+  compact?: boolean;
 };
 
 /**

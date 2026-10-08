@@ -1,5 +1,17 @@
 # Changelog
 
+## R8.446 | 2026-10-08 | feat(studioflow): phase notes become a chat-style message stream (Lead)
+
+- **Owner request (2026-10-08):** Notes should work like sending WhatsApp messages to yourself: drop info, client feedback and screenshots in one place, star what matters, and no Undo bar for notes. Built by the Lead end to end at the owner's request (no Executor hand-off); WO-SF-NOTEFEED-01 in PLAN.md.
+- **Phase page:** the Notes card is one stream per phase, oldest first, grouped by day. Each message shows its round label (D1, D2…), author, time, "edited", and a Client feedback badge. Star (pinned, shown on top), mark/unmark client feedback, edit (paste or drop more images while editing), delete with a confirm. Filters: All, Starred, Client feedback, and one per round (with its dates, outcome and Rename). Composer: Enter sends, Shift+Enter new line, Enter in a list adds an item; images pasted, dropped or picked wait as thumbnails until sent.
+- **Elsewhere:** "Client answered" posts the text and pasted screenshots as client feedback on that round. A visit's note is posted as a message on the visit. The project card's "Client notes…" became "Add note…", and its pinned-notes dialog lists starred messages per phase. Removed: the per-round notes editor, the "Pinned for this phase" box and the "Brief" box: earlier feedback now sits above in the stream and under the Client feedback filter.
+- **Data (migration `20261008140000_sf_phase_note_feed`):** new `sf_phase_note` and `sf_phase_note_image`. Each round's note and images became one client-feedback message on that round (a visit's note an unmarked one), and each pinned note a starred message without a round; then `sf_iteration_image`, `sf_revision.note` and `sf_phase.note` were dropped. Applied to `studioflow_rebuild` (4 notes converted: 3 client feedback, 1 starred) and `studioflow_rebuild_test`. Home DB still to migrate.
+- **Rules:** notes are not phase steps (no `SfPhaseEvent`, never undone; audited as `studioflow.phase-note.*`). An iteration with messages counts as attached work (not deleted, its creation not undone). An admin reset keeps the messages, without the round label. Asset reference checks and archived-asset retention read note images.
+- **Shared layer:** UI Engine `ImageGallery` (thumbnails + viewer, replaces the StudioFlow-only list), `RichTextEditor` `onSubmit`/`compact` and a visible placeholder, `formatInstant` style `"time"`. UI_ENGINE.md and the StudioFlow contract (§5.2, §5.3, §6.1, §7) updated.
+- **Dependencies:** none.
+
+**Checks.** `prisma validate`; `tsc --noEmit`; eslint on StudioFlow and `src/platform` (only an existing `<img>` warning); `npm test` 963/963 (none failed, skipped or cancelled). Dev DB diff against the schema shows only the existing `sf_holiday` drift. `npm run build` not run (the dev server on this checkout was left running). No browser check; the dev server needs a restart for the new Prisma client.
+
 ## R8.445 | 2026-10-08 | feat(ui-engine): paste or drop a photo like in Notes, through one shared intake (Lead)
 
 - **Owner request:** "Change photo" in the Schedule spec panel should take Ctrl+V like the Notes do. Copy an image, then press Ctrl+V anywhere in the panel outside a text field (or drop it on the photo box): the photo editor opens with the image already in it, ready to crop. The new-option photo and the photo editor itself take a paste or drop too. A hint "Or paste a photo (Ctrl+V)" sits under the photo box.

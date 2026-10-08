@@ -7,6 +7,7 @@ export * from "./draft-dialog";
 export * from "./file-drop-zone";
 export * from "./file-intake";
 export * from "./hooks";
+export * from "./image-gallery";
 export * from "./image-workspace";
 export * from "./inline-edit";
 export * from "./pagination";

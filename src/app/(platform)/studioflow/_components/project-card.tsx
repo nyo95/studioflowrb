@@ -6,11 +6,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { phaseStepPresentation } from "@/apps/studioflow/domain/phase-display";
-import { Badge, Button, Dialog, Field, FormActions, IconButton, InlineError, PipelineStrip, RowActionMenu, RichTextEditor, SectionCard, Textarea, type RowActionItem } from "@/platform/ui_engine";
+import { Badge, Button, Dialog, Field, FormActions, IconButton, InlineError, PipelineStrip, RowActionMenu, SectionCard, Textarea, type RowActionItem } from "@/platform/ui_engine";
 
 import { projectCompletionAction } from "../actions";
 import { IterationButtons, UndoBar, usePhaseCommands, VisitDialog, type IterationView, type PhaseView } from "./phase-commands";
-import { IterationImageArea, type IterationImage } from "./iteration-images";
+import { NoteComposer } from "./phase-note-composer";
 import { PhaseNotesDialog } from "./phase-notes-dialog";
 import { ProjectCompletionDialog } from "./project-completion";
 import { useCommand } from "./use-command";
@@ -22,12 +22,13 @@ export type ProjectCardPhase = {
   seat: "designer" | "drafter";
   is_supervision: boolean;
   can_start: boolean;
-  has_note: boolean;
+  /** Starred messages in the phase notes. */
+  starred_notes: number;
   iteration_count: number;
   skipped_reason: string | null;
   can_add_round: boolean;
   last_visit_days_ago: number | null;
-  current_iteration: { id: string; name: string; short_name?: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[]; note: string | null; images?: readonly IterationImage[] } | null;
+  current_iteration: { id: string; name: string; short_name?: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[] } | null;
 };
 
 export type ProjectCardData = {
@@ -50,9 +51,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
   const [notesOpen, setNotesOpen] = useState(false);
   const [confirmComplete, setConfirmComplete] = useState(false);
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [notesFor, setNotesFor] = useState<{ phaseId: string; phaseName: string; iterationId: string; iterationName: string; note: string | null } | null>(null);
-  const notesImages = notesFor ? card.phases.find((p) => p.id === notesFor.phaseId)?.current_iteration?.images ?? [] : [];
-  const [notesDraft, setNotesDraft] = useState("");
+  const [noteFor, setNoteFor] = useState<{ phaseId: string; phaseName: string } | null>(null);
   const [skipPhase, setSkipPhase] = useState<{ id: string; name: string } | null>(null);
   const [skipReason, setSkipReason] = useState("");
 
@@ -69,7 +68,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
   const steps = card.phases.map((phase, index) => {
     const current = phase.current_iteration;
     const view: PhaseView = { id: phase.id, name: phase.name, status: phase.status, isSupervision: phase.is_supervision, canStart: phase.can_start };
-    const iteration: IterationView | null = current ? { id: current.id, name: current.short_name ?? current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices, note: current.note, images: current.images ?? [] } : null;
+    const iteration: IterationView | null = current ? { id: current.id, name: current.short_name ?? current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices } : null;
     const canAct = !completed && projectActive && viewer.canWork && seatOwner(phase);
     const display = phaseStepPresentation({
       phaseName: phase.name,
@@ -83,7 +82,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
     });
     const phaseMenu: RowActionItem[] = [
       { label: "Open phase", onSelect: () => router.push(`/studioflow/projects/${card.id}?phase=${phase.id}`) },
-      ...(current && current.state !== "SENT" && canAct ? [{ label: "Client notes…", onSelect: () => { setNotesFor({ phaseId: phase.id, phaseName: phase.name, iterationId: current.id, iterationName: current.short_name ?? current.name, note: current.note }); setNotesDraft(current.note ?? ""); } }] : []),
+      ...(canAct ? [{ label: "Add note…", onSelect: () => setNoteFor({ phaseId: phase.id, phaseName: phase.name }) }] : []),
       ...(phase.can_add_round && canAct ? [{ label: "+ New iteration", onSelect: () => void commands.exec(`${phase.id}:add`, { command: "addIteration", phaseId: phase.id }, `New ${phase.name} iteration added`) }] : []),
       ...((phase.status === "PENDING" || phase.status === "ACTIVE") && !completed && projectActive && viewer.canReview && seatOwner(phase) ? [{ label: "Skip phase…", separatorBefore: true, onSelect: () => { setSkipPhase({ id: phase.id, name: phase.name }); setSkipReason(""); } }] : []),
     ];
@@ -117,7 +116,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
             {completed ? <Badge tone="success"><Check className="h-3 w-3" aria-hidden="true" />Completed</Badge> : null}
             {card.dependents_review_suggested ? <Badge tone="warning" title="An earlier phase is active again while a later one is already done.">Check later phases</Badge> : null}
             <span className="relative inline-flex">
-              <IconButton size="sm" variant="ghost" label="Pinned notes" icon={<StickyNote aria-hidden="true" />} onClick={() => setNotesOpen(true)} />
+              <IconButton size="sm" variant="ghost" label="Starred notes" icon={<StickyNote aria-hidden="true" />} onClick={() => setNotesOpen(true)} />
               {card.note_phases.length > 0 ? <span className="pointer-events-none absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-warning" aria-hidden="true" /> : null}
             </span>
             <RowActionMenu items={menu} label="Project actions" pending={completion.pending} />
@@ -131,9 +130,9 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
         </div>
       </SectionCard>
       <VisitDialog open={visitPhaseId !== null} onOpenChange={(open) => { if (!open) setVisitPhaseId(null); }} pending={visitPhaseId !== null && commands.isPending(`${visitPhaseId}:visit`)} error={commands.error} onSave={(visitDate, note) => commands.exec(`${visitPhaseId}:visit`, { command: "createVisit", phaseId: visitPhaseId!, visitDate, note }, "Site visit added")} />
-      <PhaseNotesDialog projectId={card.id} open={notesOpen} onOpenChange={setNotesOpen} canEdit={canManage || card.phases.some(seatOwner)} />
+      <PhaseNotesDialog projectId={card.id} open={notesOpen} onOpenChange={setNotesOpen} />
       <ProjectCompletionDialog projectId={card.id} projectName={card.name} open={confirmComplete} onOpenChange={setConfirmComplete} />
-      {notesFor ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("card-notes")) setNotesFor(null); }} title={`${notesFor.phaseName}: client notes`} description="The client's notes for this iteration. They carry over to the next iteration."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("card-notes", { command: "setIterationNote", phaseId: notesFor.phaseId, iterationId: notesFor.iterationId, note: notesDraft.trim() || null }, `${notesFor.iterationName}: notes saved`)) setNotesFor(null); }}><IterationImageArea projectId={card.id} phaseId={notesFor.phaseId} iterationId={notesFor.iterationId} images={notesImages}><Field label="Client notes"><RichTextEditor maxLength={4000} value={notesDraft} autoFocus onChange={setNotesDraft} /></Field></IterationImageArea>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setNotesFor(null)} disabled={commands.isPending("card-notes")}>Cancel</Button><Button type="submit" variant="primary" pending={commands.isPending("card-notes")}>Save notes</Button></FormActions></form></Dialog> : null}
+      {noteFor ? <Dialog open onOpenChange={(open) => { if (!open) setNoteFor(null); }} title={`${noteFor.phaseName}: add a note`} description="It goes to this phase's notes, labelled with the iteration running now."><NoteComposer projectId={card.id} phaseId={noteFor.phaseId} autoFocus onSent={() => setNoteFor(null)} /></Dialog> : null}
       {skipPhase ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("card-skip")) setSkipPhase(null); }} title="Skip this phase" description="The phase is marked done without work. A reason is recorded."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("card-skip", { command: "bypass", phaseId: skipPhase.id, reason: skipReason }, `${skipPhase.name} skipped`)) setSkipPhase(null); }}><Field label="Reason" required><Textarea rows={2} value={skipReason} maxLength={500} placeholder="e.g. Moodboard supplied by the client" onChange={(event) => setSkipReason(event.target.value)} /></Field>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setSkipPhase(null)} disabled={commands.isPending("card-skip")}>Cancel</Button><Button type="submit" variant="primary" pending={commands.isPending("card-skip")} disabled={!skipReason.trim()}>Skip phase</Button></FormActions></form></Dialog> : null}
     </article>
   );

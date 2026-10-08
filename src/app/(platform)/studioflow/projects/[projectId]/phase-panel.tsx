@@ -5,21 +5,20 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { Badge, Button, ButtonMenu, Dialog, Field, FormActions, InlineError, Input, RadioGroup, SectionCard, Text, Textarea } from "@/platform/ui_engine";
 
-import { NotesWorkspace, ITERATION_STATE_LABEL as STATE_LABEL, ITERATION_STATE_TONE as STATE_TONE, type IterationRow } from "./notes-workspace";
+import { NotesWorkspace, ITERATION_STATE_LABEL as STATE_LABEL, ITERATION_STATE_TONE as STATE_TONE, type IterationRow, type PhaseNoteRow } from "./notes-workspace";
 import { IterationButtons, UndoBar, usePhaseCommands, VisitDialog, type IterationView, type PhaseView } from "../../_components/phase-commands";
 
 
-export function PhasePanel({ projectId, phase, current, iterations, note, skippedReason, startBlockedReason, canAct, canSkip, canNote, canOverride, archived, children, aside }: {
+export function PhasePanel({ projectId, phase, current, iterations, notes, skippedReason, startBlockedReason, canAct, canSkip, canOverride, archived, children, aside }: {
   projectId: string;
   phase: PhaseView;
   current: IterationView | null;
   iterations: IterationRow[];
-  note: string | null;
+  notes: readonly PhaseNoteRow[];
   skippedReason: string | null;
   startBlockedReason: string | null;
   canAct: boolean;
   canSkip: boolean;
-  canNote: boolean;
   canOverride: boolean;
   archived: boolean;
   children?: ReactNode;
@@ -34,8 +33,6 @@ export function PhasePanel({ projectId, phase, current, iterations, note, skippe
   const [resetOpen, setResetOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [reset, setReset] = useState({ mode: "HARD_RESET_ACTIVE" as "HARD_RESET_ACTIVE" | "HARD_RESET_PENDING", iteration: "1", note: "" });
-  const [noteDraft, setNoteDraft] = useState(note ?? "");
-  const [noteEditing, setNoteEditing] = useState(false);
   const acting = canAct && !archived;
   const currentRow = current ? iterations.find((item) => item.id === current.id) ?? null : null;
   const earlier = iterations.filter((item) => item.id !== current?.id);
@@ -60,7 +57,7 @@ export function PhasePanel({ projectId, phase, current, iterations, note, skippe
   const title = current ? current.name : "Current iteration";
   const nextStep = phase.status === "PENDING" ? (startBlockedReason ?? "Start this phase when work begins.")
     : phase.status === "DONE" ? (skippedReason ? `Skipped: ${skippedReason}` : `Done in ${iterations.length} iteration${iterations.length === 1 ? "" : "s"}.`)
-      : current?.state === "SENT" ? "The client's notes go here once they reply."
+      : current?.state === "SENT" ? "Waiting for the client. Their feedback goes in the notes below."
         : current?.state === "ANSWERED" ? "Choose the outcome when the team is ready."
           : "Prepare this iteration, then send it to the client.";
 
@@ -82,7 +79,7 @@ export function PhasePanel({ projectId, phase, current, iterations, note, skippe
             </div>
           </SectionCard>
 
-          <NotesWorkspace projectId={projectId} phaseId={phase.id} commands={commands} iterations={iterations} currentId={current?.id ?? null} closedBySkipId={closedBySkipId} pinned={note} canPin={canNote && !archived} canEdit={acting} locale={locale} timezone={timezone} onRename={openRename} />
+          <NotesWorkspace projectId={projectId} phaseId={phase.id} notes={notes} iterations={iterations} currentId={current?.id ?? null} closedBySkipId={closedBySkipId} canEdit={acting} locale={locale} timezone={timezone} onRename={openRename} />
           {children}
         </div>
 

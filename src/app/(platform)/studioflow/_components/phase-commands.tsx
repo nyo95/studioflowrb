@@ -6,8 +6,8 @@ import { currentDateOnly } from "@platform/utilities/date";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { Button, Dialog, Field, FormActions, InlineError, Input, SimpleTextEditor } from "@/platform/ui_engine";
 
-import { phaseCommandAction, undoPhaseEventAction, type PhaseCommandInput, type PhaseCommandOutcome } from "../actions";
-import { IterationImageArea, type IterationImage } from "./iteration-images";
+import { phaseCommandAction, phaseNoteAction, undoPhaseEventAction, type PhaseCommandInput, type PhaseCommandOutcome } from "../actions";
+import { NoteDraftFields, uploadNoteImages, useNoteDraft } from "./phase-note-composer";
 import { useCommand } from "./use-command";
 
 /** The commands a person can give a phase from a card or from the phase page (everything except `projectId`). */
@@ -24,13 +24,14 @@ export function usePhaseCommands(projectId: string) {
   const command = useCommand();
   const [undo, setUndo] = useState<Undo | null>(null);
 
-  const exec = (key: string, body: PhaseCommandBody, summary: string) =>
+  const exec = (key: string, body: PhaseCommandBody, summary: string, onResult?: (result: unknown) => void) =>
     command.run(
       key,
       () => phaseCommandAction({ ...body, projectId } as PhaseCommandInput),
       (data) => {
         const outcome = data as PhaseCommandOutcome;
         setUndo(outcome.undo ? { eventId: outcome.undo.eventId, summary, expiresAt: Date.parse(outcome.undo.expiresAt) } : null);
+        onResult?.(outcome.result);
       },
     );
 
@@ -79,10 +80,6 @@ export type IterationView = {
   choices: readonly string[];
   /** The outcomes offered once the client has answered (Revision / Done, or Continue to CD Final on CD Mall). */
   answerChoices?: readonly string[];
-  /** What the client said about this iteration. */
-  note?: string | null;
-  /** Images attached to those notes (WO-SF-NOTE-IMG-01). */
-  images?: readonly IterationImage[];
 };
 
 export type PhaseView = { id: string; name: string; status: "PENDING" | "ACTIVE" | "DONE"; isSupervision: boolean; canStart: boolean };
@@ -156,20 +153,34 @@ const OUTCOME: Record<string, { label: string; outcome: "REVISION" | "DONE" | "C
 };
 
 /**
- * "Client answered" (owner, 2026-10-05): what the client said is the iteration's notes, written here in one box,
- * then the outcome — OK, or a Revision whose next iteration shows these notes as its brief. "Decide later" keeps the
- * answer and the notes and leaves the choice on the card.
+ * "Client answered" (owner, 2026-10-05): what the client said is written here (text, pasted screenshots), then the
+ * outcome — OK, or a Revision. It is posted to the phase notes as client feedback on this iteration
+ * (WO-SF-NOTEFEED-01). "Decide later" keeps the answer and leaves the choice on the card.
  */
 export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { phase: PhaseView; iteration: IterationView; commands: PhaseCommands; onClose: () => void }) {
-  const [note, setNote] = useState(iteration.note ?? "");
+  const draft = useNoteDraft();
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [problems, setProblems] = useState<string[]>([]);
   const choices = (iteration.answerChoices ?? ["revision", "done"]).filter((choice) => OUTCOME[choice]);
   const it = { phaseId: phase.id, iterationId: iteration.id };
   const answer = async (choice: string | null) => {
     setBusyKey(choice ?? "later");
+    setProblems([]);
     try {
-      const answered = await commands.exec(`${phase.id}:answer`, { ...it, command: "recordClientAnswer", note: note.trim() ? note.trim() : null }, `${iteration.name}: client answered`);
+      const text = draft.text.trim();
+      const files = draft.files;
+      let noteId: string | null = null;
+      const answered = await commands.exec(`${phase.id}:answer`, { ...it, command: "recordClientAnswer", note: text || null }, `${iteration.name}: client answered`, (result) => { noteId = (result as { noteId?: string | null } | null)?.noteId ?? null; });
       if (!answered) return;
+      if (files.length > 0) {
+        // Screenshots only: they still need a client-feedback message to sit on.
+        if (!noteId) {
+          const posted = await phaseNoteAction({ command: "post", projectId: commands.projectId, phaseId: phase.id, body: null, clientFeedback: true, withImages: true });
+          if (posted.ok) noteId = posted.data.noteId; else setProblems([posted.error.safeMessage]);
+        }
+        if (noteId) setProblems(await uploadNoteImages(commands.projectId, phase.id, noteId, files));
+      }
+      draft.clear();
       if (choice) {
         const picked = OUTCOME[choice]!;
         if (!(await commands.exec(`${phase.id}:${choice}`, { ...it, command: "chooseOutcome", outcome: picked.outcome }, picked.summary(iteration.name)))) return;
@@ -184,7 +195,7 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
       open
       onOpenChange={(open) => { if (!open && !busyKey) onClose(); }}
       title={`${iteration.name}: the client answered`}
-      description="Write what the client said. If you choose Revision, the next iteration shows these notes as its brief."
+      description="Write what the client said, or paste their screenshots. It goes to the phase notes as client feedback."
       dismissible={!busyKey}
       footer={
         <div className="flex flex-wrap justify-end gap-2">
@@ -196,12 +207,11 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
       }
     >
       <div className="grid gap-3">
-        <IterationImageArea projectId={commands.projectId} phaseId={phase.id} iterationId={iteration.id} images={iteration.images ?? []} disabled={Boolean(busyKey)}>
-        <Field label="Client notes" description="One point per line is easiest to read later. Use the buttons for bold, bullets or numbering.">
-          <SimpleTextEditor rows={6} maxLength={4000} value={note} onChange={(event) => setNote(event.target.value)} placeholder={"e.g.\n- Warmer palette for the lounge\n- Keep the marble at reception"} autoFocus />
+        <Field label="Client feedback" description="One point per line is easiest to read later.">
+          <NoteDraftFields draft={draft} label="Client feedback" placeholder="e.g. warmer palette for the lounge" disabled={Boolean(busyKey)} autoFocus />
         </Field>
-        </IterationImageArea>
         {commands.error ? <InlineError>{commands.error}</InlineError> : null}
+        {problems.length > 0 ? <InlineError>{problems.join(" ")}</InlineError> : null}
       </div>
     </Dialog>
   );

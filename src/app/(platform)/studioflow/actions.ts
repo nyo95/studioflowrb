@@ -320,11 +320,9 @@ const PhaseCommand = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("addIteration"), projectId: Id, phaseId: Id }),
   z.strictObject({ command: z.literal("sendIteration"), projectId: Id, phaseId: Id, iterationId: Id }),
   z.strictObject({ command: z.literal("recordClientAnswer"), projectId: Id, phaseId: Id, iterationId: Id, note: z.string().max(4000).nullish() }),
-  z.strictObject({ command: z.literal("setIterationNote"), projectId: Id, phaseId: Id, iterationId: Id, note: z.string().max(4000).nullable() }),
   z.strictObject({ command: z.literal("chooseOutcome"), projectId: Id, phaseId: Id, iterationId: Id, outcome: z.enum(["REVISION", "DONE", "CONTINUE_CD_FINAL"]) }),
   z.strictObject({ command: z.literal("renameIteration"), projectId: Id, phaseId: Id, iterationId: Id, name: z.string().max(200) }),
   z.strictObject({ command: z.literal("deleteIteration"), projectId: Id, phaseId: Id, iterationId: Id }),
-  z.strictObject({ command: z.literal("setPhaseNote"), projectId: Id, phaseId: Id, note: z.string().max(4000).nullable() }),
   z.strictObject({ command: z.literal("dismissRequirement"), projectId: Id, phaseId: Id, itemId: Id }),
   z.strictObject({ command: z.literal("createVisit"), projectId: Id, phaseId: Id, visitDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), note: z.string().max(2000).nullish() }),
   z.strictObject({ command: z.literal("chooseVisit"), projectId: Id, phaseId: Id, iterationId: Id, outcome: z.enum(["NEXT_VISIT", "DONE"]) }),
@@ -348,11 +346,9 @@ export async function phaseCommandAction(input: PhaseCommandInput): Promise<Acti
       case "addIteration": result = await phases.addIteration(base); break;
       case "sendIteration": result = await phases.sendIteration({ ...base, iterationId: data.iterationId }); break;
       case "recordClientAnswer": result = await phases.recordClientAnswer({ ...base, iterationId: data.iterationId, note: data.note }); break;
-      case "setIterationNote": result = await phases.setIterationNote({ ...base, iterationId: data.iterationId, note: data.note }); break;
       case "chooseOutcome": result = await phases.chooseIterationOutcome({ ...base, iterationId: data.iterationId, outcome: data.outcome }); break;
       case "renameIteration": result = await phases.renameIteration({ ...base, iterationId: data.iterationId, name: data.name }); break;
       case "deleteIteration": result = await phases.deleteNeverSentIteration({ ...base, iterationId: data.iterationId }); break;
-      case "setPhaseNote": result = await phases.setPhaseNote({ ...base, note: data.note }); break;
       case "dismissRequirement": result = await phases.dismissRequirement({ ...base, itemId: data.itemId }); break;
       case "createVisit": result = await phases.createSupervisionVisit({ ...base, visitDate: data.visitDate, note: data.note ?? null }); break;
       case "chooseVisit": result = await phases.chooseSupervisionVisit({ ...base, iterationId: data.iterationId, outcome: data.outcome }); break;
@@ -366,28 +362,48 @@ export async function phaseCommandAction(input: PhaseCommandInput): Promise<Acti
   });
 }
 
-// Images on an iteration's client notes (WO-SF-NOTE-IMG-01). Not undoable, so no undo outcome is returned.
-const IterationImageForm = z.strictObject({ projectId: Id, phaseId: Id, iterationId: Id });
-export async function addIterationImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
+// ── Phase notes (WO-SF-NOTEFEED-01) ─────────────────────────────────────────
+// Notes are not phase steps: these actions return no undo outcome, so posting never shows the Undo bar.
+
+const NoteBody = z.string().max(4000).nullable();
+const PhaseNoteCommand = z.discriminatedUnion("command", [
+  z.strictObject({ command: z.literal("post"), projectId: Id, phaseId: Id, body: NoteBody, clientFeedback: z.boolean().optional(), withImages: z.boolean().optional() }),
+  z.strictObject({ command: z.literal("edit"), projectId: Id, phaseId: Id, noteId: Id, body: NoteBody }),
+  z.strictObject({ command: z.literal("flags"), projectId: Id, phaseId: Id, noteId: Id, starred: z.boolean().optional(), clientFeedback: z.boolean().optional() }),
+  z.strictObject({ command: z.literal("delete"), projectId: Id, phaseId: Id, noteId: Id }),
+  z.strictObject({ command: z.literal("removeImage"), projectId: Id, phaseId: Id, imageId: Id }),
+]);
+export type PhaseNoteCommandInput = z.infer<typeof PhaseNoteCommand>;
+
+export async function phaseNoteAction(input: PhaseNoteCommandInput): Promise<ActionResult<{ noteId: string }>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const data = parse(IterationImageForm, { projectId: formData.get("projectId"), phaseId: formData.get("phaseId"), iterationId: formData.get("iterationId") });
-    const file = formData.get("file");
-    if (!(file instanceof File)) throw new AppError("VALIDATION", "ITERATION_IMAGE_REQUIRED", "Choose an image.");
-    const result = await studioFlow.phases.addIterationImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
+    const data = parse(PhaseNoteCommand, input);
+    const base = { ...ctx, projectId: data.projectId, phaseId: data.phaseId };
+    const phases = studioFlow.phases;
+    let noteId: string;
+    switch (data.command) {
+      case "post": noteId = (await phases.postPhaseNote({ ...base, body: data.body, clientFeedback: data.clientFeedback, withImages: data.withImages })).noteId; break;
+      case "edit": noteId = (await phases.editPhaseNote({ ...base, noteId: data.noteId, body: data.body })).noteId; break;
+      case "flags": noteId = (await phases.setPhaseNoteFlags({ ...base, noteId: data.noteId, starred: data.starred, clientFeedback: data.clientFeedback })).noteId; break;
+      case "delete": noteId = (await phases.deletePhaseNote({ ...base, noteId: data.noteId })).noteId; break;
+      case "removeImage": noteId = (await phases.removePhaseNoteImage({ ...base, imageId: data.imageId })).noteId; break;
+    }
     refresh(data.projectId);
-    return { imageId: result.imageId };
+    return { noteId };
   });
 }
 
-const IterationImageRemove = z.strictObject({ projectId: Id, phaseId: Id, imageId: Id });
-export async function removeIterationImageAction(input: z.infer<typeof IterationImageRemove>): Promise<ActionResult<unknown>> {
+const NoteImageForm = z.strictObject({ projectId: Id, phaseId: Id, noteId: Id });
+export async function addPhaseNoteImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const data = parse(IterationImageRemove, input);
-    const result = await studioFlow.phases.removeIterationImage({ ...ctx, ...data });
+    const data = parse(NoteImageForm, { projectId: formData.get("projectId"), phaseId: formData.get("phaseId"), noteId: formData.get("noteId") });
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new AppError("VALIDATION", "NOTE_IMAGE_REQUIRED", "Choose an image.");
+    const result = await studioFlow.phases.addPhaseNoteImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
     refresh(data.projectId);
-    return result;
+    return { imageId: result.imageId };
   });
 }
 
@@ -432,10 +448,11 @@ export async function projectCompletionReadinessAction(projectId: string) {
   });
 }
 
-export async function listPhaseNotesAction(projectId: string) {
+/** Every phase's starred notes, for the project card's pinned-notes dialog. */
+export async function listStarredPhaseNotesAction(projectId: string) {
   return runSafeAction(async () => {
     const ctx = await context();
-    return studioFlow.phases.listPhaseNotes({ grants: ctx.grants, projectId: parse(Id, projectId) });
+    return studioFlow.phases.listStarredPhaseNotes({ grants: ctx.grants, projectId: parse(Id, projectId) });
   });
 }
 

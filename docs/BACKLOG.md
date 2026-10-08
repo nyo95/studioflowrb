@@ -156,6 +156,11 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   with a reason end to end and its "Complete anyway" entry in History, saving a
   multi-supplier grid with real suppliers, typing "By Request" in each price
   table, Library images from real Brand websites, the StudioFlow rail at 840 px.
+- [ ] [UNVERIFIED] Phase notes as a chat (R8.446, WO-SF-NOTEFEED-01): owner
+  walk on the phase page (send with Enter, paste/drop images, star, mark client
+  feedback, edit, delete, filters), the card's Add note… and Starred notes,
+  Client answered with pasted screenshots, a visit's note. Migration ran on the
+  office dev DB (4 notes converted, 1 starred); run it at home too.
 - [ ] [UNVERIFIED] Client notes replace feedback (R8.327): run the data
   migration on the office and home databases, read its precheck NOTICE, then
   spot-check a few projects' round notes and requirements.
@@ -170,13 +175,6 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   header and tabs stay fixed and only the content scrolls; the phase row
   scrolls inside its own card instead of pushing the page sideways. DESIGN v2
   (R8.357–R8.362) may already cover it; check at 390 px before planning.
-- [ ] [PLANNED][P2] Phase notes with the full editor (owner, 2026-10-07): the
-  client's notes per iteration (and the pinned note) move to the shared
-  `SimpleTextEditor` — checkbox, numbering, bullets, bold, plus pasted or
-  uploaded images on the existing storage. Replaces the plain-text client note
-  (owner: replace, not add alongside); the carry-over of notes to the next
-  iteration stays. Needs a Work Order with a safe migration of existing plain
-  notes. Independent of the working-time/Gantt item below.
 - [ ] [PLANNED][P3] Gantt follow-ups (R8.381 shipped the read-only Gantt, the
   project Timeline tab and the Plan panel): drag a bar to move or resize its
   dates (today a click opens the date dialog); a "today / this month" jump

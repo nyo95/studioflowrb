@@ -29,9 +29,11 @@ const EXTENSIONS = [
   Markdown,
 ];
 
-export default function RichTextEditorImpl({ value, onChange, maxLength, disabled, autoFocus, placeholder, "aria-label": ariaLabel, className }: RichTextEditorProps) {
+export default function RichTextEditorImpl({ value, onChange, maxLength, disabled, autoFocus, placeholder, "aria-label": ariaLabel, className, onSubmit, compact = false }: RichTextEditorProps) {
   // The last text we reported: the parent echoing it back is not a replacement, so typing is never reset.
   const reported = useRef(value);
+  const submitRef = useRef(onSubmit);
+  useEffect(() => { submitRef.current = onSubmit; });
   const editor = useEditor({
     extensions: EXTENSIONS,
     content: value,
@@ -39,7 +41,27 @@ export default function RichTextEditorImpl({ value, onChange, maxLength, disable
     editable: !disabled,
     autofocus: autoFocus ? "end" : false,
     immediatelyRender: false,
-    editorProps: { attributes: { role: "textbox", "aria-multiline": "true", ...(ariaLabel ? { "aria-label": ariaLabel } : {}) } },
+    editorProps: {
+      attributes: { role: "textbox", "aria-multiline": "true", ...(ariaLabel ? { "aria-label": ariaLabel } : {}) },
+      handleKeyDown: (view, event) => {
+        const submit = submitRef.current;
+        if (!submit || event.key !== "Enter" || event.isComposing) return false;
+        const { $from } = view.state.selection;
+        let inList = false;
+        for (let depth = $from.depth; depth > 0; depth -= 1) if (["listItem", "taskItem"].includes($from.node(depth).type.name)) inList = true;
+        if (event.ctrlKey || event.metaKey || (!event.shiftKey && !inList)) {
+          event.preventDefault();
+          submit();
+          return true;
+        }
+        // Shift+Enter starts a new paragraph (what Enter does without sending), not a soft line break the stored text cannot keep.
+        if (event.shiftKey && !inList) {
+          view.dispatch(view.state.tr.split(view.state.selection.from).scrollIntoView());
+          return true;
+        }
+        return false;
+      },
+    },
     onUpdate: ({ editor: current }) => {
       const markdown = current.getMarkdown();
       const next = maxLength !== undefined && markdown.length > maxLength ? markdown.slice(0, maxLength) : markdown;
@@ -72,12 +94,14 @@ export default function RichTextEditorImpl({ value, onChange, maxLength, disable
         {tool("Checklist", <ListChecks aria-hidden="true" size={14} />, !!editor?.isActive("taskList"), () => editor?.chain().focus().toggleTaskList().run())}
         {over ? <span className="ml-auto pr-1 text-xs text-ink-tertiary">Limit reached</span> : null}
       </div>
+      <div className="relative">
+      {placeholder && !value ? <span aria-hidden="true" className="pointer-events-none absolute left-3 top-2 text-sm text-ink-tertiary">{placeholder}</span> : null}
       <EditorContent
         editor={editor}
         data-placeholder={placeholder}
         className={cx(
-          "min-h-[116px] px-3 py-2 text-sm text-ink",
-          "[&_.ProseMirror]:min-h-[96px] [&_.ProseMirror]:outline-none [&_.ProseMirror]:[overflow-wrap:anywhere]",
+          compact ? "max-h-64 min-h-[44px] overflow-y-auto px-3 py-2 text-sm text-ink" : "min-h-[116px] px-3 py-2 text-sm text-ink",
+          compact ? "[&_.ProseMirror]:min-h-[24px] [&_.ProseMirror]:outline-none [&_.ProseMirror]:[overflow-wrap:anywhere]" : "[&_.ProseMirror]:min-h-[96px] [&_.ProseMirror]:outline-none [&_.ProseMirror]:[overflow-wrap:anywhere]",
           "[&_.ProseMirror_p]:my-0 [&_.ProseMirror_h2]:my-1 [&_.ProseMirror_h2]:text-base [&_.ProseMirror_h2]:font-semibold",
           "[&_.ProseMirror_ul]:my-0 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-5 [&_.ProseMirror_ol]:my-0 [&_.ProseMirror_ol]:list-decimal [&_.ProseMirror_ol]:pl-5",
           "[&_.ProseMirror_ul[data-type=taskList]]:list-none [&_.ProseMirror_ul[data-type=taskList]]:pl-0",
@@ -86,6 +110,7 @@ export default function RichTextEditorImpl({ value, onChange, maxLength, disable
           "[&_.ProseMirror_li[data-checked=true]>div]:text-ink-tertiary [&_.ProseMirror_li[data-checked=true]>div]:line-through",
         )}
       />
+      </div>
     </div>
   );
 }

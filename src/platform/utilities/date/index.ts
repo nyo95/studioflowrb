@@ -68,8 +68,9 @@ export type InstantDisplayOptions = {
    * - "long" (default) — explicit year/month/day/hour/minute tokens, long month name.
    * - "date" — `dateStyle: "medium"` (e.g. "10 Sep 2026"). No time component.
    * - "datetime" — `dateStyle: "medium", timeStyle: "short"` (e.g. "10 Sep 2026, 14:30").
+   * - "time" — `timeStyle: "short"` (e.g. "14:30"), for a list already grouped by day.
    */
-  style?: "long" | "date" | "datetime";
+  style?: "long" | "date" | "datetime" | "time";
 };
 
 /** Formats a UTC instant for display in an explicit/default timezone. Accepts a
@@ -86,6 +87,9 @@ export function formatInstant(value: string | Date, options: InstantDisplayOptio
   const style = options.style ?? "long";
   if (style === "date") {
     return new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium" }).format(new Date(iso));
+  }
+  if (style === "time") {
+    return new Intl.DateTimeFormat(locale, { timeZone, timeStyle: "short" }).format(new Date(iso));
   }
   if (style === "datetime") {
     return new Intl.DateTimeFormat(locale, { timeZone, dateStyle: "medium", timeStyle: "short" }).format(new Date(iso));

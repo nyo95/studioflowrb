@@ -23,7 +23,7 @@ with a better UI. Since then the owner has simplified the workflow further:
 |---|---|
 | RW-01 | A phase is a chain of **client-sent rounds** (iterations): `NOT_SENT → SENT → ANSWERED → REVISED / DONE`. No internal review and no `vMAJOR.MINOR` (WO-SF-ITER-01, R8.285–R8.295; legacy commands removed R8.321). |
 | RW-02 | A project has a **PIC Designer** and a **PIC Drafter**. Authorization = platform RBAC grant AND assignment (§3). The Construction Drawing phase is the drafter's seat. No role enum. |
-| RW-03 | What the client said is the round's **client notes**; per-point feedback is retired (R8.327). |
+| RW-03 | What the client said is a **client-feedback message** in the phase notes, labelled with its round; per-point feedback is retired (R8.327), and the per-round note and pinned note became one message stream per phase (WO-SF-NOTEFEED-01, R8.446). |
 | RW-04 | No personal to-dos, My Tasks or Quick add; the checklist holds **requirements** only (WO-SF-NOTES-ONLY-01, R8.342). |
 | RW-05 | A project completes **only** by an explicit "Mark as completed" (KB-060). |
 | RW-06 | Project names are free text; there is no project code (R8.213). |
@@ -96,7 +96,7 @@ owns grant mechanics.
 | `studioflow.project.manage` | Create/edit clients and projects, PICs, priority, status, archive/restore, mark completed; see every running project on Home; edit planned phase dates |
 | `studioflow.project.override` | Pass every assignment gate (replaces legacy "admin always allowed") |
 | `studioflow.project.pic-designer` / `.pic-drafter` | Positions: who may be picked for each PIC seat |
-| `studioflow.phase.work` | Round commands (add, send, client answered, outcome, visits, rename, delete unsent, notes), pinned note, dismiss requirement, undo of those commands, CD list, files |
+| `studioflow.phase.work` | Round commands (add, send, client answered, outcome, visits, rename, delete unsent), phase notes (post, edit, star, mark client feedback, delete, images), dismiss requirement, undo of the round commands, CD list, files |
 | `studioflow.phase.review` | Skip a phase that is pending or active (bypass, reason required) and undo that skip |
 | `studioflow.phase.override` | Admin reset of a phase's rounds (audited snapshot) |
 | `studioflow.task.manage` | Rename requirements, add subtasks |
@@ -196,11 +196,12 @@ phase is done (`canActivatePhase`); otherwise the screen says
 
 Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
 (`SfRevision`: `major`, `name`, `status`, `sent_at`, `answered_at`, `done_at`,
-`visit_date?`, `note?`):
+`visit_date?`):
 
 - `NOT_SENT` → **Send to client** → `SENT` (days waiting shown) → **Client
-  answered** (write the client notes) → `ANSWERED` → **Revision** (`REVISED`;
-  the next round opens with these notes as its brief) or **OK, done** (`DONE`;
+  answered** (write or paste what the client said; it is posted to the phase
+  notes as client feedback on this round) → `ANSWERED` → **Revision** (`REVISED`;
+  the next round opens) or **OK, done** (`DONE`;
   phase done). "Save, decide later" keeps the answer and leaves the choice.
 - **CD Mall** (the first of two iteration kinds) answers with Revision or
   **Continue to CD Final**; only CD Final's OK closes the phase.
@@ -214,10 +215,11 @@ Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
   (`domain/iteration-kinds.ts`), the same rule the commands enforce.
 - Commands: `addIteration`, `sendIteration`, `recordClientAnswer`,
   `chooseOutcome`, `createVisit`, `chooseVisit`, `renameIteration`,
-  `deleteIteration` (never-sent only), `setIterationNote`, `setPhaseNote`,
-  `dismissRequirement`, `bypass` (§5.3), `override` (§5.3). Each writes an
-  `SfPhaseEvent`; the person who made the latest change may **undo** it for
-  five minutes (`UNDO_WINDOW_MS`).
+  `deleteIteration` (never-sent only), `dismissRequirement`, `bypass` (§5.3),
+  `override` (§5.3). Each writes an `SfPhaseEvent`; the person who made the
+  latest change may **undo** it for five minutes (`UNDO_WINDOW_MS`). Phase
+  notes (§6.1) are not round commands: they write no event and are never
+  undone.
 - Round names default to `<phase> <n>`; screens show those as `Round <n>`
   (`domain/phase-display.ts`). Other names (CD Mall, renamed rounds, visits)
   show as stored. **Round** is the only user-facing word; `iteration` remains
@@ -229,14 +231,15 @@ Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
   and locked; a reason is required and audited. A sent or otherwise populated
   open round is closed and kept in history, labelled "Closed by skip" (never
   "Approved", which would claim a client approval). A never-sent round is removed only
-  when it has no client notes or files; skipping a pending phase
+  when it has no notes or files; skipping a pending phase
   still records its closed round 1. The next eligible phase opens by the normal
   auto-advance rule. Home and the phase strip say **Skipped**, and the phase
   page shows the reason. The same actor may undo the skip for five minutes;
   undo restores the exact phase/round state and removes the auto-opened phase.
 - **Admin reset** (`override`, `phase.override`): rewrite a phase's rounds to
   "restart at round N" or "back to not started"; a note is required and the
-  full history snapshot goes into the audit event.
+  full history snapshot goes into the audit event. The phase's notes stay;
+  they only lose their round label.
 
 ### 5.4 Files (deliverables)
 
@@ -257,14 +260,21 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
 
 ## 6. Notes and requirements
 
-### 6.1 Three kinds of text per phase
+### 6.1 Phase notes and requirements
 
-- **Client notes** (per round, `SfRevision.note`): what the client said.
-  Written at "Client answered", editable on any answered round while the
-  project is open, undoable, kept in the admin reset snapshot. Never copied,
-  ticked or assigned: a Revision answers them.
-- **Pinned note** (`SfPhase.note`, one per phase): what holds for the whole
-  phase, whatever the round.
+- **Phase notes** (`SfPhaseNote` + `SfPhaseNoteImage`, WO-SF-NOTEFEED-01,
+  owner 2026-10-08): one stream of messages per phase, like a chat to
+  yourself. A message has text (the `FormattedText` dialect, max 4000) and/or
+  up to 12 images (PNG/JPEG/WebP, 3 MB each, pasted, dropped or picked), its
+  author and time, and the round running when it was written as a label.
+  A message can be **starred** (the starred ones are the phase's pinned notes,
+  shown on top and in the card's Starred notes dialog), marked **client
+  feedback**, edited or deleted, on any phase of an open, active project,
+  including while the round is with the client. "Client answered" and a
+  visit's note post here too. Never copied, ticked or assigned. Existing
+  round notes and pinned notes were converted in R8.446 (round notes →
+  client-feedback messages on their round, a visit's note → an unmarked
+  message, pinned note → a starred message).
 - **Requirements** (§6.2): the standard checklist.
 
 `sf_activity` (legacy feedback rows) is closed history: no command writes it.
@@ -305,12 +315,11 @@ may act on; the same read supplies the Home rail badge.
   **Everyone's** is available to holders of `studioflow.project.manage`.
   A Running / Completed switch sits beside it.
 - A card shows the project name and client, badges (On hold, Completed, Check
-  later phases), the pinned-notes marker, the actions menu (Open, Mark as
+  later phases), the starred-notes marker, the actions menu (Open, Mark as
   completed…, Reopen), and the phase strip (`PipelineStrip variant="track"`)
   with each phase's round, state and its next action. Only a decision after
   the client answered is a primary button there. Each phase also has a ⋯ menu:
-  **Open phase**; **Client notes…** for an editable open round (hidden while it
-  is with the client); **+ New round** for a finished phase or an active one with no open round; and **Skip phase…**
+  **Open phase**; **Add note…** (posts to that phase's notes); **+ New round** for a finished phase or an active one with no open round; and **Skip phase…**
   for an eligible pending/active phase when the viewer can act and holds
   `phase.review`.
 

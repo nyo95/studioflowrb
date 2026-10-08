@@ -736,27 +736,13 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           client: { select: { id: true, name: true } },
           phases: { orderBy: { order_index: "asc" }, include: {
             definition: { select: { default_iteration_kinds: true } },
-            revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true, note: true, images: { orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }], select: { id: true, storage_key: true, content_type: true, bytes: true } } } },
+            revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true } },
+            _count: { select: { notes: { where: { is_starred: true } } } },
             events: { where: { to_state: "DONE", undone_at: null }, orderBy: { occurred_at: "desc" }, take: 1, select: { auto_created: true } },
           } },
         },
       });
       const now = nowOf(ports);
-      // Only the current iteration of each phase is signed: the card shows nothing older.
-      const signed = new Map<string, Array<{ id: string; url: string | null; contentType: string; bytes: number }>>();
-      const signing: Array<Promise<void>> = [];
-      for (const project of rows) {
-        for (const phase of project.phases) {
-          const current = phase.revisions.find((iteration) => ["NOT_SENT", "SENT", "ANSWERED"].includes(iteration.status));
-          if (!current) continue;
-          signing.push(Promise.all(current.images.map(async (image) => {
-            let url: string | null = null;
-            try { url = await ports.storage.createSignedReadUrl(image.storage_key, 15 * 60); } catch { /* one thumbnail stays blank; the card still renders */ }
-            return { id: image.id, url, contentType: image.content_type, bytes: image.bytes };
-          })).then((images) => { signed.set(current.id, images); }));
-        }
-      }
-      await Promise.all(signing);
       return rows.map((project) => {
         const phases = project.phases.map((phase, index) => {
           const previous = index > 0 ? project.phases[index - 1]! : null;
@@ -768,8 +754,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           const choices = !current ? (phase.status === "DONE" || (phase.status === "ACTIVE" && !isSupervision) ? ["add_iteration"] : []) : iterationChoices({ state: current.status, phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision });
           return {
             id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,
-            current_iteration: current ? { id: current.id, name: current.name, short_name: iterationShortName(current.name, phase.prefix_snapshot, current, kinds.includes(current.name)), state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices, answer_choices: iterationChoices({ state: "ANSWERED", phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision }), note: current.note, images: signed.get(current.id) ?? [] } : null,
-            iteration_count: phase.revisions.length, has_note: Boolean(phase.note?.trim()),
+            current_iteration: current ? { id: current.id, name: current.name, short_name: iterationShortName(current.name, phase.prefix_snapshot, current, kinds.includes(current.name)), state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices, answer_choices: iterationChoices({ state: "ANSWERED", phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision }) } : null,
+            iteration_count: phase.revisions.length, starred_notes: phase._count.notes,
             skipped_reason: phaseSkipReason(phase.events[0]),
             can_add_round: choices.includes("add_iteration"),
             is_supervision: isSupervision,
@@ -788,7 +774,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           all_phases_done: allPhasesDone,
           dependents_review_suggested: earliestActive !== undefined && project.phases.some((phase) => phase.order_index > earliestActive && phase.status === "DONE" && !phase.allow_parallel),
           can_mark_completed: project.status !== "COMPLETED" && Boolean(input.actorId && (project.pic_designer_id === input.actorId || project.pic_drafter_id === input.actorId || hasPermission(input.grants, P.projectOverride))),
-          note_phases: project.phases.filter((phase) => Boolean(phase.note?.trim())).map((phase) => phase.id),
+          note_phases: project.phases.filter((phase) => phase._count.notes > 0).map((phase) => phase.id),
           last_update_at: [project.updated_at, ...project.phases.map((phase) => phase.updated_at)].reduce((latest, value) => latest > value ? latest : value),
           phases,
         };

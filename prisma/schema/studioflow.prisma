@@ -176,8 +176,6 @@ model SfPhase {
   seat_snapshot     String
   /// When status last changed; drives "waiting N days".
   status_changed_at DateTime?
-  /// One free-text working note; requirements remain separate reminders.
-  note              String?
   /// Portfolio Timeline (owner, 2026-09-23): overridable planned start/end; unset falls back to the equal-width sequence split.
   planned_start_date DateTime?    @db.Date
   planned_end_date   DateTime?    @db.Date
@@ -193,6 +191,7 @@ model SfPhase {
   deliverables    SfDeliverable[]
   cd_items        SfCdItem[]
   events          SfPhaseEvent[]
+  notes           SfPhaseNote[]
 
   @@unique([project_id, order_index])
   @@map("sf_phase")
@@ -222,16 +221,15 @@ model SfRevision {
   sent_at    DateTime?
   answered_at DateTime?
   done_at    DateTime?
-  /// Supervision visits reuse the iteration history with a dated visit and note.
+  /// Supervision visits reuse the iteration history with a dated visit; its note is a message in the phase notes.
   visit_date DateTime?        @db.Date
-  note       String?
   created_at DateTime         @default(now())
 
   phase        SfPhase        @relation(fields: [phase_id], references: [id], onDelete: Cascade)
   activities   SfActivity[]
   deliverables SfDeliverable[]
   events       SfPhaseEvent[]
-  images       SfIterationImage[]
+  notes        SfPhaseNote[]
 
   @@unique([phase_id, major])
   @@index([phase_id, status])
@@ -239,10 +237,37 @@ model SfRevision {
   @@schema("studioflow")
 }
 
-/// Screenshots and marked-up photos attached to one iteration's client notes (WO-SF-NOTE-IMG-01).
-model SfIterationImage {
+/// One message in a phase's notes (owner, 2026-10-08: notes work like a chat to yourself). The iteration running when
+/// it was written labels it; starred messages are the phase's pinned notes (WO-SF-NOTEFEED-01).
+model SfPhaseNote {
+  id                 String    @id @default(uuid())
+  phase_id           String
+  /// Kept as a label only: hard-resetting a phase's iterations leaves its messages unlabelled, never deleted.
+  iteration_id       String?
+  /// The rich-text dialect `FormattedText` shows. Empty when the message is only images.
+  body               String    @default("")
+  is_starred         Boolean   @default(false)
+  is_client_feedback Boolean   @default(false)
+  author_id          String?
+  /// Snapshot, so the name survives the person being renamed or removed. Null on notes converted from the old fields.
+  author_name        String?
+  created_at         DateTime  @default(now())
+  edited_at          DateTime?
+
+  phase     SfPhase            @relation(fields: [phase_id], references: [id], onDelete: Cascade)
+  iteration SfRevision?        @relation(fields: [iteration_id], references: [id], onDelete: SetNull)
+  images    SfPhaseNoteImage[]
+
+  @@index([phase_id, created_at])
+  @@index([iteration_id])
+  @@map("sf_phase_note")
+  @@schema("studioflow")
+}
+
+/// Screenshots and photos sent with one note message.
+model SfPhaseNoteImage {
   id               String   @id @default(uuid())
-  iteration_id     String
+  note_id          String
   storage_key      String   @unique
   content_type     String
   bytes            Int
@@ -252,10 +277,10 @@ model SfIterationImage {
   uploaded_by_name String
   created_at       DateTime @default(now())
 
-  iteration SfRevision @relation(fields: [iteration_id], references: [id], onDelete: Cascade)
+  note SfPhaseNote @relation(fields: [note_id], references: [id], onDelete: Cascade)
 
-  @@index([iteration_id, sort_order])
-  @@map("sf_iteration_image")
+  @@index([note_id, sort_order])
+  @@map("sf_phase_note_image")
   @@schema("studioflow")
 }
 
