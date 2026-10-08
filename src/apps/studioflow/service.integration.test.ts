@@ -17,6 +17,7 @@ import { SfCdItemStatus, type PrismaClient } from "@/generated/prisma/client";
 import { APP_REGISTRATIONS } from "../../app/app-registrations";
 import { dateToDateOnly } from "./domain/dates";
 import { LEGACY_PHASE_DEFINITION_IDS as LEGACY } from "./domain/phase";
+import { DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, normalizeScheduleCategory } from "./domain/schedule";
 import { STUDIOFLOW_PERMISSIONS as P } from "./permissions";
 import { createStudioFlowService, type StudioFlowService } from "./service";
 import { readBlockerCounts, readBlockerCountsBatch } from "./phases/blocker-query";
@@ -1838,6 +1839,45 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(row.templateItemId, null, "project rows keep their snapshot after the template is deleted");
     assert.equal(row.options[0].productName, "Downlight");
     await rejectsWith(sf.schedule.deleteTemplateItem({ ...as(drafter, DRAFTER_GRANTS), templateItemId: two.templateItemId }).catch((e) => { throw e instanceof AppError && e.kind === "FORBIDDEN" ? new AppError("FORBIDDEN", "FORBIDDEN_OK", "x") : e; }), "FORBIDDEN_OK");
+  });
+
+  it("seeds each legacy Material reserve once, keeps PT-01 for its first product, and permits deletion", async () => {
+    await testDb.prisma.sfSchedulePrefix.createMany({
+      data: DEFAULT_SCHEDULE_MATERIAL_CATEGORIES.map(({ category, prefix }) => ({
+        section: "MATERIAL",
+        category,
+        category_key: normalizeScheduleCategory(category).key,
+        prefix,
+      })),
+    });
+    for (const { category, exportOrder } of DEFAULT_SCHEDULE_MATERIAL_CATEGORIES) {
+      const categoryKey = normalizeScheduleCategory(category).key;
+      const template = await testDb.prisma.sfScheduleTemplateCategory.create({
+        data: { section: "MATERIAL", category, category_key: categoryKey, sort_order: exportOrder * 10 },
+      });
+      await testDb.prisma.sfScheduleTemplateItem.create({
+        data: { template_category_id: template.id, section: "MATERIAL", category, category_key: categoryKey, product_name: "", sort_order: exportOrder * 10 },
+      });
+    }
+
+    const { projectId } = await newProject();
+    const seeded = await sf.schedule.listSchedule({ grants: ALL, projectId, section: "MATERIAL" });
+    assert.deepEqual(
+      seeded.map((row) => [row.category, row.code, row.options.length]),
+      DEFAULT_SCHEDULE_MATERIAL_CATEGORIES.map(({ category, prefix }) => [category, `${prefix}-01`, 0]),
+      "every explicit default is an empty reserve row with its legacy prefix",
+    );
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 0 });
+    assert.deepEqual(await sf.schedule.applyTemplates({ ...as(designer), projectId }), { created: 0 }, "applying twice does not duplicate seed rows");
+
+    const paint = seeded.find((row) => row.category === "Paint")!;
+    await sf.schedule.createOption({ ...as(designer), projectId, entryId: paint.id, snapshot: { productName: "Easy Clean" } });
+    const paintWithProduct = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.id === paint.id)!;
+    assert.deepEqual([paintWithProduct.code, paintWithProduct.options.length, paintWithProduct.options[0]?.isFinal], ["PT-01", 1, false], "the first Paint product fills PT-01 and remains unselected");
+
+    const glass = seeded.find((row) => row.category === "Glass")!;
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: glass.id });
+    assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).some((row) => row.id === glass.id), false, "an empty reserve row can be removed");
   });
 
   it("stores one photo per option, shares it on reuse and templates, and releases unreferenced objects", async () => {

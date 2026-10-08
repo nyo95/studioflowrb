@@ -7,6 +7,7 @@ const serviceTs = readFileSync("src/apps/studioflow/schedule/service.ts", "utf8"
 const actionsTs = readFileSync("src/app/(platform)/studioflow/actions.ts", "utf8");
 const settingsView = readFileSync("src/app/(platform)/studioflow/settings/schedule/schedule-templates-view.tsx", "utf8");
 const scheduleDomain = readFileSync("src/apps/studioflow/domain/schedule.ts", "utf8");
+const schedulePrint = readFileSync("src/app/(document)/studioflow/print/projects/[projectId]/schedule/page.tsx", "utf8");
 
 describe("WO-SF-SCHED-RELAYOUT-01 board structure", () => {
   it("keeps one outer Board/List branch", () => {
@@ -106,6 +107,11 @@ describe("WO-SF-SCHED-RELAYOUT-01 one drawer editor", () => {
 });
 
 describe("Schedule field rules survive the relayout", () => {
+  it("keeps reserve rows out of the printed schedule", () => {
+    assert.match(schedulePrint, /entries\.filter\(\(entry\) => entry\.section === section && shownOptionOf\(entry\)\)/);
+    assert.doesNotMatch(schedulePrint, /Reserved — no product yet/);
+  });
+
   it("Type is always shown and never a card-field toggle", () => {
     assert.match(scheduleBoard, /aria-label="Type"/);
     assert.doesNotMatch(scheduleBoard, /visibilityAction\("type"/i);

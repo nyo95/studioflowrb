@@ -6,7 +6,7 @@ import { fullBlockers, todoBlockers } from "./blockers";
 import { iterationChoices } from "./iteration-kinds";
 import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot } from "./mom";
 import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
-import { compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
+import { DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
   buildTree,
   canTickChecklistItem,
@@ -164,6 +164,26 @@ describe("schedule rules", () => {
     assert.equal(fallbackPrefix("Paint"), "PT", "Paint → PT");
     assert.equal(fallbackPrefix("PAINT"), "PT", "PAINT → PT");
     assert.equal(fallbackPrefix("paint"), "PT", "paint → PT");
+  });
+
+  it("keeps the 14 explicit legacy Material defaults in SketchUp export order", () => {
+    assert.deepEqual(DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, [
+      { category: "Paint", prefix: "PT", exportOrder: 1 },
+      { category: "Spray Paint", prefix: "SPR", exportOrder: 2 },
+      { category: "Wood", prefix: "WD", exportOrder: 3 },
+      { category: "High Pressure Laminate", prefix: "PL", exportOrder: 4 },
+      { category: "Solid Surface", prefix: "SO", exportOrder: 5 },
+      { category: "Stone", prefix: "ST", exportOrder: 6 },
+      { category: "Terrazzo", prefix: "TER", exportOrder: 7 },
+      { category: "Ceramic Tile", prefix: "CT", exportOrder: 8 },
+      { category: "Homogeneous Tile", prefix: "HT", exportOrder: 9 },
+      { category: "Glass", prefix: "GL", exportOrder: 10 },
+      { category: "Metal", prefix: "MT", exportOrder: 11 },
+      { category: "Acrylic", prefix: "ACR", exportOrder: 12 },
+      { category: "Fabric", prefix: "F", exportOrder: 13 },
+      { category: "Miscellaneous", prefix: "MSC", exportOrder: 14 },
+    ]);
+    assert.equal(new Set(DEFAULT_SCHEDULE_MATERIAL_CATEGORIES.map((row) => row.prefix)).size, 14, "each default category owns its prefix");
   });
 
   it("falls back to first 2 chars for unknown categories", () => {

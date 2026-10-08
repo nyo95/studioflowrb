@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.434 | 2026-10-08 | feat(studioflow): seed the legacy Material Product Schedule defaults
+
+- New projects now receive 14 empty Material reserve rows in the verified legacy export order: Paint (`PT`), Spray Paint (`SPR`), Wood (`WD`), High Pressure Laminate (`PL`), Solid Surface (`SO`), Stone (`ST`), Terrazzo (`TER`), Ceramic Tile (`CT`), Homogeneous Tile (`HT`), Glass (`GL`), Metal (`MT`), Acrylic (`ACR`), Fabric (`F`), and Miscellaneous (`MSC`). Fixture remains empty.
+- The migration stores every prefix explicitly rather than deriving it from a category name. It is idempotent and creates only settings/template data: existing projects stay unchanged until someone deliberately chooses Apply templates.
+- A reserved row has no product or selected option. Filling Paint's reserve row keeps `PT-01`; Apply templates may be run again without a duplicate; an unused reserve row may be deleted. The print regression test confirms Lead's R8.433 filter keeps reserve rows out of the printed schedule.
+
+**Checks.** Migration applied successfully to the isolated rebuild dev and test databases at `localhost:5433`; `npm run typecheck`; `npm run lint -- --quiet`; `npm run check:boundaries`; `npm run check:legacy-runtime`; `npm test` (951 passed); `npm run build`; whitespace check.
+
 ## R8.433 | 2026-10-08 | fix(studioflow): the printed Product Schedule leaves out rows with no product yet (Lead)
 
 - Codex's BLOCKED report on the category seed: the print page printed every reserved row as "Reserved — no product yet". With 14 seeded empty categories a new project would print 14 empty cards. The print now lists only rows that have a product; the schedule screen still shows the reserved rows. This clears the way for the seed work (Codex, option A).

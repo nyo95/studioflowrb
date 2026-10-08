@@ -248,6 +248,29 @@ const LEGACY_PREFIX_MAP: Record<string, string> = {
   PAINT: "PT",
 };
 
+/**
+ * Studio's Material reserve rows, in the exact legacy SketchUp-export order.
+ * These are deliberately explicit: category-name fallbacks are only for a
+ * category a person creates later and are not allowed to define studio
+ * defaults (for example, Paint must be PT, not PA).
+ */
+export const DEFAULT_SCHEDULE_MATERIAL_CATEGORIES = [
+  { category: "Paint", prefix: "PT", exportOrder: 1 },
+  { category: "Spray Paint", prefix: "SPR", exportOrder: 2 },
+  { category: "Wood", prefix: "WD", exportOrder: 3 },
+  { category: "High Pressure Laminate", prefix: "PL", exportOrder: 4 },
+  { category: "Solid Surface", prefix: "SO", exportOrder: 5 },
+  { category: "Stone", prefix: "ST", exportOrder: 6 },
+  { category: "Terrazzo", prefix: "TER", exportOrder: 7 },
+  { category: "Ceramic Tile", prefix: "CT", exportOrder: 8 },
+  { category: "Homogeneous Tile", prefix: "HT", exportOrder: 9 },
+  { category: "Glass", prefix: "GL", exportOrder: 10 },
+  { category: "Metal", prefix: "MT", exportOrder: 11 },
+  { category: "Acrylic", prefix: "ACR", exportOrder: 12 },
+  { category: "Fabric", prefix: "F", exportOrder: 13 },
+  { category: "Miscellaneous", prefix: "MSC", exportOrder: 14 },
+] as const;
+
 export function fallbackPrefix(category: string): string {
   const { key } = normalizeScheduleCategory(category);
   const mapped = LEGACY_PREFIX_MAP[key];
