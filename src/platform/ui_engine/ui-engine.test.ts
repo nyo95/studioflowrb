@@ -286,7 +286,7 @@ describe("UI Engine foundation", () => {
       createElement("svg", { "aria-hidden": true }),
       createElement("span", null, "New record"),
     ));
-    assert.match(button, /inline-flex items-center gap-\[7px\] whitespace-nowrap/);
+    assert.match(button, /inline-flex min-w-0 items-center gap-\[7px\] whitespace-nowrap/);
   });
 
   it("connects field labels, descriptions, and errors to their control", () => {

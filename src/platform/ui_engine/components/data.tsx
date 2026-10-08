@@ -238,10 +238,10 @@ export function TableCell({
   return (
     <td
       className={cx(
-        "border-b border-line-subtle px-3 first:pl-[var(--ui-card-gutter,var(--ui-section-px))] last:pr-[var(--ui-card-gutter,var(--ui-section-px))] py-(--ui-td-py,10px) align-middle whitespace-nowrap first:shadow-[inset_3px_0_0_var(--ui-row-marker,transparent)]",
+        "border-b border-line-subtle px-3 first:pl-[var(--ui-card-gutter,var(--ui-section-px))] last:pr-[var(--ui-card-gutter,var(--ui-section-px))] py-(--ui-td-py,10px) align-middle first:shadow-[inset_3px_0_0_var(--ui-row-marker,transparent)]",
         identifier && IDENTIFIER_CLASSES,
         TABLE_ALIGN_CLASSES[align],
-        wrap && "whitespace-normal",
+        wrap ? "whitespace-normal" : "whitespace-nowrap",
         stickyEnd && "sticky right-0 z-[1] border-l border-l-line bg-surface",
         className,
       )}

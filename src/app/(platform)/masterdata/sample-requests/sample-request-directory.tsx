@@ -201,7 +201,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
       {filtered.length === 0 ? (
         <EmptyState title="No sample requests" description="Requests StudioFlow designers ask for will appear here for pricing." />
       ) : (
-        <DataTable framed={false} density="compact" stickyHeader fill minWidth={860}>
+        <DataTable framed={false} density="compact" stickyHeader fill minWidth={780} className="[&_td]:!px-2 [&_th]:!px-2">
           <TableHeader>
             <TableRow>
               <TableHead>Product</TableHead>
@@ -242,7 +242,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
                       {specOf(row) ? <span className="block text-xs text-ink-tertiary">{specOf(row)}</span> : null}
                     </button>
                   </TableCell>
-                  <TableCell>{row.project.name}</TableCell>
+                  <TableCell wrap>{row.project.name}</TableCell>
                   <TableCell>{row.requestedBy.name}</TableCell>
                   <TableCell>{formatInstant(row.requestedAt, { locale, timeZone: timezone, style: "datetime" })}</TableCell>
                   <TableCell>{statusBadge(row)}</TableCell>

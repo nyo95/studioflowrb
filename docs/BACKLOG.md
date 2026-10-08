@@ -79,13 +79,8 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## Master Data
 
-- [ ] [UNVERIFIED] Sample shelf R8.386–R8.390 in the browser (WO-MD-SAMPLE-01
-  "Reviewer Acceptance"): add, move, lend with a project, send to a client,
-  mark lost, return, the remove refusal while out, history, right-click menu;
-  then "Put on shelf" from Sample requests and "Sample received" with the shelf
-  note in that project's Schedule plus the requester's notification. Staff
-  roles first need `masterdata.sample.read` / `masterdata.sample.manage`
-  granted in Settings → Access.
+- [ ] [UNVERIFIED] Sample shelf R8.386-R8.390, still open after the 2026-10-08 walk (passed on an isolated server: add a sample with a typed new rack, lend it to a person and a StudioFlow project, return it, the history of both steps, "Remove" disabled with "return it first" while it is out; StudioFlow request, Put on shelf from Sample requests, the designer's Schedule card reading "Sample received" and the requester's notification "Your sample is on the shelf: R3 / B9"): send to a client, mark lost, discard, the right-click menu, the list view and the filters, and the "Sample received" shelf note inside the option dialog.
+
 - [ ] [UNVERIFIED] Quick "New SKU" (no price) from Add sample and Put on shelf
   (R8.391): type a name nobody has, create it, and it is selected; the SKU then
   shows on the SKU page without prices until one is added on Pricing.
@@ -235,3 +230,5 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 - [ ] [PLANNED][P3] BQ language (found in the 2026-10-08 walk): the screens mix Indonesian and English ("Belum ada section", "dapat diedit", "Nama Work Item", "Tambah", "Terapkan Assembly", "Harga diubah", "Belum ada harga", "X dari Y Cost Component sudah ada harga", "Belum lengkap — ada item tanpa harga", the column "URAIAN" next to "Add section", "Lock project", "Quotation"). Owner decision: one language per screen, or follow the account's guide language.
 - [ ] [PLANNED][P3] BQ new Work Item defaults to unit "ls", which shows as "ls (inactive snapshot)" when Master Data has no active unit with that code (the seeded test database has none). Check the owner's real units; if "ls" is not there, offer the default from an active unit.
 - [ ] [PLANNED][P3] BQ lock asks to type LOCK although Unlock exists; consider a plain confirmation (the type-to-confirm is for actions that cannot be undone).
+- [ ] [CLEANUP][P3] The SKU pickers on the shelf and in "Put on shelf" offer 'New SKU "X" (no price yet)' even when an existing SKU is named exactly X; hide it on an exact match so a click cannot only end in an identity conflict.
+- [ ] [CLEANUP][P3] In Sample requests a request already marked received shows "Already received" with a red dot, which reads as a warning; use the neutral or green tone.

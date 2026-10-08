@@ -210,7 +210,7 @@ export function CreatableSearch({
     <Popover.Root open={open} onOpenChange={setOpen}>
       <Popover.Trigger asChild>
         <Button
-          className={cx("min-w-[190px] justify-between!", className)}
+          className={cx("min-w-[190px] max-w-full justify-between!", className)}
           variant="secondary"
           trailingIcon={<ChevronDown aria-hidden="true" />}
           aria-label={label}
@@ -219,7 +219,7 @@ export function CreatableSearch({
           disabled={disabled}
           onClick={() => setOpen((current) => !current)}
         >
-          {selected?.label ?? placeholder}
+          <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
         </Button>
       </Popover.Trigger>
       <Popover.Portal>
