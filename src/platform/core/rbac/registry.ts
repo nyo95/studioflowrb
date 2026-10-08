@@ -26,6 +26,9 @@ export const PLATFORM_PERMISSIONS = [
   "platform.role.read",
   "platform.role.manage",
   "platform.audit.read",
+  "platform.integration.manage",
+  "platform.integration.admin",
+  "platform.integration.ping",
 ] as const satisfies readonly PermissionId[];
 
 export const APP_ID_PATTERN = /^[a-z][a-z0-9-]*$/;

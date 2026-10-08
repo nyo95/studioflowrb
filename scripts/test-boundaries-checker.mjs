@@ -13,6 +13,7 @@ import {
   collectMigrationIsolationViolations,
   RULE_MIGRATION_ISOLATION,
   RULE_SERVER_CALLS_CLIENT_FUNCTION,
+  RULE_INTEGRATION_ROUTE_IMPORTS,
   RULE_DUPLICATE_MACHINERY,
   RULE_UNSCANNED_FILE,
   collectPermissionVocabularyViolations,
@@ -239,6 +240,9 @@ const FOUNDATION_FILES = {
 `,
   "src/apps/ven/generated/nested.ts": `export const f = new Intl.DateTimeFormat("id-ID");
 `,
+  "src/app/api/integrations/v1/legal/route.ts": `import { kit } from "@platform/core/integrations"; import { z } from "zod"; export const x = [kit, z];\n`,
+  "src/app/api/integrations/v1/bad-prisma/route.ts": `import { PrismaClient } from "@prisma/client"; export const x = PrismaClient;\n`,
+  "src/app/api/integrations/v1/bad-internal/route.ts": `import { Widget } from "@/apps/moon/ui/widget"; export const x = Widget;\n`,
 
   "src/app/app-registrations.ts": `import type { AppPermissionRegistrationInput } from "@platform/core/rbac/registry";\nimport { SUN_PERMISSIONS } from "@/apps/sun/public";\nimport { MOON_PERMISSIONS } from "@/apps/moon/public";\nimport { VEN_PERMISSIONS } from "@/apps/ven/public";\n\nexport const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [\n  { appId: "sun", name: "Sun", rootPath: "/sun", permissions: Object.values(SUN_PERMISSIONS) },\n  { appId: "moon", name: "Moon", rootPath: "/moon", permissions: Object.values(MOON_PERMISSIONS) },\n  { appId: "ven", name: "Ven", rootPath: "/ven", permissions: Object.values(VEN_PERMISSIONS) },\n];\n`,
 
@@ -265,6 +269,8 @@ try {
       `src/apps/ven/legacy.tsx | ${RULE_RAW_LEGACY_UI_CLASS} | ui-card`,
       `src/platform/core/guard.ts | ${RULE_CORE_TO_UI_ENGINE} | @/platform/ui_engine`,
       `src/platform/core/persist.ts | ${RULE_CORE_TO_INFRASTRUCTURE} | @/platform/infrastructure/storage`,
+      `src/app/api/integrations/v1/bad-prisma/route.ts | ${RULE_INTEGRATION_ROUTE_IMPORTS} | @prisma/client`,
+      `src/app/api/integrations/v1/bad-internal/route.ts | ${RULE_INTEGRATION_ROUTE_IMPORTS} | @/apps/moon/ui/widget`,
     ].sort(),
   );
 

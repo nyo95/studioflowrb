@@ -76,6 +76,8 @@ const PLATFORM_TABLES = [
   "Session",
   "PlatformGeneralSettings",
   "LoginRateLimit",
+  "IntegrationRequest",
+  "IntegrationToken",
   "MessengerConversation",
   "MessengerParticipant",
   "MessengerMessage",

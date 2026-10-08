@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.456 | 2026-10-09 | feat(platform): add personal integration-token foundation (Executor)
+
+- Added personal, revocable, hash-only integration tokens with scoped creation, expiry, own-token management, separately authorized administration, and audit history that never records the secret.
+- Added the versioned integration route kit: bearer authentication against live users and grants, safe error envelopes, request IDs, no-store responses, 24-hour idempotency replay/conflict protection, and audited writes.
+- Added the reference `GET`/idempotent `POST /api/integrations/v1/ping` endpoint, integration contract/endpoint recipe, three locked Platform permissions, and a boundary rule with legal/rejecting fixtures for integration API routes.
+- **Migrations/dependencies:** additive `20261009090000_platform_integrations`; no dependency added. Applied locally to the selected home development database and its disposable test database.
+- **Checks:** `npm test`, `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, boundary fixtures, and `npm run build` passed.
+
 ## R8.455 | 2026-10-09 | docs(plan): lock integration permissions (Lead)
 
 - Executor BLOCKED report on WO-PLAT-INTEGRATIONS-01 (no permission locked for token management or `ping`) answered with option A: new Platform permissions `platform.integration.manage` (own tokens), `platform.integration.admin` (list/revoke anyone's), `platform.integration.ping`. Recorded as Locked Decision 12 in `PLAN.md`; Executor target moves to R8.456.

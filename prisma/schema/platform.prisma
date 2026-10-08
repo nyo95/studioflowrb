@@ -36,8 +36,51 @@ model User {
   user_roles UserRole[]
   preference UserPreference?
   tutorials  UserTutorial[]
+  integration_tokens IntegrationToken[]
 
   @@index([status])
+  @@schema("platform")
+}
+
+/// A revocable personal token for native companion integrations.  Only the
+/// SHA-256 digest is persisted; the raw secret is returned exactly once.
+model IntegrationToken {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id String @db.Uuid
+  label String
+  token_prefix String
+  token_hash String @unique
+  scopes String[]
+  expires_at DateTime?
+  last_used_at DateTime?
+  revoked_at DateTime?
+  created_at DateTime @default(now())
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Restrict)
+  requests IntegrationRequest[]
+
+  @@index([user_id, revoked_at])
+  @@index([expires_at])
+  @@schema("platform")
+}
+
+/// Per-token idempotency ledger.  A completed response is replayed verbatim;
+/// an in-progress row makes concurrent retries fail safely.
+model IntegrationRequest {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  token_id String @db.Uuid
+  key String
+  method_path String
+  request_hash String
+  status String
+  response_status Int?
+  response_body Json?
+  created_at DateTime @default(now())
+
+  token IntegrationToken @relation(fields: [token_id], references: [id], onDelete: Restrict)
+
+  @@unique([token_id, key])
+  @@index([created_at])
   @@schema("platform")
 }
 

@@ -20,6 +20,7 @@ export const RULE_UNSCANNED_FILE = "unscanned file under src";
 export const RULE_DUPLICATE_MACHINERY = "app-local copy of generic machinery";
 export const RULE_MIGRATION_ISOLATION = "migration touches more than one app schema";
 export const RULE_SERVER_CALLS_CLIENT_FUNCTION = "server code -> function in a \"use client\" module";
+export const RULE_INTEGRATION_ROUTE_IMPORTS = "integration route import allow-list";
 
 /**
  * App layers a composition/shell file (anything under `src/app` or
@@ -482,12 +483,23 @@ export async function collectBoundaryViolations({ projectRoot = process.cwd(), s
       importer.kind === "other" && (isInside(join(srcDir, "app"), file) || isInside(join(srcDir, "application"), file));
     if (importer.kind !== "app" && importer.kind !== "platform" && !shell) continue;
     const source = await readFile(file, "utf8");
+    const integrationRoute = isInside(join(srcDir, "app", "api", "integrations"), file);
     const importerDomainApp = importer.kind === "app" && !importer.lane ? domainAppOf(file, appsRoot) : null;
     const importerCore =
       importer.kind === "platform" && isInside(platformRoot, file) && relative(platformRoot, file).split(sep)[0] === "core";
 
     for (const specifier of extractImportSpecifiers(source, file)) {
       const targetPath = resolveSpecifier(specifier, file, aliasMap, projectRoot);
+
+      if (integrationRoute && !isAllowedIntegrationRouteImport(specifier, targetPath, projectRoot, apps)) {
+        violations.push({
+          rule: RULE_INTEGRATION_ROUTE_IMPORTS,
+          file,
+          specifier,
+          detail: "Integration API routes may import only the integration kit, safe errors, zod, or an extension public/contract/runtime lane. Keep Prisma and app internals behind the kit/service boundary.",
+        });
+        continue;
+      }
 
       if (importerDomainApp && !/\.(test|spec)\.[jt]sx?$/.test(file) && importsPersistence(specifier, targetPath, srcDir)) {
         violations.push({
@@ -588,6 +600,13 @@ export async function collectBoundaryViolations({ projectRoot = process.cwd(), s
   }
 
   return violations;
+}
+
+function isAllowedIntegrationRouteImport(specifier, targetPath, projectRoot, apps) {
+  if (specifier === "@platform/core/integrations" || specifier === "@platform/core/errors" || specifier === "zod") return true;
+  if (!targetPath) return false;
+  const target = classifyTarget(targetPath, projectRoot, apps);
+  return target.kind === "app" && ["public", "contract.ts", "contract", "runtime.ts", "runtime"].includes(target.layer);
 }
 
 export async function collectPermissionVocabularyViolations({ projectRoot = process.cwd(), srcDir } = {}) {
