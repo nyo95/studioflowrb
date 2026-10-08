@@ -1584,6 +1584,19 @@ describe("Bulk price entry", () => {
     );
   });
 
+  it("saves valid material rows and returns invalid rows in save-valid mode", async () => {
+    const context = await createMaterialContext();
+    const supplierType = await testDb.prisma.vendorType.findUniqueOrThrow({ where: { code: "SUPPLIER" } });
+    const second = (await service.createVendor({ grants: GRANTS, actor: ACTOR, name: "Partial material Supplier", vendorTypeIds: [supplierType.id] })).vendorId;
+    const first = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Partial material One", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    const secondSku = await service.createSku({ grants: GRANTS, actor: ACTOR, name: "Partial material Two", baseUnitId: context.unit.id, categoryId: context.categoryId, priceMaterials: [{ supplierVendorId: context.vendorId, amount: "1", currency: "IDR" }] });
+    await service.createPriceMaterial({ grants: GRANTS, actor: ACTOR, skuId: first.skuId, supplierVendorId: second, amount: "1", currency: "IDR" });
+    const result = await service.createMaterialPriceRows({ grants: GRANTS, actor: ACTOR, currency: "IDR", onInvalid: "save-valid", rows: [{ skuId: first.skuId, vendorId: second, amount: "2" }, { skuId: secondSku.skuId, vendorId: second, amount: "3" }] });
+    assert.equal(result.ids.length, 1);
+    assert.ok("rejected" in result);
+    assert.deepEqual(result.rejected.map((row) => [row.rowIndex, row.field, row.code]), [[0, "skuId", "PRICE_PAIR_CONFLICT"]]);
+  });
+
   it("limits a batch to 100 rows and rejects an empty one", async () => {
     const vendorId = await workSupplier("Bulk Limits");
     const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
@@ -1661,6 +1674,17 @@ describe("Compare-suppliers grid", () => {
       },
     );
     assert.equal(await testDb.prisma.priceLabor.count(), before, "supplier A's valid cells were rolled back too");
+  });
+
+  it("saves valid cells and returns rejected cells with their supplier in save-valid mode", async () => {
+    const a = await workSupplier("Grid Partial A"); const b = await workSupplier("Grid Partial B");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Grid Partial Works", kind: "WORK" });
+    await service.createPriceLabor({ grants: GRANTS, actor: ACTOR, name: "Taken", categoryId: category.categoryId, vendorId: b, unitId: unit.id, amount: "1", currency: "IDR" });
+    const result = await service.createWorkPriceMatrix({ grants: GRANTS, actor: ACTOR, kind: "labor", categoryId: category.categoryId, currency: "IDR", vendorIds: [a, b], onInvalid: "save-valid", rows: [{ name: "Good", unitId: unit.id, amounts: { [a]: "10", [b]: "11" } }, { name: "Taken", unitId: unit.id, amounts: { [b]: "12" } }] });
+    assert.equal(result.ids.length, 2);
+    assert.ok("rejected" in result);
+    assert.deepEqual(result.rejected.map((row) => [row.rowIndex, row.vendorId, row.field, row.code]), [[1, b, "name", "PRICE_IDENTITY_CONFLICT"]]);
   });
 
   it("limits suppliers, requires an amount somewhere, and keeps blank grids out", async () => {

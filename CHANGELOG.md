@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.419 | 2026-10-08 | feat(masterdata): save valid price-grid rows alongside rejected rows (Executor)
+
+- Added `onInvalid: "save-valid"` to material and work price batch commands and the supplier comparison grid. The default remains `reject-all`, preserving the existing all-or-nothing behaviour for callers and workbook imports.
+- In save-valid mode, each row (or comparison cell) uses its own transaction. Successful price ids return together with `rejected` rows containing the existing index, supplier where applicable, field, code, and message. An all-rejected save still returns `BULK_ROWS_INVALID`.
+- Batch audit entries now record both saved and rejected counts. Added coverage for partial material-row and comparison-grid saves.
+
+**Checks.** `tsc --noEmit`, `npm run lint -- --quiet`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npm test` 946/946, and `npm run build` pass. Browser not required.
+
 ## R8.418 | 2026-10-08 | docs(plan): review of R8.416 and R8.417 PASS; WO-MD-ENTRY-01 narrowed to group C (Lead)
 
 - **Review of group A (R8.416 `6bc45c0`): PASS.** One helper, `ensurePriceMaterialBrandSupplierLink`, replaces the "not linked" refusal in the single create and the SKU-with-prices create (the bulk, grid and workbook paths go through them); it runs after the live and material-capable checks, so an archived or non-material supplier is still refused; owner and already-linked suppliers add nothing; the link is audited as `brand.supplier-linked`.

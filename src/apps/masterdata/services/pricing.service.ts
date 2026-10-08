@@ -17,6 +17,7 @@ export const BULK_PRICE_ROW_LIMIT = 100;
 export const MATRIX_SUPPLIER_LIMIT = 12;
 
 export type BulkRowError = { rowIndex: number; field: string | null; code: string; message: string };
+type OnInvalid = "reject-all" | "save-valid";
 
 function bulkErrorField(code: string): string | null {
   if (code.includes("NAME") || code.includes("IDENTITY") || code === "BULK_DUPLICATE_IN_BATCH") return "name";
@@ -282,11 +283,33 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
      * same single-price service (so every rule is identical); if any row fails the whole batch is rolled back and all
      * row problems are returned together in `details.rows`.
      */
-    async createWorkPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; kind: "labor" | "material-labor"; vendorId: string; categoryId: string; currency: string; rows: Array<{ name: string; unitId: string; amount: string; notes?: string | null; scopeNote?: string | null }> }) {
+    async createWorkPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; kind: "labor" | "material-labor"; vendorId: string; categoryId: string; currency: string; rows: Array<{ name: string; unitId: string; amount: string; notes?: string | null; scopeNote?: string | null }>; onInvalid?: OnInvalid; writeBatchAudit?: boolean }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
       if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
       if (input.rows.length > BULK_PRICE_ROW_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_ROWS", `A batch holds at most ${BULK_PRICE_ROW_LIMIT} rows.`);
+      if (input.onInvalid === "save-valid") {
+        const errors: BulkRowError[] = []; const ids: string[] = []; const batchId = randomUUID(); const seen = new Map<string, number>();
+        const existing = input.kind === "labor" ? await db.priceLabor.findMany({ where: { vendor_id: input.vendorId, deleted_at: null }, select: { name: true, slug: true } }) : await db.priceMaterialLabor.findMany({ where: { vendor_id: input.vendorId, deleted_at: null }, select: { name: true, slug: true } });
+        const liveNames = new Set(existing.flatMap((row) => [row.name.trim().toLowerCase(), row.slug]));
+        for (const [rowIndex, row] of input.rows.entries()) {
+          const slugKey = (() => { try { return requiredSlug(row.name); } catch { return ""; } })(); const key = slugKey || row.name.trim().toLowerCase();
+          if (key && seen.has(key)) { errors.push({ rowIndex, field: "name", code: "BULK_DUPLICATE_IN_BATCH", message: `Same name as row ${seen.get(key)! + 1} in this batch.` }); continue; }
+          if (key) seen.set(key, rowIndex);
+          if (key && (liveNames.has(key) || (slugKey && liveNames.has(slugKey)))) { errors.push({ rowIndex, field: "name", code: "PRICE_IDENTITY_CONFLICT", message: "This supplier already has a price with this name. Make the name more specific." }); continue; }
+          try {
+            const created = await runTransaction(async (rowTx: TxClient) => {
+              const inner = createPricingService(asPrismaClient(rowTx), { ...ports, runTransaction: async (work) => work(rowTx) });
+              const common = { grants: input.grants, actor: input.actor, name: row.name, categoryId: input.categoryId, vendorId: input.vendorId, unitId: row.unitId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined };
+              return input.kind === "labor" ? inner.createPriceLabor(common) : inner.createPriceMaterialLabor({ ...common, scopeNote: row.scopeNote ?? undefined });
+            });
+            ids.push("priceLaborId" in created ? created.priceLaborId : created.priceMaterialLaborId); if (key) { liveNames.add(key); if (slugKey) liveNames.add(slugKey); }
+          } catch (error) { errors.push(error instanceof AppError ? { rowIndex, field: bulkErrorField(error.code), code: error.code, message: error.safeMessage } : { rowIndex, field: null, code: "PRICE_SAVE_FAILED", message: "This row could not be saved." }); }
+        }
+        if (ids.length === 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} row(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
+        if (input.writeBatchAudit !== false) await runTransaction((auditTx: TxClient) => writeAudit(ports, auditTx, { action: "price-bulk.created", entityType: "vendor", entityId: input.vendorId, actor: input.actor, metadata: { batch_id: batchId, kind: input.kind, count: ids.length, rejected_count: errors.length, category_id: input.categoryId } }));
+        return { batchId, ids, rejected: errors };
+      }
       return runTransaction(async (tx: TxClient) => {
         const inner = createPricingService(asPrismaClient(tx), { ...ports, runTransaction: async (work) => work(tx) });
         const errors: BulkRowError[] = [];
@@ -325,7 +348,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
      * means that supplier has no price for the item). Runs the per-supplier bulk command for each supplier inside one
      * transaction, so the whole grid is all or nothing; every problem comes back as `details.rows` with its supplier.
      */
-    async createWorkPriceMatrix(input: { grants: PermissionGrants; actor: AuditActor; kind: "labor" | "material-labor"; categoryId: string; currency: string; vendorIds: string[]; rows: Array<{ name: string; unitId: string; notes?: string | null; amounts: Record<string, string | null | undefined> }> }) {
+    async createWorkPriceMatrix(input: { grants: PermissionGrants; actor: AuditActor; kind: "labor" | "material-labor"; categoryId: string; currency: string; vendorIds: string[]; rows: Array<{ name: string; unitId: string; notes?: string | null; amounts: Record<string, string | null | undefined> }>; onInvalid?: OnInvalid }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkManage);
       actorIsUsable(input.actor);
       const vendorIds = [...new Set(input.vendorIds)];
@@ -333,6 +356,23 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
       if (vendorIds.length > MATRIX_SUPPLIER_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_SUPPLIERS", `A grid compares at most ${MATRIX_SUPPLIER_LIMIT} suppliers.`);
       if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
       if (input.rows.length > BULK_PRICE_ROW_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_ROWS", `A batch holds at most ${BULK_PRICE_ROW_LIMIT} rows.`);
+      if (input.onInvalid === "save-valid") {
+        const ids: string[] = []; const rejected: Array<BulkRowError & { vendorId: string }> = []; const batchId = randomUUID();
+        for (const vendorId of vendorIds) {
+          const picked = input.rows.map((row, rowIndex) => ({ row, rowIndex })).filter(({ row }) => isOffered(row.amounts[vendorId] ?? "")); if (picked.length === 0) continue;
+          try {
+            const result = await createPricingService(db, ports).createWorkPricesBulk({ grants: input.grants, actor: input.actor, kind: input.kind, vendorId, categoryId: input.categoryId, currency: input.currency, onInvalid: "save-valid", writeBatchAudit: false, rows: picked.map(({ row }) => ({ name: row.name, unitId: row.unitId, amount: row.amounts[vendorId]!, notes: row.notes ?? undefined })) });
+            ids.push(...result.ids); for (const row of ("rejected" in result ? result.rejected : [])) rejected.push({ ...row, rowIndex: picked[row.rowIndex]?.rowIndex ?? row.rowIndex, vendorId });
+          } catch (error) {
+            if (!(error instanceof AppError) || error.code !== "BULK_ROWS_INVALID") throw error;
+            const rows = (error.details as { rows?: BulkRowError[] } | undefined)?.rows ?? [];
+            for (const row of rows) rejected.push({ ...row, rowIndex: picked[row.rowIndex]?.rowIndex ?? row.rowIndex, vendorId });
+          }
+        }
+        if (ids.length === 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${rejected.length} cell(s) need fixing. Nothing was saved.`, { details: { rows: rejected } });
+        await runTransaction((auditTx: TxClient) => writeAudit(ports, auditTx, { action: "price-matrix.created", entityType: "category", entityId: input.categoryId, actor: input.actor, metadata: { batch_id: batchId, kind: input.kind, suppliers: vendorIds.length, count: ids.length, rejected_count: rejected.length } }));
+        return { batchId, ids, rejected };
+      }
       return runTransaction(async (tx: TxClient) => {
         const inner = createPricingService(asPrismaClient(tx), { ...ports, runTransaction: async (work) => work(tx) });
         const errors: Array<BulkRowError & { vendorId: string }> = [];
@@ -365,11 +405,25 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
      * Creates many material prices (existing SKUs), each row naming its own supplier, all or nothing. A SKU can be priced
      * by several suppliers and one supplier can price many SKUs in the same save. Row problems come back in `details.rows`.
      */
-    async createMaterialPriceRows(input: { grants: PermissionGrants; actor: AuditActor; currency: string; rows: Array<{ skuId: string; vendorId: string; amount: string; notes?: string | null }> }) {
+    async createMaterialPriceRows(input: { grants: PermissionGrants; actor: AuditActor; currency: string; rows: Array<{ skuId: string; vendorId: string; amount: string; notes?: string | null }>; onInvalid?: OnInvalid }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
       if (input.rows.length > BULK_PRICE_ROW_LIMIT) throw new AppError("VALIDATION", "BULK_TOO_MANY_ROWS", `A batch holds at most ${BULK_PRICE_ROW_LIMIT} rows.`);
+      if (input.onInvalid === "save-valid") {
+        const errors: BulkRowError[] = []; const ids: string[] = []; const batchId = randomUUID(); const seen = new Map<string, number>();
+        const vendorIds = [...new Set(input.rows.map((row) => row.vendorId))]; const live = await db.priceMaterial.findMany({ where: { supplier_vendor_id: { in: vendorIds }, deleted_at: null }, select: { sku_id: true, supplier_vendor_id: true } }); const taken = new Set(live.map((row) => `${row.supplier_vendor_id}|${row.sku_id}`));
+        for (const [rowIndex, row] of input.rows.entries()) {
+          const pair = `${row.vendorId}|${row.skuId}`;
+          if (seen.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "BULK_DUPLICATE_IN_BATCH", message: `Same SKU and supplier as row ${seen.get(pair)! + 1} in this batch.` }); continue; }
+          seen.set(pair, rowIndex); if (taken.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "PRICE_PAIR_CONFLICT", message: "This supplier already has a live price for this SKU. Edit that price instead." }); continue; }
+          try { const created = await runTransaction(async (rowTx: TxClient) => createPricingService(asPrismaClient(rowTx), { ...ports, runTransaction: async (work) => work(rowTx) }).createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: row.skuId, supplierVendorId: row.vendorId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined })); ids.push(created.priceMaterialId); taken.add(pair); }
+          catch (error) { errors.push(error instanceof AppError ? { rowIndex, field: bulkErrorField(error.code), code: error.code, message: error.safeMessage } : { rowIndex, field: null, code: "PRICE_SAVE_FAILED", message: "This row could not be saved." }); }
+        }
+        if (ids.length === 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} row(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
+        const single = vendorIds.length === 1; await runTransaction((auditTx: TxClient) => writeAudit(ports, auditTx, { action: "price-bulk.created", entityType: single ? "vendor" : "price_batch", entityId: single ? vendorIds[0]! : batchId, actor: input.actor, metadata: { batch_id: batchId, kind: "material", count: ids.length, rejected_count: errors.length, suppliers: vendorIds.length } }));
+        return { batchId, ids, rejected: errors };
+      }
       return runTransaction(async (tx: TxClient) => {
         const inner = createPricingService(asPrismaClient(tx), { ...ports, runTransaction: async (work) => work(tx) });
         const errors: BulkRowError[] = [];
@@ -400,8 +454,8 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     },
 
     /** Creates many material prices (existing SKUs) for one supplier, all or nothing. See createMaterialPriceRows. */
-    async createMaterialPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; currency: string; rows: Array<{ skuId: string; amount: string; notes?: string | null }> }) {
-      return createPricingService(db, ports).createMaterialPriceRows({ grants: input.grants, actor: input.actor, currency: input.currency, rows: input.rows.map((row) => ({ ...row, vendorId: input.vendorId })) });
+    async createMaterialPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; currency: string; rows: Array<{ skuId: string; amount: string; notes?: string | null }>; onInvalid?: OnInvalid }) {
+      return createPricingService(db, ports).createMaterialPriceRows({ grants: input.grants, actor: input.actor, currency: input.currency, onInvalid: input.onInvalid, rows: input.rows.map((row) => ({ ...row, vendorId: input.vendorId })) });
     },
 
     async createPriceLabor(input: { grants: PermissionGrants; actor: AuditActor; name: string; categoryId: string; vendorId: string; unitId: string; amount: string; currency: string; notes?: string }) {
