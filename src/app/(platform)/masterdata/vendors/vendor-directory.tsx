@@ -324,6 +324,17 @@ export function VendorDirectory({
     description: "Your edits are only in this browser and have not been saved.",
   });
 
+  const matchesQuery = (v: VendorRow) => {
+    if (!query) return true;
+    const q = query.toLowerCase();
+    return (
+      v.name.toLowerCase().includes(q) ||
+      v.slug.toLowerCase().includes(q) ||
+      (v.legal_name && v.legal_name.toLowerCase().includes(q)) ||
+      v.contacts.some((c) => c.person_name.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q)) || contactPhoneList(c).some((phone) => phone.replace(/D/g, "").includes(q.replace(/D/g, "")))) ||
+      (v.address?.toLowerCase().includes(q) ?? false) || (v.notes?.toLowerCase().includes(q) ?? false) || carriedBrandNames(v.owned_brands, v.brand_suppliers).some((name) => name.toLowerCase().includes(q))
+    );
+  };
   const filtered = vendors.filter((v) => {
     if (!matchesDirectoryStatus(v.deleted_at, statusFilter)) return false;
     if (typeFilter !== "ALL" && !v.types.some((t) => t.vendor_type.id === typeFilter)) return false;
@@ -332,16 +343,10 @@ export function VendorDirectory({
     if (brandFilter !== "ALL" && !v.brand_suppliers.some((item) => item.brand.id === brandFilter) && !v.owned_brands.some((item) => item.id === brandFilter)) return false;
     if (capabilityFilter === "MATERIAL" && !v.types.some((item) => item.vendor_type.can_supply_material)) return false;
     if (capabilityFilter === "LABOR" && !v.types.some((item) => item.vendor_type.can_supply_labor)) return false;
-    if (!query) return true;
-    const q = query.toLowerCase();
-    return (
-      v.name.toLowerCase().includes(q) ||
-      v.slug.toLowerCase().includes(q) ||
-      (v.legal_name && v.legal_name.toLowerCase().includes(q)) ||
-      v.contacts.some((c) => c.person_name.toLowerCase().includes(q) || (c.email && c.email.toLowerCase().includes(q)) || contactPhoneList(c).some((phone) => phone.replace(/\D/g, "").includes(q.replace(/\D/g, "")))) ||
-      (v.address?.toLowerCase().includes(q) ?? false) || (v.notes?.toLowerCase().includes(q) ?? false) || carriedBrandNames(v.owned_brands, v.brand_suppliers).some((name) => name.toLowerCase().includes(q))
-    );
+    return matchesQuery(v);
   });
+  // A typed name can match a supplier that a filter (often the type) hides: say so instead of looking like the search failed.
+  const hiddenMatches = query ? vendors.filter((v) => !filtered.includes(v) && matchesQuery(v)) : [];
   const { locale, timezone } = useDisplaySettings();
   const [sortKey, setSortKey] = useState<"Supplier" | "Brands">("Supplier");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -493,6 +498,9 @@ export function VendorDirectory({
       </TableToolbar>}>
 
 
+      {hiddenMatches.length > 0 ? <Notice tone="neutral" title={`${hiddenMatches.length} more ${hiddenMatches.length === 1 ? "supplier matches" : "suppliers match"} "${query}" but ${hiddenMatches.length === 1 ? "is" : "are"} hidden by the filters`}>
+        <div className="flex flex-wrap items-center gap-2"><Text size="sm" tone="secondary">{hiddenMatches.slice(0, 3).map((v) => v.name).join(", ")}{hiddenMatches.length > 3 ? ", …" : ""}</Text><Button size="sm" onClick={() => { setStatusFilter("ALL"); setTypeFilter("ALL"); setCategoryFilter("ALL"); setProductCategoryFilter("ALL"); setBrandFilter("ALL"); setCapabilityFilter("ALL"); }}>Show them (clear the filters)</Button></div>
+      </Notice> : null}
       {filtered.length === 0 ? (
         <EmptyState
           title="No suppliers found"

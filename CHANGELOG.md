@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.436 | 2026-10-08 | fix(masterdata): the supplier search says when filters hide a match (Lead)
+
+- **Staff report.** Searching "Ikaya" showed nothing because that supplier is a Subcon and the type filter said Supplier; the search itself works. The supplier directory now shows "1 more supplier matches ... but is hidden by the filters", the names, and a "Show them (clear the filters)" button. Filters are never cleared without the person asking.
+- Checked in a browser: type filter Subcon + search for a Supplier-type name shows the hint; the button brings the supplier back.
+
+**Checks.** `tsc --noEmit`, lint, `npm test` 953/953 (none failed, skipped or cancelled), `npm run build`.
+
 ## R8.435 | 2026-10-08 | feat(studioflow,ui-engine): one Notes card with a what-you-see editor (Tiptap) (Lead)
 
 - **Owner decision 2026-10-08: option B, Tiptap approved, built by the Lead.** New `RichTextEditor` in the UI Engine (loaded on demand): bold, italic, heading, bullet, numbered and check lists, with a toolbar. The stored value stays plain text in the same dialect (`**bold**`, `## heading`, `- `, `1. `, `- [ ]`), so notes written before open unchanged, stay searchable and printable, and need no converter or migration. `FormattedText` now also shows headings and check items.
