@@ -3,7 +3,7 @@
 Plan ID: WO-SF-ITERNAME-01 (iteration names built from the project name, the phase prefix and the number)
 Scope: StudioFlow backend for the new default iteration name, its short label, the "Rename" rules and a one-time data migration. The Lead changes the screens afterwards.
 Target revisions: next unused revision at commit time (one commit).
-Status: READY
+Status: BUILT by the Lead in R8.431 (not for the Executor; ignore the Executor Prompt below)
 Priority: P2
 Owner: Product Owner. Decisions confirmed in chat on 2026-10-08 (kantor).
 Last updated: 2026-10-08
