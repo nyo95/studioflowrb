@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.411 | 2026-10-08 | docs(plan): WO-MD-CRUD-01 A3 no longer names SKU categories (Lead)
+
+- The Executor stopped (BLOCKED / CONFLICT): the plan asked `createSku` to collapse repeated categories, but a SKU takes exactly one `categoryId` (checked in `sku.service.ts`). Accepted its recommendation A: A3 now covers Brand (links, categories, suppliers, hashtags) and Supplier (types) only; the plan's acceptance line and the BACKLOG [BUG] entry are corrected. Nothing else in the plan changes.
+
+**Checks.** Docs only; no code changed.
+
 ## R8.410 | 2026-10-08 | docs(plan): WO-MD-CRUD-01; review of R8.409 PASS (Lead)
 
 - **Review of R8.409 (`adddd07`, WO-PLAT-COST-02 item C): PASS.** The diff is type-only: `as any` replaced by `TxClient`, `Prisma.InputJsonArray` and one documented `asPrismaClient` helper in `services/shared.ts`. Lead re-ran `tsc --noEmit` and the full tests: 938/938. Items B (R8.406) and C (R8.409) of the 2026-10-07 audit are closed; their BACKLOG entries are removed.

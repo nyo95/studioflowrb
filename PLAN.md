@@ -54,9 +54,9 @@ Owner (2026-10-08):
   still refused; `restoreBrand` keeps its own owner check.
 - A3. Create paths collapse duplicate input like the update paths do: link
   URLs (trimmed, case as the unique index sees them), category ids, supplier
-  ids and hashtags in `createBrand`; supplier type ids in `createVendor`;
-  category ids in `createSku`. No generic error from a unique index for input
-  the caller repeated.
+  ids and hashtags in `createBrand`; supplier type ids in `createVendor`. SKU is
+  out: a SKU has exactly one category (`categoryId`), so it cannot repeat one.
+  No generic error from a unique index for input the caller repeated.
 
 **Item group B — Material+Labor capability** (decision 3):
 - `createPriceMaterialLabor`, `updatePriceMaterialLabor`, the bulk/matrix
@@ -96,7 +96,7 @@ release.
    still refuses; renaming a Brand whose owner is archived works; making an
    archived Supplier the owner is refused; creating a Brand with the same link
    URL, category, supplier or hashtag twice succeeds once each; the same for a
-   Supplier's types and a SKU's categories.
+   Supplier's types.
 2. B: Material+Labor price accepted for a material-only, a labor-only and a
    both-capable Supplier, refused for one with neither; Labor price still needs
    labor; restore and Supplier-Type removal follow the new rule; the matrix and

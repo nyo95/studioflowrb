@@ -267,8 +267,9 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   owner, even when only the name or notes change. Check the owner only when it is
   being changed (the restore path keeps its own check).
 - [ ] [BUG][P3] Creating a Brand, Supplier or SKU with the same item twice in the
-  input (the same link URL, category, Supplier Type) hits a unique index outside
+  input (the same link URL, category, supplier or Supplier Type) hits a unique index outside
   `mapWriteError` and returns a generic error. The update paths already collapse
-  duplicates with a Map; make the create paths do the same (`createBrand` links
-  and categories, `createVendor` supplier types, `createSku` categories).
+  duplicates with a Map; make the create paths do the same (`createBrand` links,
+  categories, suppliers and hashtags; `createVendor` supplier types). A SKU takes
+  one category only, so it is not affected.
 - [ ] [PLANNED][P2] WO-MD-CRUD-01 (owner decisions 2026-10-08): the three [BUG] entries above, Material+Labor prices from a material, a labor or a both-capable Supplier, and archiving a Supplier also archives the Brands it owns with their SKUs and prices. Plan in `PLAN.md`; the Lead then updates the Pricing pickers and the quick-add supplier form.
