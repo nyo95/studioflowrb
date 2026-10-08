@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.424 | 2026-10-08 | fix(masterdata): directory tables fit a 1000 px window without a scrollbar; browser walk part 2 - the labor grids (Lead)
+
+- **Tables (owner request).** The Brands table lost its Owner column (the owner already heads "Supplied by", marked "(owner)"), has a flexible Brand column, narrower fixed columns, half the side padding between columns, and short link labels (Web, IG, Catalog; the full text is the tooltip); the Pricing tables get the same padding and a lower minimum width. The main cause of the scrollbar was the shared "Actions" header: its label needed about 65 px in a 48 px column and spilled out of the table in every directory; it is now screen-reader text only. Measured in the browser at 1000 px: Brands, Suppliers and Material prices have no horizontal scroll (before: 904 px of content in an 886 px box on Brands, 1,180 px minimum on Pricing).
+- **Browser walk, part 2** (isolated test server): the labor grid saves two rows and keeps the repeated name with its reason ("2 saved. 1 row needs fixing and is still here."); the several-suppliers grid saves three cells and keeps the one failing cell on its supplier ("3 saved. 1 cell needs fixing…"); the Material+Labor quick-add supplier offers every Supplier Type and creates and selects the supplier; a Material+Labor price from a material-only supplier saves. A "Discard price draft?" confirmation correctly appears when switching mode with a leftover row.
+- **Found and fixed:** the duplicate-in-batch refusals said "Same name as row 1 in this batch" while the leftover row had moved to position 1, which read as the row naming itself; they now say "another row".
+- Not walked yet (BACKLOG): client-note images, formatted notes, Timeline and Schedule, BQ screens, sample shelf, Dark, 840 px rail.
+
+**Checks.** `tsc --noEmit`, lint (touched areas), `npm test` 947/947 (none failed, skipped or cancelled).
+
 ## R8.423 | 2026-10-08 | fix: tour no longer restarts when the language is switched; refusals scroll into view; supplier archive wording; browser walk part 1 (Lead)
 
 - **Browser walk (part 1), on an isolated server.** Run on a second dev server (port 3101, separate build folder, the disposable test database, the seeded test owner), so the owner's dev database and session were not touched; fixtures named `ZZ-Test …` were created with the service layer. Passed: first-use tour (language pick, 4 steps in English and Indonesian, Done never replays, Help replay, Esc, phone width), auto-link of a supplier to a Brand on price save, the material grid saving the good row and keeping the bad one with its reason, "Show those prices" opening the Pricing list filtered to exactly those prices, Material+Labor and Labor supplier lists, Supplier archive and restore cascading through its owned Brand, SKU and price (and leaving a Brand that only lists it), a price-less SKU and its Brand archiving and restoring.

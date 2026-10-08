@@ -139,7 +139,7 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
   const materialTab = (
     <DirectoryShell fill surface toolbar={toolbarFor("material", material.length, props.materialPrices.length)} pagination={pagination(materialPaged.currentPage, materialPaged.pageCount)}>
       {material.length === 0 ? emptyState("No material prices", "Create a material price for an active SKU and eligible supplier.") : (
-        <DataTable density="compact" stickyHeader fill framed={false} minWidth={1180}>
+        <DataTable density="compact" stickyHeader fill framed={false} minWidth={820} className="[&_td]:!px-2 [&_th]:!px-2">
           <TableHeader>
             <TableRow>
               {sortableHead("name", "SKU")}{sortableHead("brand", "Brand")}{sortableHead("category", "Category")}<TableHead>Size</TableHead>{sortableHead("vendor", "Supplier")}{sortableHead("amount", "Price", "end")}<TableHead>Unit</TableHead>{sortableHead("updated", "Updated")}{props.canManageMaterial && <RowActionsHead />}
@@ -176,7 +176,7 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
     return (
       <DirectoryShell fill surface toolbar={toolbarFor(kind, rows.length, totalCount)} pagination={pagination(paged.currentPage, paged.pageCount)}>
         {rows.length === 0 ? emptyState(title, "No pricing records yet.") : (
-          <DataTable density="compact" stickyHeader fill framed={false} minWidth={980}>
+          <DataTable density="compact" stickyHeader fill framed={false} minWidth={780} className="[&_td]:!px-2 [&_th]:!px-2">
             <TableHeader>
               <TableRow>
                 {sortableHead("name", "Name")}{sortableHead("category", "Category")}{sortableHead("vendor", "Supplier")}{sortableHead("amount", "Price", "end")}<TableHead>Unit</TableHead>{sortableHead("updated", "Updated")}{canManage && <RowActionsHead />}

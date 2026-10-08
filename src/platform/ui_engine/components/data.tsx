@@ -219,7 +219,7 @@ export function TableHead({
 
 /** Canonical sticky actions column header for entity directories. */
 export function RowActionsHead() {
-  return <TableHead stickyEnd align="center" style={{ width: 48 }}>Actions</TableHead>;
+  return <TableHead stickyEnd align="center" style={{ width: 48 }}><span className="sr-only">Actions</span></TableHead>;
 }
 
 export function TableCell({

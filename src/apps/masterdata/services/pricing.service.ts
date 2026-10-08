@@ -294,7 +294,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const liveNames = new Set(existing.flatMap((row) => [row.name.trim().toLowerCase(), row.slug]));
         for (const [rowIndex, row] of input.rows.entries()) {
           const slugKey = (() => { try { return requiredSlug(row.name); } catch { return ""; } })(); const key = slugKey || row.name.trim().toLowerCase();
-          if (key && seen.has(key)) { errors.push({ rowIndex, field: "name", code: "BULK_DUPLICATE_IN_BATCH", message: `Same name as row ${seen.get(key)! + 1} in this batch.` }); continue; }
+          if (key && seen.has(key)) { errors.push({ rowIndex, field: "name", code: "BULK_DUPLICATE_IN_BATCH", message: "Same name as another row in this batch." }); continue; }
           if (key) seen.set(key, rowIndex);
           if (key && (liveNames.has(key) || (slugKey && liveNames.has(slugKey)))) { errors.push({ rowIndex, field: "name", code: "PRICE_IDENTITY_CONFLICT", message: "This supplier already has a price with this name. Make the name more specific." }); continue; }
           try {
@@ -323,7 +323,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         for (const [rowIndex, row] of input.rows.entries()) {
           const slugKey = (() => { try { return requiredSlug(row.name); } catch { return ""; } })();
           const key = slugKey || row.name.trim().toLowerCase(); // two names with the same slug are the same price to the database
-          if (key && seen.has(key)) { errors.push({ rowIndex, field: "name", code: "BULK_DUPLICATE_IN_BATCH", message: `Same name as row ${seen.get(key)! + 1} in this batch.` }); continue; }
+          if (key && seen.has(key)) { errors.push({ rowIndex, field: "name", code: "BULK_DUPLICATE_IN_BATCH", message: "Same name as another row in this batch." }); continue; }
           if (key && (liveNames.has(key) || (slugKey && liveNames.has(slugKey)))) { errors.push({ rowIndex, field: "name", code: "PRICE_IDENTITY_CONFLICT", message: "This supplier already has a price with this name. Make the name more specific." }); continue; }
           if (key) seen.set(key, rowIndex);
           try {
@@ -420,7 +420,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const vendorIds = [...new Set(input.rows.map((row) => row.vendorId))]; const live = await db.priceMaterial.findMany({ where: { supplier_vendor_id: { in: vendorIds }, deleted_at: null }, select: { sku_id: true, supplier_vendor_id: true } }); const taken = new Set(live.map((row) => `${row.supplier_vendor_id}|${row.sku_id}`));
         for (const [rowIndex, row] of input.rows.entries()) {
           const pair = `${row.vendorId}|${row.skuId}`;
-          if (seen.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "BULK_DUPLICATE_IN_BATCH", message: `Same SKU and supplier as row ${seen.get(pair)! + 1} in this batch.` }); continue; }
+          if (seen.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "BULK_DUPLICATE_IN_BATCH", message: "Same SKU and supplier as another row in this batch." }); continue; }
           seen.set(pair, rowIndex); if (taken.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "PRICE_PAIR_CONFLICT", message: "This supplier already has a live price for this SKU. Edit that price instead." }); continue; }
           try { const created = await runTransaction(async (rowTx: TxClient) => createPricingService(asPrismaClient(rowTx), { ...ports, runTransaction: async (work) => work(rowTx) }).createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: row.skuId, supplierVendorId: row.vendorId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined })); ids.push(created.priceMaterialId); taken.add(pair); }
           catch (error) { errors.push(error instanceof AppError ? { rowIndex, field: bulkErrorField(error.code), code: error.code, message: error.safeMessage } : { rowIndex, field: null, code: "PRICE_SAVE_FAILED", message: "This row could not be saved." }); }
@@ -440,7 +440,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const ids: string[] = [];
         for (const [rowIndex, row] of input.rows.entries()) {
           const pair = `${row.vendorId}|${row.skuId}`;
-          if (seen.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "BULK_DUPLICATE_IN_BATCH", message: `Same SKU and supplier as row ${seen.get(pair)! + 1} in this batch.` }); continue; }
+          if (seen.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "BULK_DUPLICATE_IN_BATCH", message: "Same SKU and supplier as another row in this batch." }); continue; }
           seen.set(pair, rowIndex);
           if (taken.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "PRICE_PAIR_CONFLICT", message: "This supplier already has a live price for this SKU. Edit that price instead." }); continue; }
           try {
