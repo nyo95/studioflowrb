@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.429 | 2026-10-08 | fix(studioflow): client notes saved on an unsent iteration now show on its card; two owner ideas recorded (Lead)
+
+- **Owner report: "tidak muncul di mana-mana".** Client notes (text and images) saved on an iteration that had not been answered were shown nowhere: the card showed the previous iteration's notes as the brief and the iteration's own notes only after the client answered. The phase page now shows "Client notes for this iteration" with the text and images whenever the current iteration has any, in every state. Checked in the browser: a note typed on an unsent Moodboard 1 appears on the card at once, with its Undo bar.
+- **Recorded for the owner's decision (BACKLOG):** default iteration names built from project name, phase prefix and number ("2026-474 Sociolla SBW R1 D1"), with the open question about "Rename iteration"; and one merged Notes idea (pinned note and client notes) with checklist, rich text and annotated images, in three sizes.
+- **Seen in the owner's screenshot, not investigated:** the Requirements card lists "Ukuran Videotron" twice; this may be two template items with the same label.
+
+**Checks.** `tsc --noEmit`, lint (StudioFlow project screens), `npm test` 947/947 (none failed, skipped or cancelled).
+
 ## R8.428 | 2026-10-08 | fix(masterdata): the Updated column no longer cuts the date (Lead)
 
 - **Owner report (screenshot of Brands).** The "Updated" column cut the end of the time ("30 Sep 2026, 13.4") while the Brand column kept half the table's width. The shared `UpdatedCell` (Brands, Suppliers, Pricing) now shows the date only ("8 Okt 2026") with the user under it, and the exact date and time as the tooltip; the Brands column is 156 px.

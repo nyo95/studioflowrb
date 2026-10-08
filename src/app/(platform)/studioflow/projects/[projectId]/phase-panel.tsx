@@ -87,6 +87,7 @@ export function PhasePanel({ projectId, phase, current, previous, iterations, no
                 <Text tone="secondary" size="sm">{nextStep}</Text>
               </div>
               {current?.state === "NOT_SENT" && (previous?.note || previous?.images.length) ? <Notice tone="neutral" title={`Client notes from ${previous.name}`}><div className="grid gap-2">{previous.note ? <FormattedText text={previous.note} /> : null}<IterationImageList images={previous.images} />{previousRow && acting ? <Button size="sm" variant="ghost" className="justify-self-start" onClick={() => openNotes(previousRow)}>Add to notes</Button> : null}</div></Notice> : null}
+              {current && current.state !== "ANSWERED" && (current.note || current.images?.length) ? <Notice tone="neutral" title="Client notes for this iteration"><div className="grid gap-2">{current.note ? <FormattedText text={current.note} /> : null}<IterationImageList images={current.images ?? []} /></div></Notice> : null}
               {current?.state === "ANSWERED" ? <div className="grid gap-2">{current.note ? <FormattedText text={current.note} className="text-sm text-ink-secondary" /> : (current.images?.length ? null : <Text as="p" tone="tertiary" size="sm">No client notes recorded.</Text>)}<IterationImageList images={current.images ?? []} /></div> : null}
               <UndoBar commands={commands} />
               {commands.error && !visitOpen && !renaming && !notesFor && !skipOpen && !resetOpen ? <InlineError>{commands.error}</InlineError> : null}
