@@ -2,9 +2,9 @@
 
 import { ChevronLeft, ChevronRight, ImagePlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ClipboardEvent, type DragEvent, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 
-import { Button, Dialog, IconButton, InlineError, Text, shrinkImageFile, useConfirm } from "@/platform/ui_engine";
+import { Button, Dialog, IconButton, InlineError, Text, shrinkImageFile, useConfirm, useFileIntake } from "@/platform/ui_engine";
 
 import { addIterationImageAction, removeIterationImageAction } from "../actions";
 
@@ -77,14 +77,12 @@ export function IterationImageArea({ projectId, phaseId, iterationId, images, di
   const busy = useRef(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
-  const [dragging, setDragging] = useState(false);
   const room = MAX_IMAGES - images.length - uploading;
 
-  const upload = async (files: File[]) => {
+  const upload = async (accepted: File[], refused: File[] = []) => {
     if (busy.current) { setErrors(["Wait for the images being added to finish first."]); return; }
-    const accepted = files.filter((file) => ACCEPTED.includes(file.type));
     const problems: string[] = [];
-    if (accepted.length < files.length) problems.push("Only PNG, JPEG or WebP images can be added.");
+    if (refused.length > 0) problems.push("Only PNG, JPEG or WebP images can be added.");
     const batch = accepted.slice(0, Math.max(0, room));
     if (accepted.length > batch.length) problems.push(`An iteration holds at most ${MAX_IMAGES} images.`);
     setErrors(problems);
@@ -123,34 +121,13 @@ export function IterationImageArea({ projectId, phaseId, iterationId, images, di
     router.refresh();
   };
 
-  const filesOf = (list: DataTransferItemList | FileList | null) => {
-    if (!list) return [];
-    if ("length" in list && list instanceof FileList) return Array.from(list);
-    return Array.from(list as DataTransferItemList).filter((item) => item.kind === "file").map((item) => item.getAsFile()).filter((file): file is File => file !== null);
-  };
-
-  const onPaste = (event: ClipboardEvent<HTMLDivElement>) => {
-    if (disabled) return;
-    const files = filesOf(event.clipboardData.items).filter((file) => file.type.startsWith("image/"));
-    // Only a pasted image is taken over; pasted text goes into the notes as usual.
-    if (files.length === 0) return;
-    event.preventDefault();
-    void upload(files);
-  };
-  const onDrop = (event: DragEvent<HTMLDivElement>) => {
-    if (disabled) return;
-    event.preventDefault();
-    setDragging(false);
-    void upload(filesOf(event.dataTransfer.files));
-  };
+  // Pasted text still goes into the notes as usual; only files are taken over.
+  const intake = useFileIntake({ accept: ACCEPTED.join(","), multiple: true, disabled, onFiles: (files, refused) => void upload(files, refused) });
 
   return (
     <div
-      className={`grid gap-2 rounded-control ${dragging ? "outline-2 outline-dashed outline-offset-4 outline-line-focus" : ""}`}
-      onPaste={onPaste}
-      onDragOver={(event) => { if (!disabled && Array.from(event.dataTransfer.types).includes("Files")) { event.preventDefault(); setDragging(true); } }}
-      onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false); }}
-      onDrop={onDrop}
+      className={`grid gap-2 rounded-control ${intake.active ? "outline-2 outline-dashed outline-offset-4 outline-line-focus" : ""}`}
+      {...intake.target}
     >
       {children}
       <IterationImageList images={images} onRemove={disabled ? undefined : (image) => void remove(image)} removingId={removingId} />
@@ -160,7 +137,7 @@ export function IterationImageArea({ projectId, phaseId, iterationId, images, di
             {uploading > 0 ? `Adding ${uploading}…` : "Add images"}
           </Button>
           <Text size="sm" tone="tertiary">{room <= 0 ? `${MAX_IMAGES} images is the limit.` : "Or drop them here, or paste a screenshot (Ctrl+V)."}</Text>
-          <input ref={pickerRef} type="file" accept={ACCEPTED.join(",")} multiple hidden onChange={(event) => { const files = filesOf(event.target.files); event.target.value = ""; void upload(files); }} />
+          <input ref={pickerRef} type="file" accept={ACCEPTED.join(",")} multiple hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; void upload(files.filter((file) => ACCEPTED.includes(file.type)), files.filter((file) => !ACCEPTED.includes(file.type))); }} />
         </div>
       )}
       {errors.length > 0 ? <InlineError>{errors.join(" ")}</InlineError> : null}

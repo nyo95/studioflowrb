@@ -50,6 +50,7 @@ import {
   Text,
   Textarea,
   useConfirm,
+  useFileIntake,
   type CreatableSearchGroup,
   type CreatableSearchOption,
 } from "@/platform/ui_engine";
@@ -120,12 +121,15 @@ function InlinePhotoEditor({
   entryCode,
   option,
   command,
+  initialFile,
   onClose,
 }: {
   projectId: string;
   entryCode: string;
   option: ScheduleOptionView;
   command: Command;
+  /** A photo already pasted or dropped on the option's photo box; the file picker then stays shut. */
+  initialFile: File | null;
   onClose: () => void;
 }) {
   const { run, isPending } = command;
@@ -151,11 +155,11 @@ function InlinePhotoEditor({
       <div className="flex items-start justify-between gap-2">
         <div>
           <Text size="sm" weight="semibold">{`Photo — ${entryCode} option ${option.label}`}</Text>
-          <Text size="sm" tone="tertiary">Choose a photo and crop it to the 4:5 catalog frame.</Text>
+          <Text size="sm" tone="tertiary">Choose, drop or paste a photo, then crop it to the 4:5 catalog frame.</Text>
         </div>
         <Button type="button" size="sm" variant="ghost" onClick={onClose} disabled={isPending(pendingKey)}>Cancel</Button>
       </div>
-      <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPrepared} disabled={isPending(pendingKey)} openOnMount />
+      <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPrepared} disabled={isPending(pendingKey)} openOnMount={!initialFile} initialFile={initialFile} pasteFromPage />
       {photoError ? <InlineError>{photoError}</InlineError> : null}
     </div>
   );
@@ -1003,6 +1007,17 @@ function EntryPanelContent({
 
   const selected = selectedId === "new" ? null : entry.options.find((option) => option.id === selectedId) ?? shownOptionOf(entry);
 
+  // Paste a photo like in Notes (owner, 2026-10-08): Ctrl+V anywhere outside a text field, or a drop on the photo box,
+  // opens the photo editor with that image already in it.
+  const [handedPhoto, setHandedPhoto] = useState<File | null>(null);
+  const openPhoto = (optionId: string, file: File | null = null) => { setHandedPhoto(file); setPhotoFor(optionId); setReuse(false); setSampleFor(null); };
+  const photoIntake = useFileIntake({
+    accept: "image/*",
+    disabled: !canEdit || !selected || photoFor !== null,
+    pasteFromPage: true,
+    onFiles: (files, refused) => { const file = files[0] ?? refused[0]; if (file && selected) openPhoto(selected.id, file); },
+  });
+
   // Owner decision 2026-09-24: nothing auto-saves per field. `baseline` is what is persisted for the item-level
   // pieces; `optionBaseline` holds what was last saved per option (props catch up after the refresh);
   // `drafts` holds only the options the person has touched.
@@ -1172,7 +1187,7 @@ function EntryPanelContent({
         label={`Option ${selected.label} actions`}
         pending={isPending(busyKey)}
         items={[
-          { label: selected.imageUrl ? "Change photo" : "Add photo", onSelect: () => setPhotoFor(selected.id) },
+          { label: selected.imageUrl ? "Change photo" : "Add photo", onSelect: () => openPhoto(selected.id) },
           ...(selected.imageUrl ? [{ label: "Remove photo", onSelect: () => void removePhoto(selected) }] : []),
           ...(selected.isFinal ? [{ label: "Unset final", separatorBefore: true, onSelect: () => void run(busyKey, () => unmarkScheduleFinalAction({ projectId, optionId: selected.id })) }] : []),
           ...(selected.sampleRequest?.status === "REQUESTED" ? [{ label: "Cancel sample request", danger: true, separatorBefore: true, onSelect: () => void cancelSample(selected) }] : []),
@@ -1203,21 +1218,22 @@ function EntryPanelContent({
       </div>
 
       {photoFor && entry.options.some((option) => option.id === photoFor) ? (
-        <InlinePhotoEditor projectId={projectId} entryCode={entry.code} option={entry.options.find((option) => option.id === photoFor)!} command={command} onClose={() => setPhotoFor(null)} />
+        <InlinePhotoEditor projectId={projectId} entryCode={entry.code} option={entry.options.find((option) => option.id === photoFor)!} command={command} initialFile={handedPhoto} onClose={() => { setPhotoFor(null); setHandedPhoto(null); }} />
       ) : (
         <div className="grid items-start gap-4 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
           {/* Photo of the selected option (4:5, as on the board). */}
           <div className="relative">
             {selectedId === "new" && canEdit ? (
-              <div className="grid gap-1"><ImageWorkspace label="New option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={setPreparedNewPhoto} disabled={savePending} />{preparedNewPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedNewPhoto.name}</Text> : null}</div>
+              <div className="grid gap-1"><ImageWorkspace label="New option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={setPreparedNewPhoto} disabled={savePending} pasteFromPage />{preparedNewPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedNewPhoto.name}</Text> : null}</div>
             ) : selected && canEdit ? (
-              <button type="button" onClick={() => setPhotoFor(selected.id)} aria-label={selected.imageUrl ? `Change photo of option ${selected.label}` : `Add photo to option ${selected.label}`} className="relative block w-full rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+              <button type="button" onClick={() => openPhoto(selected.id)} {...photoIntake.target} aria-label={selected.imageUrl ? `Change photo of option ${selected.label}` : `Add photo to option ${selected.label}`} title="Click to choose, or drop / paste a photo (Ctrl+V)" className={`relative block w-full rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus ${photoIntake.active ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}>
                 <Thumb url={selected.imageUrl} alt={selected.productName} className="aspect-[4/5] !h-auto w-full !rounded-control" />
                 <span className="pointer-events-none absolute bottom-2 left-2 rounded-full bg-surface/90 px-2 py-0.5 text-[11px] font-medium text-ink-secondary">{selected.imageUrl ? "Change photo" : "Add photo"}</span>
               </button>
             ) : (
               <Thumb url={selected?.imageUrl ?? null} alt={selected?.productName ?? "No photo"} className="aspect-[4/5] !h-auto w-full !rounded-control" />
             )}
+            {selectedId !== "new" && selected && canEdit ? <Text as="p" size="sm" tone="tertiary" className="mt-1 text-center">Or paste a photo (Ctrl+V)</Text> : null}
           </div>
 
           <div className="grid min-w-0 gap-2.5">

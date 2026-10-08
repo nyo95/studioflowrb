@@ -80,6 +80,9 @@ describe("UI Engine foundation", () => {
       "InlineEdit",
       // R7.43 — activated by the phase deliverable intake consumer (KB-011).
       "FileDropZone",
+      // Drop and paste intake every file-taking surface shares (owner, 2026-10-08: paste a photo like in Notes).
+      "useFileIntake",
+      "clipboardFiles",
       // R7.48 — canonical copy-to-clipboard button; no StudioFlow vocabulary.
       "CopyButton",
       "SimpleTextEditor",
@@ -755,8 +758,10 @@ describe("UI Engine foundation", () => {
     const source = readFileSync(new URL("./patterns/file-drop-zone.tsx", import.meta.url), "utf8");
     /* Interaction only: no transport, no reading, no storage policy. */
     assert.doesNotMatch(source, /fetch\(|FileReader|arrayBuffer|XMLHttpRequest|FormData/);
-    /* Without preventDefault the browser leaves the page and opens the file. */
-    assert.match(source, /event\.preventDefault\(\)/);
+    /* The drag gesture is the shared intake's, and that intake keeps the browser from opening the file. */
+    assert.match(source, /useFileIntake\(/);
+    const intake = readFileSync(new URL("./patterns/file-intake.tsx", import.meta.url), "utf8");
+    assert.match(intake, /event\.preventDefault\(\)/);
   });
 
   it("filters a drop by accept and hands single-select zones one file", () => {
@@ -778,6 +783,17 @@ describe("UI Engine foundation", () => {
     assert.equal(matchesAccept("image/*", { name: "a", size: 1, type: "imagex/png" }), false);
     assert.equal(matchesAccept("text/plain", { name: "a", size: 1, type: "text/plain" }), true);
     assert.equal(matchesAccept("text/plain", { name: "a", size: 1, type: "text/html" }), false);
+  });
+
+  it("reads pasted files from either clipboard list and ignores plain text", () => {
+    const shot = { name: "image.png", size: 10, type: "image/png" } as File;
+    const clipboard = (files: File[], items: Array<{ kind: string; getAsFile: () => File | null }>) => ({ files, items }) as unknown as DataTransfer;
+    assert.deepEqual(ui.clipboardFiles(clipboard([shot], [])), [shot]);
+    /* Some browsers fill only the item list for a copied screenshot. */
+    assert.deepEqual(ui.clipboardFiles(clipboard([], [{ kind: "string", getAsFile: () => null }, { kind: "file", getAsFile: () => shot }])), [shot]);
+    /* Text alone yields nothing, so a text paste is never taken over. */
+    assert.deepEqual(ui.clipboardFiles(clipboard([], [{ kind: "string", getAsFile: () => null }])), []);
+    assert.deepEqual(ui.clipboardFiles(null), []);
   });
 
   it("keeps a disabled zone inert and marks nothing before a drag", () => {

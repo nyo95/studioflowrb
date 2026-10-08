@@ -1,16 +1,10 @@
 "use client";
 
-import {
-  useRef,
-  useState,
-  type ChangeEvent,
-  type DragEvent,
-  type HTMLAttributes,
-  type ReactNode,
-} from "react";
+import { useRef, type ChangeEvent, type HTMLAttributes, type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 import { selectFiles, type FileDescriptor } from "../internal/file-drop";
+import { useFileIntake } from "./file-intake";
 
 export type { FileDescriptor };
 
@@ -62,20 +56,16 @@ export function FileDropZone({
   className,
   ...props
 }: FileDropZoneProps) {
-  const [active, setActive] = useState(false);
   const pickerRef = useRef<HTMLInputElement>(null);
 
-  const emit = (list: FileList | null) => {
+  const emit = (list: readonly File[] | FileList | null) => {
     if (disabled || !list) return;
     const chosen = selectFiles(Array.from(list), { accept, multiple });
     if (chosen.length) onFiles(chosen);
   };
 
-  // Without preventDefault the browser leaves the page and opens the file.
-  const hold = (event: DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    if (!disabled) setActive(true);
-  };
+  // The drag gesture is the shared intake's; this zone only reduces what arrives to file facts.
+  const { active, target } = useFileIntake({ onFiles: (files) => emit(files), accept, multiple, disabled });
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     emit(event.target.files);
@@ -99,18 +89,10 @@ export function FileDropZone({
       aria-label={label}
       aria-disabled={disabled || undefined}
       data-drop-active={active || undefined}
-      onDragEnter={hold}
-      onDragOver={hold}
-      onDragLeave={(event) => {
-        // Only leaving the zone's own boundary ends the highlight; crossing a
-        // child element does not, or the target flickers while dragging over it.
-        if (event.currentTarget === event.target) setActive(false);
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        setActive(false);
-        emit(event.dataTransfer.files);
-      }}
+      onDragEnter={target.onDragEnter}
+      onDragOver={target.onDragOver}
+      onDragLeave={target.onDragLeave}
+      onDrop={target.onDrop}
     >
       {children}
       <div

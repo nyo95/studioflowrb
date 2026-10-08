@@ -4,10 +4,10 @@ import { Download, Expand, MessageCircle, Plus, Send, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
-import type { ChangeEvent, ClipboardEvent, DragEvent, FormEvent, KeyboardEvent } from "react";
+import type { ChangeEvent, FormEvent, KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
-import { EmptyState, IconButton, Text, Textarea } from "@/platform/ui_engine";
+import { EmptyState, IconButton, Text, Textarea, useFileIntake } from "@/platform/ui_engine";
 import {
   getUnreadMessengerCountAction,
   listMessengerConversationsAction,
@@ -49,10 +49,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function hasFiles(event: DragEvent): boolean {
-  return Array.from(event.dataTransfer.types).includes("Files");
-}
-
 export function QuickMessenger() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -66,7 +62,6 @@ export function QuickMessenger() {
   const [pending, startTransition] = useTransition();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [draftsLoaded, setDraftsLoaded] = useState(false);
-  const [dragging, setDragging] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -74,7 +69,6 @@ export function QuickMessenger() {
   const recipientRef = useRef<HTMLSelectElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sendingRef = useRef(false);
-  const dragDepthRef = useRef(0);
   const pendingCaretRef = useRef<number | null>(null);
 
   const draftKey = activeId ?? NEW_DRAFT_KEY;
@@ -291,36 +285,9 @@ export function QuickMessenger() {
     event.target.value = "";
   };
 
-  const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>) => {
-    const pasted = Array.from(event.clipboardData.files);
-    if (pasted.length === 0) return;
-    event.preventDefault();
-    addFiles(pasted);
-  };
-
-  const onDragEnter = (event: DragEvent) => {
-    if (!hasFiles(event)) return;
-    event.preventDefault();
-    dragDepthRef.current += 1;
-    setDragging(true);
-  };
-  const onDragOver = (event: DragEvent) => {
-    if (!hasFiles(event)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-  };
-  const onDragLeave = (event: DragEvent) => {
-    if (!hasFiles(event)) return;
-    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-    if (dragDepthRef.current === 0) setDragging(false);
-  };
-  const onDrop = (event: DragEvent) => {
-    if (!hasFiles(event)) return;
-    event.preventDefault();
-    dragDepthRef.current = 0;
-    setDragging(false);
-    addFiles(Array.from(event.dataTransfer.files));
-  };
+  // Any file type may be attached; the composer's own limits are applied by `addFiles`.
+  const intake = useFileIntake({ multiple: true, onFiles: (files) => addFiles(files) });
+  const dragging = intake.active;
 
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -441,10 +408,10 @@ export function QuickMessenger() {
 
           <form
             onSubmit={onSubmit}
-            onDragEnter={onDragEnter}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
+            onDragEnter={intake.target.onDragEnter}
+            onDragOver={intake.target.onDragOver}
+            onDragLeave={intake.target.onDragLeave}
+            onDrop={intake.target.onDrop}
             className={`grid gap-1.5 border-t p-3 transition-colors ${dragging ? "border-line-focus bg-surface-muted" : "border-line-subtle"}`}
           >
             {error ? <Text size="sm" className="text-danger" role="alert">{error}</Text> : null}
@@ -477,7 +444,7 @@ export function QuickMessenger() {
                 value={draft.text}
                 onChange={(event) => updateDraft(draftKey, (current) => ({ ...current, text: event.target.value }))}
                 onKeyDown={onComposerKeyDown}
-                onPaste={onPaste}
+                onPaste={intake.target.onPaste}
                 placeholder={dragging ? "Drop files to attach" : "Write a message..."}
                 aria-label="Message"
                 aria-describedby="quick-messenger-hint"

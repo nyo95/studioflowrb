@@ -5,6 +5,7 @@ import Image from "next/image";
 
 import { Button } from "../primitives/actions";
 import { Input } from "../primitives/forms";
+import { useFileIntake } from "./file-intake";
 import { ADJUST_LIMITS, colorFilter, compressionSteps, formatSize, isNeutral, NEUTRAL_ADJUST, type ColorAdjust } from "./image-adjust";
 
 type Point = { x: number; y: number };
@@ -44,10 +45,24 @@ export type ImageWorkspaceProps = {
    * choosing a file. The browser only allows this right after a user click; if it declines, "Choose image" stays.
    */
   openOnMount?: boolean;
+  /** An image the person already handed over (pasted or dropped before the workspace opened); the picker then stays shut. */
+  initialFile?: File | null;
+  /**
+   * Also take an image pasted while the focus is on no text field, so Ctrl+V works right after copying without a
+   * click into the workspace first. One open workspace per page should ask for this.
+   */
+  pasteFromPage?: boolean;
   disabled?: boolean;
 };
 
 const DEFAULT_TARGET_BYTES = 1.5 * 1024 * 1024;
+
+/** Why a chosen image cannot be used, or null when it can. */
+function imageProblem(file: File, accept: string, maxBytes: number): string | null {
+  if (!accept.split(",").map((value) => value.trim()).includes(file.type)) return "Use a supported image format.";
+  if (file.size === 0 || file.size > maxBytes) return `Choose a non-empty image no larger than ${Math.ceil(maxBytes / 1024 / 1024)} MB.`;
+  return null;
+}
 
 /** `ctx.filter` is missing in older Safari; without it the colour sliders would preview one thing and save another, so they are hidden. */
 function canBakeColorFilter(): boolean {
@@ -110,14 +125,15 @@ function drawStrokes(context: CanvasRenderingContext2D, strokes: readonly Stroke
 }
 
 /** Browser image preparation only; storage and consumer policy stay outside. */
-export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false, openOnMount = false }: ImageWorkspaceProps) {
+export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false, openOnMount = false, initialFile = null, pasteFromPage = false }: ImageWorkspaceProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
   const opened = useRef(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const panState = useRef<{ pointerId: number; startX: number; startY: number; startPanX: number; startPanY: number } | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // A handed-over image starts the workspace already loaded, with the same checks as a picked one.
+  const [file, setFile] = useState<File | null>(() => initialFile && !imageProblem(initialFile, accept, maxBytes) ? initialFile : null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(() => initialFile && !imageProblem(initialFile, accept, maxBytes) ? URL.createObjectURL(initialFile) : null);
   const [zoom, setZoom] = useState(1);
   const [panX, setPanX] = useState(50);
   const [panY, setPanY] = useState(50);
@@ -126,7 +142,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [drawing, setDrawing] = useState(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => initialFile ? imageProblem(initialFile, accept, maxBytes) : null);
   const [adjust, setAdjust] = useState<ColorAdjust>(NEUTRAL_ADJUST);
   const [sizeNote, setSizeNote] = useState<string | null>(null);
   // Read once on the client; the controls only render after an image is chosen, so there is no server markup to disagree with.
@@ -135,10 +151,10 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
   useEffect(() => {
-    if (!openOnMount || disabled || opened.current) return;
+    if (!openOnMount || disabled || opened.current || initialFile) return;
     opened.current = true;
     pickerRef.current?.click();
-  }, [openOnMount, disabled]);
+  }, [openOnMount, disabled, initialFile]);
 
   useEffect(() => {
     const canvas = overlayRef.current;
@@ -156,20 +172,17 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
 
   const select = (selected: File | undefined) => {
     if (!selected) return;
-    setError(null);
-    if (!accept.split(",").map((value) => value.trim()).includes(selected.type)) {
-      setError("Use a supported image format.");
-      return;
-    }
-    if (selected.size === 0 || selected.size > maxBytes) {
-      setError(`Choose a non-empty image no larger than ${Math.ceil(maxBytes / 1024 / 1024)} MB.`);
-      return;
-    }
+    const problem = imageProblem(selected, accept, maxBytes);
+    setError(problem);
+    if (problem) return;
     if (previewUrl) URL.revokeObjectURL(previewUrl);
     setFile(selected);
     setPreviewUrl(URL.createObjectURL(selected));
     setZoom(1); setPanX(50); setPanY(50); setStrokes([]); setAdjust(NEUTRAL_ADJUST); setSizeNote(null);
   };
+
+  // Drop or paste an image anywhere on the workspace; the same checks as a picked file apply (an unsupported file is explained, not dropped silently).
+  const intake = useFileIntake({ accept, disabled: disabled || pending, pasteFromPage, onFiles: (files, refused) => select(files[0] ?? refused[0]) });
 
   const pointFromEvent = (event: PointerEvent<HTMLCanvasElement>): Point => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -259,9 +272,9 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
     setZoom((current) => clamp(current - event.deltaY / 500, 1, 3));
   };
 
-  return <div className="grid gap-3 rounded-control shadow-plane p-3" aria-label={label}>
+  return <div className={intake.active ? "grid gap-3 rounded-control shadow-plane p-3 outline-2 outline-dashed outline-offset-2 outline-line-focus" : "grid gap-3 rounded-control shadow-plane p-3"} aria-label={label} {...intake.target}>
     <input ref={pickerRef} className="sr-only" type="file" accept={accept} disabled={disabled || pending} onChange={(event) => { select(event.target.files?.[0]); event.target.value = ""; }} />
-    {!previewUrl ? <Button type="button" variant="secondary" onClick={() => pickerRef.current?.click()} disabled={disabled}>Choose image</Button> : <>
+    {!previewUrl ? <div className="grid gap-1.5"><Button type="button" variant="secondary" onClick={() => pickerRef.current?.click()} disabled={disabled}>Choose image</Button><p className="text-xs text-ink-tertiary">Or drop an image here, or paste one (Ctrl+V).</p></div> : <>
       <div
         className={aspect ? "relative overflow-hidden rounded-control border border-line bg-surface-muted touch-none" : "relative aspect-video overflow-hidden rounded-control border border-line bg-surface-muted touch-none"}
         style={aspect ? { aspectRatio: String(aspect) } : undefined}

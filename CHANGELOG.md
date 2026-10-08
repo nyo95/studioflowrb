@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.445 | 2026-10-08 | feat(ui-engine): paste or drop a photo like in Notes, through one shared intake (Lead)
+
+- **Owner request:** "Change photo" in the Schedule spec panel should take Ctrl+V like the Notes do. Copy an image, then press Ctrl+V anywhere in the panel outside a text field (or drop it on the photo box): the photo editor opens with the image already in it, ready to crop. The new-option photo and the photo editor itself take a paste or drop too. A hint "Or paste a photo (Ctrl+V)" sits under the photo box.
+- **Shared layer (owner asked for a UI Engine check).** Drop/paste was written three times (Notes images, quick messenger, and the unused `FileDropZone`), against the UI_ENGINE.md rule that apps consume one drop implementation. Added `useFileIntake` (+ `clipboardFiles`) in the UI Engine; `FileDropZone`, `ImageWorkspace` (new `initialFile`, `pasteFromPage`), the StudioFlow notes images and the quick messenger now all use it. Behaviour of Notes and the messenger is unchanged. UI_ENGINE.md updated.
+- **Ledger note:** R8.443 and R8.444 were each used twice by two sessions on 2026-10-08 (commits 85840c5/a9c1b62 and 4a258bf/3f6afa2). Left as they are (history is not renumbered); this revision continues at R8.445.
+- **Migrations/dependencies:** none. No browser check (owner tests in the browser).
+
+**Checks.** `tsc --noEmit`; eslint on `src/platform` and StudioFlow (only an existing `<img>` warning); `node --test` on ui-engine, quick-messenger, schedule regression and the boundary checker (all pass, clipboard test added). Full `npm test` and `npm run build` not run.
+
 ## R8.444 | 2026-10-08 | fix(masterdata): the SKU list no longer repeats the name as a slug line (Lead)
 
 - **Owner review:** under each SKU name the list showed the internal slug (the name in lowercase with dashes), which tells nothing the name does not. It now shows only the article code when the SKU has one; otherwise just the name. Search by slug still works.

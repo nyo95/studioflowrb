@@ -5,6 +5,7 @@ export * from "./creatable-multi-select";
 export * from "./creatable-search";
 export * from "./draft-dialog";
 export * from "./file-drop-zone";
+export * from "./file-intake";
 export * from "./hooks";
 export * from "./image-workspace";
 export * from "./inline-edit";

@@ -956,7 +956,17 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   surrounding form; a consumer that needs bytes on a server sends them
   through its own approved boundary. Apps must consume this export rather
   than reimplement drop handlers locally.
-- `ImageWorkspace` owns browser selection, preview, crop through zoom/focus
+- `useFileIntake` is the one implementation of the drop and paste gestures
+  (R8.445). It owns the drag highlight (counted, so child elements do not make
+  it flicker), the native `accept` filter, and reading files off a clipboard,
+  and hands the consumer the real `File`s plus the refused ones so a refusal
+  can be explained. A paste without files is left alone, so text still pastes
+  into a field. `pasteFromPage` also takes a file pasted while the focus is on
+  no text field; one mounted intake per page may ask for it. `FileDropZone`,
+  `ImageWorkspace`, the StudioFlow notes images, and the quick messenger all
+  take files through it; no app or shell keeps its own drop/paste handlers.
+- `ImageWorkspace` owns browser selection (picker, drop, paste, or an
+  `initialFile` handed over by the consumer), preview, crop through zoom/focus
   (optionally locked to an `aspect`), freehand annotation, PNG or JPEG output
   (`outputType`, `outputQuality`), preparation progress, and safe preparation
   errors. The
