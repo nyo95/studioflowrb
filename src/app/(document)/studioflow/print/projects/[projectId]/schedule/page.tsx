@@ -83,7 +83,7 @@ export default async function SchedulePrintPage({
         </header>
 
         {SCHEDULE_SECTIONS.map((section) => {
-          const sectionEntries = entries.filter((entry) => entry.section === section);
+          const sectionEntries = entries.filter((entry) => entry.section === section && shownOptionOf(entry));
           if (sectionEntries.length === 0) return null;
           return (
             <section key={section} className="mt-6">
@@ -107,11 +107,7 @@ export default async function SchedulePrintPage({
                             ) : null}
                             <span className="absolute right-1 top-1 bg-white/90 px-1 font-mono text-[9px] font-bold">{entry.code}</span>
                           </div>
-                          {shown ? (
-                            <p className="text-xs font-semibold uppercase leading-tight">{shown.productName}</p>
-                          ) : (
-                            <p className="text-xs italic text-neutral-500">Reserved — no product yet</p>
-                          )}
+                            <p className="text-xs font-semibold uppercase leading-tight">{shown?.productName}</p>
                           <div className="mt-1 grid gap-0.5">
                             {details.map(([label, value]) => (value ? (
                               <div key={label} className="flex justify-between gap-2 text-[10px]">

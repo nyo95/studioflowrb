@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.433 | 2026-10-08 | fix(studioflow): the printed Product Schedule leaves out rows with no product yet (Lead)
+
+- Codex's BLOCKED report on the category seed: the print page printed every reserved row as "Reserved — no product yet". With 14 seeded empty categories a new project would print 14 empty cards. The print now lists only rows that have a product; the schedule screen still shows the reserved rows. This clears the way for the seed work (Codex, option A).
+
+**Checks.** `tsc --noEmit`, lint on the print screens. No test covers the print page; browser not checked.
+
 ## R8.431 | 2026-10-08 | feat(studioflow): iteration names built from the project name, phase letter and number (Lead)
 
 - **Owner decision 2026-10-08, built by the Lead** (the owner asked for it to run in parallel with Codex's schedule work; `PLAN.md` WO-SF-ITERNAME-01 is superseded by this commit). A new iteration is named `<project name> <prefix><number>`, for example "2026-474 Sociolla SBW R1 D1". Kinds (CD Mall, CD Final) keep their locked names. Rename stays as an override: the next iteration still continues the number, and saving an empty name resets the iteration to its default.
