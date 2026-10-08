@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.449 | 2026-10-08 | docs(plan): WO-SF-IDEAS-01 personal Ideas board, backend (Lead)
+
+- **Owner decisions (2026-10-08):** Ideas belong to the user, Product Schedule to the project. A card is valid with only an image. "Use in schedule" is a snapshot: the image is copied into a new storage object for the project and the card keeps only a usage record (read live, so it shows the current code). Schedule rows are created only through the schedule service's own path (no second code/label allocator). No Master Data coupling.
+- **Plan:** `PLAN.md` READY for the Executor, target R8.450. Shared-layer change named in the plan: Core `ObjectStorage.copy` (storage had no copy or read).
+- **Migrations/dependencies:** none in this revision.
+
+**Checks.** Documentation only; `git diff --check`.
+
 ## R8.448 | 2026-10-08 | docs(studioflow): Ideas board recorded as planned work (Lead)
 
 - **Owner decisions (2026-10-08):** a personal Ideas board per user, spanning the projects that user holds; drop or paste any image as a card with no form; "Use in schedule" turns a card into a new schedule item or an extra option on an existing one, copying the image and labelling the card where it is used. StudioFlow stays independent of Master Data (read-only for the Library only). Recorded in `docs/BACKLOG.md` as `[PLANNED][P2]`; no code yet, a `PLAN.md` slice follows.
