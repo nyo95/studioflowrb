@@ -44,84 +44,6 @@ const pricingCategoryQuickForm = z.object({
   name: z.string().min(1).max(64),
 });
 
-export async function createPricingBrandQuickAction(name: string): Promise<ActionResult<{ brandId: string }>> {
-  return runSafeAction(async () => {
-    const { principal, grants } = await requirePrincipalGrants();
-    const parsed = z.string().min(1, "Brand name is required").max(64, "Brand name is too long").safeParse(name);
-    if (!parsed.success) throw validationError(parsed.error);
-    const result = await masterDataService.createBrand({
-      grants,
-      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      name: parsed.data,
-    });
-    refreshPricing();
-    revalidatePath("/masterdata/brands");
-    revalidatePath("/masterdata/skus");
-    revalidatePath("/masterdata");
-    return result;
-  });
-}
-
-export async function createMaterialSkuAction(formData: FormData): Promise<ActionResult<{ skuId: string }>> {
-  return runSafeAction(async () => {
-    const { principal, grants } = await requirePrincipalGrants();
-    const categoryId = String(formData.get("categoryId") ?? "");
-    const schema = z.object({
-      name: z.string().max(128).optional().nullable().or(z.literal("")),
-      code: z.string().max(32).optional().nullable().or(z.literal("")),
-      brandId: z.string().uuid().or(z.literal("")),
-      baseUnitId: z.string().uuid(),
-      purchaseUnitId: z.string().uuid().optional().nullable().or(z.literal("")),
-      dimensionLength: z.string().max(32).optional().nullable().or(z.literal("")),
-      dimensionWidth: z.string().max(32).optional().nullable().or(z.literal("")),
-      dimensionThickness: z.string().max(32).optional().nullable().or(z.literal("")),
-      dimensionUnitId: z.string().uuid().optional().nullable().or(z.literal("")),
-      categoryId: z.string().uuid("Product category is required"),
-      supplierVendorId: z.string().uuid(),
-      amount: z.string().min(1),
-      currency: z.string().length(3),
-      notes: z.string().max(1000).optional().nullable().or(z.literal("")),
-    }).refine((value) => Boolean(value.name?.trim() || value.code?.trim()), { message: "SKU code or SKU name is required.", path: ["name"] });
-    const parsed = schema.safeParse({
-      name: formData.get("name") ? String(formData.get("name")) : null,
-      code: formData.get("code") ? String(formData.get("code")) : null,
-      brandId: String(formData.get("brandId") ?? ""),
-      baseUnitId: String(formData.get("baseUnitId") ?? ""),
-      purchaseUnitId: formData.get("purchaseUnitId") ? String(formData.get("purchaseUnitId")) : null,
-      dimensionLength: formData.get("dimensionLength") ? String(formData.get("dimensionLength")) : null,
-      dimensionWidth: formData.get("dimensionWidth") ? String(formData.get("dimensionWidth")) : null,
-      dimensionThickness: formData.get("dimensionThickness") ? String(formData.get("dimensionThickness")) : null,
-      dimensionUnitId: formData.get("dimensionUnitId") ? String(formData.get("dimensionUnitId")) : null,
-      categoryId,
-      supplierVendorId: String(formData.get("supplierVendorId") ?? ""),
-      amount: String(formData.get("amount") ?? ""),
-      currency: String(formData.get("currency") ?? "IDR").toUpperCase(),
-      notes: formData.get("notes") ? String(formData.get("notes")) : null,
-    });
-    if (!parsed.success) throw validationError(parsed.error);
-    const result = await masterDataService.createSku({
-      grants,
-      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
-      name: parsed.data.name,
-      code: parsed.data.code || undefined,
-      brandId: parsed.data.brandId,
-      baseUnitId: parsed.data.baseUnitId,
-      purchaseUnitId: parsed.data.purchaseUnitId || undefined,
-      dimensionLength: parsed.data.dimensionLength || undefined,
-      dimensionWidth: parsed.data.dimensionWidth || undefined,
-      dimensionThickness: parsed.data.dimensionThickness || undefined,
-      dimensionUnitId: parsed.data.dimensionUnitId || undefined,
-      categoryId: parsed.data.categoryId,
-      priceMaterials: [{ supplierVendorId: parsed.data.supplierVendorId, amount: parsed.data.amount, currency: parsed.data.currency, notes: parsed.data.notes || undefined }],
-      notes: parsed.data.notes || undefined,
-    });
-    refreshPricing();
-    revalidatePath("/masterdata/brands");
-    revalidatePath("/masterdata");
-    return result;
-  });
-}
-
 export async function createPricingWorkCategoryQuickAction(formData: FormData): Promise<ActionResult<{ categoryId: string }>> {
   return runSafeAction(async () => {
     const parsed = pricingCategoryQuickForm.safeParse(Object.fromEntries(formData));
@@ -340,11 +262,6 @@ export async function saveWorkPriceMatrixAction(input: unknown): Promise<ActionR
   });
 }
 
-const materialRowsInput = z.object({
-  currency: z.string().length(3).default("IDR"),
-  rows: z.array(z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes })).min(1).max(100),
-});
-
 const mixedMaterialRowInput = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("existing"), skuId: z.string().uuid(), vendorId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes }),
   z.object({
@@ -369,19 +286,6 @@ const mixedMaterialInput = z.object({
   currency: z.string().length(3).default("IDR"),
   rows: z.array(mixedMaterialRowInput).min(1).max(100),
 });
-
-/** Saves many material prices where every row names its supplier. Valid rows are saved; failing rows come back in `rejected`. */
-export async function saveMaterialPriceRowsAction(input: unknown): Promise<ActionResult<GridSaveResult>> {
-  return runSafeAction(async () => {
-    const parsed = materialRowsInput.safeParse(input);
-    if (!parsed.success) throw validationError(parsed.error);
-    const ctx = await context();
-    const result = await masterDataService.createMaterialPriceRows({ ...ctx, ...parsed.data, onInvalid: "save-valid" });
-    refreshPricing();
-    revalidatePath("/masterdata/vendors");
-    return result;
-  });
-}
 
 /** Saves existing-SKU prices and new SKUs with their first prices in one table submission. Valid rows are kept and rejected rows retain their input indexes. */
 export async function saveMaterialSkuPricesBulkAction(input: unknown): Promise<ActionResult<MaterialSkuBulkResult>> {

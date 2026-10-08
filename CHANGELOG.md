@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.453 | 2026-10-08 | feat(masterdata): new SKUs are added inside the price table (Lead)
+
+- **WO-MD-SKUBULK-01 step 2 (owner flow 2026-10-08; backend R8.441).** In New price → Material, typing a SKU name that does not exist and choosing "Create SKU" turns that row into a new SKU instead of switching to a separate form. The row shows a "New SKU" panel: category (searchable, can add a category; the last one chosen is used for the next new row) and an optional size. Brand is the one chosen above the table (none on All brands). Units: pcs; with a size such as 1220 × 2440 × 0.7 the base unit is M², the supplier unit is the sheet and the panel shows "1 sheet = 2,9768 M²". An X turns the row back into a SKU search.
+- **One save for both kinds of row** through `saveMaterialSkuPricesBulkAction`: valid rows save, failing rows stay with their reasons. A "new" name that already exists shows "Use the existing SKU", which switches the row to that SKU.
+- **Removed (no callers left):** the separate "New SKU + material price" form and its button, and the actions `createMaterialSkuAction`, `saveMaterialPriceRowsAction`, `createPricingBrandQuickAction`. The services behind them stay (the bulk save reuses them).
+- **Browser check (local disposable database):** brand Taco, row 1 an existing SKU, row 2 a new SKU with size 1220 × 2440 × 0.7, row 3 a "new" name equal to an existing SKU: the new SKU saved with base M², purchase sheet, factor 2,9768 and its price; rows 1 and 3 stayed with "This supplier already has a live price for this SKU" and "A live SKU already uses this identity"; "Use the existing SKU" switched row 3. No page errors.
+- **Audit 2026-10-08 item 1 closed.** BACKLOG entry is now `[UNVERIFIED]` for the owner walk.
+- **Migrations/dependencies:** none.
+
+**Checks.** `tsc --noEmit`; eslint on `src/app/(platform)/masterdata` (clean); boundary check OK; `npm test` 973/973 (none failed, skipped or cancelled); `npm run build` passes.
+
 ## R8.452 | 2026-10-08 | feat(studioflow): Ideas board page (Lead)
 
 - **Owner decision (2026-10-08):** a free page to drop images from Pinterest or anywhere, linked to a project's schedule when used (WO-SF-IDEAS-01; backend R8.450).

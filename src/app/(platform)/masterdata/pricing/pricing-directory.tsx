@@ -17,9 +17,9 @@ import { compareDecimals,formatDecimal,type DecimalString } from "@platform/util
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { createMoney,currencyPrefix,formatMoney } from "@platform/utilities/money";
 import Link from "next/link";
-import { CircleHelp, Plus, Trash2 } from "lucide-react";
+import { CircleHelp, Plus, Trash2, X } from "lucide-react";
 import { useEffect,useRef,useState,useTransition,type FormEvent,type ReactNode } from "react";
-import { archivePriceAction,createMaterialSkuAction,saveBulkWorkPricesAction,saveMaterialPriceRowsAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
+import { archivePriceAction,saveBulkWorkPricesAction,saveMaterialSkuPricesBulkAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
 type SkuRef = { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; base_unit: { id: string; code: string; name: string } | null; purchase_unit: { id: string; code: string; name: string } | null; dimension_length: string | null; dimension_width: string | null; dimension_thickness: string | null; dimension_unit: { id: string; code: string; name: string } | null; purchase_to_base_factor: string | null };
@@ -208,7 +208,7 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
   return <div className="flex min-h-0 flex-1 flex-col gap-4">
     {rowError ? <InlineError>{rowError}</InlineError> : null}
     {matrixKind && <PriceMatrixDialog key={matrixKind} kind={matrixKind} modes={(onChange) => entryModes({ kind: matrixKind, multiSupplier: true }, onChange)} onSwitch={openEntry} vendors={matrixKind === "material-labor" ? props.materialLaborVendors : props.workVendors} categories={props.workCategories} units={props.units} onClose={() => setMatrixKind(null)} />}
-    {editor && <PriceEditor key={`${editor.kind}-${editor.row?.id ?? "new"}`} modes={editor.row ? undefined : (onChange) => entryModes({ kind: editor.kind, multiSupplier: false }, onChange)} onSwitch={openEntry} pending={savePending} editor={editor} refs={{ ...props, vendors: editor.kind === "material" ? props.materialVendors : editor.kind === "material-labor" ? props.materialLaborVendors : props.workVendors }} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = editor.kind === "material" && !editor.row && formData.get("materialEntryMode") === "new" ? await createMaterialSkuAction(formData) : await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
+    {editor && <PriceEditor key={`${editor.kind}-${editor.row?.id ?? "new"}`} modes={editor.row ? undefined : (onChange) => entryModes({ kind: editor.kind, multiSupplier: false }, onChange)} onSwitch={openEntry} pending={savePending} editor={editor} refs={{ ...props, vendors: editor.kind === "material" ? props.materialVendors : editor.kind === "material-labor" ? props.materialLaborVendors : props.workVendors }} error={formError} onCancel={closeEditor} onSubmit={async (event) => { event.preventDefault(); if (savePending) return; setSavePending(true); setFormError(null); const formData = new FormData(event.currentTarget); try { const result = await savePriceAction(editor.kind, formData); if (result.ok) closeEditor(); else if (result.ok === false) setFormError(result.error.safeMessage); } catch { setFormError("The price could not be saved. Please try again."); } finally { setSavePending(false); } }} />}
     <PillTabPanels
       fill
       label="Price views"
@@ -230,8 +230,15 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
 
 type BulkRow = { key: number; name: string; unitId: string; amountDisplay: string; amount: string; notes: string; scopeNote: string };
 type BulkRowProblem = { rowIndex: number; message: string };
-type MaterialBulkRow = { key: number; skuId: string; vendorId: string; amountDisplay: string; amount: string; notes: string };
-function emptyMaterialRow(key: number, vendorId: string): MaterialBulkRow { return { key, skuId: "", vendorId, amountDisplay: "", amount: "", notes: "" }; }
+/** A SKU typed in a row that does not exist yet (WO-MD-SKUBULK-01): saved with its first price in the same submit. */
+type NewSkuDraft = { name: string; categoryId: string; size: string };
+type MaterialBulkRow = { key: number; skuId: string; newSku: NewSkuDraft | null; vendorId: string; amountDisplay: string; amount: string; notes: string };
+function emptyMaterialRow(key: number, vendorId: string): MaterialBulkRow { return { key, skuId: "", newSku: null, vendorId, amountDisplay: "", amount: "", notes: "" }; }
+/** "1220 × 2440 × 0.7" → length, width, thickness (decimal comma accepted). */
+function sizeParts(text: string): [string, string, string] {
+  const [length = "", width = "", thickness = ""] = text.split(/\s*[x×*]\s*/i).map((part) => part.trim().replace(",", ".")).filter(Boolean);
+  return [length, width, thickness];
+}
 function emptyBulkRow(key: number, unitId: string): BulkRow { return { key, name: "", unitId, amountDisplay: "", amount: "", notes: "", scopeNote: "" }; }
 
 type PriceEditorRefs = {
@@ -248,9 +255,6 @@ type PriceEditorRefs = {
   productCategories: Ref[];
 };
 
-function FieldHelp({ label, content }: { label: string; content: string }) {
- return <Tooltip content={content}><IconButton label={`About ${label}`} icon={<CircleHelp size={14} />} size="sm" className="!h-4 !w-4 !min-h-4 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink" /></Tooltip>;
-}
 
 function SkuMeasurementSummary({ sku }: { sku: SkuRef }) {
   const dimensions = sku.dimension_length && sku.dimension_width && sku.dimension_unit
@@ -276,19 +280,12 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const row = editor.row;
   const materialRow = material && row ? row as MaterialRow : undefined;
   const workRow = !material && row ? row as WorkRow : undefined;
-  const [materialEntryMode, setMaterialEntryMode] = useState<"existing" | "new">("existing");
   const { options: vendorOptions, upsertOverlayOption } = useOptionOverlay(refs.vendors);
   const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(refs.workCategories);
-  const { options: brandOptions, upsertOverlayOption: upsertBrandOption } = useOptionOverlay(refs.brands);
+  const { options: brandOptions } = useOptionOverlay(refs.brands);
   const { options: productCategoryOptions, upsertOverlayOption: upsertProductCategoryOption } = useOptionOverlay(refs.productCategories);
   const [vendorId, setVendorId] = useState(materialRow?.supplier_vendor.id ?? workRow?.vendor.id ?? "");
   const [categoryId, setCategoryId] = useState(workRow?.category.id ?? "");
-  const [brandId, setBrandId] = useState(materialRow?.sku.brand?.id ?? "");
-  const [skuId, setSkuId] = useState(materialRow?.sku.id ?? "");
-  const [skuName, setSkuName] = useState("");
-  const [skuBrandFilter, setSkuBrandFilter] = useState<string>("ALL");
-  const [selectedProductCategoryId, setSelectedProductCategoryId] = useState("");
-  const [productCategorySearchId, setProductCategorySearchId] = useState("");
   const currency = row?.currency ?? "IDR";
   const [amount, setAmount] = useState(row ? storedAmountText(row.amount, row.amount_label) : "");
   const [amountDisplay, setAmountDisplay] = useState(row ? blurDisplay(storedAmountText(row.amount, row.amount_label)) : "");
@@ -297,77 +294,14 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const [quickVendorTypeId, setQuickVendorTypeId] = useState("");
   const [quickError, setQuickError] = useState<string | null>(null);
   const [quickPending, setQuickPending] = useState(false);
-  const [brandCreateError, setBrandCreateError] = useState<string | null>(null);
-  const [brandCreatePending, setBrandCreatePending] = useState(false);
   const [productCategoryCreateError, setProductCategoryCreateError] = useState<string | null>(null);
   const [productCategoryCreatePending, setProductCategoryCreatePending] = useState(false);
   const [categoryCreateError, setCategoryCreateError] = useState<string | null>(null);
   const [categoryCreatePending, setCategoryCreatePending] = useState(false);
-  const defaultBaseUnit = refs.units.find((unit) => unit.code.toUpperCase() === "M2");
-  const defaultPurchaseUnit = refs.units.find((unit) => unit.code.toUpperCase() === "SHEET");
-  const defaultDimensionUnit = refs.units.find((unit) => unit.code.toUpperCase() === "MM");
-  const [baseUnitId, setBaseUnitId] = useState(defaultBaseUnit?.id ?? "");
-  const [purchaseUnitId, setPurchaseUnitId] = useState(defaultPurchaseUnit?.id ?? "");
-  const [dimensionLength, setDimensionLength] = useState("");
-  const [dimensionWidth, setDimensionWidth] = useState("");
-  const [dimensionThickness, setDimensionThickness] = useState("");
-  const [dimensionUnitId, setDimensionUnitId] = useState(defaultDimensionUnit?.id ?? "");
-  const [sizeText, setSizeText] = useState("");
-  /** "1220 × 2440 × 0.7": fills length, width and thickness; a size makes M² the base unit (the supplier unit keeps the old base, e.g. the sheet). */
-  const applySize = (text: string) => {
-    setSizeText(text);
-    const parts = text.split(/s*[x×*]s*/i).map((part) => part.trim().replace(",", ".")).filter(Boolean);
-    const [length = "", width = "", thickness = ""] = parts;
-    setDimensionLength(length); setDimensionWidth(width); setDimensionThickness(thickness);
-    if (!length || !width) return;
-    const m2 = refs.units.find((unit) => unit.code.toUpperCase() === "M2");
-    if (m2 && baseUnitId !== m2.id) {
-      if (!purchaseUnitId && baseUnitId) setPurchaseUnitId(baseUnitId);
-      setBaseUnitId(m2.id);
-    }
-    if (!dimensionUnitId && defaultDimensionUnit) setDimensionUnitId(defaultDimensionUnit.id);
-  };
   const needsMaterial = material;
   // Material+Labor accepts a Supplier that supplies material, provides labor, or both (owner, 2026-10-08).
   const eligibleTypes = refs.vendorTypes.filter((type) => needsMaterial ? type.canSupplyMaterial : editor.kind === "material-labor" ? type.canSupplyMaterial || type.canSupplyLabor : type.canSupplyLabor);
-  const newMaterialSku = material && !edit && materialEntryMode === "new";
-  const selectedBaseUnit = refs.units.find((unit) => unit.id === baseUnitId);
-  const selectedPurchaseUnit = refs.units.find((unit) => unit.id === purchaseUnitId);
-  const selectedDimensionUnit = refs.units.find((unit) => unit.id === dimensionUnitId);
-  const selectedSku = refs.skus.find((sku) => sku.id === skuId);
-  const filteredSkus = refs.skus.filter((sku) => {
-    if (skuBrandFilter === "ALL") return true;
-    return sku.brand?.id === skuBrandFilter;
-  });
-  const dimensionFactors: Readonly<Record<string, string>> = { MM: "0.001", CM: "0.01", M: "1" };
-  let areaPreview: string | null = null;
-  const dimensionFactor = selectedDimensionUnit ? dimensionFactors[selectedDimensionUnit.code.toUpperCase()] : null;
-  if (dimensionLength && dimensionWidth && dimensionFactor) {
-    try {
-      areaPreview = calculateRectangleAreaSquareMeters({ length: dimensionLength, width: dimensionWidth, lengthToMeterFactor: dimensionFactor });
-    } catch {
-      areaPreview = null;
-    }
-  }
-  // With a size the base unit is M² by rule; the select is locked until the size is cleared.
-  const sizeLocksBase = Boolean(areaPreview) && selectedBaseUnit?.code.toUpperCase() === "M2";
 
-  const createBrand = async (name: string) => {
-    setBrandCreateError(null);
-    setBrandCreatePending(true);
-    try {
-      const result = await createPricingBrandQuickAction(name);
-      if (result.ok) {
-        upsertBrandOption({ id: result.data.brandId, name });
-        setBrandId(result.data.brandId);
-        return result.data.brandId;
-      }
-      if (result.ok === false) setBrandCreateError(result.error.safeMessage);
-      return "";
-    } finally {
-      setBrandCreatePending(false);
-    }
-  };
 
   const createProductCategory = async (name: string) => {
     setProductCategoryCreateError(null);
@@ -378,7 +312,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
       const result = await createPricingProductCategoryQuickAction(formData);
       if (result.ok) {
         upsertProductCategoryOption({ id: result.data.categoryId, name });
-        setSelectedProductCategoryId(result.data.categoryId);
+        setNewSkuCategoryId(result.data.categoryId);
         return result.data.categoryId;
       }
       if (result.ok === false) setProductCategoryCreateError(result.error.safeMessage);
@@ -440,7 +374,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
 
   const vendorField = !edit && (
     <>
-      <input type="hidden" name={newMaterialSku ? "supplierVendorId" : "vendorId"} value={vendorId} required />
+      <input type="hidden" name="vendorId" value={vendorId} required />
       <Field label={material ? "Supplier" : "Supplier"} required>
         <CreatableSearch
           label={material ? "Supplier" : "Supplier"}
@@ -458,72 +392,6 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
     </>
   );
 
-  const newMaterialFields = newMaterialSku ? <>
-    <div className="grid grid-cols-2 gap-3">
-      <div className="col-span-2 grid gap-1.5">
-        <Field label="Product name / SKU" required description="One line is enough, e.g. the model and colour: HPL Taco TI Y8012 MC - Platinum Cliff."><Input name="name" textCase="title" value={skuName} onChange={(event) => setSkuName(event.target.value)} maxLength={128} placeholder="HPL Taco TI Y8012 MC - Platinum Cliff" autoFocus required /></Field>
-        <details className="text-sm"><summary className="cursor-pointer text-ink-secondary">Add an article code (optional)</summary><div className="pt-2"><Field label="Article code"><Input name="code" maxLength={32} placeholder="KPF 2005" /></Field></div></details>
-      </div>
-      <input type="hidden" name="brandId" value={brandId} />
-      <Field label="Brand" description="Optional. Leave empty for an unbranded SKU.">
-        <CreatableSearch
-          label="Brand"
-          options={[{ id: "", label: "No brand" }, ...brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))]}
-          value={brandId}
-          onValueChange={setBrandId}
-          placeholder="Search or select brand"
-          searchPlaceholder="Search brands…"
-          emptyLabel="No brand matches this search."
-          onCreate={refs.canManageBrands ? createBrand : undefined}
-          createLabel={(name) => `Add “${name}” as a brand`}
-          disabled={brandCreatePending}
-          className="w-full"
-        />
-      </Field>
-      {brandCreateError ? <InlineError>{brandCreateError}</InlineError> : null}
-    </div>
-    <div className="grid grid-cols-2 gap-3">
-      <Field label={<span className="inline-flex items-center gap-1">Base / BQ unit <FieldHelp label="base / BQ unit" content="The unit used to compare and calculate material usage." /></span>} required><Select name={sizeLocksBase ? undefined : "baseUnitId"} value={baseUnitId} onChange={(event) => setBaseUnitId(event.target.value)} required disabled={sizeLocksBase}><option value="">Select base unit...</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}</Select></Field>{sizeLocksBase ? <input type="hidden" name="baseUnitId" value={baseUnitId} /> : null}
-      <Field label={<span className="inline-flex items-center gap-1">Purchase unit <FieldHelp label="purchase unit" content="The unit quoted by the supplier." /></span>}><Select name="purchaseUnitId" value={purchaseUnitId} onChange={(event) => setPurchaseUnitId(event.target.value)}><option value="">Same as base unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}</Select></Field>
-    </div>
-    <SectionCard>
-      <div className="mb-3 flex items-center gap-2"><Text weight="semibold">Dimensions and BQ conversion</Text><Tooltip content="Optional for sheet materials. Enter length and width to calculate the BQ area contained in one purchase unit."><IconButton label="About dimensions and BQ conversion" icon={<CircleHelp size={14} />} size="sm" className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink" /></Tooltip></div>
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(145px,1fr)]">
-        <Field label={<span className="inline-flex items-center gap-1">Size <FieldHelp label="size" content="Length × width, and thickness if you want it noted: 1220 × 2440 × 0.7. Thickness is not used for the area. A size makes the base unit M² and the supplier unit stays the sheet." /></span>}><Input value={sizeText} onChange={(event) => applySize(event.target.value)} placeholder="1220 × 2440 × 0.7" inputMode="text" autoComplete="off" /></Field>
-        <input type="hidden" name="dimensionLength" value={dimensionLength} /><input type="hidden" name="dimensionWidth" value={dimensionWidth} /><input type="hidden" name="dimensionThickness" value={dimensionThickness} />
-        <Field label={<span className="inline-flex items-center gap-1">Dimension unit <FieldHelp label="dimension unit" content="The unit used for length, width, and thickness." /></span>}><Select name="dimensionUnitId" value={dimensionUnitId} onChange={(event) => setDimensionUnitId(event.target.value)}><option value="">Select unit</option>{refs.units.filter((unit) => ["MM", "CM", "M"].includes(unit.code.toUpperCase())).map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}</Select></Field>
-      </div>
-      <div className="mt-3 rounded border border-line-subtle bg-surface-muted/40 px-3 py-2 text-sm">
-      {areaPreview && selectedBaseUnit?.code.toUpperCase() === "M2" && selectedPurchaseUnit
-          ? <><span className="font-medium">Conversion preview:</span> 1 {selectedPurchaseUnit.code} = {formatDecimal(areaPreview)} M²</>
-          : areaPreview && selectedBaseUnit?.code.toUpperCase() !== "M2" ? <span className="text-danger">A size needs M² as the base unit. Choose M2, or clear the size.</span> : null}
-      </div>
-    </SectionCard>
-    <Field label="Product categories" required description="At least one category is required.">
-      <div className="grid gap-3">
-        <CreatableSearch
-          label="Product categories"
-          options={productCategoryOptions.map((category) => ({ id: category.id, label: category.name }))}
-          value={productCategorySearchId}
-          onValueChange={(value) => {
-            setProductCategorySearchId(value);
-            if (value) {
-            setSelectedProductCategoryId(value);
-            }
-          }}
-          onCreate={refs.canManageCategories ? createProductCategory : undefined}
-          createLabel={(name) => `Add “${name}” as a product category`}
-          emptyLabel="No product category matches this search."
-          searchPlaceholder="Search or create product category…"
-          placeholder="Search product categories"
-          disabled={productCategoryCreatePending}
-          className="w-full"
-        />
-        {productCategoryCreateError ? <InlineError>{productCategoryCreateError}</InlineError> : null}
-        <input type="hidden" name="categoryId" value={selectedProductCategoryId} required />
-      </div>
-    </Field>
-  </> : null;
 
   const categoryField = !material && (
     <>
@@ -567,6 +435,8 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const bulkKey = useRef(1);
   const [rows, setRows] = useState<BulkRow[]>(() => [emptyBulkRow(0, "")]);
   const [rowProblems, setRowProblems] = useState<Record<number, string>>({});
+  /** Rows whose "new" SKU turned out to exist: the id of the existing one, offered as a one-click switch. */
+  const [existingMatch, setExistingMatch] = useState<Record<number, string>>({});
   const [bulkPending, setBulkPending] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const focusKey = useRef<number | null>(null);
@@ -586,11 +456,27 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
     const fresh = bulkKey.current++;
     setRows((current) => current.length === 1 ? [emptyBulkRow(fresh, current[0]?.unitId ?? "")] : current.filter((entry) => entry.key !== key));
   };
-  const bulkMaterial = material && !edit && materialEntryMode === "existing";
+  const bulkMaterial = material && !edit;
   const anyBulk = bulk || bulkMaterial;
   // Material prices are entered brand first: the Brand narrows the SKU list, and every row names its own supplier.
   const [mRows, setMRows] = useState<MaterialBulkRow[]>(() => [emptyMaterialRow(0, "")]);
+  const [newSkuCategoryId, setNewSkuCategoryId] = useState("");
+  const unitCoded = (code: string) => refs.units.find((unit) => unit.code.toUpperCase() === code);
+  /**
+   * A new SKU's units (owner, 2026-10-08): pcs by default; with a size the base is M² and the supplier quotes per
+   * sheet, the size in mm. The server applies the same M² rule and computes the factor.
+   */
+  const newSkuShape = (draft: NewSkuDraft) => {
+    const [length, width, thickness] = sizeParts(draft.size);
+    const pcs = unitCoded("PCS");
+    if (!length || !width) return { baseUnit: pcs, purchaseUnit: null, length: null, width: null, thickness: null, dimensionUnit: null, area: null };
+    let area: string | null = null;
+    try { area = calculateRectangleAreaSquareMeters({ length, width, lengthToMeterFactor: "0.001" }); } catch { area = null; }
+    return { baseUnit: unitCoded("M2"), purchaseUnit: unitCoded("SHEET") ?? pcs, length, width, thickness: thickness || null, dimensionUnit: unitCoded("MM"), area };
+  };
+
   const [materialBrandFilter, setMaterialBrandFilter] = useState("ALL");
+  const filterBrand = materialBrandFilter !== "ALL" ? brandOptions.find((brand) => brand.id === materialBrandFilter) ?? null : null;
   const brandsOfVendor = (id: string) => vendorOptions.find((vendor) => vendor.id === id)?.brandIds ?? [];
   const skuOptionsForTable = refs.skus.filter((sku) => materialBrandFilter === "ALL" || sku.brand?.id === materialBrandFilter).map((sku) => ({
     id: sku.id,
@@ -614,7 +500,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
     const fresh = bulkKey.current++;
     setMRows((current) => current.length === 1 ? [emptyMaterialRow(fresh, current[0]?.vendorId ?? "")] : current.filter((entry) => entry.key !== key));
   };
-  const filledMRows = mRows.filter((entry) => entry.skuId || entry.amount || entry.notes.trim());
+  const filledMRows = mRows.filter((entry) => entry.skuId || entry.newSku || entry.amount || entry.notes.trim());
   const filledRows = rows.filter((entry) => entry.name.trim() || entry.amount || entry.notes.trim() || entry.scopeNote.trim());
   const filledCount = bulkMaterial ? filledMRows.length : filledRows.length;
   const submitBulk = async (event: FormEvent<HTMLFormElement>) => {
@@ -626,30 +512,67 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
       if (filledMRows.length === 0) { setBulkError("Fill in at least one row."); return; }
       const missingM: Record<number, string> = {};
       filledMRows.forEach((entry) => {
-        const lacks = [!entry.skuId && "SKU", !entry.vendorId && "supplier", !entry.amount && "amount"].filter(Boolean);
+        const lacks = entry.newSku
+          ? [!entry.newSku.name.trim() && "SKU name", !entry.newSku.categoryId && "category", !entry.vendorId && "supplier", !entry.amount && "amount", Boolean(entry.newSku.size.trim()) && !newSkuShape(entry.newSku).area && "a size like 1220 × 2440"].filter(Boolean)
+          : [!entry.skuId && "SKU", !entry.vendorId && "supplier", !entry.amount && "amount"].filter(Boolean);
         if (lacks.length > 0) missingM[entry.key] = `Needs ${lacks.join(", ")}.`;
       });
       if (Object.keys(missingM).length > 0) { setRowProblems(missingM); setBulkError("Some rows are incomplete. Nothing was saved."); return; }
       setBulkPending(true);
       try {
-        const result = await saveMaterialPriceRowsAction({ currency, rows: filledMRows.map((entry) => ({ skuId: entry.skuId, vendorId: entry.vendorId, amount: entry.amount, notes: entry.notes.trim() || null })) });
+        const result = await saveMaterialSkuPricesBulkAction({ currency, rows: filledMRows.map((entry) => {
+          const notes = entry.notes.trim() || null;
+          if (!entry.newSku) return { kind: "existing" as const, skuId: entry.skuId, vendorId: entry.vendorId, amount: entry.amount, notes };
+          const shape = newSkuShape(entry.newSku);
+          return {
+            kind: "new" as const,
+            name: entry.newSku.name.trim(),
+            // The brand is the one chosen above the table; no brand when it is on All brands.
+            brandId: filterBrand?.id ?? null,
+            baseUnitId: shape.baseUnit?.id ?? "",
+            purchaseUnitId: shape.purchaseUnit?.id ?? null,
+            dimensionLength: shape.length,
+            dimensionWidth: shape.width,
+            dimensionThickness: shape.thickness,
+            dimensionUnitId: shape.dimensionUnit?.id ?? null,
+            categoryId: entry.newSku.categoryId,
+            vendorId: entry.vendorId,
+            amount: entry.amount,
+            notes,
+          };
+        }) });
         if (result.ok) {
           const rejected = result.data.rejected ?? [];
           if (rejected.length === 0) { onCancel(); return; }
           // Keep only the rows that failed, with their reasons; the saved ones are already in the list.
           const problems: Record<number, string> = {};
-          for (const problem of rejected) { const target = filledMRows[problem.rowIndex]; if (target) problems[target.key] = problem.message; }
+          const existing: Record<number, string> = {};
+          for (const problem of rejected) {
+            const target = filledMRows[problem.index];
+            if (!target) continue;
+            problems[target.key] = problem.message;
+            const existingSkuId = problem.code === "NEW_SKU_ALREADY_EXISTS" ? problem.details?.existingSkuId : undefined;
+            if (typeof existingSkuId === "string") existing[target.key] = existingSkuId;
+          }
           const keep = new Set(Object.keys(problems).map(Number));
           if (keep.size > 0) setMRows((current) => current.filter((entry) => keep.has(entry.key)));
+          setExistingMatch(existing);
           setRowProblems(problems);
           setBulkError(`${result.data.ids.length} saved. ${rejected.length} row${rejected.length === 1 ? "" : "s"} ${rejected.length === 1 ? "needs" : "need"} fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
           return;
         }
         if (result.ok === false) {
-          const details = (result.error.details as { rows?: BulkRowProblem[] } | undefined)?.rows ?? [];
+          const details = (result.error.details as { rows?: Array<{ index: number; code: string; message: string; details?: { existingSkuId?: unknown } }> } | undefined)?.rows ?? [];
           const problems: Record<number, string> = {};
-          for (const problem of details) { const target = filledMRows[problem.rowIndex]; if (target) problems[target.key] = problem.message; }
+          const existing: Record<number, string> = {};
+          for (const problem of details) {
+            const target = filledMRows[problem.index];
+            if (!target) continue;
+            problems[target.key] = problem.message;
+            if (problem.code === "NEW_SKU_ALREADY_EXISTS" && typeof problem.details?.existingSkuId === "string") existing[target.key] = problem.details.existingSkuId;
+          }
           setRowProblems(problems);
+          setExistingMatch(existing);
           setBulkError(result.error.safeMessage);
         }
       } catch {
@@ -755,23 +678,33 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           <span>SKU</span><span>Supplier</span><span>Unit</span><span>Amount ({currency})</span><span>Notes</span><span />
         </div>
         {mRows.map((entry, index) => {
-          const sku = refs.skus.find((candidate) => candidate.id === entry.skuId);
+          const draft = entry.newSku;
+          const sku = draft ? undefined : refs.skus.find((candidate) => candidate.id === entry.skuId);
+          const shape = draft ? newSkuShape(draft) : null;
           const unlinked = Boolean(sku?.brand && entry.vendorId && !brandsOfVendor(entry.vendorId).includes(sku.brand.id));
+          const match = existingMatch[entry.key] ? refs.skus.find((candidate) => candidate.id === existingMatch[entry.key]) : undefined;
           return (
             <div key={entry.key} className="grid gap-1">
               <div className="grid items-start gap-2 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)_4rem_8rem_minmax(0,2fr)_2rem]">
-                <CreatableSearch
-                  label={`SKU, row ${index + 1}`}
-                  options={skuOptionsForTable}
-                  value={entry.skuId}
-                  onValueChange={(value) => patchMRow(entry.key, { skuId: value })}
-                  onCreate={refs.canManageSkus ? (name) => { setSkuName(name); setMaterialEntryMode("new"); return ""; } : undefined}
-                  createLabel={(name) => `Create SKU “${name}”`}
-                  placeholder="Search SKU name, code, or brand"
-                  searchPlaceholder="Search SKU name, code, or brand…"
-                  emptyLabel="No SKU matches this search."
-                  className="w-full"
-                />
+                {draft ? (
+                  <div className="flex items-start gap-1">
+                    <Input aria-label={`New SKU name, row ${index + 1}`} density="compact" textCase="title" maxLength={128} value={draft.name} onChange={(event) => patchMRow(entry.key, { newSku: { ...draft, name: event.target.value } })} invalid={Boolean(rowProblems[entry.key])} />
+                    <IconButton label={`Search an existing SKU instead, row ${index + 1}`} icon={<X size={14} />} size="sm" onClick={() => patchMRow(entry.key, { newSku: null })} />
+                  </div>
+                ) : (
+                  <CreatableSearch
+                    label={`SKU, row ${index + 1}`}
+                    options={skuOptionsForTable}
+                    value={entry.skuId}
+                    onValueChange={(value) => patchMRow(entry.key, { skuId: value })}
+                    onCreate={refs.canManageSkus ? (name) => { patchMRow(entry.key, { skuId: "", newSku: { name, categoryId: newSkuCategoryId, size: "" } }); return ""; } : undefined}
+                    createLabel={(name) => `Create SKU “${name}”`}
+                    placeholder="Search SKU name, code, or brand"
+                    searchPlaceholder="Search SKU name, code, or brand…"
+                    emptyLabel="No SKU matches this search."
+                    className="w-full"
+                  />
+                )}
                 <CreatableSearch
                   label={`Supplier, row ${index + 1}`}
                   options={supplierOptionsFor(sku)}
@@ -784,7 +717,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
                   emptyLabel="No supplier matches this search."
                   className="w-full"
                 />
-                <div className="flex min-h-(--ui-control-height-sm) items-center px-1 font-ui-mono text-sm text-ink-secondary">{sku ? (sku.purchase_unit ?? sku.base_unit)?.code ?? "–" : "–"}</div>
+                <div className="flex min-h-(--ui-control-height-sm) items-center px-1 font-ui-mono text-sm text-ink-secondary">{sku ? (sku.purchase_unit ?? sku.base_unit)?.code ?? "–" : shape ? (shape.purchaseUnit ?? shape.baseUnit)?.code ?? "–" : "–"}</div>
                 <PrefixedInput prefix={currencyPrefix(currency)} prefixVisible={shouldShowAmountPrefix(entry.amount, entry.amountDisplay)} aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="text" placeholder={`15.000 or "text"`} className="tabular-nums" value={entry.amountDisplay}
                   onChange={(event) => { const read = readTypedAmount(event.target.value); if (read === null) return; patchMRow(entry.key, { amount: read.value, amountDisplay: read.display }); }}
                   onBlur={() => patchMRow(entry.key, { amountDisplay: blurDisplay(entry.amount) })}
@@ -794,6 +727,36 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
                 <IconButton label={`Remove row ${index + 1}`} icon={<Trash2 size={14} />} size="sm" onClick={() => removeMRow(entry.key)} />
               </div>
               {sku ? <SkuMeasurementSummary sku={sku} /> : null}
+              {draft && shape ? (
+                <div className="grid gap-2 rounded-control border border-line-subtle bg-surface-muted/40 p-2 sm:grid-cols-[auto_minmax(0,2fr)_minmax(0,2fr)] sm:items-start">
+                  <div className="flex min-h-(--ui-control-height-sm) items-center"><Badge tone="success">New SKU</Badge></div>
+                  <CreatableSearch
+                    label={`Category of the new SKU, row ${index + 1}`}
+                    options={productCategoryOptions.map((category) => ({ id: category.id, label: category.name }))}
+                    value={draft.categoryId}
+                    onValueChange={(value) => { patchMRow(entry.key, { newSku: { ...draft, categoryId: value } }); if (value) setNewSkuCategoryId(value); }}
+                    onCreate={refs.canManageCategories ? createProductCategory : undefined}
+                    createLabel={(name) => `Add “${name}” as a product category`}
+                    placeholder="Category"
+                    searchPlaceholder="Search or create product category…"
+                    emptyLabel="No product category matches this search."
+                    disabled={productCategoryCreatePending}
+                    className="w-full"
+                  />
+                  <Input aria-label={`Size of the new SKU, row ${index + 1} (optional)`} density="compact" inputMode="text" autoComplete="off" placeholder="Size, optional: 1220 × 2440 × 0.7" value={draft.size} onChange={(event) => patchMRow(entry.key, { newSku: { ...draft, size: event.target.value } })} />
+                  <div className="text-xs text-ink-secondary sm:col-span-3">
+                    {filterBrand ? `Brand ${filterBrand.name} (from the filter above). ` : "No brand: choose a brand above the table to give it one. "}
+                    {shape.area ? `Priced per ${shape.purchaseUnit?.code ?? "sheet"}; 1 ${shape.purchaseUnit?.code ?? "sheet"} = ${formatDecimal(shape.area as DecimalString)} M² (size in mm).` : draft.size.trim() ? <span className="text-danger">Write the size as length × width in mm, e.g. 1220 × 2440.</span> : `Unit ${shape.baseUnit?.code ?? "pcs"}. Add a size for sheet materials priced per sheet.`}
+                  </div>
+                  {productCategoryCreateError ? <InlineError>{productCategoryCreateError}</InlineError> : null}
+                </div>
+              ) : null}
+              {match ? (
+                <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
+                  <span className="text-ink-secondary">{match.name ?? match.code} already exists.</span>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { patchMRow(entry.key, { newSku: null, skuId: match.id }); setExistingMatch((current) => { const next = { ...current }; delete next[entry.key]; return next; }); }}>Use the existing SKU</Button>
+                </div>
+              ) : null}
               {unlinked && sku?.brand ? <div className="px-1 text-xs text-ink-secondary">This supplier will be added as a supplier of {sku.brand.name} when you save.</div> : null}
               {rowProblems[entry.key] ? <div role="alert" className="px-1 text-xs text-danger">Row {index + 1}: {rowProblems[entry.key]}</div> : null}
             </div>
@@ -801,7 +764,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
         })}
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="ghost" size="sm" leadingIcon={<Plus />} onClick={addMRow}>Add row</Button>
-          {refs.canManageSkus ? <Button type="button" variant="ghost" size="sm" onClick={() => setMaterialEntryMode("new")}>Create a new SKU with its first price</Button> : null}
+          {refs.canManageSkus ? <Text size="sm" tone="tertiary">A SKU that does not exist yet: type its name in a row and choose “Create SKU”.</Text> : null}
         </div>
       </div>
     </div>
@@ -812,17 +775,16 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const draftGuard = useFormDraftGuard({
     formRef,
     resetKey: `${editor.kind}-${row?.id ?? "new"}`,
-    watchedValue: JSON.stringify([vendorId, categoryId, brandId, skuId, amount, materialEntryMode, skuBrandFilter, anyBulk ? [rows, mRows] : null]),
+    watchedValue: JSON.stringify([vendorId, categoryId, amount, anyBulk ? [rows, mRows] : null]),
     title: edit ? "Discard changes?" : "Discard price draft?",
     description: edit ? "Your edits are only in this browser and have not been saved." : "Your changes are only in this browser and have not been saved.",
   });
 
   return <>
-    <Dialog open size={anyBulk ? "xl" : "md"} dismissible={!pending && !bulkPending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={edit ? `Edit ${priceLabel}` : newMaterialSku ? "New SKU + material price" : "New price"} description={material && edit ? "SKU and supplier identity are read-only." : edit ? "Choose only active and eligible catalog references." : material ? "One row per SKU and supplier, saved together." : "One supplier and category, one row per item, saved together."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={anyBulk ? submitBulk : onSubmit}>
-      {modes && !newMaterialSku ? modes((next) => void draftGuard.requestDiscard(() => onSwitch(next))) : null}
-      <input type="hidden" name="materialEntryMode" value={materialEntryMode} />
+    <Dialog open size={anyBulk ? "xl" : "md"} dismissible={!pending && !bulkPending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={edit ? `Edit ${priceLabel}` : "New price"} description={material && edit ? "SKU and supplier identity are read-only." : edit ? "Choose only active and eligible catalog references." : material ? "One row per SKU and supplier, saved together." : "One supplier and category, one row per item, saved together."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={anyBulk ? submitBulk : onSubmit}>
+      {modes ? modes((next) => void draftGuard.requestDiscard(() => onSwitch(next))) : null}
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
-      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit" description="Unit and size follow the SKU."><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field>{refs.canManageSkus ? <div><Link href={`/masterdata/skus?edit=${materialRow!.sku.id}`} className="text-sm text-accent underline">Edit SKU (size, unit)</Link></div> : null}</> : newMaterialSku ? <><div><Button type="button" variant="ghost" size="sm" onClick={() => setMaterialEntryMode("existing")}>← Back to the price table</Button></div>{newMaterialFields}{vendorField}</> : <>{materialTable}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
+      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit" description="Unit and size follow the SKU."><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field>{refs.canManageSkus ? <div><Link href={`/masterdata/skus?edit=${materialRow!.sku.id}`} className="text-sm text-accent underline">Edit SKU (size, unit)</Link></div> : null}</> : <>{materialTable}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
       {!anyBulk && <><input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
       <Field label="Amount" description={`${currency} default currency. Use quotation marks for text, e.g. "call sales".`} required><PrefixedInput prefix={currencyPrefix(currency)} prefixVisible={shouldShowAmountPrefix(amount, amountDisplay)} aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(blurDisplay(amount))} inputMode="text" placeholder={`15.000 or "call sales"`} className="tabular-nums" required /></Field><Field label="Notes"><SimpleTextEditor name="notes" defaultValue={row?.notes ?? ""} placeholder="Additional pricing context..." maxLength={1000} rows={3} /></Field></>}{anyBulk && bulkError ? <div role="alert" className="text-sm text-danger">{bulkError}</div> : null}<FormActions><Button type="button" variant="ghost" disabled={pending} onClick={() => void draftGuard.requestDiscard(onCancel)}>Cancel</Button><Button type="submit" variant="primary" pending={pending || bulkPending}>{edit ? "Save changes" : anyBulk ? `Create ${filledCount || ""} ${filledCount === 1 ? "price" : "prices"}`.replace("  ", " ") : "Create price"}</Button></FormActions>
     </form></Dialog>
