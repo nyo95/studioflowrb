@@ -251,3 +251,16 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   the account's display locale, `/ui-engine` showcase is a public path, and
   `studioflow/actions.ts` (1,248 lines) and `schedule-board.tsx` (1,533 lines)
   are oversized.
+- [ ] [CLEANUP][P3] Sample holder project (external audit 2026-10-08, checked
+  against the code): the browser path is safe (the action schema has no project
+  name and `sample-request-coordinator.ts` resolves it from StudioFlow's
+  non-archived projects, with a test for an unknown project), but
+  `masterdata/services/sample.service.ts` `setSampleStatus` still takes
+  `holderProjectId` and `holderProjectName` from its caller. Only the
+  coordinator calls it today; if a second caller appears, make Master Data take
+  the id alone through a port that returns the name.
+- [ ] [PLANNED][P3] Sample workflow orchestration is split across
+  `sample-request-coordinator.ts`, `sample-request-notifier.ts`,
+  `masterdata/services/sample.service.ts` and
+  `studioflow/public/sample-request-command.ts`. Not a defect; revisit as one
+  application-level workflow once two or three more cross-app workflows exist.

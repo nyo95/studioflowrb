@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.407 | 2026-10-08 | fix(studioflow): one image batch at a time; external audit of R8.395 checked (Lead)
+
+- **External audit (2026-10-08, written against R8.395) checked against the current code.** P1 "sample holder trusts the browser's project name": not exploitable. The status action's schema accepts only a project id, and `sample-request-coordinator.ts` resolves the name from StudioFlow's non-archived projects (unknown id gives `SAMPLE_PROJECT_NOT_FOUND`, tested). What remains is defense in depth: Master Data's own service still takes the name from its one caller; recorded in BACKLOG [CLEANUP][P3]. The sample-orchestration spread is recorded as [PLANNED][P3], no refactor now.
+- **P3 confirmed, with a different cause.** In `iteration-images.tsx` the room left is the image count minus uploads in flight, but the count only updates after the batch's refresh, so a second paste or drop mid-batch could count room too generously (the server still refuses past 12). The area now takes one batch at a time and says so if a second arrives.
+
+**Checks.** `tsc --noEmit`, lint (touched file). Browser not opened; the image walk stays [UNVERIFIED] in BACKLOG.
+
 ## R8.406 | 2026-10-07 | refactor(studioflow): split phase service by responsibility (Executor)
 
 - Split the phase workflow, phase-template administration, and deliverable handling into separate files while keeping the same public phase-service members and behavior. A member-surface regression test guards the composed service.

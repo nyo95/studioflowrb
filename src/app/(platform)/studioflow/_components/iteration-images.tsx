@@ -73,12 +73,15 @@ export function IterationImageArea({ projectId, phaseId, iterationId, images, di
   const confirm = useConfirm();
   const pickerRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(0);
+  // One batch at a time: the image count only catches up after the batch's refresh, so a second batch would count room wrongly.
+  const busy = useRef(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [dragging, setDragging] = useState(false);
   const room = MAX_IMAGES - images.length - uploading;
 
   const upload = async (files: File[]) => {
+    if (busy.current) { setErrors(["Wait for the images being added to finish first."]); return; }
     const accepted = files.filter((file) => ACCEPTED.includes(file.type));
     const problems: string[] = [];
     if (accepted.length < files.length) problems.push("Only PNG, JPEG or WebP images can be added.");
@@ -86,6 +89,7 @@ export function IterationImageArea({ projectId, phaseId, iterationId, images, di
     if (accepted.length > batch.length) problems.push(`An iteration holds at most ${MAX_IMAGES} images.`);
     setErrors(problems);
     if (batch.length === 0) return;
+    busy.current = true;
     setUploading((count) => count + batch.length);
     // One at a time keeps the order the person chose and stays under the request size limit.
     for (const file of batch) {
@@ -106,6 +110,7 @@ export function IterationImageArea({ projectId, phaseId, iterationId, images, di
     }
     setErrors([...problems]);
     router.refresh();
+    busy.current = false;
   };
 
   const remove = async (image: IterationImage) => {
