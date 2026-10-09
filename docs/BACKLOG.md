@@ -114,6 +114,14 @@ Order matters; each item is its own Work Order.
   (R8.485): storage folder as a setting and remote access; not yet turned
   into a READY plan.
 
+- [ ] [PLANNED][P1] Installable modules (owner, 2026-10-09;
+  `apps/platform/MODULES-DECISION.md`): M1 registry and switch (`PLAN.md`
+  WO-MODULES-M1, READY), M2 Ideas/Presentation coupling report, M3 Ideas then
+  Presentation extracted to their own module and schema, M4 signed entitlement
+  (after the owner's commercial/IP agreement), M5 customer build profiles and
+  installer.
+- [ ] [PLANNED] Lead UI after M1: read-only "Modules" section in Settings.
+
 ## UI Engine and Shared Utilities
 
 

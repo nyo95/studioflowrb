@@ -46,6 +46,15 @@ implementation. Model or tool choice never widens authority beyond the lane.
 
 Companion apps and injected features (SketchUp plugin, AI chatbot, and the like) are built as isolated extensions under `docs/agent/EXTENSIONS.md`.
 
+**Modules (owner, 2026-10-09; `docs/apps/platform/MODULES-DECISION.md`).** The
+product is a platform of separately versioned, separately switchable modules.
+Every new business capability is born as its own module (manifest, schema,
+`public/` door, no database relation into another module's schema); every plan
+names the module it changes. Module install/enable/disable, versions and
+entitlements are System Owner operations outside RBAC: no role, including the
+Company Administrator, can hold them, and no agent may turn them into a
+permission.
+
 Read `docs/agent/README.md` to select scoped context. Never load every app contract, roadmap section, or legacy artifact merely because it exists.
 
 ## Lead-led execution

@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.494 | 2026-10-09 | docs(platform,agent): installable modules decision, harness rules, WO-MODULES-M1 (Lead)
+
+- **Owner decision 2026-10-09:** StudioFlowRB becomes a platform of separately versioned, separately switchable modules, decided before the codebase grows further. Recorded in `docs/apps/platform/MODULES-DECISION.md` (D1-D9): "install" = built into the build plus an ENABLED/DISABLED state at runtime (no runtime code drop-in on Next.js); a module is a business capability with a manifest; gates are built in, entitled, enabled, then RBAC; disabling keeps data, purge is separate; Company Administrator (RBAC, the existing `platform-owner` role) versus System Owner (not a permission, server command only); per-module semver and release tags; signed entitlement later; new capabilities are born as modules; Ideas Board is the pilot extraction, then Presentation. Phases M0-M5.
+- **Evidence for the split:** Ideas and Presentation sit in the `studioflow` schema with relations into the Schedule (`SfIdeaUsage.option_id`, `SfPresentationAnnotation.schedule_entry_id`, cascade deletes) and Ideas imports Schedule and Presentation internals directly.
+- **Harness:** `AGENTS.md` gets a Modules paragraph (born as modules, System Owner operations never become permissions); `docs/agent/EXTENSIONS.md` (an extension is an optional module); `docs/MODULE-BOUNDARIES.md` (module layer); `docs/agent/PLAN-TEMPLATE.md` (a plan names its modules).
+- `PLAN.md` is WO-MODULES-M1 (READY): Platform manifest/registry, `platform.module_state`, `MODULE_DISABLED` gates, Ideas and Presentation as optional modules of StudioFlow, the System Owner command, the owner role shown as "Company Administrator". BACKLOG lists M1-M5 and the Lead's read-only Modules page.
+- **Migrations/dependencies:** none. Documentation only. **Checks:** `git diff --check`.
+
 ## R8.493 | 2026-10-09 | fix(studioflow): the Presentation PDF name uses the shared calendar-date helper (Lead)
 
 - `check:boundaries` failed on `print-title.ts` (R8.487 formatted the date with its own `Intl.DateTimeFormat`). It now uses the canonical `currentDateOnly` from `@platform/utilities/date`; the file name is unchanged (`20261009 Sociolla SG Funan Material Funan`).

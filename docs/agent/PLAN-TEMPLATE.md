@@ -8,6 +8,7 @@ sections that do not help the Executor.
 
 Plan ID: <stable identifier — the Work Order ID>
 Scope: <bounded product/technical area>
+Module(s): <module ids this plan changes; a new capability names its new module>
 Target revision: R<N>.<NN>
 Status: DRAFT | READY | BLOCKED
 Priority: P0 | P1 | P2 | P3 | PARKED

@@ -13,6 +13,12 @@ rules are checked mechanically.
 
 The rule that matters: **an app may know another app's capability, never its implementation.**
 
+**Modules (2026-10-09).** On top of this, each app and each optional capability is a *module* with
+a manifest, a version and a runtime state, gated in the order built in → entitled → enabled → RBAC.
+See `docs/apps/platform/MODULES-DECISION.md`. A module never holds a database relation into another
+module's schema; it keeps plain ids plus a snapshot. Ideas Board and Presentation predate this rule
+and are scheduled for extraction (M3).
+
 ## Ownership
 
 | Module | Owns | Code | Postgres schema |

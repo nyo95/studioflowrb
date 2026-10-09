@@ -8,6 +8,12 @@ them only through their public doors: the SketchUp Ruby plugin sync, an AI
 chatbot, a future mobile or desktop companion. It never edits how StudioFlow,
 Master Data, BQ or Platform work inside.
 
+An extension is an **optional module** (`docs/apps/platform/MODULES-DECISION.md`):
+it has a manifest (id, version, `kind: "optional"`, `parent`, `requires`) in its
+`public/` door, it can be disabled without touching anything else, and its data
+survives being disabled. Since 2026-10-09 every new business capability starts
+this way (D8), not as a folder inside an existing app.
+
 ## The two doors (the only ways in)
 
 ```text
