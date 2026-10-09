@@ -110,6 +110,10 @@ Order matters; each item is its own Work Order.
   cleanup ledger, but a process crash between commit and removal is not
   pre-enqueued as deliverable and MOM deletes are (R8.372).
 
+- [ ] [PLANNED] Lead verdict on `agent/reports/STORAGE-TUNNEL-DISCUSSION.md`
+  (R8.485): storage folder as a setting and remote access; not yet turned
+  into a READY plan.
+
 ## UI Engine and Shared Utilities
 
 
@@ -142,9 +146,13 @@ Order matters; each item is its own Work Order.
   WO-SCHEMA-HARDEN-01 (MD-AUD-012 and the BQ/StudioFlow FK indexes), the
   Signage sheet of the owner's workbook, SKU prices read from that file, and an
   optional one-off rewrite of names the capitalization rule would change.
-- [ ] [PLANNED][P3] Owner decision: should a workbook re-import add missing
-  categories and contacts to suppliers that already exist? Today it merges
-  nothing, and its area suffix only separates repeats within one file.
+- [ ] [BUG][P1] Price-database import overwrites a work price's unit and
+  category when a row matches by supplier + name (identity stays supplier +
+  name, owner 2026-10-09: a mismatch must be a row error). Fix: WO-AUDIT-FIX-01 slice B.
+- [ ] [BUG][P2] The Suppliers sheet looks editable (the current-data export
+  lists every supplier) but existing suppliers are silently left unchanged on
+  re-import (owner 2026-10-09: keep not updating them, say so per row). Fix:
+  WO-AUDIT-FIX-01 slice C.
 - [ ] [PLANNED] Define media/file behavior on the shared storage.
 
 ## BQ
@@ -170,6 +178,10 @@ Order matters; each item is its own Work Order.
 
 ## StudioFlow
 
+- [ ] [PLANNED][P1] Schedule codes fill the lowest empty number (owner
+  2026-10-09, contract §11.2, replaces R8.464): with HT-01 deleted the next HT
+  row is HT-01. Today a deleted number is never reissued, and an import can
+  still bring one back. Fix: WO-AUDIT-FIX-01 slice A.
 - [ ] [PLANNED][P2] Ideas board (owner, 2026-10-08): a personal page where a
   user drops any image (Ctrl+V screenshot, a dropped download, picked files)
   and it becomes a card at once; title, source link and note are optional and

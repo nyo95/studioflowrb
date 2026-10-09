@@ -510,15 +510,20 @@ offers the Qty row when `section = FIXTURE`.
 
 ### 11.2 Numbering
 
-**Codes are stable (owner, 2026-10-07; replaces the earlier gapless rule).** A
-code may already be on a drawing or a document sent out, so it never shifts
-by itself: deleting a row or moving it to another category leaves its number
-empty, and a new row takes one past the highest number in its group (so only
-the highest number can come back after its row is deleted). Reorder (drag,
-up/down) hands the group's existing numbers out again in the new order inside
-one transaction (two-phase update): only the rows that moved get another
-code, and a gap stays a gap. A Google Sheets import keeps the sheet's own
-code when its prefix is the category's and the number is free (§11.6).
+**Existing codes are stable; a new row fills the lowest empty number (owner,
+2026-10-09; replaces the "never reissue" rule of R8.464 and the "one past the
+highest" rule of 2026-10-07).** A code may already be on a drawing or a
+document sent out, so an existing row's code never shifts by itself: deleting
+a row or moving it to another category leaves its number empty and nothing
+renumbers. A new row in a group (quick add, Add item, template, move into the
+category, Ideas to Schedule, import without a usable own number) takes the
+**lowest empty number from 1 up**: with HT-01 deleted and HT-02 live, the next
+HT row is HT-01. This is legacy's gap-filling ("normalisasi") for new rows
+only. Reorder (drag, up/down) hands the group's existing numbers out again in
+the new order inside one transaction (two-phase update): only the rows that
+moved get another code, and a gap stays a gap until a new row fills it. A
+Google Sheets import keeps the sheet's own code when its prefix is the
+category's and the number is not used by a live row in the group (§11.6).
 
 **Category order.** Categories follow the studio template category order;
 categories the templates do not know come after, A to Z. There is no

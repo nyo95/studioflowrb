@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.489 | 2026-10-09 | docs(plan): WO-AUDIT-FIX-01 Schedule gap-filling codes, work-price identity, supplier import messages (Lead)
+
+- **Audit check 2026-10-09 (Lead, against the code at R8.488):** confirmed all four findings of the external audit: an imported Schedule number could bring back a deleted code; the price-database import matches a work price by supplier + name and then overwrites its unit and category; the Suppliers sheet of the current-data export looks editable but existing suppliers are left unchanged; revision numbers R8.05, R8.164, R8.443, R8.444 and R8.485 are each used twice (history is not rewritten; serial work only).
+- **Owner decision 2026-10-09:** a new Schedule row takes the lowest empty number in its group (legacy "normalisasi" for new rows: HT-01 deleted, HT-02 live, next is HT-01); existing codes still never shift and reorder is unchanged. This replaces R8.464 ("never reissue"). Contract §11.2 updated. Work-price identity stays supplier + name, a unit or category mismatch is a row error (option a). Existing suppliers stay unchanged by import, now reported per row; this also answers the open backlog question about merging into existing suppliers (no).
+- `PLAN.md` is WO-AUDIT-FIX-01 (READY, three slices, target R8.490-R8.492); BACKLOG records the three items and the pending verdict on the storage/remote-access report.
+- **Migrations/dependencies:** none. Documentation only. **Checks:** `git diff --check`.
+
 ## R8.488 | 2026-10-09 | chore(repo): clean up old stashes and merged branches, keep one idea (Lead)
 
 - **Owner request 2026-10-09:** removed two stale local stashes (an old archive-document header tweak and an R4.07 changelog entry from 2026-09-01) and the merged remote branch `claude/r8-447-audit-fixes` (no commit that is not in `main`). `main` is now the only branch.
