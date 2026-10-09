@@ -231,7 +231,6 @@ test("6.4 sample shelf supports movement, statuses, history, context menu and fi
 });
 
 test("6.5 shelving a request updates Schedule, location note and requester notification", async ({ page }) => {
-  test.fail(true, "[BUG] Schedule detail does not show the shelf location after a sample is shelved.");
   await page.goto("/masterdata/sample-requests");
   await page.getByRole("button", { name: "Actions for ZZ-Test 6.5 Requested Sample" }).click();
   await page.getByRole("menuitem", { name: "Put on shelf" }).click();
@@ -249,8 +248,9 @@ test("6.5 shelving a request updates Schedule, location note and requester notif
   await expect(page.getByText("Sample received", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /ZZ-Test 6\.5 Requested Sample/ }).click();
   await expect(page.getByText("Option A · sample received", { exact: true })).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/6.5-schedule-missing-shelf-location.png` });
-  await expect.soft(page.getByText(/REQ65 \/ 7/)).toBeVisible();
+  await page.screenshot({ path: `${SHOTS}/6.5-schedule-shelf-location.png` });
+  await expect(page.getByText(/REQ65 \/ 7/)).toBeVisible();
+  await page.keyboard.press("Escape"); // the option dialog sits over the header bell
   await page.getByRole("button", { name: /Notifications/ }).click();
   await expect(page.getByText("Your sample is on the shelf", { exact: true })).toBeVisible();
 });

@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.479 | 2026-10-09 | docs(review)+fix(studioflow): R8.478 verdict PASS, shelf location now shown in the Schedule (Lead)
+
+- **Review of R8.478 (`a270ef9`, WO-E2E-ACCEPT-01 Stage 2):** only `e2e/`, the seed and the ledgers changed. Lead ran the whole file: 10 passed (6.5 as an expected failure). Verdict **PASS**; Stage 2 (walk sections 5 and 6) is complete.
+- **The 6.5 finding was real and is fixed.** When Master Data put a requested sample on the shelf, StudioFlow stored "On the shelf: REQ65 / 7 (Master Data)" in the request, but no screen ever showed it. The option detail in the Schedule now shows that line under the option's header once the sample is received.
+- Spec repair: 6.5 no longer expects a failure; it also closes the option dialog before opening the header bell (the dialog covered it, which the expected-failure mark had been hiding). The `[BUG]` entry is removed. All 10 specs pass.
+- **Migrations/dependencies:** none. **Checks:** `tsc --noEmit`, eslint, `playwright test e2e/masterdata-archive-samples.spec.ts` (10 passed). Not walked in a real browser by the owner.
+
 ## R8.478 | 2026-10-09 | test(masterdata): cover archive cascades and sample shelf acceptance (Executor)
 
 - Added one isolated Playwright file for `WO-E2E-ACCEPT-01` Stage 2. Every step has its own `ZZ-Test …` fixture or creates its own record; the disposable seed also clears sample-request intake state so repeated one-step runs cannot leak old requests.

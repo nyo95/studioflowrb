@@ -1256,6 +1256,7 @@ function EntryPanelContent({
         </div>
         {reuse ? <InlineReuse projectId={projectId} entry={entry} command={command} onClose={() => setReuse(false)} /> : null}
         {selectedId !== "new" ? optionActions : null}
+        {selectedId !== "new" && selected?.sampleRequest?.status === "RECEIVED" && selected.sampleRequest.receivedNote ? <Text size="sm" tone="secondary">{selected.sampleRequest.receivedNote}</Text> : null}
         {sampleFor ? <InlineSampleRequest projectId={projectId} option={sampleFor} command={command} onClose={() => setSampleFor(null)} /> : null}
         {entry.options.length === 0 && selectedId !== "new" ? <Text size="sm" tone="tertiary">No product yet. Fill in the Type and fields below and Save, or copy one from a past project.</Text> : null}
       </div>
