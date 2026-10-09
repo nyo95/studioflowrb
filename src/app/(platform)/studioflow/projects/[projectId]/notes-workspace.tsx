@@ -8,6 +8,8 @@ import { currentDateOnly, formatInstant } from "@platform/utilities/date";
 import { Badge, Button, FormattedInstant, FormattedText, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, SectionCard, Text, useConfirm, useFileIntake } from "@/platform/ui_engine";
 
 import { phaseNoteAction, type PhaseNoteCommandInput } from "../../actions";
+import { saveNoteImageToIdeasAction, applyNoteImageToScheduleAction } from "../../ideas/actions";
+import { UseInScheduleDialog } from "../../ideas/use-in-schedule-dialog";
 import { NOTE_MAX, NoteComposer, uploadNoteImages, useNoteDraft, type NoteImage } from "../../_components/phase-note-composer";
 import type { IterationView } from "../../_components/phase-commands";
 
@@ -261,9 +263,39 @@ function NoteBubble({ note, projectId, phaseId, canEdit, locale, timezone, busy,
       ) : (
         <>
           {note.body ? <FormattedText text={note.body} className="text-sm" /> : null}
-          <ImageGallery images={note.images} />
+          <ImageGallery images={note.images} viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} phaseId={phaseId} />} />
         </>
       )}
     </article>
+  );
+}
+
+/** Under a note image in the large viewer: keep a copy on the person's Ideas board, or put it in this project's schedule. Both copy; the note is never changed. */
+function NoteImageActions({ image, projectId, phaseId }: { image: { id: string }; projectId: string; phaseId: string }) {
+  const [saved, setSaved] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [using, setUsing] = useState(false);
+  const save = async () => {
+    setPending(true); setError(null);
+    const result = await saveNoteImageToIdeasAction({ projectId, phaseId, imageId: image.id });
+    setPending(false);
+    if (result.ok) setSaved(true); else setError(result.error.safeMessage);
+  };
+  return (
+    <>
+      <Button size="sm" variant="secondary" pending={pending} disabled={saved} onClick={() => void save()}>{saved ? "Saved to Ideas" : "Save to Ideas"}</Button>
+      <Button size="sm" variant="secondary" onClick={() => setUsing(true)}>Use in schedule</Button>
+      {error ? <InlineError>{error}</InlineError> : null}
+      {using ? (
+        <UseInScheduleDialog
+          initialName=""
+          initialNotes=""
+          targets={[{ id: projectId, name: "this project" }]}
+          apply={(input) => applyNoteImageToScheduleAction({ projectId, phaseId, imageId: image.id, target: input.target, option: input.option })}
+          onClose={() => setUsing(false)}
+        />
+      ) : null}
+    </>
   );
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.471 | 2026-10-09 | feat(studioflow): turn a note image into an idea or a schedule option (Lead)
+
+- **Owner request 2026-10-09:** an image in a phase note can be kept or used. Open the image large: **Save to Ideas** puts a private copy on the person's own Ideas board (its note reads "From the notes of <project>"); **Use in schedule** opens the same dialog as the Ideas board, for this project only: a new item (gets its code then) or an extra option on an existing item. Both copy the image, so deleting the note, the card or the option never touches the others. Using it in the schedule needs the same access as editing that schedule; a note image is not a card, so there is no "Used in" label.
+- `ImageGallery` (UI Engine) gains an optional `viewerActions` slot for buttons under the large image. The Ideas board's "Use in schedule" dialog moved to a shared `UseInScheduleDialog`; the board behaves as before.
+- Backend: `saveNoteImageToIdeas` and `useNoteImageInSchedule` in the StudioFlow ideas service; `useIdeaInSchedule` and the new command share one `placeInSchedule`. A note image outside the given project and phase is not found. Test added in `service.integration.test.ts`.
+- **Migrations/dependencies:** none. **Checks:** `npm test`, `tsc --noEmit`, eslint, `check:boundaries`. Not walked in the browser (UNVERIFIED in the backlog).
+
 ## R8.470 | 2026-10-09 | feat(studioflow): hide the requirements and files column, fix the account test (Lead)
 
 - **Owner request 2026-10-09:** the notes of a phase should be able to use the whole width. A small button above the phase ("Hide requirements & files" / "Show requirements & files") folds away the right column (Requirements, Deliverables); the choice is remembered per browser (kept for the visit if storage is blocked). Hidden below 1100 px, where the column already sits under the notes.

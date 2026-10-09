@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 import { Dialog } from "../layouts/overlays";
@@ -14,6 +14,8 @@ export type ImageGalleryProps = {
   /** With it, each thumbnail gets a remove button; what removing means stays with the consumer. */
   onRemove?: (image: GalleryImage) => void;
   removingId?: string | null;
+  /** Buttons shown under the large image in the viewer (for example "Save to Ideas"); what they do stays with the consumer. */
+  viewerActions?: (image: GalleryImage) => ReactNode;
   /** Accessible name of the list, e.g. "Images". */
   label?: string;
   size?: "sm" | "md";
@@ -24,7 +26,7 @@ export type ImageGalleryProps = {
  * Thumbnails that open large in a viewer with Previous/Next (and the arrow keys). The URLs are the consumer's
  * (often short-lived signed links), so plain `<img>` is used: an optimiser would cache a link that soon expires.
  */
-export function ImageGallery({ images, onRemove, removingId, label = "Images", size = "md", className }: ImageGalleryProps) {
+export function ImageGallery({ images, onRemove, removingId, viewerActions, label = "Images", size = "md", className }: ImageGalleryProps) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   if (images.length === 0) return null;
   const open = openIndex !== null ? images[openIndex] ?? null : null;
@@ -54,6 +56,7 @@ export function ImageGallery({ images, onRemove, removingId, label = "Images", s
               // eslint-disable-next-line @next/next/no-img-element
               <img src={open.url} alt={`Image ${openIndex! + 1}`} className="max-h-[70vh] w-full rounded-control object-contain" />
             ) : <Text tone="tertiary">This image could not be loaded.</Text>}
+            {viewerActions && open.url ? <div className="flex flex-wrap gap-2">{viewerActions(open)}</div> : null}
             {images.length > 1 ? (
               <div className="flex justify-between">
                 <Button variant="ghost" leadingIcon={<ChevronLeft className="h-4 w-4" />} onClick={() => step(-1)}>Previous</Button>

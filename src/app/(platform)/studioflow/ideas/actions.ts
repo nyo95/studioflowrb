@@ -127,3 +127,29 @@ export async function applyIdeaToScheduleAction(input: UseIdeaInput): Promise<Ac
     return result;
   });
 }
+
+const NoteImageRef = { projectId: Id, phaseId: Id, imageId: Id };
+
+/** "Save to Ideas" on a phase-note image: a private copy on the signed-in user's own board. */
+export async function saveNoteImageToIdeasAction(input: { projectId: string; phaseId: string; imageId: string }): Promise<ActionResult<{ cardId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(z.strictObject(NoteImageRef), input);
+    const result = await studioFlow.ideas.saveNoteImageToIdeas({ ...ctx, ...data });
+    revalidatePath("/studioflow/ideas");
+    return result;
+  });
+}
+
+const NoteUseInput = z.strictObject({ ...NoteImageRef, target: UseInput.shape.target, option: UseInput.shape.option });
+
+/** "Use in schedule" straight from a phase-note image, in the note's own project. */
+export async function applyNoteImageToScheduleAction(input: z.infer<typeof NoteUseInput>): Promise<ActionResult<{ projectId: string; entryId: string; optionId: string; code: string; label: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(NoteUseInput, input);
+    const result = await studioFlow.ideas.useNoteImageInSchedule({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}

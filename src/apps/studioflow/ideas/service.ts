@@ -90,6 +90,39 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
     return card;
   }
 
+  /** An image of a phase note of this project, with the project's name for the card's source line. */
+  async function noteImageOf(tx: Db | TxClient, input: { projectId: string; phaseId: string; imageId: string }) {
+    const image = await tx.sfPhaseNoteImage.findFirst({
+      where: { id: input.imageId, note: { phase_id: input.phaseId, phase: { project_id: input.projectId } } },
+      select: { id: true, storage_key: true, content_type: true, bytes: true, note: { select: { phase: { select: { project: { select: { name: true } } } } } } },
+    });
+    if (!image) throw notFound("note image");
+    return { id: image.id, key: image.storage_key, contentType: image.content_type, bytes: image.bytes, projectName: image.note.phase.project.name };
+  }
+
+  /** Puts a stored image into the schedule as a new item or an extra option, copying the object; the caller supplies the audit metadata. */
+  async function placeInSchedule(input: CommandContext & { projectId: string; target: IdeaUseTarget; option: IdeaOptionText }, source: { key: string; contentType: string }, metadata: Record<string, unknown>, after?: (tx: TxClient, created: { optionId: string; entryId: string; code: string; label: string }) => Promise<void>) {
+    const extension = STUDIOFLOW_IMAGE_TYPES[source.contentType] ?? "png";
+    const key = createPrivateObjectKey(`studioflow/schedule/${input.projectId}`, extension);
+    await storage.copy({ fromKey: source.key, toKey: key });
+    try {
+      return await runTransaction(async (tx) => {
+        const snapshot: SnapshotInput = { ...input.option, brandId: null, imageKey: key };
+        const created = input.target.kind === "new-item"
+          ? await schedule.createEntry(tx, { actor: input.actor, projectId: input.projectId, section: input.target.section, category: input.target.category, qty: input.target.qty, unit: input.target.unit, location: input.target.location, snapshot, metadata })
+          : await schedule.createOption(tx, { actor: input.actor, projectId: input.projectId, entryId: input.target.entryId, snapshot, metadata });
+        // A new item always carries the snapshot, so its first option exists.
+        const optionId = created.optionId!;
+        const placed = { projectId: input.projectId, entryId: created.entryId, optionId, code: created.code, label: created.label! };
+        if (after) await after(tx, placed);
+        return placed;
+      });
+    } catch (error) {
+      await discardObjects(db, storage, [key]);
+      throw error;
+    }
+  }
+
   async function signedUrl(key: string): Promise<string | null> {
     try {
       return await storage.createSignedReadUrl(key, IDEA_SIGNED_URL_SECONDS);
@@ -246,27 +279,37 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
     async useIdeaInSchedule(input: CommandContext & { cardId: string; projectId: string; target: IdeaUseTarget; option: IdeaOptionText }) {
       const userId = await schedule.requireAccess(input);
       const card = await ownCard(db, userId, input.cardId);
-      const extension = STUDIOFLOW_IMAGE_TYPES[card.content_type] ?? "png";
-      const key = createPrivateObjectKey(`studioflow/schedule/${input.projectId}`, extension);
-      await storage.copy({ fromKey: card.image_key, toKey: key });
+      return placeInSchedule(input, { key: card.image_key, contentType: card.content_type }, { ideaCardId: card.id }, async (tx, created) => {
+        await ownCard(tx, userId, card.id);
+        await tx.sfIdeaUsage.create({ data: { card_id: card.id, option_id: created.optionId } });
+        await writeAudit(ports, tx, { action: "studioflow.idea.used", entityType: CARD_ENTITY, entityId: card.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: created.entryId, optionId: created.optionId, code: created.code, label: created.label } });
+      });
+    },
+
+    /** "Save to Ideas" on a phase-note image: a private copy on the caller's own board, so deleting either side never touches the other. */
+    async saveNoteImageToIdeas(input: CommandContext & { projectId: string; phaseId: string; imageId: string }) {
+      const userId = requireCommand(input, P.access);
+      if (!hasPermission(input.grants, P.projectRead)) throw invalid("PERMISSION_DENIED", "You cannot open this project.");
+      const image = await noteImageOf(db, input);
+      const key = createPrivateObjectKey("studioflow/ideas", STUDIOFLOW_IMAGE_TYPES[image.contentType] ?? "png");
+      await storage.copy({ fromKey: image.key, toKey: key });
       try {
         return await runTransaction(async (tx) => {
-          await ownCard(tx, userId, card.id);
-          const snapshot: SnapshotInput = { ...input.option, brandId: null, imageKey: key };
-          const metadata = { ideaCardId: card.id };
-          const created = input.target.kind === "new-item"
-            ? await schedule.createEntry(tx, { actor: input.actor, projectId: input.projectId, section: input.target.section, category: input.target.category, qty: input.target.qty, unit: input.target.unit, location: input.target.location, snapshot, metadata })
-            : await schedule.createOption(tx, { actor: input.actor, projectId: input.projectId, entryId: input.target.entryId, snapshot, metadata });
-          // A new item always carries the snapshot, so its first option exists.
-          const optionId = created.optionId!;
-          await tx.sfIdeaUsage.create({ data: { card_id: card.id, option_id: optionId } });
-          await writeAudit(ports, tx, { action: "studioflow.idea.used", entityType: CARD_ENTITY, entityId: card.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: created.entryId, optionId, code: created.code, label: created.label } });
-          return { projectId: input.projectId, entryId: created.entryId, optionId, code: created.code, label: created.label! };
+          const card = await tx.sfIdeaCard.create({ data: { owner_user_id: userId, note: `From the notes of ${image.projectName}`.slice(0, IDEA_NOTE_MAX), image_key: key, content_type: image.contentType, bytes: image.bytes }, select: { id: true } });
+          await writeAudit(ports, tx, { action: "studioflow.idea.created", entityType: CARD_ENTITY, entityId: card.id, actor: input.actor, metadata: { bytes: image.bytes, fromNoteImageId: image.id, projectId: input.projectId } });
+          return { cardId: card.id };
         });
       } catch (error) {
         await discardObjects(db, storage, [key]);
         throw error;
       }
+    },
+
+    /** "Use in schedule" straight from a phase-note image: the project is the note's own, so only the item or option is chosen. */
+    async useNoteImageInSchedule(input: CommandContext & { projectId: string; phaseId: string; imageId: string; target: IdeaUseTarget; option: IdeaOptionText }) {
+      await schedule.requireAccess(input);
+      const image = await noteImageOf(db, input);
+      return placeInSchedule(input, { key: image.key, contentType: image.contentType }, { fromNoteImageId: image.id });
     },
   };
 }

@@ -3341,6 +3341,38 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     assert.equal(await testDb.prisma.sfScheduleOption.count({ where: { id: { in: [asNew.optionId, asOption.optionId] } } }), 2);
   });
 
+  it("copies a phase-note image to the caller's Ideas board or into that project's schedule, leaving the note alone", async () => {
+    const { projectId } = await newProject("Note source");
+    const phase = await phaseOf(projectId, "moodboard");
+    await openIteration(phase.id);
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    const { noteId } = await sf.phases.postPhaseNote({ ...base, body: null, withImages: true });
+    await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
+    const image = await testDb.prisma.sfPhaseNoteImage.findFirstOrThrow({ where: { note_id: noteId } });
+
+    const saved = await sf.ideas.saveNoteImageToIdeas({ ...base, imageId: image.id });
+    const card = await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: saved.cardId } });
+    assert.equal(card.owner_user_id, designer.id);
+    assert.notEqual(card.image_key, image.storage_key);
+    assert.deepEqual(bytesOf(card.image_key), bytesOf(image.storage_key));
+    assert.match(card.note ?? "", /Note source/);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.idea.created", entity_id: card.id } }), 1);
+
+    const placed = await sf.ideas.useNoteImageInSchedule({ ...base, imageId: image.id, target: { kind: "new-item", section: "MATERIAL", category: "Stone" }, option: { productName: "From the notes" } });
+    const option = await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: placed.optionId } });
+    assert.ok(option.image_key && option.image_key !== image.storage_key && option.image_key.startsWith(`studioflow/schedule/${projectId}/`));
+    assert.deepEqual(bytesOf(option.image_key), bytesOf(image.storage_key));
+    assert.equal(option.is_final, false);
+    assert.equal(await testDb.prisma.sfIdeaUsage.count({ where: { option_id: option.id } }), 0, "a note image is not a card, so no usage row");
+
+    // The note keeps its image; deleting the card or the option never touches it.
+    await sf.ideas.deleteIdeaCard({ ...as(designer), cardId: saved.cardId });
+    assert.ok(storage.objects.has(image.storage_key));
+    // Another phase's or another project's image id is not reachable through this note's route.
+    const other = await newProject("Other note source");
+    await rejectsWith(sf.ideas.saveNoteImageToIdeas({ ...as(designer), projectId: other.projectId, phaseId: phase.id, imageId: image.id }), "NOTE_IMAGE_NOT_FOUND");
+  });
+
   it("shows the current code after a reorder and drops a usage whose option is deleted, keeping the card", async () => {
     const { projectId } = await newProject("Reorder project");
     const first = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone", snapshot: { productName: "First" } });
