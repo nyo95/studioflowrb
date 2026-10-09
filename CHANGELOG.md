@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.493 | 2026-10-09 | fix(studioflow): the Presentation PDF name uses the shared calendar-date helper (Lead)
+
+- `check:boundaries` failed on `print-title.ts` (R8.487 formatted the date with its own `Intl.DateTimeFormat`). It now uses the canonical `currentDateOnly` from `@platform/utilities/date`; the file name is unchanged (`20261009 Sociolla SG Funan Material Funan`).
+- **Migrations/dependencies:** none. **Checks:** `check:boundaries` OK, the print-title tests (3 passed), eslint.
+
 ## R8.492 | 2026-10-09 | fix(masterdata): the price import says which Suppliers rows were not used (Lead, executing WO-AUDIT-FIX-01 slice C at the owner's request)
 
 - **Owner decision 2026-10-09:** a supplier that already exists is still never changed from the Suppliers sheet, but each such row now gets a message, `Supplier "Afa Interindo" already exists; this row was not used. Edit suppliers on the Suppliers page.`, in the check and in the save result, so an address or phone edited in Excel is not thought saved. The template's Notes sheet says the same.
