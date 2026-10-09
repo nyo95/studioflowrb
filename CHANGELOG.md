@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.485 | 2026-10-09 | docs(platform): recommend safe storage cutover and remote access (Executor)
+
+- `DISCUSS-STORAGE-TUNNEL-01`: inspected the active local storage composition, every direct and injected storage consumer, signed/public reads, usage reporting, cleanup jobs, Platform settings persistence, login/session/proxy handling, and Windows unattended-operation evidence. The discussion report recommends an env-backed typed Platform override whose destination activates only after a resumable checksum-verified copy and guarded cutover.
+- For remote access, the report recommends a named Cloudflare Tunnel with Cloudflare Access and a loopback-only production origin; Tailscale private is the preferred alternative when access is limited to enrolled team devices. It also records production-origin, proxy-aware limiter, health, Task Scheduler/service, backup, logging, and review gates without exposing a port or starting a tunnel.
+- **Migrations/dependencies:** none. Documentation only. **Checks:** `npm test` (984 passed), `npm run typecheck`, eslint (0 errors, 2 existing image warnings), `npm run check:boundaries`, `npm run check:legacy-runtime`, production build, report structure/link review, and staged/unstaged whitespace checks.
+
 ## R8.484 | 2026-10-09 | docs(plan): discussion plan for storage as a setting and reaching the app from anywhere (Lead)
 
 - `PLAN.md` is DISCUSS-STORAGE-TUNNEL-01, status DISCUSSION: the Executor inspects and writes a recommendation report only (`docs/agent/reports/STORAGE-TUNNEL-DISCUSSION.md`), no code. Topic 1: the storage folder as a Platform setting that overrides the env value, through a thin resolving layer in front of the existing adapters, never moving files by itself. Topic 2: how to reach the PC from outside (tunnel options, what the app must change to be safe behind one, unattended run with `next start`, a safety checklist). Hard rule: do not break anything that works; add a layer.
