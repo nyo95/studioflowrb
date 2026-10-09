@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.484 | 2026-10-09 | docs(plan): discussion plan for storage as a setting and reaching the app from anywhere (Lead)
+
+- `PLAN.md` is DISCUSS-STORAGE-TUNNEL-01, status DISCUSSION: the Executor inspects and writes a recommendation report only (`docs/agent/reports/STORAGE-TUNNEL-DISCUSSION.md`), no code. Topic 1: the storage folder as a Platform setting that overrides the env value, through a thin resolving layer in front of the existing adapters, never moving files by itself. Topic 2: how to reach the PC from outside (tunnel options, what the app must change to be safe behind one, unattended run with `next start`, a safety checklist). Hard rule: do not break anything that works; add a layer.
+- **Published:** `main` pushed to GitHub with R8.462-R8.483 at the owner's request.
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.483 | 2026-10-09 | docs(plan): no active Work Order (Lead)
 
 - `PLAN.md` now says there is no READY Work Order: the browser acceptance stages and the template-first import are closed, the SketchUp plan stays deferred.
