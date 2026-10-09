@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.476 | 2026-10-09 | fix(studioflow): Presentation image upload shrinks big photos and shows why it failed (Lead)
+
+- **Owner report 2026-10-09:** "Add images" on a Presentation board did nothing visible. Cause: the server accepts a slide image up to 3 MB, the screen sent the file as it was (a phone photo or a big render is larger) and **ignored the server's answer**, so a refusal looked like nothing happened. Now each image is shrunk in the browser to fit (as the Ideas board already does), and any refusal is shown above the board ("This file is not a valid image.", wrong type, and so on).
+- New spec `e2e/presentation-upload.spec.ts` (P.1 a 3 MB+ photo becomes Slide 1; P.2 a file that is not an image shows the reason). Both fail on the code before this fix and pass after it.
+- **Migrations/dependencies:** none. **Checks:** `tsc --noEmit`, eslint, the two new Playwright specs.
+
 ## R8.475 | 2026-10-09 | docs(review): R8.474 verdict PASS, Stage 1 complete (Lead)
 
 - **Review of R8.474 (`f1e706a`, WO-E2E-ACCEPT-01 Stage 1, second part):** the commit touches only `e2e/`, the seed and the changelog (no application code, migration or dependency). Lead ran the whole file in one process: **12 passed in 29 s**, `next-env.d.ts` stays clean. Verdict **PASS**. Stage 1 (walk sections 2, 3, 4) is complete and every step passes; the earlier finding 2.4 was closed by R8.473.
