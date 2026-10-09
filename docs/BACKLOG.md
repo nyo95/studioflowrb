@@ -43,6 +43,11 @@ Order matters; each item is its own Work Order.
 - [ ] [PLANNED][P3] Integration tokens, admin view: `platform.integration.admin` can list and revoke any
   token in the service (`listAny`, `revokeAny`) but there is no screen yet, and the list has no owner
   name. Add when a second person starts using tokens.
+- [ ] [UNVERIFIED] Phase page (R8.470, R8.471): the "Hide requirements & files" button gives the notes the full width and
+  is remembered after a reload; in a note, open an image large: "Save to Ideas" shows a new card on the Ideas board with
+  the note "From the notes of <project>"; "Use in schedule" adds a new item or an extra option in that project (a person
+  who may not edit the schedule gets the refusal message). Next, if it works well: annotated images (pins and arrows with
+  text) on note images; a free-layout canvas was judged too big for now.
 - [ ] [UNVERIFIED] Token page on My preferences (R8.465): create (secret shown once, copy button),
   the list with Active/Expired/Revoked, Revoke; needs a user whose role has `platform.integration.manage`.
 - [ ] [PLANNED][P2] **DEFERRED by the owner 2026-10-09.** Plan written, not READY: `docs/apps/sketchup/WO-SKETCHUP-01.md`

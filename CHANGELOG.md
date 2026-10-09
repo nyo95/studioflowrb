@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.472 | 2026-10-09 | docs(review): R8.469 verdict PARTIAL, backlog for R8.470-R8.471 (Lead)
+
+- **Review of R8.469 (`e5f6af5`, WO-E2E-ACCEPT-01 Stage 1):** the harness was never the problem (Lead re-ran `settings.spec.ts`: 11 passed). The commit has working specs for 2.1-2.3, 3.1, 3.3 and 4.1 and one real finding (2.4, recorded as `[BUG]`). Six steps are NOT COVERED (2.5-2.6, 3.2, 3.4-3.5, 4.2), so Stage 1 is **PARTIAL**, not complete. Next correction pass: cover those six, then Stage 2.
+- **Finding 2.4 needs a Lead decision, not a fix by the Executor:** the walk expects the valid rows to save while a duplicate and an incomplete row stay; the grid today refuses the whole submission when one row lacks an amount ("Some rows are incomplete. Nothing was saved."), and only server-side rejections keep their rows. To decide with the owner: save the valid rows even when another row is incomplete.
+- Backlog: unverified entry for R8.470-R8.471 and the follow-ups.
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.471 | 2026-10-09 | feat(studioflow): turn a note image into an idea or a schedule option (Lead)
 
 - **Owner request 2026-10-09:** an image in a phase note can be kept or used. Open the image large: **Save to Ideas** puts a private copy on the person's own Ideas board (its note reads "From the notes of <project>"); **Use in schedule** opens the same dialog as the Ideas board, for this project only: a new item (gets its code then) or an extra option on an existing item. Both copy the image, so deleting the note, the card or the option never touches the others. Using it in the schedule needs the same access as editing that schedule; a note image is not a card, so there is no "Used in" label.
