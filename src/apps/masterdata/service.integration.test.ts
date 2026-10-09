@@ -1949,6 +1949,26 @@ describe("Supplier and price database workbook", () => {
     assert.equal(price.amount.toString(), "125000");
   });
 
+  it("leaves an existing supplier unchanged and says so on its row, while a new one in the same sheet is created", async () => {
+    const file = await sampleWorkbook();
+    const first = await service.previewPriceDatabaseImport(importAs(file));
+    await service.applyPriceDatabaseImport({ ...importAs(file), hash: first.hash });
+    const edited = await flatWorkbook(SAMPLE_PRICES, [
+      ["Afa Interindo", "Subcon", "", "Jl. Baru 1", "0899-0000-0000", "", "Someone Else", "", ""],
+      ["Karya Baru", "Subcon", "", "", "", "", "", "", ""],
+    ]);
+    const preview = await service.previewPriceDatabaseImport(importAs(edited));
+    assert.equal(preview.totals.suppliersExisting, 1);
+    assert.equal(preview.totals.suppliersCreated, 1);
+    const note = preview.messages.find((m) => m.sheet === "Suppliers" && m.level === "info");
+    assert.deepEqual([note?.row, note?.message], [2, 'Supplier "Afa Interindo" already exists; this row was not used. Edit suppliers on the Suppliers page.']);
+    const applied = await service.applyPriceDatabaseImport({ ...importAs(edited), hash: preview.hash });
+    assert.ok(applied.messages.some((m) => /"Afa Interindo" already exists/.test(m.message)), "the save reports it too");
+    const afa = await testDb.prisma.vendor.findFirstOrThrow({ where: { name: "Afa Interindo" }, include: { contacts: true } });
+    assert.deepEqual([afa.address, afa.contacts[0].person_name], ["Jl. Pondok Jagung No. 55", "Ahmad Amin"], "the existing supplier is untouched");
+    assert.ok(await testDb.prisma.vendor.findFirst({ where: { name: "Karya Baru" } }));
+  });
+
   it("refuses a row that matches a work price by supplier and name but disagrees on unit or category, and leaves the price alone", async () => {
     const file = await sampleWorkbook();
     const first = await service.previewPriceDatabaseImport(importAs(file));

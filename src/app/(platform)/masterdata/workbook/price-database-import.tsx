@@ -70,7 +70,8 @@ export function PriceDatabaseImport({ canExport, canImport, units }: { canExport
       check={async (file) => {
         const result = await previewPriceDatabaseImportAction(form(file));
         if (result.ok === false) return result;
-        const { totals, errors } = result.data;
+        const { totals, errors, messages } = result.data;
+        const where = (item: { sheet?: string; row?: number }) => [item.sheet, item.row ? `row ${item.row}` : null].filter(Boolean).join(", ") || "File";
         const suppliers = totals.suppliersCreated + totals.suppliersFromPrices;
         const summary: CheckSummary = {
           hash: result.data.hash,
@@ -79,10 +80,12 @@ export function PriceDatabaseImport({ canExport, canImport, units }: { canExport
             { label: `${totals.pricesUpdated} changed`, tone: "warning" },
             { label: `${totals.pricesUnchanged} unchanged`, tone: "neutral" },
             ...(suppliers > 0 ? [{ label: `${suppliers} new ${suppliers === 1 ? "supplier" : "suppliers"}`, tone: "success" as const }] : []),
+            ...(totals.suppliersExisting > 0 ? [{ label: `${totals.suppliersExisting} ${totals.suppliersExisting === 1 ? "supplier" : "suppliers"} already there, not changed`, tone: "neutral" as const }] : []),
             ...(totals.categoriesCreated > 0 ? [{ label: `${totals.categoriesCreated} new ${totals.categoriesCreated === 1 ? "category" : "categories"}`, tone: "neutral" as const }] : []),
             { label: `${errors.length} with problems`, tone: errors.length > 0 ? "danger" as const : "neutral" as const },
           ],
-          problems: errors.map((item) => ({ where: [item.sheet, item.row ? `row ${item.row}` : null].filter(Boolean).join(", ") || "File", message: item.message })),
+          problems: errors.map((item) => ({ where: where(item), message: item.message })),
+          notes: messages.filter((item) => item.sheet === "Suppliers" && item.level === "info").map((item) => ({ where: where(item), message: item.message })),
           changes: totals.pricesCreated + totals.pricesUpdated + suppliers,
           empty: totals.pricesCreated + totals.pricesUpdated + totals.pricesUnchanged + suppliers + errors.length === 0,
         };

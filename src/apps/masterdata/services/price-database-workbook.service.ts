@@ -204,7 +204,12 @@ export function createPriceDatabaseWorkbookService(
     // 1. Supplier sheets.
     for (const supplier of parsed.suppliers) {
       const where = { level: "error" as const, sheet: supplier.sheet, row: supplier.row };
-      if (vendorByKey.has(key(supplier.name))) { totals.suppliersExisting += 1; continue; }
+      if (vendorByKey.has(key(supplier.name))) {
+        // Existing suppliers are never changed from the file (owner, 2026-10-09); say so, so an edit made in Excel is not thought saved.
+        totals.suppliersExisting += 1;
+        messages.push({ level: "info", sheet: supplier.sheet, row: supplier.row, message: `Supplier "${supplier.name}" already exists; this row was not used. Edit suppliers on the Suppliers page.` });
+        continue;
+      }
       const type = typeFor(supplier.typeName);
       if (!type) { errors.push({ ...where, message: `Supplier type "${supplier.typeName}" does not exist. Add it under Settings, or rename the sheet.` }); continue; }
       const categoryIds: string[] = [];
@@ -331,7 +336,7 @@ export function createPriceDatabaseWorkbookService(
       const notes = [
         ["How to use", ""],
         ["Fill the Prices sheet: one row per price of one supplier. Delete the example row first.", ""],
-        ["Suppliers (optional): only for suppliers that do not exist yet. One that already exists is left unchanged.", ""],
+        ["Suppliers (optional): only adds suppliers that do not exist yet. A supplier that already exists is never changed from this sheet (the check lists it); edit it on the Suppliers page.", ""],
         ["Upload the file on the Import & export prices page; it is checked before anything is saved.", ""],
         ["", ""],
         ...[...PRICE_COLUMNS, ...SUPPLIER_COLUMNS].filter((column) => column.note).map((column) => [column.header, [column.required ? "Required. " : "", column.note ?? ""].join("")]),

@@ -11,6 +11,8 @@ export type CheckSummary = {
   badges: Array<{ label: string; tone: "success" | "warning" | "neutral" | "danger" }>;
   /** Rows the save would skip; the rest are saved. */
   problems: Array<{ where: string; message: string }>;
+  /** Rows that are fine but are not used, with why (a supplier that already exists). Nothing to fix. */
+  notes?: Array<{ where: string; message: string }>;
   /** How many rows the save would create or change. */
   changes: number;
   /** True when the file had no data rows at all. */
@@ -145,6 +147,14 @@ export function TemplateImport({ title, description, limits, canImport, template
                         ))}
                       </TableBody>
                     </DataTable>
+                  </div>
+                ) : null}
+                {summary.notes && summary.notes.length > 0 ? (
+                  <div className="grid gap-1">
+                    <Text tone="secondary" size="sm">Not used (nothing to fix):</Text>
+                    <ul className="grid gap-0.5 text-sm">
+                      {summary.notes.map((note, index) => <li key={`${note.where}-${index}`}><Text tone="tertiary" size="sm">{note.where}: {note.message}</Text></li>)}
+                    </ul>
                   </div>
                 ) : null}
                 {summary.changes === 0 ? <Text tone="secondary" size="sm">{summary.empty ? "The file has no data rows." : "Nothing to save. Every valid row matches what is already stored."}</Text> : null}

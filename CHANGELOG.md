@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.492 | 2026-10-09 | fix(masterdata): the price import says which Suppliers rows were not used (Lead, executing WO-AUDIT-FIX-01 slice C at the owner's request)
+
+- **Owner decision 2026-10-09:** a supplier that already exists is still never changed from the Suppliers sheet, but each such row now gets a message, `Supplier "Afa Interindo" already exists; this row was not used. Edit suppliers on the Suppliers page.`, in the check and in the save result, so an address or phone edited in Excel is not thought saved. The template's Notes sheet says the same.
+- **Screen (Lead):** the check shows a badge "N suppliers already there, not changed" and a short "Not used (nothing to fix)" list under the badges; `TemplateImport` takes optional `notes` for that. The SKU price import is unchanged.
+- **Tests:** one integration test (an existing supplier with an edited address and contact left untouched and reported on its row, a new supplier in the same sheet created).
+- **Migrations/dependencies:** none. **Checks:** `tsc --noEmit`, eslint on Master Data and the workbook screen, Master Data integration suite (122 passed) on the disposable local PostgreSQL. Not walked in a browser.
+
 ## R8.491 | 2026-10-09 | fix(masterdata): a price-import row never moves an existing work price to another unit or category (Lead, executing WO-AUDIT-FIX-01 slice B at the owner's request)
 
 - **Owner decision 2026-10-09 (option a):** a work price (labor and material+labor) is one supplier + name. In the price-database import a row that matches a live price by supplier and name but has a different unit or category is now a row problem, `"Screeding Base" already exists for this supplier with unit m2 in Floor Works. Use that unit and category to update it, or give this row a more specific name.`, instead of silently changing that price's unit and category. Same unit and category still update the amount and notes as before. The preview runs the same import, so the problem shows before Save; the default saves the other rows, `applyValidRows: false` refuses the file.
