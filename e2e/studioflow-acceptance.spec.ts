@@ -97,20 +97,20 @@ test("7.6 a note image can be saved to Ideas, put on the moodboard and used in t
   await expect(page.getByText("ZZ-Test From Note").first()).toBeVisible();
 });
 
-test("8.6 a deleted last code is not handed out again", async ({ page }) => {
+test("8.6 a deleted code is filled again by the next new row", async ({ page }) => {
   await openProject(page, sf.codes, "/schedule");
   await page.getByRole("button", { name: /ST-02/ }).first().click();
   await page.getByRole("button", { name: "Actions for ST-02" }).click();
   await page.getByRole("menuitem", { name: /Delete/ }).click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Delete item" }).click();
   await expect(page.getByRole("button", { name: /^NO IMAGE ST-02/ })).toHaveCount(0);
-  // The add button promises the code the server will really give: ST-02 stays retired.
-  await expect(page.getByRole("button", { name: "Add ST-03" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Add ST-02" })).toHaveCount(0);
-  await page.getByRole("textbox", { name: "Quick add to Stone" }).fill("ZZ-Test Code Three");
+  // The add button promises the code the server will really give: the lowest empty number, ST-02 (owner, 2026-10-09).
+  await expect(page.getByRole("button", { name: "Add ST-02" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add ST-03" })).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Quick add to Stone" }).fill("ZZ-Test Code Two Again");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("button", { name: /^NO IMAGE ST-03/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: /^NO IMAGE ST-02/ })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^NO IMAGE ST-02/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^NO IMAGE ST-03/ })).toHaveCount(0);
 });
 
 test("8.7 Add item can start from a product of a past project", async ({ page }) => {

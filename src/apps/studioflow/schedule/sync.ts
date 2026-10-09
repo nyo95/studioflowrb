@@ -1,5 +1,6 @@
 import {
   fallbackPrefix,
+  lowestFreeNumber,
   normalizeSchedulePrefix,
   normalizeExtraFields,
   orderCardFields,
@@ -120,19 +121,16 @@ export async function categoryPrefix(tx: TxClient, input: { projectId: string; s
 }
 
 /**
- * The number a new entry of a code group gets: one above the highest number the group has ever used, so a
- * number freed by deleting the last entry never returns for a different item. `wanted` (an imported sheet's
- * own number) is kept when it is free.
+ * The number a new entry of a code group gets: the lowest empty number from 1 up (owner, 2026-10-09; contract
+ * §11.2), so a number freed by a delete is filled again. Existing rows never change. `wanted` (an imported sheet's
+ * own number) is kept when no live row of the group uses it. The project row is locked first so two writes in
+ * one project never pick the same empty number.
  */
 export async function allocateIncrement(tx: TxClient, scope: { projectId: string; section: ScheduleSection; prefix: string }, wanted?: number | null): Promise<number> {
+  await tx.$queryRaw`SELECT id FROM studioflow.sf_project WHERE id = ${scope.projectId} FOR UPDATE`;
   const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: scope.projectId, section: scope.section, prefix: scope.prefix }, select: { increment: true } });
-  const key = { project_id_section_prefix: { project_id: scope.projectId, section: scope.section, prefix: scope.prefix } };
-  const mark = await tx.sfScheduleCodeMark.findUnique({ where: key, select: { last_increment: true } });
-  const highest = Math.max(mark?.last_increment ?? 0, ...siblings.map((row) => row.increment));
-  const increment = wanted != null && !siblings.some((row) => row.increment === wanted) ? wanted : highest + 1;
-  const last = Math.max(highest, increment);
-  await tx.sfScheduleCodeMark.upsert({ where: key, create: { project_id: scope.projectId, section: scope.section, prefix: scope.prefix, last_increment: last }, update: { last_increment: last } });
-  return increment;
+  const used = siblings.map((row) => row.increment);
+  return wanted != null && wanted > 0 && !used.includes(wanted) ? wanted : lowestFreeNumber(used);
 }
 
 export async function createEntryWithOptionalOption(tx: TxClient, input: {

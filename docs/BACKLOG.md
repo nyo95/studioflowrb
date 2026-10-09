@@ -178,10 +178,6 @@ Order matters; each item is its own Work Order.
 
 ## StudioFlow
 
-- [ ] [PLANNED][P1] Schedule codes fill the lowest empty number (owner
-  2026-10-09, contract §11.2, replaces R8.464): with HT-01 deleted the next HT
-  row is HT-01. Today a deleted number is never reissued, and an import can
-  still bring one back. Fix: WO-AUDIT-FIX-01 slice A.
 - [ ] [PLANNED][P2] Ideas board (owner, 2026-10-08): a personal page where a
   user drops any image (Ctrl+V screenshot, a dropped download, picked files)
   and it becomes a card at once; title, source link and note are optional and

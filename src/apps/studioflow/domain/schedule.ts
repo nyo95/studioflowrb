@@ -285,6 +285,17 @@ export function scheduleCode(prefix: string, increment: number): string {
   return `${normalizeSchedulePrefix(prefix)}-${String(increment).padStart(2, "0")}`;
 }
 
+/**
+ * The number a new row of a code group takes: the lowest empty number from 1 up (owner, 2026-10-09, legacy
+ * gap filling). With 01 deleted and 02 live the next row is 01; with nothing empty it is one past the highest.
+ */
+export function lowestFreeNumber(used: Iterable<number>): number {
+  const taken = new Set(used);
+  let candidate = 1;
+  while (taken.has(candidate)) candidate += 1;
+  return candidate;
+}
+
 export function optionLabel(index: number): string {
   let n = index + 1;
   let label = "";

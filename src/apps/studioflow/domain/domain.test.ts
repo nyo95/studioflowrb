@@ -6,7 +6,7 @@ import { fullBlockers, todoBlockers } from "./blockers";
 import { iterationChoices } from "./iteration-kinds";
 import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot } from "./mom";
 import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
-import { DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, compareOptionLabels, fallbackPrefix, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
+import { DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, compareOptionLabels, fallbackPrefix, lowestFreeNumber, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
   buildTree,
   canTickChecklistItem,
@@ -154,6 +154,10 @@ describe("schedule rules", () => {
     assert.deepEqual(normalizeScheduleCategory(" loose   furniture "), { label: "loose furniture", key: "LOOSE FURNITURE" });
     assert.equal(fallbackPrefix("Loose Furniture"), "LO");
     assert.equal(scheduleCode("pt", 3), "PT-03");
+    assert.equal(lowestFreeNumber([]), 1);
+    assert.equal(lowestFreeNumber([2, 3]), 1, "HT-01 deleted, HT-02 live: the next row is HT-01");
+    assert.equal(lowestFreeNumber([1, 3]), 2);
+    assert.equal(lowestFreeNumber([3, 1, 2]), 4);
     assert.equal(optionLabel(0), "A");
     assert.equal(optionLabel(26), "AA");
     assert.equal(scheduleSearchKey({ brandName: "TACO", productName: "TH 121", color: "Ivory" }), "taco | th 121 | ivory");

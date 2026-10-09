@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.490 | 2026-10-09 | fix(studioflow): a new Schedule row fills the lowest empty code number (Lead, executing WO-AUDIT-FIX-01 slice A at the owner's request)
+
+- **Owner decision 2026-10-09 (contract §11.2, replaces R8.464):** a new row of a code group takes the lowest empty number from 1 up: HT-01 deleted and HT-02 live, the next HT row is HT-01. Existing rows never change code by themselves; reorder is unchanged. `lowestFreeNumber` (pure, unit-tested) is the one rule; `allocateIncrement` uses it for every new row (quick add, Add item, template, Ideas to Schedule, move into another category) and keeps an imported sheet's own number when no live row of the group uses it, including a number deleted before. The list's `nextNumber` uses the same rule, so the add button shows the code the server will give.
+- **Concurrency:** allocation locks the project row first (`FOR UPDATE`, as in phase notes), so rows added at the same time in one group get different numbers. The new test fails without the lock (checked).
+- **Schema:** `SfScheduleCodeMark` removed; migration `20261009150000_drop_sf_schedule_code_mark` drops `studioflow.sf_schedule_code_mark` (it only held the "highest ever" counter).
+- **Tests:** integration tests for filling a gap, filling 01, the highest number coming back, a moved row taking the target group's gap, three concurrent creates, an import keeping a formerly deleted number; the old "stays retired" test is replaced and the delete test now expects the gap to be filled. Playwright 8.6 now expects "Add ST-02" after deleting ST-02.
+- **Migrations/dependencies:** one migration (drop table), no dependency. **Checks:** `tsc --noEmit`, eslint on the touched code, `check:legacy-runtime`, StudioFlow integration and domain suites (207 passed) on a disposable local PostgreSQL 16 in the cloud session, `prisma migrate deploy` there, migrate diff shows nothing for this table. `check:boundaries` fails on one finding that predates this change (R8.487 `print-title.ts`); Playwright 8.6 not run here.
+
 ## R8.489 | 2026-10-09 | docs(plan): WO-AUDIT-FIX-01 Schedule gap-filling codes, work-price identity, supplier import messages (Lead)
 
 - **Audit check 2026-10-09 (Lead, against the code at R8.488):** confirmed all four findings of the external audit: an imported Schedule number could bring back a deleted code; the price-database import matches a work price by supplier + name and then overwrites its unit and category; the Suppliers sheet of the current-data export looks editable but existing suppliers are left unchanged; revision numbers R8.05, R8.164, R8.443, R8.444 and R8.485 are each used twice (history is not rewritten; serial work only).

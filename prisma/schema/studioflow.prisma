@@ -147,7 +147,6 @@ model SfProject {
   checklist_items  SfChecklistItem[]
   mom_documents    SfMomDocument[]
   schedule_entries SfScheduleEntry[]
-  schedule_code_marks SfScheduleCodeMark[]
   presentation_boards SfPresentationBoard[]
   deliverables     SfDeliverable[]
   phase_events     SfPhaseEvent[]
@@ -723,22 +722,6 @@ model SfPresentationSlide {
 
   @@index([board_id, sort_order])
   @@map("sf_presentation_slide")
-  @@schema("studioflow")
-}
-
-/// Highest number a project has ever handed out under one code prefix. Deleting the last entry of a group
-/// must not let its number come back for a different item (owner, 2026-10-09).
-model SfScheduleCodeMark {
-  project_id     String
-  section        SfScheduleSection
-  prefix         String
-  last_increment Int
-  updated_at     DateTime          @default(now()) @updatedAt
-
-  project SfProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
-
-  @@id([project_id, section, prefix])
-  @@map("sf_schedule_code_mark")
   @@schema("studioflow")
 }
 

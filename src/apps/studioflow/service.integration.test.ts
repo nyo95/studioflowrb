@@ -1409,17 +1409,70 @@ describe("SF-R3 Product Schedule", () => {
     await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: first.entryId });
     assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => [e.id, e.code]), [[second.entryId, "PT-02"]], "later codes keep their number after a delete");
     await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
-    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["PT-02", "PT-03"], "a new row takes one past the highest number");
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["PT-01", "PT-02"], "a new row fills the lowest empty number");
   });
 
-  it("never hands a deleted code out again, even when the last entry of the group was the one deleted", async () => {
+  it("fills the lowest empty number of a code group and never shifts existing codes (owner, 2026-10-09)", async () => {
     const { projectId } = await newProject();
     await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Stone", prefix: "ST" });
+    const codes = async () => (await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code);
+    const nextNumbers = async () => [...new Set((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.nextNumber))];
+    const one = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    const two = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    const three = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: two.entryId });
+    assert.deepEqual(await codes(), ["ST-01", "ST-03"], "a delete leaves a gap; ST-03 does not shift");
+    assert.deepEqual(await nextNumbers(), [2], "the add button offers the gap");
     await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
-    const last = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
-    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: last.entryId });
+    assert.deepEqual(await codes(), ["ST-01", "ST-02", "ST-03"], "the new row fills ST-02");
+    assert.deepEqual(await nextNumbers(), [4]);
+
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: one.entryId });
     await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
-    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["ST-01", "ST-03"], "ST-02 was used once, so it stays retired");
+    assert.deepEqual(await codes(), ["ST-01", "ST-02", "ST-03"], "with ST-01 deleted the next row is ST-01");
+
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: three.entryId });
+    assert.deepEqual(await nextNumbers(), [3], "the highest number can come back too");
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    assert.deepEqual(await codes(), ["ST-01", "ST-02", "ST-03"]);
+  });
+
+  it("a row moved into another category takes that group's lowest empty number", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Stone", prefix: "ST" });
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    const st1 = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    const st2 = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: st2.entryId });
+    const pt1 = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    const moved = await sf.schedule.moveEntryToCategory({ ...as(designer), projectId, entryId: pt1.entryId, category: "Stone" });
+    assert.equal(moved.code, "ST-02");
+    const codes = Object.fromEntries((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((row) => [row.id, row.code]));
+    assert.equal(codes[st1.entryId], "ST-01");
+    assert.deepEqual(Object.values(codes).sort(), ["PT-02", "ST-01", "ST-02", "ST-03"], "PT-02 keeps its code; PT-01 is left empty");
+  });
+
+  it("two rows added at the same time in one group get two different numbers", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Stone", prefix: "ST" });
+    await Promise.all([1, 2, 3].map(() => sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" })));
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["ST-01", "ST-02", "ST-03"]);
+  });
+
+  it("an imported sheet keeps its own number when no live row uses it, even a number deleted before", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
+    const first = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: first.entryId });
+    const sheet = ["Code,Product Category,Ex,Type", "PT-01,Paint,Dulux,Easy Clean"].join("\n");
+    assert.deepEqual(await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: sheet }), { created: 1, updated: 0 });
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["PT-01", "PT-02"], "the sheet's PT-01 is kept");
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["PT-01", "PT-02", "PT-03"]);
   });
 
   it("reorders by handing the group's own numbers out again, so a deleted code stays empty", async () => {
