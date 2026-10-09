@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.468 | 2026-10-09 | docs(plan): template-first price import Work Order (Lead)
+
+- Owner decided to delete the company-layout Excel reader: the price database imports and exports one plain flat shape (Suppliers and Prices sheets) and the owner copies into the company workbook by hand. Work Order `docs/apps/masterdata/WO-MD-IMPORT-SIMPLE-01.md`: template, flat export without IDs, natural-key matching, apply the valid rows for the price database and the SKU workbook. Queued behind WO-E2E-ACCEPT-01 Stage 1.
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.467 | 2026-10-09 | docs(backlog): simple template-first import (Lead)
 
 - Owner direction recorded in `docs/BACKLOG.md`: the imports must not require filling a copy of the company's complex Excel; the main path becomes download template, fill, upload (checked at once), save. Split between Executor (template generator and tests) and Lead (screen).
