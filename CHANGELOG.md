@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.480 | 2026-10-09 | test(studioflow): browser acceptance Stage 3 (Lead took over); the add button shows the real next code (Lead)
+
+- **Owner decision 2026-10-09:** the Lead finishes the remaining acceptance stages. `e2e/studioflow-acceptance.spec.ts`, 8 specs, each in its own seeded project: 7.1 bold and a bullet list that Enter continues; 7.2 a PNG goes in and a PDF is refused; 8.5 the hide/show button for requirements and files, remembered after a reload; 7.6 a note image saved to Ideas, put on the moodboard and used in the schedule; 8.6 a deleted last code is not handed out again; 8.7 Add item from a product of a past project; 8.3 send to client, client answered, revision opens the next iteration; 8.1 Timeline to the Dates & plan dialog and Save. All 8 pass, twice in a row.
+- The e2e owner now has the first-use guides marked done in the seed (the guide card covered the page); the guide specs will use a fresh account.
+- **A real mismatch found and fixed:** after the last code of a group was deleted, the quick-add button still said "Add ST-02" while the server (R8.464) would give ST-03. The Schedule list now carries `nextNumber` per entry from the server (highest number ever handed out + 1), and the button uses it.
+- Not covered by a spec and left for the owner's eyes or a later pass: Product Schedule right-click menu and New category picker, the template apply count, the Google Sheets re-import, the manager completion override, MOM print formatting, drop and paste of several images in the answer dialog.
+- **Migrations/dependencies:** none. **Checks:** `npm test` (982), `tsc --noEmit`, eslint, 8 Playwright specs.
+
 ## R8.479 | 2026-10-09 | docs(review)+fix(studioflow): R8.478 verdict PASS, shelf location now shown in the Schedule (Lead)
 
 - **Review of R8.478 (`a270ef9`, WO-E2E-ACCEPT-01 Stage 2):** only `e2e/`, the seed and the ledgers changed. Lead ran the whole file: 10 passed (6.5 as an expected failure). Verdict **PASS**; Stage 2 (walk sections 5 and 6) is complete.

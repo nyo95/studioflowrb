@@ -126,6 +126,8 @@ export type ScheduleEntryView = {
   section: ScheduleSection;
   category: string;
   code: string;
+  /** The number the next new entry of this code group will get (the group never reuses a number it has handed out). */
+  nextNumber: number;
   qty: string | null;
   unit: string | null;
   location: string | null;

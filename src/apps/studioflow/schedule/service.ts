@@ -341,14 +341,21 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     async listSchedule(input: ReadContext & { projectId: string; section?: string }) {
       requireRead(input.grants);
       const section = input.section ? sectionOf(input.section) : undefined;
-      const [unordered, templateCategories] = await Promise.all([
+      const [unordered, templateCategories, marks] = await Promise.all([
         db.sfScheduleEntry.findMany({
           where: { project_id: input.projectId, ...(section ? { section } : {}) },
           orderBy: [{ section: "asc" }, { category_key: "asc" }, { increment: "asc" }],
           include: { options: { include: { sample_requests: { orderBy: { created_at: "desc" }, take: 1 } } } },
         }),
         db.sfScheduleTemplateCategory.findMany({ select: { section: true, category_key: true, sort_order: true } }),
+        db.sfScheduleCodeMark.findMany({ where: { project_id: input.projectId }, select: { section: true, prefix: true, last_increment: true } }),
       ]);
+      const nextByGroup = new Map<string, number>();
+      for (const mark of marks) nextByGroup.set(`${mark.section}:${mark.prefix}`, mark.last_increment + 1);
+      for (const entry of unordered) {
+        const key = `${entry.section}:${entry.prefix}`;
+        nextByGroup.set(key, Math.max(nextByGroup.get(key) ?? 1, entry.increment + 1));
+      }
       // Categories follow the studio template order; categories the templates do not know come after, A to Z.
       const templateOrder = new Map(templateCategories.map((row) => [`${row.section}:${row.category_key}`, row.sort_order]));
       const rankOf = (entry: { section: string; category_key: string }) => templateOrder.get(`${entry.section}:${entry.category_key}`) ?? Number.MAX_SAFE_INTEGER;
@@ -364,6 +371,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         prefix: entry.prefix,
         increment: entry.increment,
         code: scheduleCode(entry.prefix, entry.increment),
+        nextNumber: nextByGroup.get(`${entry.section}:${entry.prefix}`) ?? entry.increment + 1,
         qty: entry.qty?.toString() ?? null,
         unit: entry.unit,
         location: entry.location,

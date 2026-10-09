@@ -266,9 +266,8 @@ function entryBadges(entry: ScheduleEntryView): Array<{ label: string; tone: "su
 function QuickAddTile({ group, command, projectId, section }: { group: { category: string; rows: ScheduleEntryView[] }; command: Command; projectId: string; section: Section }) {
   const [productName, setProductName] = useState("");
   const prefix = group.rows[0]?.code.split("-")[0] ?? "";
-  // One past the highest number, as the server numbers it: a deleted code is left empty, never reused in between.
-  const highest = group.rows.reduce((max, row) => Math.max(max, Number(row.code.split("-")[1]) || 0), 0);
-  const nextCode = `${prefix}-${String(highest + 1).padStart(2, "0")}`;
+  // The number comes from the server: a group never hands out a number twice, even after its last entry was deleted.
+  const nextCode = `${prefix}-${String(group.rows[0]?.nextNumber ?? 1).padStart(2, "0")}`;
   const key = `quick-add-${section}-${group.category}`;
   const submit = async () => {
     const value = productName.trim();

@@ -9,6 +9,7 @@ import { createAuditEventWriter } from "@platform/core/audit/persistence";
 import { bootstrapFirstOwner } from "@platform/core/auth/bootstrap";
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePlatformTables } from "@platform/core/db/test-support";
 import { runSerializableTransaction } from "@platform/core/db/transactions";
+import { createUserTutorialService } from "@platform/core/tutorials";
 import { createNotificationWriter } from "@platform/core/notifications/persistence";
 import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { initializePermissionRegistry } from "@platform/core/rbac/registry";
@@ -43,6 +44,9 @@ async function main() {
       { runTransaction: (work) => runSerializableTransaction(db, work), auditWriter: createAuditEventWriter(), now: () => new Date(), generateId: () => crypto.randomUUID() },
       { email, displayName: "Eka Tester", password, permissionIds: registry.permissions },
     );
+
+    // The owner account has seen the first-use guides; the guide specs create their own fresh account.
+    for (const tourKey of ["studioflow", "bq", "masterdata"]) await createUserTutorialService(db).record({ userId: owner.userId, tourKey, version: 99, state: "completed" });
 
     const template = await db.sfPhaseTemplate.create({ data: { name: "Standard", is_default: true, is_active: true } });
     const definitions = [
@@ -139,11 +143,28 @@ async function main() {
     const seededEntry = (await sf.schedule.listSchedule({ grants: registry.permissions, projectId: project.projectId })).find((entry) => entry.id === requestEntry.entryId)!;
     await sf.schedule.requestSample({ ...{ grants: registry.permissions, actor }, projectId: project.projectId, optionId: seededEntry.options[0].id, requestedFrom: "ZZ-Test Mat A" });
 
+    // Stage 3 fixtures: one project per spec so no spec depends on another's changes.
+    const sfGrants = { grants: registry.permissions, actor };
+    const sfProject = (name: string) => sf.projects.createProject({ ...sfGrants, name, newClientName: "E2E Client", picDesignerId: owner.userId, picDrafterId: owner.userId });
+    const sfFixtures = {
+      notes: (await sfProject("ZZ-Test SF Notes")).projectId,
+      noteFormat: (await sfProject("ZZ-Test SF Note Format")).projectId,
+      noteImage: (await sfProject("ZZ-Test SF Note Image")).projectId,
+      aside: (await sfProject("ZZ-Test SF Aside")).projectId,
+      past: (await sfProject("ZZ-Test SF Past")).projectId,
+      reuse: (await sfProject("ZZ-Test SF Reuse")).projectId,
+      codes: (await sfProject("ZZ-Test SF Codes")).projectId,
+      round: (await sfProject("ZZ-Test SF Round")).projectId,
+    };
+    await sf.schedule.createEntry({ ...sfGrants, projectId: sfFixtures.past, section: "MATERIAL", category: "Stone", snapshot: { productName: "ZZ-Test Past Marble" } });
+    await sf.schedule.createEntry({ ...sfGrants, projectId: sfFixtures.codes, section: "MATERIAL", category: "Stone", snapshot: { productName: "ZZ-Test Code One" } });
+    await sf.schedule.createEntry({ ...sfGrants, projectId: sfFixtures.codes, section: "MATERIAL", category: "Stone", snapshot: { productName: "ZZ-Test Code Two" } });
+
     const bq = createBqService(db, { auditWriter: createAuditEventWriter(), runTransaction: (work) => db.$transaction((tx) => work(tx as unknown as PrismaClient)) });
     const bqProject = await bq.createProject({ grants: registry.permissions, actor, title: "E2E Long BQ Project Title For Phone Width Checks At The Breeze BSD Phase 2", clientName: "E2E Client" });
 
     mkdirSync("e2e/.tmp", { recursive: true });
-    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, projectId: project.projectId, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, sku3: sku3.skuId, workCategory: workCategory.categoryId, priceLess62: priceLess62.skuId, priceLess63: priceLess63.skuId, priceLess63Brand: priceLess63Brand.brandId, requestSku: requestSku.skuId } }));
+    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, projectId: project.projectId, sf: sfFixtures, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, sku3: sku3.skuId, workCategory: workCategory.categoryId, priceLess62: priceLess62.skuId, priceLess63: priceLess63.skuId, priceLess63Brand: priceLess63Brand.brandId, requestSku: requestSku.skuId } }));
   } finally {
     await closeTestDb(testDb);
   }
