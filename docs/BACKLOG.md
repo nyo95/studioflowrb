@@ -40,10 +40,6 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 Harness: `agent/EXTENSIONS.md`. Foundation: `apps/platform/INTEGRATIONS.md`.
 Order matters; each item is its own Work Order.
 
-- [ ] [PLANNED][P2] Integration foundation follow-up (`PLAN.md`, WO-PLAT-INTEGRATIONS-01c, target R8.461,
-  Executor): R8.459 passed review; two gaps found in it remain: a 4xx thrown by a
-  handler after partial writes commits those writes, and two concurrent requests with
-  the same key can return a 500 instead of a retryable conflict.
 - [ ] [PLANNED][P2] Token management page (Lead, after R8.459): create (shown once),
   list, revoke on the account page; admin list/revoke for `platform.integration.admin`;
   assign the three `platform.integration.*` permissions in the role screen. Service

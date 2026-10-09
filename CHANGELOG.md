@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.462 | 2026-10-09 | docs(review): R8.461 verdict PASS (Lead)
+
+- **Review of R8.461 (`40b4881`):** savepoint around the handler (a failed handler undoes its own writes before a replayable 4xx is stored; 5xx still rolls everything back) and a unique-key race mapped to the retryable `IDEMPOTENCY_IN_PROGRESS`. Both gaps from R8.460 are closed with tests. Verdict **PASS**. The integration foundation is ready to build extensions on.
+- **Legacy finding for the SketchUp plan (read-only, legacy `c4b0c46`):** `catalog-ownership.ts` and `autoLinkSyncedMaterial` show the final legacy rule: the plugin owns technical identity and geometry; the Product Schedule owns catalog content AND the code. A push that reports a different code is a divergence, not an instruction, and `planCodeConvergence` queues rename orders back to the plugin. The older comment in the sync route saying SketchUp is the source of truth is stale.
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.461 | 2026-10-09 | fix(platform): roll back failed integration handler writes (Executor)
 
 - Integration write handlers now run behind a savepoint. Any handler failure first removes its own partial work; deterministic client errors still become replayable responses with their audit record, while server failures continue to roll back the entire request and leave the key retryable.
