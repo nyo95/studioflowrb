@@ -8,12 +8,16 @@ import { appLabelOf, groupPermissionsByApp } from "./permission-grouping";
 const registry = composePermissionRegistry([
   {
     appId: "masterdata",
+    version: "1.0.0",
+    kind: "core",
     name: "Master Data",
     rootPath: "/masterdata",
     permissions: ["masterdata.access", "masterdata.brand.read", "masterdata.brand.manage", "masterdata.price-material.read"],
   },
   {
     appId: "studioflow",
+    version: "1.0.0",
+    kind: "core",
     name: "StudioFlow",
     rootPath: "/studioflow",
     permissions: ["studioflow.access", "studioflow.phase.work", "studioflow.phase.review", "studioflow.phase.override"],
@@ -89,6 +93,8 @@ describe("groupPermissionsByApp positions", () => {
   const withPositions = composePermissionRegistry([
     {
       appId: "studioflow",
+      version: "1.0.0",
+      kind: "core",
       name: "StudioFlow",
       rootPath: "/studioflow",
       permissions: ["studioflow.access", "studioflow.project.read", "studioflow.project.pic-designer", "studioflow.project.pic-drafter"],
@@ -111,7 +117,7 @@ describe("groupPermissionsByApp positions", () => {
 
   it("rejects a position that is not a registered permission", () => {
     assert.throws(() => composePermissionRegistry([
-      { appId: "x", name: "X", rootPath: "/x", permissions: ["x.access"], positions: [{ permission: "x.thing.work", label: "Y" }] },
+      { appId: "x", version: "1.0.0", kind: "core", name: "X", rootPath: "/x", permissions: ["x.access"], positions: [{ permission: "x.thing.work", label: "Y" }] },
     ]));
   });
 });

@@ -35,6 +35,8 @@ export const APP_ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 
 export type RegisteredApp = {
   appId: string;
+  version: string;
+  kind: "core" | "optional";
   /** Launcher display name. */
   name: string;
   /** App root route, always absolute. */
@@ -52,6 +54,8 @@ export type AppPositionInput = { permission: PermissionId; label: string };
 
 export type AppPermissionRegistrationInput = {
   appId: string;
+  version: string;
+  kind: "core" | "optional";
   name: string;
   rootPath: string;
   icon?: string;
@@ -85,7 +89,7 @@ export function composePermissionRegistry(
   const apps: RegisteredApp[] = [];
 
   for (const registration of registrations) {
-    const { appId, name, rootPath, permissions, icon, positions = [] } = registration;
+    const { appId, version, kind, name, rootPath, permissions, icon, positions = [] } = registration;
     if (!APP_ID_PATTERN.test(appId)) {
       throw new AppError("INVARIANT", "REGISTRY_INVALID_APP_ID", "An app registration is invalid.");
     }
@@ -119,6 +123,8 @@ export function composePermissionRegistry(
     seenApps.add(appId);
     apps.push({
       appId,
+      version,
+      kind,
       name: name.trim(),
       rootPath,
       ...(typeof icon === "string" && icon.trim() ? { icon: icon.trim() } : {}),

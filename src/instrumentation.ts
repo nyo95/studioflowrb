@@ -23,8 +23,12 @@ export async function register(): Promise<void> {
   const { assertStorageRootConfigured } = await import("@platform/infrastructure/storage/storage-root");
   await assertStorageRootConfigured();
   const { initializePermissionRegistry } = await import("@platform/core/rbac/registry");
-  const { APP_REGISTRATIONS } = await import("./app/app-registrations");
+  const { initializeModuleRegistry } = await import("@platform/core/modules/manifest");
+  const { synchronizeModuleVersions } = await import("@platform/core/modules/state");
+  const { APP_REGISTRATIONS, MODULE_MANIFESTS } = await import("./app/app-registrations");
   initializePermissionRegistry(APP_REGISTRATIONS);
+  initializeModuleRegistry(MODULE_MANIFESTS);
+  await synchronizeModuleVersions();
   try {
     const { startStudioFlowAssetSweep } = await import("./apps/studioflow/runtime");
     startStudioFlowAssetSweep();

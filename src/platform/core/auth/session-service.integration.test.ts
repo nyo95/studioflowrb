@@ -268,6 +268,7 @@ describe("bootstrap command", () => {
     assert.equal(user?.password_hash.includes("correct horse"), false);
     const role = await db.prisma.role.findUnique({ where: { code: "platform-owner" }, include: { role_permissions: true } });
     assert.equal(role?.is_system, true);
+    assert.equal(role?.name, "Company Administrator");
     assert.equal(role?.role_permissions.length, 10);
     const audit = await db.prisma.auditEvent.findFirst({ where: { action: "bootstrap.first_owner" } });
     assert.equal(audit?.actor_kind, "SYSTEM");

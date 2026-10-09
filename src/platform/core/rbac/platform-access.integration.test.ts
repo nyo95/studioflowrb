@@ -25,6 +25,8 @@ import { hashPassword } from "../auth/password";
 const REGISTRY_INPUT = [
   {
     appId: "masterdata",
+    version: "1.0.0",
+    kind: "core" as const,
     name: "Master Data",
     rootPath: "/masterdata",
     permissions: ["masterdata.access", "masterdata.price.read"],

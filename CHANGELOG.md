@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.495 | 2026-10-09 | feat(platform): add the installable-module foundation and System Owner command (Executor)
+
+- **WO-MODULES-M1 slice M1a only:** added the Platform module manifest contract, strict boot-time registry validation, and version/kind metadata on every application registration. `ideas` and `presentation` are optional modules under `studioflow`, exported from StudioFlow's public boundary; no page, action, navigation, or entry-point gate is included yet (M1b).
+- Added `platform.module_state` with enabled/disabled runtime state and last-seen module version. Core modules are always enabled; optional modules default enabled when no state row exists; parent and required-module state is respected. `isModuleEnabled`, `requireModuleEnabled` (`MODULE_DISABLED`), enabled-module IDs, and boot version synchronization are Platform services and are not RBAC permissions.
+- Added `npm run studioflow -- module list | enable <id> | disable <id>` for the out-of-band System Owner. Optional state changes preserve module data and write one atomic `SYSTEM` audit event; core-module state changes are refused. Renamed the `platform-owner` role's display name to `Company Administrator` in bootstrap and migration data repair.
+- **Migration:** `20261009170000_platform_module_state`, applied successfully only to the verified disposable rebuild test database selected from `.env.rumah`; the ordinary home development database was intentionally not migrated. **Dependencies:** none.
+- **Checks:** Prisma generate; migration deploy (98 migrations, new migration applied); CLI list/disable/enable plus core refusal; `tsc --noEmit`; eslint (0 errors, 1 pre-existing Presentation `<img>` warning); `npm test` (1,002 passed); `check:boundaries`; `check:legacy-runtime`; production build; staged and unstaged whitespace checks.
+
 ## R8.494 | 2026-10-09 | docs(platform,agent): installable modules decision, harness rules, WO-MODULES-M1 (Lead)
 
 - **Owner decision 2026-10-09:** StudioFlowRB becomes a platform of separately versioned, separately switchable modules, decided before the codebase grows further. Recorded in `docs/apps/platform/MODULES-DECISION.md` (D1-D9): "install" = built into the build plus an ENABLED/DISABLED state at runtime (no runtime code drop-in on Next.js); a module is a business capability with a manifest; gates are built in, entitled, enabled, then RBAC; disabling keeps data, purge is separate; Company Administrator (RBAC, the existing `platform-owner` role) versus System Owner (not a permission, server command only); per-module semver and release tags; signed entitlement later; new capabilities are born as modules; Ideas Board is the pilot extraction, then Presentation. Phases M0-M5.

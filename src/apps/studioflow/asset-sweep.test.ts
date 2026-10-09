@@ -54,11 +54,13 @@ it("instrumentation starts cleanup only on Node and catches startup/import failu
       if (id.endsWith("asset-signing")) return { assertAssetSigningConfigured() {} };
       if (id.endsWith("storage-root")) return { async assertStorageRootConfigured() {} };
       if (id.endsWith("registry")) return { initializePermissionRegistry() {} };
-      if (id.endsWith("app-registrations")) return { APP_REGISTRATIONS: [] };
+      if (id.endsWith("manifest")) return { initializeModuleRegistry() {} };
+      if (id.endsWith("state")) return { async synchronizeModuleVersions() {} };
+      if (id.endsWith("app-registrations")) return { APP_REGISTRATIONS: [], MODULE_MANIFESTS: [] };
       throw Error("private import failure details");
     } });
     await exports.register();
-    assert.equal(imports.length, runtime === "nodejs" ? 6 : 0);
+    assert.equal(imports.length, runtime === "nodejs" ? 8 : 0);
     assert.deepEqual(logs, runtime === "nodejs" ? ["StudioFlow asset cleanup startup failed.", "Notification retention startup failed."] : []);
   }
 });

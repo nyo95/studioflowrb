@@ -11,6 +11,25 @@ enum UserStatus {
   @@schema("platform")
 }
 
+enum ModuleRuntimeState {
+  ENABLED
+  DISABLED
+
+  @@schema("platform")
+}
+
+/// Runtime switch for built-in optional modules. Core modules never have rows.
+model ModuleState {
+  module_id   String             @id
+  state       ModuleRuntimeState @default(ENABLED)
+  last_version String
+  updated_at  DateTime           @default(now()) @updatedAt
+  updated_by  String
+
+  @@map("module_state")
+  @@schema("platform")
+}
+
 /// Platform user identity. Email is stored already normalized (trimmed,
 /// lowercase); race-safe uniqueness is the unique index itself.
 ///

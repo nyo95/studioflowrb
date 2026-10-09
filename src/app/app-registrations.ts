@@ -1,7 +1,8 @@
 import type { AppPermissionRegistrationInput } from "@platform/core/rbac/registry";
+import type { ModuleManifest } from "@platform/core/modules/manifest";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 import { BQ_PERMISSIONS } from "@/apps/bq/public";
-import { STUDIOFLOW_PERMISSIONS, STUDIOFLOW_POSITIONS } from "@/apps/studioflow/public";
+import { IDEAS_MODULE_MANIFEST, PRESENTATION_MODULE_MANIFEST, STUDIOFLOW_PERMISSIONS, STUDIOFLOW_POSITIONS } from "@/apps/studioflow/public";
 
 /**
  * App registrations for the platform permission registry and app launcher
@@ -16,6 +17,8 @@ import { STUDIOFLOW_PERMISSIONS, STUDIOFLOW_POSITIONS } from "@/apps/studioflow/
 export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
   {
     appId: "masterdata",
+    version: "1.0.0",
+    kind: "core",
     name: "Master Data",
     rootPath: "/masterdata",
     icon: "database",
@@ -23,6 +26,8 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
   },
   {
     appId: "bq",
+    version: "1.0.0",
+    kind: "core",
     name: "Bill of Quantity",
     rootPath: "/bq",
     icon: "calculator",
@@ -30,10 +35,18 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
   },
   {
     appId: "studioflow",
+    version: "1.0.0",
+    kind: "core",
     name: "StudioFlow",
     rootPath: "/studioflow",
     icon: "layout-dashboard",
     permissions: Object.values(STUDIOFLOW_PERMISSIONS),
     positions: STUDIOFLOW_POSITIONS,
   },
+];
+
+export const MODULE_MANIFESTS: readonly ModuleManifest[] = [
+  ...APP_REGISTRATIONS.map(({ appId: id, name, version, kind }) => ({ id, name, version, kind, requires: [] })),
+  IDEAS_MODULE_MANIFEST,
+  PRESENTATION_MODULE_MANIFEST,
 ];

@@ -67,6 +67,7 @@ export async function createTestDb(databaseUrl: string): Promise<TestDb> {
 }
 
 const PLATFORM_TABLES = [
+  "module_state",
   "User",
   "user_preference",
   "user_tutorial",

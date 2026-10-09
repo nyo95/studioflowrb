@@ -10,6 +10,8 @@ import {
 
 const MASTERDATA_REGISTRATION = {
   appId: "masterdata",
+  version: "1.0.0",
+  kind: "core" as const,
   name: "Master Data",
   rootPath: "/masterdata",
   permissions: [
