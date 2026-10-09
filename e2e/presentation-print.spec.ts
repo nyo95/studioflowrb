@@ -65,8 +65,8 @@ test("P.6 the printed presentation is the same as the screen, one slide per page
   await page.goto(`/studioflow/print/projects/${sf.past}/presentation/${boardId}?paper=A4&orientation=landscape`);
   const sheets = page.locator(".ui-document-page");
   await expect(sheets).toHaveCount(2);
-  // A saved PDF is named after the page title, which is the project and the board, not the address.
-  await expect(page).toHaveTitle("ZZ-Test SF Past - Material Funan");
+  // A saved PDF is named after the page title: the date, the project and the board, not the address.
+  await expect(page).toHaveTitle(/^\d{8} ZZ-Test SF Past Material Funan$/);
   await page.locator(".ui-document-page img").first().evaluate((image: HTMLImageElement) => image.decode());
   await expect(page.getByText("ST-01").first()).toBeVisible();
   await expect(page.getByText("Blue Sand Texture")).toBeVisible();

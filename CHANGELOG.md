@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.487 | 2026-10-09 | fix(studioflow): the saved Presentation PDF is named date, project, board (Lead)
+
+- **Owner decision 2026-10-09:** the default file name is `date - project - title`, for example `20261009 Sociolla SG Funan Material Funan`. The date is today's date as `YYYYMMDD` in the organisation's time zone (Platform Settings), the project name is shown without its leading number (`2026-506`), then the board title. This replaces the `project - board` name of R8.486. A pure function `printTitle` with three tests; P.6 checks the title shape.
+- The MOM, Schedule and quotation prints keep their own names for now; the same naming can be applied to them if wanted.
+- **Migrations/dependencies:** none. **Checks:** `tsc --noEmit`, eslint, the print-title tests, `playwright test e2e/presentation-print.spec.ts`.
+
 ## R8.486 | 2026-10-09 | fix(studioflow): a saved Presentation PDF is named after the project and the board (Lead)
 
 - **Owner report 2026-10-09:** Save as PDF from the Presentation print offered a name made from the web address (`localhost_3001_studioflow_print_projects_...pdf`). The print page now sets its title to "project - board title" (for example `2026-506 Sociolla SG Funan - Material Funan`), the same way the MOM, Schedule and quotation prints already name theirs. P.6 checks the title.

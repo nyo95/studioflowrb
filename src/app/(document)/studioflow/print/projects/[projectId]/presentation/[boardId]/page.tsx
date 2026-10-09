@@ -6,7 +6,11 @@ import { AppError } from "@platform/core/errors";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { DocumentPage, DocumentSheet, PrintButton, PrintFormatPicker, printFormatFromSearchParams } from "@/platform/ui_engine";
+import { prisma } from "@platform/core/db";
+import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { formatInstant } from "@platform/utilities/date";
+
+import { printTitle } from "../../../../print-title";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +39,9 @@ export default async function PresentationPrintPage({ params, searchParams }: { 
     studioFlow.projects.getProject({ grants, projectId }),
     studioFlow.presentation.getBoard({ grants, projectId, boardId }),
   ]).catch((error) => { if (error instanceof AppError && (error.kind === "NOT_FOUND" || error.kind === "FORBIDDEN")) notFound(); throw error; });
-  const printed = formatInstant(new Date(), { locale: "id-ID", style: "date" });
+  const now = new Date();
+  const printed = formatInstant(now, { locale: "id-ID", style: "date" });
+  const { timezone } = await readPlatformGeneralSettings(prisma);
 
   const header = (
     <header className="flex shrink-0 items-baseline justify-between gap-6 border-b border-black pb-[2.5mm]">
@@ -49,8 +55,8 @@ export default async function PresentationPrintPage({ params, searchParams }: { 
 
   return (
     <>
-    {/* The browser names a saved PDF after the page title: "project - board", not the address. */}
-    <title>{`${project.name} - ${board.title}`}</title>
+    {/* The browser names a saved PDF after the page title: date, project, board (20261009 Sociolla SG Funan Material Funan). */}
+    <title>{printTitle({ date: now, timeZone: timezone, projectName: project.name, boardTitle: board.title })}</title>
     <DocumentSheet
       paged
       printFormat={printFormat}
