@@ -123,6 +123,7 @@ Order matters; each item is its own Work Order.
 
 ## Master Data
 
+- [ ] [BUG][P2] Browser acceptance 6.5 (2026-10-09): after **Put on shelf** completes for a StudioFlow sample request, the Schedule card and option detail correctly say **Sample received** and the requester receives **Your sample is on the shelf**, but the option detail does not show the promised shelf location. Expected: the detail includes `REQ65 / 7`; actual: no rack/box text is rendered. Evidence: `e2e/.tmp/stage-2/6.5-schedule-missing-shelf-location.png`.
 - [ ] [UNVERIFIED] Sample shelf R8.386-R8.390, still open after the 2026-10-08 walk (passed on an isolated server: add a sample with a typed new rack, lend it to a person and a StudioFlow project, return it, the history of both steps, "Remove" disabled with "return it first" while it is out; StudioFlow request, Put on shelf from Sample requests, the designer's Schedule card reading "Sample received" and the requester's notification "Your sample is on the shelf: R3 / B9"): send to a client, mark lost, discard, the right-click menu, the list view and the filters, and the "Sample received" shelf note inside the option dialog.
 
 - [ ] [UNVERIFIED] Quick "New SKU" (no price) from Add sample and Put on shelf

@@ -1,5 +1,27 @@
 # Changelog
 
+## R8.478 | 2026-10-09 | test(masterdata): cover archive cascades and sample shelf acceptance (Executor)
+
+- Added one isolated Playwright file for `WO-E2E-ACCEPT-01` Stage 2. Every step has its own `ZZ-Test …` fixture or creates its own record; the disposable seed also clears sample-request intake state so repeated one-step runs cannot leak old requests.
+- **Walk results:**
+
+  | Step | Result | Evidence |
+  | --- | --- | --- |
+  | 5.1 | PASS | The owned Brand, its priced SKU, and a separately linked Brand are visible under their supplier. |
+  | 5.2 | PASS | Archiving the supplier hides its owned Brand, SKU and price; the merely linked Brand stays active. |
+  | 5.3 | PASS | Restoring the supplier restores its owned Brand, SKU and price. |
+  | 5.4 | PASS | A directly archived Brand stays archived after its supplier is archived and restored. |
+  | 5.5 | PASS | Restoring an archived Brand into a live naming conflict is refused without changing either record. |
+  | 6.1 | PASS | Add sample creates and selects a new price-less SKU, then shelves the sample. |
+  | 6.2 | PASS | The created fixture SKU is shown in the SKU directory with **No price**. |
+  | 6.3 | PASS | A price-less SKU and its Brand both archive and restore normally. |
+  | 6.4 | PASS | Move, borrow for a StudioFlow project, send to client, return, lost, discarded, history, right-click menu, held-item removal guard, list view and filters all work. |
+  | 6.5 | KNOWN FAIL | Shelving succeeds, Schedule says **Sample received**, and the requester notification appears; the Schedule option detail omits the rack/box note. Recorded as `[BUG]`. |
+
+- **New `[BUG]`:** Schedule option detail does not show the shelf location after Master Data shelves a requested sample. Evidence: `e2e/.tmp/stage-2/6.5-schedule-missing-shelf-location.png`.
+- **Migrations/dependencies:** none. Tests and disposable E2E seed only; no application code changed.
+- **Checks:** steps 5.1–6.5 passed in separate Playwright runs (`6.5` is an expected failure for the recorded application defect), then the whole new file completed as **10 passed** with the same known expected failure; `npm test` (982), `npm run typecheck`, eslint (0 errors, 2 existing image warnings), `npm run check:boundaries`, `npm run check:legacy-runtime`, and production build. `next-env.d.ts` stayed clean.
+
 ## R8.477 | 2026-10-09 | feat(studioflow): add an idea or a note image to the project's moodboard (Lead)
 
 - **Owner decision 2026-10-09:** the Ideas board gets a second branch next to the Product Schedule: the moodboard, for the team only. It is the project's **Moodboard board on the Presentation tab** (no new tables): "Add to moodboard" puts a copy of the image as the last slide of that board and creates the board the first time. A board the team already named "Moodboard" (any letter case) is reused. The image is copied, so deleting the card or the note never touches the slide.
