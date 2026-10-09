@@ -40,10 +40,11 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 Harness: `agent/EXTENSIONS.md`. Foundation: `apps/platform/INTEGRATIONS.md`.
 Order matters; each item is its own Work Order.
 
-- [ ] [PLANNED][P2] Token management page (Lead, after R8.459): create (shown once),
-  list, revoke on the account page; admin list/revoke for `platform.integration.admin`;
-  assign the three `platform.integration.*` permissions in the role screen. Service
-  API already exists (`integrationTokens`, `requireIntegrationManager`).
+- [ ] [PLANNED][P3] Integration tokens, admin view: `platform.integration.admin` can list and revoke any
+  token in the service (`listAny`, `revokeAny`) but there is no screen yet, and the list has no owner
+  name. Add when a second person starts using tokens.
+- [ ] [UNVERIFIED] Token page on My preferences (R8.465): create (secret shown once, copy button),
+  the list with Active/Expired/Revoked, Revoke; needs a user whose role has `platform.integration.manage`.
 - [ ] [PLANNED][P2] **DEFERRED by the owner 2026-10-09.** Plan written, not READY: `docs/apps/sketchup/WO-SKETCHUP-01.md`
   (Schedule owns the code, project in the URL, Lead Step 0 = StudioFlow schedule door).
   Original notes follow.

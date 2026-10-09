@@ -6,6 +6,7 @@ import { z } from "zod";
 import { AppError } from "@platform/core/errors";
 import { displayNameSchema, passwordSchema, requirePrincipal, requirePrincipalGrants, revokeSessionById, setSessionCookie } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
+import { integrationTokens, type IntegrationTokenPublic } from "@platform/core/integrations";
 import { platformAccount, storageUsage, userPreferences, userTutorials } from "@platform/runtime";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
@@ -139,4 +140,46 @@ export async function getStorageUsageAction(): Promise<ActionResult<unknown>> {
 /** The guide language chosen on the first tour screen; personal-only like the other preference actions. */
 export async function setGuideLanguageAction(input: { language: "id" | "en" }): Promise<ActionResult<unknown>> {
   return updateMyPreferencesAction({ language: input.language });
+}
+
+const TOKEN_EXPIRY_DAYS = { "30": 30, "90": 90, "365": 365 } as const;
+const CreateTokenSchema = z.object({
+  label: z.string().trim().min(1, "Give this token a name.").max(120),
+  scopes: z.array(z.string()).min(1, "Choose at least one thing this token may do."),
+  expiry: z.enum(["30", "90", "365", "never"]),
+});
+
+export async function createIntegrationTokenAction(
+  _prev: ActionResult<{ token: IntegrationTokenPublic; secret: string }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ token: IntegrationTokenPublic; secret: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = CreateTokenSchema.safeParse({
+      label: String(formData.get("label") ?? ""),
+      scopes: formData.getAll("scopes").map(String),
+      expiry: String(formData.get("expiry") ?? "90"),
+    });
+    if (!parsed.success) throw validationError(parsed.error);
+    const days = parsed.data.expiry === "never" ? null : TOKEN_EXPIRY_DAYS[parsed.data.expiry];
+    const created = await integrationTokens.createOwn({
+      userId: principal.userId,
+      displayName: principal.displayName,
+      grants,
+      label: parsed.data.label,
+      scopes: parsed.data.scopes,
+      expiresAt: days === null ? null : new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+    });
+    revalidatePath("/account");
+    return created;
+  });
+}
+
+export async function revokeIntegrationTokenAction(tokenId: string): Promise<ActionResult<{ revoked: true }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    await integrationTokens.revokeOwn({ userId: principal.userId, displayName: principal.displayName, grants, tokenId });
+    revalidatePath("/account");
+    return { revoked: true as const };
+  });
 }

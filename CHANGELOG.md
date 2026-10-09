@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.465 | 2026-10-09 | feat(platform): integration tokens page on My preferences (Lead)
+
+- New section "Integration tokens" on My preferences, shown only to people whose role has `platform.integration.manage`. Create a token with a name, what it may do (only what the person's own access allows) and a validity (30 days, 90 days default, 1 year, none); the secret appears once with a copy button. The list shows name, allowed actions, last used, expiry and status (Active, Expired, Revoked) with a Revoke button.
+- Uses the existing service (`createOwn`, `listOwn`, `revokeOwn`); no backend or schema change. The role screen already lists the three `platform.integration.*` permissions from the registry, so no change there. The admin view stays in the backlog (P3).
+- **Migrations/dependencies:** none.
+- **Checks:** `tsc --noEmit`, eslint on the account folder, `check:boundaries`. Not walked in the browser (recorded as UNVERIFIED in the backlog).
+
 ## R8.464 | 2026-10-09 | fix(studioflow): a deleted Schedule code never comes back for a different item (Lead)
 
 - **Owner question 2026-10-09:** after adding a stone from a past project (ST-02) and deleting ST-01, is that a bug? ST-02 staying ST-02 is the locked R8.382 rule, not a bug. The real gap was the one already in the backlog: deleting the highest number of a group let the next new item take that number again.
