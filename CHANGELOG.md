@@ -1,5 +1,23 @@
 # Changelog
 
+## R8.474 | 2026-10-09 | test(masterdata): complete Stage 1 browser-acceptance coverage (Executor)
+
+- Completed the six Stage 1 gaps in `WO-E2E-ACCEPT-01`. Each spec has its own seeded conflict or creates its own `ZZ-Test …` records; no spec depends on another spec's mutations. The shared fixture still provides `ZZ-Test SKU 1`, `2`, and `3`.
+- **Walk results:**
+
+  | Step | Result | Evidence |
+  | --- | --- | --- |
+  | 2.5 | PASS | Removing a Brand supplier that has a live price is refused; **Show those prices** opens Pricing with that supplier and Brand selected. |
+  | 2.6 | PASS | Changing the Brand owner is refused while the priced former owner is removed; keeping it as a supplier lets the change save. |
+  | 3.2 | PASS | A material-only supplier saves a Material + labor price. |
+  | 3.4 | PASS | Three valid several-suppliers cells save; the one conflicting cell stays with its supplier-specific reason. |
+  | 3.5 | PASS | A tab-separated Name, Specification, and supplier-amount block fills two grid rows, including one blank-price cell. |
+  | 4.2 | PASS | The supplier-type picker removes an already-selected type from its choices, so it cannot be added twice; the Supplier saves once. |
+
+- **New `[BUG]` entries:** none. No application defect was found in these six steps.
+- **Migrations/dependencies:** none. Tests and disposable E2E seed only; no application code changed.
+- **Checks:** the six steps passed in separate Playwright runs with `--timeout=45000 --max-failures=1`; `npm test` (981); `npm run typecheck`; `npm run lint` (0 errors, 2 existing image warnings); `npm run check:boundaries`; `npm run check:legacy-runtime`; production build. The combined E2E suite was not run because the owner required one browser step per run; the unchanged 2.1–2.4, 3.1, 3.3 and 4.1 coverage remains green from R8.473. `next-env.d.ts` stayed clean.
+
 ## R8.473 | 2026-10-09 | fix(masterdata): complete price rows save even when other rows are incomplete (Lead)
 
 - **Owner decision 2026-10-09** (finding 2.4 of the browser acceptance run): in New price (material table and the labor/material+labor table), rows that are complete are saved even when another row lacks something. An incomplete row stays in the table with what it needs ("Needs amount."), next to rows the server rejected, and the message reads "N saved. M rows need fixing and are still here." If no row is complete nothing is sent and the message stays "Some rows are incomplete. Nothing was saved."

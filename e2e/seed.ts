@@ -95,6 +95,9 @@ async function main() {
     const sku1 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 1", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "10000", currency: "IDR" }] });
     const sku2 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 2", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
     const sku3 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 3", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
+    const guardBrand = await masterData.createBrand({ grants: masterDataGrants, actor, name: "ZZ-Test Guard Brand", ownerVendorId: matA.vendorId, suppliers: [{ vendorId: matA.vendorId }, { vendorId: matB.vendorId }] });
+    await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test Guard SKU", brandId: guardBrand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matB.vendorId, amount: "15000", currency: "IDR" }] });
+    await masterData.createPriceMaterialLabor({ grants: masterDataGrants, actor, name: "ZZ-Test Existing Matrix", categoryId: workCategory.categoryId, vendorId: labor.vendorId, unitId: pcs.id, amount: "9000", currency: "IDR" });
     const project = await sf.projects.createProject({
       grants: registry.permissions,
       actor,
