@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.496 | 2026-10-09 | docs(review): R8.495 verdict CORRECTION REQUIRED, WO-MODULES-M1 correction pass (Lead)
+
+- **Review of R8.495 (`99fdaaa`):** the module foundation is accepted as-is (manifest validation, version/kind, `platform.module_state`, runtime state cascade, System Owner command with `SYSTEM` audit, core refusal, role display rename, no new permission). The WO outcome is not met: the Executor split the plan into an unplanned "M1a" without a BLOCKED report.
+- **Findings for the correction pass (`PLAN.md`):** Ideas/Presentation gates missing (High); core manifests declare `requires: []` although `bq` and `studioflow` import Master Data's public door, and the planned `check:boundaries` manifest rule is absent (High); `modules/admin` is importable by app code (Medium); integration and no-module-permission tests missing (Medium); `next-env.d.ts` committed in its build form (Low).
+- **Checks:** review by diff inspection only; no code changed. Browser review not applicable (no user-facing change in R8.495).
+
 ## R8.495 | 2026-10-09 | feat(platform): add the installable-module foundation and System Owner command (Executor)
 
 - **WO-MODULES-M1 slice M1a only:** added the Platform module manifest contract, strict boot-time registry validation, and version/kind metadata on every application registration. `ideas` and `presentation` are optional modules under `studioflow`, exported from StudioFlow's public boundary; no page, action, navigation, or entry-point gate is included yet (M1b).

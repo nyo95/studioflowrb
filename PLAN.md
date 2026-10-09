@@ -4,10 +4,10 @@ Plan ID: WO-MODULES-M1 (module registry, runtime switch, System Owner command)
 Scope: Platform module foundation; StudioFlow Ideas Board and Presentation gated as optional modules
 Module(s): platform (new module registry), studioflow, ideas, presentation
 Target revision: next unused after R8.494 (check `CHANGELOG.md`)
-Status: READY
+Status: READY (correction pass after R8.495 review; see "Review of R8.495")
 Priority: P1
 Owner: owner decision 2026-10-09, `docs/apps/platform/MODULES-DECISION.md` (read it first)
-Last updated: 2026-10-09 (Lead)
+Last updated: 2026-10-09 (Lead, R8.496 review)
 
 WO-AUDIT-FIX-01 is done (R8.490-R8.492, Lead executed at the owner's request).
 
@@ -117,20 +117,71 @@ the Playwright specs that touch Ideas and Presentation with both modules enabled
 Lead: disable Ideas from the command, see the nav entry and the "add to ideas"
 entry points disappear and the page 404; enable it and see the cards again.
 
+## Review of R8.495 (`99fdaaa`) — CORRECTION REQUIRED
+
+Accepted as the foundation (keep, do not rewrite): manifest type and boot
+validation (`src/platform/core/modules/manifest.ts`, all Locked Decision 1 cases
+tested), `version`/`kind` on registrations, `platform.module_state` migration and
+role display rename, `isModuleEnabled`/`requireModuleEnabled`/`enabledModuleIds`
+with parent/requires cascade, boot `last_version` sync, the
+`scripts/studioflow.ts` command with serializable transaction and one `SYSTEM`
+audit row, core refusal, no new permission.
+
+Not accepted — the plan asked for the whole outcome in one revision; the
+Executor split it into "M1a" without a BLOCKED report. Findings, all fixed in
+one correction revision:
+
+1. **[High] Outcome 3 missing.** No Ideas/Presentation page, layout, print
+   route, server action, nav or in-page entry point is gated. Expected: every
+   one gated per Locked Decision 4 (page/layout/print → `notFound()`; action and
+   route → `requireModuleEnabled` → `MODULE_DISABLED`; nav and entry points
+   hidden from `enabledModuleIds()` passed down from the StudioFlow layout).
+   Find callers by grep (`ideas`, `moodboard`, `projectPresentation`,
+   `presentation/` imports); the list in Context is a start.
+2. **[High] Manifests lie about dependencies.** `MODULE_MANIFESTS` gives every
+   core app `requires: []`, but `bq` and `studioflow` import
+   `@/apps/masterdata/public` (e.g. `src/apps/bq/runtime.ts`,
+   `src/apps/studioflow/runtime.ts`). Expected: core manifests declare their real
+   `requires` (registration field, not derived as empty), and the planned
+   `check:boundaries` rule (manifest `requires` ⇔ actual cross-app `public`
+   imports, with fixtures in `scripts/test-boundaries-checker.mjs`) exists and
+   passes. Cross-app imports from tests may be ignored by the rule.
+3. **[Medium] Nothing stops app code from calling the state writer.**
+   `src/platform/core/modules/admin.ts` is importable from any server action.
+   Expected: a `check:boundaries` rule that only `scripts/**` and
+   `src/platform/core/modules/**` (incl. tests) may import `modules/admin`, with
+   a failing fixture.
+4. **[Medium] Acceptance tests missing.** Required: an integration test on the
+   disposable test DB (default ENABLED; disable ideas → state row + one audit
+   row, data rows untouched; enable → back; disable studioflow refused; same for
+   presentation) and an assertion that no registered permission id mentions
+   `module` (the RBAC vocabulary has no module permission).
+5. **[Low] `next-env.d.ts` committed in its build form** (`.next/types/...`);
+   `next dev` will rewrite it to `.next/dev/types/...` and dirty the tree. Restore
+   the dev form in the correction commit; never commit the build form.
+
+Environment note (not a defect): the home development database still lacks
+`20261009170000_platform_module_state`; boot now reads `module_state`, so
+`next dev` against it fails until it is migrated. Migrating the ordinary dev DB
+is allowed for this plan only after verifying it is the rebuild-only target.
+
 ## Executor Prompt
 
 You are the Backend Executor. Location: <rumah|kantor> (ask the owner if not
 stated). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`,
-`docs/apps/platform/MODULES-DECISION.md` and this `PLAN.md` (WO-MODULES-M1),
-then implement the READY outcome and nothing beyond it, as one local revision
-commit numbered with the next unused revision in `CHANGELOG.md`. Add the
-Platform module manifest/registry and `platform.module_state`, extend the app
-registrations with version and kind, register `ideas` and `presentation` as
-optional modules of StudioFlow and gate every page, action, nav and entry point
-of theirs, add the System Owner command (`npm run studioflow -- module …`) with
-audit, and rename the owner role's display name to "Company Administrator".
-Module state must never become an RBAC permission. Database commands only
-against a verified disposable rebuild-only database. Stop with BLOCKED /
-CONFLICT if a gate needs a UX decision. Run the checks in Verification, then reply with only a
-Planner/Reviewer prompt: commit, checks with results, limitations, dirty files,
-and a request for verdict.
+`docs/apps/platform/MODULES-DECISION.md` and `PLAN.md` (WO-MODULES-M1),
+especially "Review of R8.495". R8.495 is accepted as the foundation; do not
+rewrite it. In one local revision commit (next unused revision in
+`CHANGELOG.md`), fix findings 1-5: gate every Ideas and Presentation page,
+layout, print route, server action, nav entry and in-page entry point; give the
+core manifests their real `requires` and add the two `check:boundaries` rules
+(manifest requires ⇔ cross-app public imports; only scripts and
+`platform/core/modules` may import `modules/admin`) with fixtures; add the
+integration and no-module-permission tests; restore `next-env.d.ts` to its dev
+form. No behavior change for users while both modules are enabled; no new
+screens, permissions or dependencies. Database commands only against a verified
+rebuild-only database. Stop with BLOCKED / CONFLICT if a gate needs a UX
+decision (e.g. an entry point whose surrounding layout breaks when hidden).
+Run the checks in Verification (including the Ideas and Presentation
+Playwright specs), then reply with only a Planner/Reviewer prompt: commit,
+checks with results, limitations, dirty files, and a request for verdict.
