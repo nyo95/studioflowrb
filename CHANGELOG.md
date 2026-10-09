@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.483 | 2026-10-09 | docs(plan): no active Work Order (Lead)
+
+- `PLAN.md` now says there is no READY Work Order: the browser acceptance stages and the template-first import are closed, the SketchUp plan stays deferred.
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.482 | 2026-10-09 | feat(masterdata): template-first price imports, company layout removed (Lead)
 
 - **Owner decision 2026-10-09:** the price database import no longer copies the company's own Excel. Both imports on Import & export prices are now **download template, fill, upload (checked at once), save**. Rows with a problem are skipped and listed; the valid rows are saved (`applyValidRows`, default on; `false` refuses the whole file). Moving data into the company workbook is copy and paste.
