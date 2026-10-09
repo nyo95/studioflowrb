@@ -273,15 +273,22 @@ export function createPriceDatabaseWorkbookService(
       if (new Set(places).size === group.length) group.forEach((cell, index) => { cell.name = `${cell.item.name} (${places[index]})`; });
       else if (specs.every(Boolean) && new Set(specs).size === group.length) group.forEach((cell, index) => { cell.name = `${cell.item.name} (${specs[index]})`; });
     }
+    const identityFacts = { unit: { select: { code: true } }, category: { select: { name: true } } } as const;
     const existing = !cells.length ? [] : options.priceKind === "labor"
-      ? await tx.priceLabor.findMany({ where: { deleted_at: null, vendor_id: { in: [...new Set(cells.map((cell) => cell.vendorId))] } } })
-      : await tx.priceMaterialLabor.findMany({ where: { deleted_at: null, vendor_id: { in: [...new Set(cells.map((cell) => cell.vendorId))] } } });
+      ? await tx.priceLabor.findMany({ where: { deleted_at: null, vendor_id: { in: [...new Set(cells.map((cell) => cell.vendorId))] } }, include: identityFacts })
+      : await tx.priceMaterialLabor.findMany({ where: { deleted_at: null, vendor_id: { in: [...new Set(cells.map((cell) => cell.vendorId))] } }, include: identityFacts });
     const existingByKey = new Map(existing.map((price) => [`${price.vendor_id}|${key(price.name)}`, price] as const));
     const toCreate = new Map<string, Cell[]>(); // category|vendor -> cells
     for (const cell of cells) {
       const where = { level: "error" as const, sheet: cell.item.sheet, row: cell.item.row };
       const found = existingByKey.get(`${cell.vendorId}|${key(cell.name)}`);
       if (!found) { const groupKey = `${cell.categoryId}|${cell.vendorId}`; toCreate.set(groupKey, [...(toCreate.get(groupKey) ?? []), cell]); continue; }
+      // A work price is one supplier + name (owner, 2026-10-09): a row that disagrees on unit or category is refused
+      // instead of silently moving the existing price.
+      if (found.unit_id !== cell.unitId || found.category_id !== cell.categoryId) {
+        errors.push({ ...where, message: `"${found.name}" already exists for this supplier with unit ${found.unit.code} in ${found.category.name}. Use that unit and category to update it, or give this row a more specific name.` });
+        continue;
+      }
       const notes = cell.item.notes || null;
       if (found.amount.toString() === cell.amount && (found.amount_label ?? null) === cell.label && found.unit_id === cell.unitId && found.category_id === cell.categoryId && (found.notes ?? null) === notes) { totals.pricesUnchanged += 1; continue; }
       try {

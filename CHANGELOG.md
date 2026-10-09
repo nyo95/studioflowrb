@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.491 | 2026-10-09 | fix(masterdata): a price-import row never moves an existing work price to another unit or category (Lead, executing WO-AUDIT-FIX-01 slice B at the owner's request)
+
+- **Owner decision 2026-10-09 (option a):** a work price (labor and material+labor) is one supplier + name. In the price-database import a row that matches a live price by supplier and name but has a different unit or category is now a row problem, `"Screeding Base" already exists for this supplier with unit m2 in Floor Works. Use that unit and category to update it, or give this row a more specific name.`, instead of silently changing that price's unit and category. Same unit and category still update the amount and notes as before. The preview runs the same import, so the problem shows before Save; the default saves the other rows, `applyValidRows: false` refuses the file.
+- **Tests:** one integration test (unit mismatch, category mismatch, the other supplier's row still updating, refuse mode, the price left untouched).
+- **Migrations/dependencies:** none. **Checks:** `tsc --noEmit`, eslint on Master Data, Master Data integration suite (121 passed) on the disposable local PostgreSQL.
+
 ## R8.490 | 2026-10-09 | fix(studioflow): a new Schedule row fills the lowest empty code number (Lead, executing WO-AUDIT-FIX-01 slice A at the owner's request)
 
 - **Owner decision 2026-10-09 (contract §11.2, replaces R8.464):** a new row of a code group takes the lowest empty number from 1 up: HT-01 deleted and HT-02 live, the next HT row is HT-01. Existing rows never change code by themselves; reorder is unchanged. `lowestFreeNumber` (pure, unit-tested) is the one rule; `allocateIncrement` uses it for every new row (quick add, Add item, template, Ideas to Schedule, move into another category) and keeps an imported sheet's own number when no live row of the group uses it, including a number deleted before. The list's `nextNumber` uses the same rule, so the add button shows the code the server will give.

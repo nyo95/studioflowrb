@@ -1949,6 +1949,31 @@ describe("Supplier and price database workbook", () => {
     assert.equal(price.amount.toString(), "125000");
   });
 
+  it("refuses a row that matches a work price by supplier and name but disagrees on unit or category, and leaves the price alone", async () => {
+    const file = await sampleWorkbook();
+    const first = await service.previewPriceDatabaseImport(importAs(file));
+    await service.applyPriceDatabaseImport({ ...importAs(file), hash: first.hash });
+    const otherUnit = await flatWorkbook([["Floor works", "Screeding base", "pcs", "Afa Interindo", 99000, ""], ["Floor works", "Screeding base", "m2", "Sono Sipil", 140000, ""]]);
+    const preview = await service.previewPriceDatabaseImport(importAs(otherUnit));
+    assert.equal(preview.errors.length, 1);
+    assert.match(preview.errors[0].message, /"Screeding Base" already exists for this supplier with unit m2 in Floor Works/);
+    assert.equal(preview.errors[0].row, 2, "the problem is shown before Save, on its row");
+    assert.equal(preview.totals.pricesUpdated, 1, "the matching row of the other supplier still updates");
+
+    await assert.rejects(() => service.applyPriceDatabaseImport({ ...importAs(otherUnit), hash: preview.hash, applyValidRows: false }), (error: unknown) => error instanceof AppError && error.code === "PRICE_DATABASE_IMPORT_ERRORS");
+    const applied = await service.applyPriceDatabaseImport({ ...importAs(otherUnit), hash: preview.hash });
+    assert.equal(applied.skipped.length, 1);
+    const afa = await testDb.prisma.priceLabor.findFirstOrThrow({ where: { name: "Screeding Base", vendor: { name: "Afa Interindo" } }, include: { unit: true } });
+    assert.deepEqual([afa.unit.code, afa.amount.toString()], ["m2", "120000"], "unit and amount are untouched");
+    const sono = await testDb.prisma.priceLabor.findFirstOrThrow({ where: { name: "Screeding Base", vendor: { name: "Sono Sipil" } } });
+    assert.equal(sono.amount.toString(), "140000");
+
+    const otherCategory = await flatWorkbook([["Wall works", "Screeding base", "m2", "Afa Interindo", 99000, ""]]);
+    const moved = await service.previewPriceDatabaseImport(importAs(otherCategory));
+    assert.match(moved.errors[0]?.message ?? "", /with unit m2 in Floor Works/);
+    assert.equal(moved.totals.pricesUpdated, 0);
+  });
+
   it("reports unknown units and unreadable prices with sheet and row, saves the valid rows and skips the rest, and can refuse the whole file", async () => {
     const file = await sampleWorkbook([["Floor works", "Odd item", "kontainer", "Afa Interindo", 5000, ""], ["Floor works", "Bad amount", "m2", "Afa Interindo", "abc", ""]]);
     const preview = await service.previewPriceDatabaseImport(importAs(file));

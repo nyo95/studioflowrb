@@ -146,9 +146,6 @@ Order matters; each item is its own Work Order.
   WO-SCHEMA-HARDEN-01 (MD-AUD-012 and the BQ/StudioFlow FK indexes), the
   Signage sheet of the owner's workbook, SKU prices read from that file, and an
   optional one-off rewrite of names the capitalization rule would change.
-- [ ] [BUG][P1] Price-database import overwrites a work price's unit and
-  category when a row matches by supplier + name (identity stays supplier +
-  name, owner 2026-10-09: a mismatch must be a row error). Fix: WO-AUDIT-FIX-01 slice B.
 - [ ] [BUG][P2] The Suppliers sheet looks editable (the current-data export
   lists every supplier) but existing suppliers are silently left unchanged on
   re-import (owner 2026-10-09: keep not updating them, say so per row). Fix:
