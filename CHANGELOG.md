@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.500 | 2026-10-10 | feat(platform): read-only Settings "Modules" page and per-request module state; WO-MODULES-M1 browser acceptance (Lead)
+
+- **Settings > Platform > Modules** (`/settings/modules`, visible with `platform.settings.read`, no new permission): every installed module with its version, "Core, always on" or "Optional, part of StudioFlow", and On/Off. No controls; a notice says only the System Owner changes it on the server and that switching off keeps the data. New read-only Platform API `listModuleOverview`.
+- `isModuleEnabled` / `requireModuleEnabled` / `enabledModuleIds` now read all stored states once per request (React `cache`) instead of one query per module per call; a passed client still reads directly (tests). Same results.
+- **Browser acceptance (home dev database, migrated to `20261009170000_platform_module_state` after verifying the rebuild-only target):** with Ideas off the rail entry is gone and `/studioflow/ideas` is not-found; with Presentation off the project tab is gone with the tab bar intact, the Presentation page is not-found, and the Ideas-card menu has no "Add to moodboard…"; enabling each brings back the same 4 cards and the existing board. Note-image buttons not walked (no note image in the home database), kept `[UNVERIFIED]`.
+- **Checks:** typecheck; eslint (0 errors, 1 existing `<img>` warning); `npm test` (1,006 passed); `check:boundaries`.
+
 ## R8.499 | 2026-10-10 | docs(review): R8.498 verdict, WO-MODULES-M1 Executor work accepted (Lead)
 
 - **Review of R8.498 (`22710fd`):** code review PASS. Findings 1-5 from R8.496 are resolved: every Ideas/Presentation page, the print route and all 21 server actions are gated (`notFound()` / `MODULE_DISABLED`), the rail entry, the project Presentation tab and the note-image and Ideas-card entry points are hidden from the enabled-module list, core manifests declare `bq`/`studioflow → masterdata`, two new `check:boundaries` rules with fixtures, disposable-database integration tests, the no-module-permission assertion, and `next-env.d.ts` back in its development form. No other route, nav consumer or tour step reaches Ideas or Presentation.

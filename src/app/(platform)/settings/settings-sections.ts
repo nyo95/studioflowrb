@@ -40,6 +40,7 @@ export function platformSettingsGroups(grants: PermissionGrants): SettingsSectio
       heading: "Platform",
       items: [
         { key: "general", href: "/settings/general", label: "General", visible: hasPermission(grants, "platform.settings.read") },
+        { key: "modules", href: "/settings/modules", label: "Modules", visible: hasPermission(grants, "platform.settings.read") },
       ],
     },
     {

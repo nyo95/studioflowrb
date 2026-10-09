@@ -8,4 +8,4 @@ export {
   type ModuleManifest,
   type ModuleRegistry,
 } from "./manifest";
-export { enabledModuleIds, isModuleEnabled, requireModuleEnabled, synchronizeModuleVersions } from "./state";
+export { enabledModuleIds, isModuleEnabled, listModuleOverview, requireModuleEnabled, synchronizeModuleVersions, type ModuleOverview } from "./state";

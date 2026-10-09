@@ -291,4 +291,4 @@ this backlog's former SF-A entries.)_
 - Viewport: desktop (default)
 - Steps: 1. With both modules enabled, open Ideas and Presentation and confirm their existing workflows. 2. Disable Ideas; reload and inspect the rail and project-note image actions, then open the old Ideas URL. 3. Re-enable Ideas and confirm the same card returns. 4. Repeat for Presentation, including its project tab, moodboard entry points, board URL, and print URL.
 - Acceptance: enabled behavior is unchanged; disabled entries disappear without breaking surrounding layouts; disabled URLs are not-found; enabling restores the same saved data.
-- Status: PENDING
+- Status: PASS except the note-image buttons (R8.500, Lead, home dev database): rail Ideas entry, Ideas URL not-found, Ideas-card "Add to moodboard…" hidden with Presentation off, project Presentation tab gone with the tab bar intact, Presentation URL not-found, both back with the same cards and board after enabling. The home database has no phase-note image, so the note-image buttons were checked in code only; still to walk once a note has an image.
