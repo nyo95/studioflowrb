@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.488 | 2026-10-09 | chore(repo): clean up old stashes and merged branches, keep one idea (Lead)
+
+- **Owner request 2026-10-09:** removed two stale local stashes (an old archive-document header tweak and an R4.07 changelog entry from 2026-09-01) and the merged remote branch `claude/r8-447-audit-fixes` (no commit that is not in `main`). `main` is now the only branch.
+- **Idea kept:** the one thing worth keeping, a clear startup error when `DATABASE_URL` is missing, is filed under "Ideas to discuss" in `docs/BACKLOG.md` (it is not in the current code).
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.487 | 2026-10-09 | fix(studioflow): the saved Presentation PDF is named date, project, board (Lead)
 
 - **Owner decision 2026-10-09:** the default file name is `date - project - title`, for example `20261009 Sociolla SG Funan Material Funan`. The date is today's date as `YYYYMMDD` in the organisation's time zone (Platform Settings), the project name is shown without its leading number (`2026-506`), then the board title. This replaces the `project - board` name of R8.486. A pure function `printTitle` with three tests; P.6 checks the title shape.
