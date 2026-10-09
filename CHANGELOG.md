@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.467 | 2026-10-09 | docs(backlog): simple template-first import (Lead)
+
+- Owner direction recorded in `docs/BACKLOG.md`: the imports must not require filling a copy of the company's complex Excel; the main path becomes download template, fill, upload (checked at once), save. Split between Executor (template generator and tests) and Lead (screen).
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.466 | 2026-10-09 | docs(plan): browser acceptance as Playwright specs (Lead)
 
 - `PLAN.md` is now WO-E2E-ACCEPT-01: the owner's manual browser walk (`docs/BROWSER-ACCEPTANCE.md`) becomes Playwright specs in four stages (Master Data pricing; archive/restore and samples; StudioFlow; platform and the rest), one Executor commit per stage. Reuses the existing harness (:3101, disposable test database, seeded owner).

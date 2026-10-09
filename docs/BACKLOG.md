@@ -273,6 +273,16 @@ Order matters; each item is its own Work Order.
   `studioflow/public/sample-request-command.ts`. Not a defect; revisit as one
   application-level workflow once two or three more cross-app workflows exist.
 - [ ] [UNVERIFIED] WO-MD-CRUD-01, still open after the 2026-10-08 walks (passed: Supplier archive and restore cascade through its owned Brand, SKU and price and leave a Brand that only lists it; a price-less SKU and its Brand archive and restore; Material+Labor shows material-, labor- and both-capable suppliers and Labor only labor-capable ones; the Material+Labor quick-add supplier offers all three Supplier Types and creates and selects the supplier; a Material+Labor price from a material-only supplier saves): a hand-archived Brand staying archived through a Supplier restore and a Brand with the same link typed twice. Renaming a Brand whose owner is archived is covered by a test only.
+- [ ] [PLANNED][P2] **Simple import: template first (owner, 2026-10-09).** The price-database import reads the owner's own
+  company Excel exactly (sheets `Database - <type>`, `Database Harga - <name>`, section headings as categories), which is
+  too hard to fill in by hand. New flow on Import & export prices, for both imports: **Download template -> fill -> Upload
+  (checked at once) -> Save.** The template is a plain flat sheet with an example row and a notes sheet; the company layout
+  stays readable only as an "Advanced: company file" option, not the main path. Work split: Executor adds
+  `buildPriceDatabaseTemplate` (emit the sheets in the shape the existing reader already parses, so no new parser:
+  Suppliers = Name, Type, Categories, Address, Phone, Email, PIC, Payment terms, Notes; Prices = Category, Item,
+  Specification, Unit, Supplier, Price, Notes) plus tests that the template with its example row imports cleanly;
+  Lead reshapes the screen (template button first, auto-check on file choose, one Save, export of current data as a
+  secondary action, ID columns hidden from the main path). Folds in the next item (save the valid rows).
 - [ ] [PLANNED][P3] The workbook imports (SKU prices, price database) still reject the whole file when any row is invalid. Revisit a "apply the valid rows" option once WO-MD-ENTRY-01 has proven the grid version; the import's preview step makes it a separate decision.
 - [ ] [UNVERIFIED] WO-MD-ENTRY-01, still open after the 2026-10-08 walks (passed: auto-link on price save; the material, the labor and the several-suppliers grids each save what is valid and keep the failing row or cell with its reason; "Show those prices" opens the Pricing list filtered to those prices): only changing a Brand owner while its prices exist.
 - [ ] [UNVERIFIED] The ordered browser walk that closes every [UNVERIFIED] entry above is in `docs/BROWSER-ACCEPTANCE.md` (11 sections, about an hour). Run it once, record PASS/FAIL per section, then remove the entries that passed and file each FAIL as a [BUG].
