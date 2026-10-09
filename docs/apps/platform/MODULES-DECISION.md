@@ -1,6 +1,7 @@
 # Installable Modules — Decision Record
 
 Status: ACCEPTED (owner, 2026-10-09; recorded by the Lead in R8.494).
+Amended: owner, 2026-10-10 (D5 web console, D7 dropped, D10 updates; R8.501).
 Scope: how StudioFlowRB becomes a platform of separately versioned, separately
 switchable modules, so a customer runs only what it has, and a new capability can
 be used on its own first and injected later.
@@ -46,7 +47,7 @@ Shell (today `src/app/app-registrations.ts`): `id`, `name`, `version` (semver
 launcher/nav metadata, and later its entitlement key. Platform validates the
 graph at boot (unknown id, cycle, a required module missing → boot fails).
 
-**D4. Four gates, in this order:** built in → entitled (M4) → enabled → RBAC.
+**D4. Gates, in this order:** built in → enabled → RBAC (entitlement dropped, D7).
 RBAC decides *who* may use a module; it never decides *whether the customer
 has it*. A disabled module: its nav entries and launcher tile are hidden, its
 pages return not-found, its server actions and integration routes refuse with
@@ -63,9 +64,19 @@ separate, explicit, audited purge by the System Owner, never a side effect.
   entitlements, purges, recovery. **System Owner rights are not RBAC
   permissions.** They are not in the permission vocabulary, so no role can
   hold them and no Company Administrator can grant them, including to
-  themselves. System operations run only through a server-side command
-  (`npm run studioflow -- module …`) on the machine itself, are audited with a
-  `system` actor, and the app UI shows module state read-only.
+  themselves. System operations are audited with a `system` actor; the app
+  UI (Settings > Modules) shows module state read-only.
+- **Amended 2026-10-10 (owner):** the owner is not a programmer and must be
+  able to run the system without an AI assistant, so System Owner operations
+  get a **web console** (`/system`) in addition to the server command. It is
+  not an app account and not an RBAC role: it has its own sign-in, an
+  **authenticator app code** (TOTP, RFC 6238, scanned once as a QR) with
+  printed recovery codes, its own short session, and it is reachable from
+  anywhere (owner's choice), so it is protected by lockout after repeated
+  wrong codes, replay refusal, short sessions and an audit row for every
+  sign-in attempt and change. Enrolment and reset of the authenticator stay a
+  server command (`npm run studioflow -- system setup|reset`), so nobody who
+  only reaches the web can claim the console.
 
 **D6. Versions.** Each module carries its own semver in the manifest; Platform
 records the version each module last ran with. Patch = fixes, minor =
@@ -77,10 +88,9 @@ Migrations stay in the one Prisma history (Prisma has a single migration
 folder); a module's migration directories are named with its id
 (`<timestamp>_<module>_<what>`) so a module's history can be listed.
 
-**D7. Entitlement (M4, not now).** A license file signed by the developer
-(Ed25519 via `node:crypto`, public key built in; no new dependency) lists the
-customer and the module ids and majors it may run. Missing or invalid license
-→ only `core` modules run. RBAC and entitlement are never merged.
+**D7. Entitlement — DROPPED (owner, 2026-10-10).** No license file and no
+per-module licence. A module runs when it is built in and the System Owner
+switched it on. The gates are built in → enabled → RBAC.
 
 **D8. New capabilities are born as modules** (effective now). Any new business
 capability gets its own module id, manifest, schema and `public/` door from its
@@ -94,6 +104,15 @@ StudioFlow → module edges become calls through StudioFlow's `public/`
 writer behind a public function), and the two foreign keys become plain ids
 with a cleanup on delete.
 
+**D10. Updates (owner, 2026-10-10).** A finished module or app version is
+published by the owner as a GitHub release. The receiving server only decides
+**install now or not**: the System Owner console shows "version X available"
+with what changed, and **Install** backs up the database first, installs the
+release, migrates, rebuilds and restarts, and goes back to the previous version
+and backup automatically if any step fails. Nothing installs by itself. The
+exact mechanism depends on how the office server runs the app and is planned
+in WO-SYSTEM-02.
+
 ## Phases
 
 | Phase | What | Lane |
@@ -102,7 +121,9 @@ with a cleanup on delete.
 | M1 | Module manifest + registry, runtime state ENABLED/DISABLED, the four-gate check without entitlement, `MODULE_DISABLED`, System Owner command, read-only Modules page; Ideas and Presentation registered as optional modules of StudioFlow and gated | Executor backend, Lead UI page |
 | M2 | Discovery report: every coupling of Ideas and Presentation, the exact public functions StudioFlow must expose, the migration that moves their tables, cost | Executor report, Lead locks |
 | M3 | Ideas Board extracted to its own module and schema; Presentation next | Executor |
-| M4 | Signed entitlement file and checks | Executor, after the owner's commercial/IP agreement |
+| M4 | ~~Signed entitlement~~ dropped (D7, 2026-10-10) | — |
+| S1 | System Owner web console: authenticator sign-in, modules On/Off (WO-SYSTEM-01) | Executor backend, Lead UI |
+| S2 | Updates from GitHub releases with backup and automatic roll-back (WO-SYSTEM-02, D10) | Lead plans after the office-server facts |
 | M5 | Customer build profiles that leave out code, release tags, Windows service installer | Lead plans, later |
 
 ## Non-goals now

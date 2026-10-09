@@ -33,6 +33,8 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## Platform Foundation
 
+- [ ] [PLANNED] WO-SYSTEM-01 System Owner web console (`/system`): authenticator-app sign-in with recovery codes, lockout, own session, modules On/Off (owner 2026-10-10, `MODULES-DECISION.md` D5 amendment). READY in `PLAN.md`.
+- [ ] [PLANNED] WO-SYSTEM-02 updates from GitHub releases: the console shows "version X available", **Install** backs up the database, installs, migrates, rebuilds, restarts, and rolls back on failure (owner 2026-10-10, D10). Needs first: how the office server runs the app (manual `npm run start`, a Windows service, pm2, ...) and the release format.
 - [ ] [UNVERIFIED] Optional module switch, note-image buttons only (R8.498, R8.500): the rest of the switch was walked in the browser. Still to walk once a phase note has an image: with Ideas off, the image viewer shows no "Save to Ideas" / "Use in schedule" / "Add to moodboard" and the viewer still looks right; with only Presentation off, only "Add to moodboard" is gone.
 
 - [ ] [UNVERIFIED] Add item "From a past project" (R8.458): the search box, the empty result and the toggle were walked in the browser on the local database, which has one project, so no hit could be chosen. Still to walk with two projects: pick a hit (section and category switch to the hit's, the product shows as a summary, Remove returns to the normal fields), Save creates the item and copies the product with its photo and notes, and a failure after the item is created leaves the item without the copy.

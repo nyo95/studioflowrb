@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.501 | 2026-10-10 | docs(platform): System Owner web console decision, licence dropped, GitHub updates; WO-SYSTEM-01 (Lead)
+
+- **Owner decision 2026-10-10** (`docs/apps/platform/MODULES-DECISION.md`): the owner is not a programmer and must run the system without an AI assistant, so System Owner operations get a web console `/system` with authenticator-app (TOTP) sign-in and printed recovery codes, reachable from anywhere and protected by lockout, replay refusal, short sessions and full audit; enrolment/reset stay a server command; it is still not an app account or RBAC permission (D5 amended). Per-module licence/entitlement dropped (D7): a module runs when built in and switched on. Updates (D10): GitHub releases, installed only when the System Owner presses Install, with backup and automatic roll-back.
+- `PLAN.md` replaced with WO-SYSTEM-01 (READY, Executor backend + Lead UI); `docs/BACKLOG.md` gains `[PLANNED]` WO-SYSTEM-01 and WO-SYSTEM-02 (updates; needs the office-server facts). One new dependency approved for WO-SYSTEM-01: `qrcode` (terminal QR in the CLI only).
+- **Checks:** documentation only.
+
 ## R8.500 | 2026-10-10 | feat(platform): read-only Settings "Modules" page and per-request module state; WO-MODULES-M1 browser acceptance (Lead)
 
 - **Settings > Platform > Modules** (`/settings/modules`, visible with `platform.settings.read`, no new permission): every installed module with its version, "Core, always on" or "Optional, part of StudioFlow", and On/Off. No controls; a notice says only the System Owner changes it on the server and that switching off keeps the data. New read-only Platform API `listModuleOverview`.
