@@ -44,6 +44,9 @@ Order matters; each item is its own Work Order.
   list, revoke on the account page; admin list/revoke for `platform.integration.admin`;
   assign the three `platform.integration.*` permissions in the role screen. Service
   API already exists (`integrationTokens`, `requireIntegrationManager`).
+- [ ] [PLANNED][P2] **DEFERRED by the owner 2026-10-09.** Plan written, not READY: `docs/apps/sketchup/WO-SKETCHUP-01.md`
+  (Schedule owns the code, project in the URL, Lead Step 0 = StudioFlow schedule door).
+  Original notes follow.
 - [ ] [PLANNED][P2] SketchUp plugin sync as the first extension (D-SF-06 lifted
   for this work by the owner's 2026-10-09 request; needs its own plan and the
   owner's answers on: project binding in the URL vs token, what the schedule gets

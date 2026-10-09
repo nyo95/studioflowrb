@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.463 | 2026-10-09 | docs(plan): SketchUp sync Work Order written and deferred (Lead)
+
+- Owner decisions recorded in `docs/apps/sketchup/WO-SKETCHUP-01.md`: the Product Schedule owns the code; the plugin owns technical identity and geometry; project in the URL; legacy safeguards kept. Marked DEFERRED at the owner's request; no code and no `PLAN.md` change.
+- Found that StudioFlow's `public/` has no Schedule door, so the plan has a Lead "Step 0" before the Executor.
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.462 | 2026-10-09 | docs(review): R8.461 verdict PASS (Lead)
 
 - **Review of R8.461 (`40b4881`):** savepoint around the handler (a failed handler undoes its own writes before a replayable 4xx is stored; 5xx still rolls everything back) and a unique-key race mapped to the retryable `IDEMPOTENCY_IN_PROGRESS`. Both gaps from R8.460 are closed with tests. Verdict **PASS**. The integration foundation is ready to build extensions on.
