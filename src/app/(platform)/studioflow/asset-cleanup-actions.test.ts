@@ -27,6 +27,7 @@ function loadActions() {
     "@platform/core/auth": { requirePrincipalGrants: async () => ctx },
     "@platform/core/actions": { runSafeAction },
     "@platform/core/errors": { AppError },
+    "@platform/core/modules": { requireModuleEnabled: async () => undefined },
     "@platform/core/validation": { validationError },
     "@/apps/studioflow/runtime": {
       studioFlow: {

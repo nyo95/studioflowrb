@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { AppError } from "@platform/core/errors";
+import { requireModuleEnabled } from "@platform/core/modules";
 import { validationError } from "@platform/core/validation";
 import { studioFlow } from "@/apps/studioflow/runtime";
 
@@ -47,20 +48,30 @@ function formText(formData: FormData, name: string): string | null | undefined {
 export type IdeaCardView = Awaited<ReturnType<typeof studioFlow.ideas.listIdeaCards>>[number];
 
 export async function listIdeaCardsAction(): Promise<ActionResult<IdeaCardView[]>> {
-  return runSafeAction(async () => studioFlow.ideas.listIdeaCards(await context()));
+  return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
+    return studioFlow.ideas.listIdeaCards(await context());
+  });
 }
 
 export async function listIdeaTargetsAction(): Promise<ActionResult<Array<{ id: string; name: string }>>> {
-  return runSafeAction(async () => studioFlow.ideas.listIdeaTargets(await context()));
+  return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
+    return studioFlow.ideas.listIdeaTargets(await context());
+  });
 }
 
 export async function listIdeaTargetEntriesAction(projectId: string): Promise<ActionResult<Awaited<ReturnType<typeof studioFlow.ideas.listIdeaTargetEntries>>>> {
-  return runSafeAction(async () => studioFlow.ideas.listIdeaTargetEntries({ ...(await context()), projectId: parse(Id, projectId) }));
+  return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
+    return studioFlow.ideas.listIdeaTargetEntries({ ...(await context()), projectId: parse(Id, projectId) });
+  });
 }
 
 /** Categories the studio already knows per section, for the new-item category field. */
 export async function listIdeaCategoryChoicesAction(): Promise<ActionResult<Array<{ section: string; category: string }>>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
     const { grants } = await context();
     return (await studioFlow.schedule.listCategoryChoices({ grants })).map(({ section, category }) => ({ section, category }));
   });
@@ -70,6 +81,7 @@ const CreateForm = z.strictObject({ title: Text(160), sourceUrl: Text(2000), not
 /** FormData: `file` (required), optional `title`, `sourceUrl`, `note`. */
 export async function createIdeaCardAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
     const ctx = await context();
     const data = parse(CreateForm, { title: formText(formData, "title"), sourceUrl: formText(formData, "sourceUrl"), note: formText(formData, "note") });
     const result = await studioFlow.ideas.createIdeaCard({ ...ctx, ...data, file: await imageOf(formData) });
@@ -81,6 +93,7 @@ export async function createIdeaCardAction(formData: FormData): Promise<ActionRe
 const ImageForm = z.strictObject({ cardId: Id });
 export async function replaceIdeaImageAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
     const ctx = await context();
     const data = parse(ImageForm, { cardId: formData.get("cardId") });
     const result = await studioFlow.ideas.replaceIdeaImage({ ...ctx, ...data, file: await imageOf(formData) });
@@ -97,6 +110,7 @@ export type IdeaCommandInput = z.infer<typeof IdeaCommand>;
 
 export async function ideaCardAction(input: IdeaCommandInput): Promise<ActionResult<{ cardId: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
     const ctx = await context();
     const data = parse(IdeaCommand, input);
     const result = data.command === "update"
@@ -120,6 +134,7 @@ export type UseIdeaInput = z.infer<typeof UseInput>;
 
 export async function applyIdeaToScheduleAction(input: UseIdeaInput): Promise<ActionResult<{ projectId: string; entryId: string; optionId: string; code: string; label: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
     const ctx = await context();
     const data = parse(UseInput, input);
     const result = await studioFlow.ideas.useIdeaInSchedule({ ...ctx, ...data });
@@ -133,6 +148,7 @@ const NoteImageRef = { projectId: Id, phaseId: Id, imageId: Id };
 /** "Save to Ideas" on a phase-note image: a private copy on the signed-in user's own board. */
 export async function saveNoteImageToIdeasAction(input: { projectId: string; phaseId: string; imageId: string }): Promise<ActionResult<{ cardId: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
     const ctx = await context();
     const data = parse(z.strictObject(NoteImageRef), input);
     const result = await studioFlow.ideas.saveNoteImageToIdeas({ ...ctx, ...data });
@@ -146,6 +162,7 @@ const NoteUseInput = z.strictObject({ ...NoteImageRef, target: UseInput.shape.ta
 /** "Use in schedule" straight from a phase-note image, in the note's own project. */
 export async function applyNoteImageToScheduleAction(input: z.infer<typeof NoteUseInput>): Promise<ActionResult<{ projectId: string; entryId: string; optionId: string; code: string; label: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
     const ctx = await context();
     const data = parse(NoteUseInput, input);
     const result = await studioFlow.ideas.useNoteImageInSchedule({ ...ctx, ...data });
@@ -157,6 +174,8 @@ export async function applyNoteImageToScheduleAction(input: z.infer<typeof NoteU
 /** "Add to moodboard" on a card: a copy becomes a slide of the project Moodboard board. */
 export async function addIdeaToMoodboardAction(input: { cardId: string; projectId: string }): Promise<ActionResult<{ boardId: string; slideId: string; created: boolean }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(z.strictObject({ cardId: Id, projectId: Id }), input);
     const result = await studioFlow.ideas.addIdeaToMoodboard({ ...ctx, ...data });
@@ -168,6 +187,8 @@ export async function addIdeaToMoodboardAction(input: { cardId: string; projectI
 /** "Add to moodboard" from a phase-note image, in the note own project. */
 export async function addNoteImageToMoodboardAction(input: { projectId: string; phaseId: string; imageId: string }): Promise<ActionResult<{ boardId: string; slideId: string; created: boolean }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("ideas");
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(z.strictObject(NoteImageRef), input);
     const result = await studioFlow.ideas.addNoteImageToMoodboard({ ...ctx, ...data });

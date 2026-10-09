@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AuthenticatedShell } from "@/platform/authenticated-shell";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
+import { enabledModuleIds } from "@platform/core/modules";
 import { hasPermission } from "@platform/core/rbac";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
@@ -30,11 +31,12 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const { principal, grants } = principalGrants;
   const canManageSampleRequests = hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
   const display = await userPreferences.resolveDisplay({ userId: principal.userId });
-  const [settings, tutorial, waitingOnYou, openSampleRequests] = await Promise.all([
+  const [settings, tutorial, waitingOnYou, openSampleRequests, enabledModules] = await Promise.all([
     readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key)),
     userTutorials.getShellState({ userId: principal.userId, language: display.language }),
     grants.includes("studioflow.access") ? studioFlow.projects.countWaitingOnYou({ grants, actorId: principal.userId }) : Promise.resolve(0),
     canManageSampleRequests ? studioFlowSampleRequestRead.countPendingSampleRequests() : Promise.resolve(0),
+    enabledModuleIds(),
   ]);
   const apps = getPermissionRegistry().apps
     .filter((app) => grants.includes(app.accessPermission))
@@ -43,7 +45,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const domainNavigation = <>
     {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav canManageSampleRequests={canManageSampleRequests} canReadSamples={hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRead)} openSampleRequests={openSampleRequests} canUseWorkbook={(hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) || (hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage))} /> : null}
     {apps.some((app) => app.appId === "bq") ? <BqNav /> : null}
-    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav waitingOnYou={waitingOnYou} /> : null}
+    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav waitingOnYou={waitingOnYou} enabledModuleIds={enabledModules} /> : null}
   </>;
 
   // Each app's Settings sits in the rail's utility area; each component renders only inside its own app.

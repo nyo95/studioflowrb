@@ -6,9 +6,9 @@ import { composePermissionRegistry } from "@platform/core/rbac/registry";
 import { appGroupOf, groupAndOrderRoles, groupPriority } from "./role-grouping";
 
 const registry = composePermissionRegistry([
-  { appId: "masterdata", version: "1.0.0", kind: "core", name: "Master Data", rootPath: "/masterdata", permissions: ["masterdata.access", "masterdata.brand.manage"] },
-  { appId: "bq", version: "1.0.0", kind: "core", name: "Bill of Quantity", rootPath: "/bq", permissions: ["bq.access", "bq.project.manage"] },
-  { appId: "studioflow", version: "1.0.0", kind: "core", name: "StudioFlow", rootPath: "/studioflow", permissions: ["studioflow.access", "studioflow.schedule.manage"] },
+  { appId: "masterdata", version: "1.0.0", kind: "core", requires: [], name: "Master Data", rootPath: "/masterdata", permissions: ["masterdata.access", "masterdata.brand.manage"] },
+  { appId: "bq", version: "1.0.0", kind: "core", requires: ["masterdata"], name: "Bill of Quantity", rootPath: "/bq", permissions: ["bq.access", "bq.project.manage"] },
+  { appId: "studioflow", version: "1.0.0", kind: "core", requires: ["masterdata"], name: "StudioFlow", rootPath: "/studioflow", permissions: ["studioflow.access", "studioflow.schedule.manage"] },
 ]);
 
 describe("appGroupOf", () => {

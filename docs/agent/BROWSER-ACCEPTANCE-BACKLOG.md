@@ -284,3 +284,11 @@ this backlog's former SF-A entries.)_
 - Steps: 1. Leave All brands, search the shared code: both SKUs appear with their brand beside the code. 2. Choose one Brand: only its SKUs remain. 3. Pick a SKU, pick a supplier; add a row (Enter): the supplier is already filled. 4. Pick the supplier not linked to the Brand: it is marked, and the row offers "Link brand to supplier"; use it as brand-manage, as price-only the button is replaced by who to ask. 5. Price one SKU for two suppliers (two rows) and one supplier for two SKUs; save: all rows appear. 6. Repeat a SKU and supplier that already have a price and save: that row is marked and nothing is saved. 7. In the lists the specification shows under each name and typing part of it in the search finds the row.
 - Acceptance: nothing is saved when any row fails; the unit follows the SKU; the supplier carries down but can be changed per row; linking works only with permission.
 - Status: PENDING
+
+### [R8.498] Optional StudioFlow module gates
+- Surface: StudioFlow rail, Ideas, project notes, Presentation, and Presentation print
+- Fixture: an Ideas card and a Presentation board with at least one slide; System Owner command access
+- Viewport: desktop (default)
+- Steps: 1. With both modules enabled, open Ideas and Presentation and confirm their existing workflows. 2. Disable Ideas; reload and inspect the rail and project-note image actions, then open the old Ideas URL. 3. Re-enable Ideas and confirm the same card returns. 4. Repeat for Presentation, including its project tab, moodboard entry points, board URL, and print URL.
+- Acceptance: enabled behavior is unchanged; disabled entries disappear without breaking surrounding layouts; disabled URLs are not-found; enabling restores the same saved data.
+- Status: PENDING

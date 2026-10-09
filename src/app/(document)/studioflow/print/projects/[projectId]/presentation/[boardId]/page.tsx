@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { AppError } from "@platform/core/errors";
+import { isModuleEnabled } from "@platform/core/modules";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { DocumentPage, DocumentSheet, PrintButton, PrintFormatPicker, printFormatFromSearchParams } from "@/platform/ui_engine";
@@ -32,6 +33,7 @@ function legendTier(count: number) {
 }
 
 export default async function PresentationPrintPage({ params, searchParams }: { params: Promise<{ projectId: string; boardId: string }>; searchParams: Promise<{ paper?: string; orientation?: string }> }) {
+  if (!(await isModuleEnabled("presentation"))) notFound();
   const { projectId, boardId } = await params;
   const printFormat = printFormatFromSearchParams(await searchParams);
   const { grants } = await requirePrincipalGrants();

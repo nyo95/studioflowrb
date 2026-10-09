@@ -12,6 +12,7 @@ import { addNoteImageToMoodboardAction, saveNoteImageToIdeasAction, applyNoteIma
 import { UseInScheduleDialog } from "../../ideas/use-in-schedule-dialog";
 import { NOTE_MAX, NoteComposer, uploadNoteImages, useNoteDraft, type NoteImage } from "../../_components/phase-note-composer";
 import type { IterationView } from "../../_components/phase-commands";
+import { useStudioFlowModuleEnabled } from "../../module-state";
 
 export type IterationRow = { id: string; name: string; shortName: string; state: IterationView["state"]; createdAt: Date; sentAt: Date | null; answeredAt: Date | null; doneAt: Date | null; visitDate: string | null };
 
@@ -272,6 +273,8 @@ function NoteBubble({ note, projectId, phaseId, canEdit, locale, timezone, busy,
 
 /** Under a note image in the large viewer: keep a copy on the person's Ideas board, or put it in this project's schedule. Both copy; the note is never changed. */
 function NoteImageActions({ image, projectId, phaseId }: { image: { id: string }; projectId: string; phaseId: string }) {
+  const ideasEnabled = useStudioFlowModuleEnabled("ideas");
+  const presentationEnabled = useStudioFlowModuleEnabled("presentation");
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -290,11 +293,11 @@ function NoteImageActions({ image, projectId, phaseId }: { image: { id: string }
   };
   return (
     <>
-      <Button size="sm" variant="secondary" pending={pending} disabled={saved} onClick={() => void save()}>{saved ? "Saved to Ideas" : "Save to Ideas"}</Button>
-      <Button size="sm" variant="secondary" onClick={() => setUsing(true)}>Use in schedule</Button>
-      <Button size="sm" variant="secondary" pending={moodboard === "pending"} disabled={moodboard === "done"} onClick={() => void addToMoodboard()}>{moodboard === "done" ? "Added to moodboard" : "Add to moodboard"}</Button>
+      {ideasEnabled ? <Button size="sm" variant="secondary" pending={pending} disabled={saved} onClick={() => void save()}>{saved ? "Saved to Ideas" : "Save to Ideas"}</Button> : null}
+      {ideasEnabled ? <Button size="sm" variant="secondary" onClick={() => setUsing(true)}>Use in schedule</Button> : null}
+      {ideasEnabled && presentationEnabled ? <Button size="sm" variant="secondary" pending={moodboard === "pending"} disabled={moodboard === "done"} onClick={() => void addToMoodboard()}>{moodboard === "done" ? "Added to moodboard" : "Add to moodboard"}</Button> : null}
       {error ? <InlineError>{error}</InlineError> : null}
-      {using ? (
+      {ideasEnabled && using ? (
         <UseInScheduleDialog
           initialName=""
           initialNotes=""

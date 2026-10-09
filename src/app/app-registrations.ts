@@ -19,6 +19,7 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
     appId: "masterdata",
     version: "1.0.0",
     kind: "core",
+    requires: [],
     name: "Master Data",
     rootPath: "/masterdata",
     icon: "database",
@@ -28,6 +29,7 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
     appId: "bq",
     version: "1.0.0",
     kind: "core",
+    requires: ["masterdata"],
     name: "Bill of Quantity",
     rootPath: "/bq",
     icon: "calculator",
@@ -37,6 +39,7 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
     appId: "studioflow",
     version: "1.0.0",
     kind: "core",
+    requires: ["masterdata"],
     name: "StudioFlow",
     rootPath: "/studioflow",
     icon: "layout-dashboard",
@@ -46,7 +49,7 @@ export const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [
 ];
 
 export const MODULE_MANIFESTS: readonly ModuleManifest[] = [
-  ...APP_REGISTRATIONS.map(({ appId: id, name, version, kind }) => ({ id, name, version, kind, requires: [] })),
+  ...APP_REGISTRATIONS.map(({ appId: id, name, version, kind, requires }) => ({ id, name, version, kind, requires })),
   IDEAS_MODULE_MANIFEST,
   PRESENTATION_MODULE_MANIFEST,
 ];

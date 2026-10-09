@@ -11,9 +11,12 @@ import {
   collectDuplicateMachineryViolations,
   collectServerClientCallViolations,
   collectMigrationIsolationViolations,
+  collectModuleBoundaryViolations,
   RULE_MIGRATION_ISOLATION,
   RULE_SERVER_CALLS_CLIENT_FUNCTION,
   RULE_INTEGRATION_ROUTE_IMPORTS,
+  RULE_MODULE_ADMIN_IMPORT,
+  RULE_MODULE_MANIFEST_REQUIRES,
   RULE_DUPLICATE_MACHINERY,
   RULE_UNSCANNED_FILE,
   collectPermissionVocabularyViolations,
@@ -213,6 +216,8 @@ const FOUNDATION_FILES = {
   "src/apps/sun/service.ts": `export const SUN_PERMISSIONS = { access: "sun.access", manage: "sun.manage" };\n`,
   "src/apps/sun/public/index.ts": `export { SUN_PERMISSIONS } from "../service";\nexport { SUN_ROUTES } from "./nav";\n`,
   "src/apps/sun/public/nav.ts": `export const SUN_ROUTES = { root: "/sun", projects: "/sun/projects" };\n`,
+  "src/apps/sun/runtime-dependency.ts": `import { MOON_PERMISSIONS } from "@/apps/moon/public";\nexport const moonPermissions = MOON_PERMISSIONS;\n`,
+  "src/apps/sun/bad-module-admin.ts": `import { changeModuleState } from "@platform/core/modules/admin";\nexport const bad = changeModuleState;\n`,
   "src/app/(platform)/sun/page.tsx": `import { something } from "@/apps/moon/public";\nexport const page = something;\n`,
   "src/app/(platform)/sun/bad.tsx": `import { Widget } from "@/apps/moon/ui/widget";\nexport const bad = Widget;\n`,
 
@@ -225,6 +230,8 @@ const FOUNDATION_FILES = {
   "src/apps/ven/service.ts": `export const VEN_PERMISSIONS = { access: "ven.access", read: "ven.read" };\n`,
   "src/apps/ven/public/index.ts": `export { VEN_PERMISSIONS } from "../service";\nexport { VEN_ROUTES } from "./nav";\n`,
   "src/apps/ven/public/nav.ts": `import { VEN_PERMISSIONS } from "../service";\nexport const VEN_ROUTES = { root: "/ven", list: "/other/ven" };\n`,
+  "src/apps/ven/link-nav.ts": `import { MOON_ROUTES } from "@/apps/moon/public/nav";\nexport const moon = MOON_ROUTES;\n`,
+  "src/apps/ven/link-routes.ts": `import { SUN_ROUTES } from "@/apps/sun/public";\nexport const sun = SUN_ROUTES;\n`,
   "src/app/(platform)/ven/page.tsx": `export const page = "ven";\n`,
   "src/apps/ven/deep.ts": `import { Text } from "@/platform/ui_engine/components/button";\nexport const t = Text;\n`,
   "src/apps/ven/legacy.tsx": `export const L = () => <div className="ui-card is-open">x</div>;\n`,
@@ -244,9 +251,12 @@ const FOUNDATION_FILES = {
   "src/app/api/integrations/v1/bad-prisma/route.ts": `import { PrismaClient } from "@prisma/client"; export const x = PrismaClient;\n`,
   "src/app/api/integrations/v1/bad-internal/route.ts": `import { Widget } from "@/apps/moon/ui/widget"; export const x = Widget;\n`,
 
-  "src/app/app-registrations.ts": `import type { AppPermissionRegistrationInput } from "@platform/core/rbac/registry";\nimport { SUN_PERMISSIONS } from "@/apps/sun/public";\nimport { MOON_PERMISSIONS } from "@/apps/moon/public";\nimport { VEN_PERMISSIONS } from "@/apps/ven/public";\n\nexport const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [\n  { appId: "sun", name: "Sun", rootPath: "/sun", permissions: Object.values(SUN_PERMISSIONS) },\n  { appId: "moon", name: "Moon", rootPath: "/moon", permissions: Object.values(MOON_PERMISSIONS) },\n  { appId: "ven", name: "Ven", rootPath: "/ven", permissions: Object.values(VEN_PERMISSIONS) },\n];\n`,
+  "src/app/app-registrations.ts": `import type { AppPermissionRegistrationInput } from "@platform/core/rbac/registry";\nimport { SUN_PERMISSIONS } from "@/apps/sun/public";\nimport { MOON_PERMISSIONS } from "@/apps/moon/public";\nimport { VEN_PERMISSIONS } from "@/apps/ven/public";\n\nexport const APP_REGISTRATIONS: readonly AppPermissionRegistrationInput[] = [\n  { appId: "sun", name: "Sun", rootPath: "/sun", requires: [], permissions: Object.values(SUN_PERMISSIONS) },\n  { appId: "moon", name: "Moon", rootPath: "/moon", requires: ["sun"], permissions: Object.values(MOON_PERMISSIONS) },\n  { appId: "ven", name: "Ven", rootPath: "/ven", requires: [], permissions: Object.values(VEN_PERMISSIONS) },\n];\n`,
 
   "src/platform/core/rbac/index.ts": `export const UNUSED = true;\n`,
+  "src/platform/core/modules/admin.ts": `export const changeModuleState = true;\n`,
+  "src/platform/core/modules/legal.ts": `import { changeModuleState } from "./admin";\nexport const legal = changeModuleState;\n`,
+  "scripts/legal-module-admin.ts": `import { changeModuleState } from "../src/platform/core/modules/admin";\nexport const legal = changeModuleState;\n`,
   "src/platform/core/rbac/registry.ts": `export const PLATFORM_PERMISSIONS = [ "platform.settings.read" ] as const;\n`,
   "src/platform/infrastructure/storage.ts": `export const storage = {};\n`,
   "src/platform/core/persist.ts": `import { storage } from "@/platform/infrastructure/storage";\nexport const s = storage;\n`,
@@ -282,6 +292,16 @@ try {
       `src/apps/moon/service.ts | ${RULE_PERMISSION_VOCABULARY} | platform.settings.read`,
       `src/apps/moon/service.ts | ${RULE_PERMISSION_VOCABULARY} | sun.access`,
       `src/apps/moon/service.ts | ${RULE_PERMISSION_VOCABULARY} | external.read`,
+    ].sort(),
+  );
+
+  const modules = await collectModuleBoundaryViolations({ projectRoot: foundationRoot });
+  assert.deepEqual(
+    modules.map((v) => violationKey(foundationRoot, v)).sort(),
+    [
+      `src/apps/sun/bad-module-admin.ts | ${RULE_MODULE_ADMIN_IMPORT} | @platform/core/modules/admin`,
+      `src/apps/sun/runtime-dependency.ts | ${RULE_MODULE_MANIFEST_REQUIRES} | @/apps/moon/public`,
+      `src/app/app-registrations.ts | ${RULE_MODULE_MANIFEST_REQUIRES} | moon -> sun`,
     ].sort(),
   );
 
@@ -349,11 +369,12 @@ try {
 
   const combined = await collectAllViolations({ projectRoot: foundationRoot, allowList: [], machinery: machineryFixture });
   assert.equal(combined.boundary.length, boundary.length);
+  assert.equal(combined.modules.length, modules.length);
   assert.equal(combined.permission.length, permission.length);
   assert.equal(combined.route.length, route.length);
   assert.equal(combined.duplicate.length, duplicates.length);
 
-  console.log("PASS foundation fixtures: import/layer rules, permission SSOT, route ownership, duplicate primitives");
+  console.log("PASS foundation fixtures: import/layer rules, module manifests/admin writer, permission SSOT, route ownership, duplicate primitives");
 } finally {
   await rm(foundationRoot, { recursive: true, force: true });
 }

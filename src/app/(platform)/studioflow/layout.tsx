@@ -2,9 +2,12 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
+import { enabledModuleIds } from "@platform/core/modules";
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 import { ErrorState, PageShell } from "@/platform/ui_engine";
+
+import { StudioFlowModuleState } from "./module-state";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +22,7 @@ export default async function StudioFlowLayout({ children }: { children: ReactNo
       </PageShell>
     );
   }
+  const enabled = await enabledModuleIds();
   /* No PageShell here. It is a centred, max-width, padded CSS grid, and
      wrapping every StudioFlow route in one made a full-bleed, viewport-tall
      project workspace impossible: `flex-1` is inert inside a grid parent, so
@@ -27,5 +31,5 @@ export default async function StudioFlowLayout({ children }: { children: ReactNo
      Each page now owns its own measure, and the project workspace applies
      PageShell inside its content column — which is what the prototype does:
      `.a-main` is full-bleed and `.a-measure` sits inside it. */
-  return <>{children}</>;
+  return <StudioFlowModuleState enabledModuleIds={enabled}>{children}</StudioFlowModuleState>;
 }

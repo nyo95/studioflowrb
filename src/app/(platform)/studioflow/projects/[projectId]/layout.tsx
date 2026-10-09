@@ -2,6 +2,7 @@ import { Suspense, type ReactNode } from "react";
 import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
+import { enabledModuleIds } from "@platform/core/modules";
 import type { PermissionGrants } from "@platform/core/rbac";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
@@ -14,12 +15,12 @@ import { ProjectNavLinks, type ProjectNavItem } from "./project-nav-links";
 
 export const dynamic = "force-dynamic";
 
-function navigation(projectId: string, counts?: { mom: number; schedule: number; presentation: number }): ProjectNavItem[] {
+function navigation(projectId: string, presentationEnabled: boolean, counts?: { mom: number; schedule: number; presentation: number }): ProjectNavItem[] {
   return [
     { href: STUDIOFLOW_ROUTES.project(projectId), label: "Phases", exact: true, detail: null },
     { href: STUDIOFLOW_ROUTES.projectMom(projectId), label: "MOM", detail: counts?.mom ? String(counts.mom) : null },
     { href: STUDIOFLOW_ROUTES.projectSchedule(projectId), label: "Schedule", detail: counts?.schedule ? String(counts.schedule) : null },
-    { href: STUDIOFLOW_ROUTES.projectPresentation(projectId), label: "Presentation", detail: counts?.presentation ? String(counts.presentation) : null },
+    ...(presentationEnabled ? [{ href: STUDIOFLOW_ROUTES.projectPresentation(projectId), label: "Presentation", detail: counts?.presentation ? String(counts.presentation) : null }] : []),
     { href: STUDIOFLOW_ROUTES.projectTimeline(projectId), label: "Timeline", detail: null },
     { href: STUDIOFLOW_ROUTES.projectHistory(projectId), label: "History", detail: null },
   ];
@@ -28,11 +29,12 @@ function navigation(projectId: string, counts?: { mom: number; schedule: number;
 export default async function ProjectLayout({ children, params }: { children: ReactNode; params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
   const { grants } = await pageSession();
+  const presentationEnabled = (await enabledModuleIds()).includes("presentation");
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       <PageShell measure="wide">
-        <Suspense fallback={<ProjectHeaderSkeleton projectId={projectId} />}>
-          <ProjectHeader grants={grants} projectId={projectId} />
+        <Suspense fallback={<ProjectHeaderSkeleton projectId={projectId} presentationEnabled={presentationEnabled} />}>
+          <ProjectHeader grants={grants} projectId={projectId} presentationEnabled={presentationEnabled} />
         </Suspense>
         <Suspense fallback={null}><ProjectNotices grants={grants} projectId={projectId} /></Suspense>
         {children}
@@ -53,7 +55,7 @@ async function ProjectBreadcrumb({ grants, projectId }: { grants: PermissionGran
   return <Breadcrumb variant="capsule" appMark="SF" entries={[{ label: "StudioFlow", href: STUDIOFLOW_ROUTES.root }, { label: "Projects", href: STUDIOFLOW_ROUTES.projects }, { label: project.name }]} />;
 }
 
-async function ProjectHeader({ grants, projectId }: { grants: PermissionGrants; projectId: string }) {
+async function ProjectHeader({ grants, projectId, presentationEnabled }: { grants: PermissionGrants; projectId: string; presentationEnabled: boolean }) {
   const project = await projectOr404(grants, projectId);
   // DESIGN v2 §6: the pill tab bar sits below the header (sibling views of the page), not in its action
   // corner, where it crowded the capsule and the title.
@@ -64,18 +66,18 @@ async function ProjectHeader({ grants, projectId }: { grants: PermissionGrants; 
       title={project.name}
       meta={<MetaList items={[project.client?.name ?? "No client", `Designer: ${project.designer.displayName}`, `Drafter: ${project.drafter.displayName}`]} />}
     />
-    <Suspense fallback={<ProjectNavLinks items={navigation(projectId)} />}><ProjectNavigation grants={grants} projectId={projectId} /></Suspense>
+    <Suspense fallback={<ProjectNavLinks items={navigation(projectId, presentationEnabled)} />}><ProjectNavigation grants={grants} projectId={projectId} presentationEnabled={presentationEnabled} /></Suspense>
     </div>
   );
 }
 
-async function ProjectNavigation({ grants, projectId }: { grants: PermissionGrants; projectId: string }) {
+async function ProjectNavigation({ grants, projectId, presentationEnabled }: { grants: PermissionGrants; projectId: string; presentationEnabled: boolean }) {
   const [mom, schedule, presentation] = await Promise.all([
     studioFlow.mom.listDocuments({ grants, projectId }),
     studioFlow.schedule.listSchedule({ grants, projectId }),
-    studioFlow.presentation.listBoards({ grants, projectId }),
+    presentationEnabled ? studioFlow.presentation.listBoards({ grants, projectId }) : Promise.resolve([]),
   ]);
-  return <ProjectNavLinks items={navigation(projectId, { mom: mom.length, schedule: schedule.length, presentation: presentation.length })} />;
+  return <ProjectNavLinks items={navigation(projectId, presentationEnabled, { mom: mom.length, schedule: schedule.length, presentation: presentation.length })} />;
 }
 
 async function ProjectNotices({ grants, projectId }: { grants: PermissionGrants; projectId: string }) {
@@ -105,11 +107,11 @@ async function ProjectNotices({ grants, projectId }: { grants: PermissionGrants;
   );
 }
 
-function ProjectHeaderSkeleton({ projectId }: { projectId: string }) {
+function ProjectHeaderSkeleton({ projectId, presentationEnabled }: { projectId: string; presentationEnabled: boolean }) {
   return (
     <div className="grid gap-3 border-b border-line pb-4" aria-hidden="true">
       <div className="h-8 w-64 animate-pulse rounded bg-surface-muted" />
-      <ProjectNavLinks items={navigation(projectId)} />
+      <ProjectNavLinks items={navigation(projectId, presentationEnabled)} />
     </div>
   );
 }

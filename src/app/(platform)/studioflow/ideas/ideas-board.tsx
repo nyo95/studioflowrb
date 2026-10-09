@@ -35,7 +35,7 @@ function hostOf(url: string): string {
  * The board (owner, 2026-10-08): capture first, structure later. Paste, drop or pick any image and it is a card
  * at once; title, link and note are optional. "Use in schedule" copies the card into one project's schedule.
  */
-export function IdeasBoard({ cards, targets }: { cards: IdeaCardView[]; targets: Target[] }) {
+export function IdeasBoard({ cards, targets, presentationEnabled }: { cards: IdeaCardView[]; targets: Target[]; presentationEnabled: boolean }) {
   const router = useRouter();
   const confirm = useConfirm();
   const picker = useRef<HTMLInputElement>(null);
@@ -149,7 +149,7 @@ export function IdeasBoard({ cards, targets }: { cards: IdeaCardView[]; targets:
                   pending={busy === card.id}
                   items={[
                     { label: "Use in schedule…", onSelect: () => setUsing(card), disabled: targets.length === 0 },
-                    { label: "Add to moodboard…", onSelect: () => setMoodboarding(card), disabled: targets.length === 0 },
+                    ...(presentationEnabled ? [{ label: "Add to moodboard…", onSelect: () => setMoodboarding(card), disabled: targets.length === 0 }] : []),
                     { label: "Edit details", onSelect: () => setEditing(card) },
                     { label: "Replace image", onSelect: () => replaceImage(card) },
                     { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void remove(card) },

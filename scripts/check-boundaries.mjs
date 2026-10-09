@@ -21,6 +21,8 @@ export const RULE_DUPLICATE_MACHINERY = "app-local copy of generic machinery";
 export const RULE_MIGRATION_ISOLATION = "migration touches more than one app schema";
 export const RULE_SERVER_CALLS_CLIENT_FUNCTION = "server code -> function in a \"use client\" module";
 export const RULE_INTEGRATION_ROUTE_IMPORTS = "integration route import allow-list";
+export const RULE_MODULE_MANIFEST_REQUIRES = "module manifest requires";
+export const RULE_MODULE_ADMIN_IMPORT = "module state writer import";
 
 /**
  * App layers a composition/shell file (anything under `src/app` or
@@ -439,6 +441,108 @@ export function findRegistrationBlock(source, appId) {
     }
   }
   return null;
+}
+
+function registrationRequires(source, appId) {
+  const block = findRegistrationBlock(source, appId);
+  if (!block) return [];
+  const match = /\brequires\s*:\s*\[([\s\S]*?)\]/.exec(block);
+  if (!match) return [];
+  return [...match[1].matchAll(/["']([^"']+)["']/g)].map((entry) => entry[1]);
+}
+
+function countedPublicAppImports(source, fileName, importerApp) {
+  const sourceFile = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, scriptKindFor(fileName));
+  const imports = [];
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
+    const specifier = statement.moduleSpecifier.text;
+    const match = /^@\/apps\/([^/]+)\/public(?:\/(.*))?$/.exec(specifier);
+    if (!match || match[1] === importerApp) continue;
+    const imported = statement.importClause?.namedBindings;
+    const routesOnly = imported && ts.isNamedImports(imported) && imported.elements.length > 0 &&
+      imported.elements.every((element) => (element.propertyName ?? element.name).text.endsWith("_ROUTES"));
+    const navOnly = match[2] === "nav" || match[2]?.startsWith("nav/");
+    if (!navOnly && !routesOnly) imports.push({ app: match[1], specifier });
+  }
+  return imports;
+}
+
+/**
+ * Module manifests must name every runtime/data cross-app dependency, while
+ * navigation-only imports remain ordinary links. The module state writer is a
+ * deliberately narrow administrative surface: only its own module package and
+ * repository scripts may import it.
+ */
+export async function collectModuleBoundaryViolations({ projectRoot = process.cwd(), srcDir } = {}) {
+  projectRoot = resolve(projectRoot);
+  srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
+  const appsRoot = join(srcDir, "apps");
+  const apps = await listAppsInDir(appsRoot);
+  const registrationsPath = join(srcDir, "app", "app-registrations.ts");
+  let registrations = "";
+  try {
+    registrations = await readFile(registrationsPath, "utf8");
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  const violations = [];
+
+  for (const app of apps) {
+    const declared = new Set(registrationRequires(registrations, app));
+    const observed = new Map();
+    for (const file of await walkSources(join(appsRoot, app))) {
+      if (/\.(test|spec)\.[jt]sx?$/.test(file)) continue;
+      const source = await readFile(file, "utf8");
+      for (const dependency of countedPublicAppImports(source, file, app)) {
+        if (!observed.has(dependency.app)) observed.set(dependency.app, { file, specifier: dependency.specifier });
+      }
+    }
+    for (const [dependency, evidence] of observed) {
+      if (declared.has(dependency)) continue;
+      violations.push({
+        rule: RULE_MODULE_MANIFEST_REQUIRES,
+        file: evidence.file,
+        specifier: evidence.specifier,
+        detail: `app "${app}" imports runtime/data capability from "${dependency}" but its manifest does not declare requires: ["${dependency}"].`,
+      });
+    }
+    for (const dependency of declared) {
+      if (observed.has(dependency)) continue;
+      violations.push({
+        rule: RULE_MODULE_MANIFEST_REQUIRES,
+        file: registrationsPath,
+        specifier: `${app} -> ${dependency}`,
+        detail: `app "${app}" declares module requirement "${dependency}" without a counted cross-app public import. Remove the stale requirement or add the runtime/data dependency.`,
+      });
+    }
+  }
+
+  const aliasMap = await readAliasMap(projectRoot);
+  const modulesRoot = join(srcDir, "platform", "core", "modules");
+  const scriptsRoot = join(projectRoot, "scripts");
+  let scripts = [];
+  try {
+    scripts = await walkSources(scriptsRoot);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  const adminTarget = join(modulesRoot, "admin");
+  for (const file of [...await walkSources(srcDir), ...scripts]) {
+    if (isEqualToOrInside(modulesRoot, file) || isEqualToOrInside(scriptsRoot, file)) continue;
+    const source = await readFile(file, "utf8");
+    for (const specifier of extractImportSpecifiers(source, file)) {
+      const target = resolveSpecifier(specifier, file, aliasMap, projectRoot);
+      if (!target || target.replace(/\.[^.\\/]+$/, "") !== adminTarget) continue;
+      violations.push({
+        rule: RULE_MODULE_ADMIN_IMPORT,
+        file,
+        specifier,
+        detail: "Only repository scripts and platform/core/modules may import the module state writer. Application code must use the read-only public module API.",
+      });
+    }
+  }
+  return violations;
 }
 
 function importDeclares(source, declaredName, fromModule) {
@@ -1271,6 +1375,7 @@ export async function collectMigrationIsolationViolations({ projectRoot = proces
 
 export async function collectAllViolations(options = {}) {
   const boundary = await collectBoundaryViolations(options);
+  const modules = await collectModuleBoundaryViolations(options);
   const permission = await collectPermissionVocabularyViolations(options);
   const route = await collectRouteOwnershipViolations(options);
   const duplicate = await collectDuplicatePrimitiveViolations(options);
@@ -1279,7 +1384,7 @@ export async function collectAllViolations(options = {}) {
   const machinery = await collectDuplicateMachineryViolations(options);
   const clientCalls = await collectServerClientCallViolations(options);
   const migrations = await collectMigrationIsolationViolations(options);
-  return { boundary, permission, route, duplicate, database, unscanned, machinery, clientCalls, migrations };
+  return { boundary, modules, permission, route, duplicate, database, unscanned, machinery, clientCalls, migrations };
 }
 
 async function main() {
@@ -1295,6 +1400,7 @@ async function main() {
   const rel = (p) => relative(projectRoot, p) || p;
   const sections = [
     ["Imports and layers", all.boundary],
+    ["Module dependencies and state writer", all.modules],
     ["Permission vocabulary (SSOT)", all.permission],
     ["App route ownership", all.route],
     ["Duplicate display primitives", all.duplicate],

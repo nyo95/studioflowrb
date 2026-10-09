@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.498 | 2026-10-10 | fix(platform,studioflow): complete optional-module gates and dependency enforcement (Executor)
+
+- **WO-MODULES-M1 correction:** Ideas and Presentation now fail closed at every page/action boundary when disabled; the StudioFlow rail, project Presentation tab, note-image Ideas actions, and moodboard entry points disappear from the enabled-module list. Existing behavior and data stay unchanged while enabled, and disabling never deletes Ideas cards/usages or Presentation boards.
+- Core manifests now declare their runtime/data dependencies (`bq` and `studioflow` require `masterdata`; `masterdata` requires none). `check:boundaries` enforces manifest `requires` against counted cross-app public imports while exempting navigation links, and confines the module state writer to repository scripts and `platform/core/modules`; regression fixtures cover both failures and both link exemptions. RBAC tests assert that no permission id mentions modules.
+- Added disposable-database integration coverage for default-enabled state, audited disable/enable transitions, unchanged module data, core refusal, action `MODULE_DISABLED`, and not-found Ideas/Presentation/board/print routes. Restored `next-env.d.ts` to its development form and queued the disabled-state browser acceptance walk for the Reviewer.
+- **Migrations/dependencies:** no new migration and no dependency. The existing 98 migrations, including `20261009170000_platform_module_state`, are fully applied on the verified disposable `localhost:5433/masterdata_test` rebuild database.
+- **Checks:** `tsc --noEmit`; eslint (0 errors, 1 existing Presentation `<img>` warning); `npm test` (1,005 passed); targeted final module-state integration (1 passed); `check:boundaries`; `check:legacy-runtime`; production build; Ideas/Presentation Playwright cases P.1, P.2, P.5, P.6, P.7 and 7.6 (6 passed); staged and unstaged whitespace checks.
+
 ## R8.497 | 2026-10-09 | docs(plan): lock the module `requires` meaning after the Executor's dependency-cycle BLOCKED (Lead)
 
 - **BLOCKED resolved (option A):** Master Data imports `STUDIOFLOW_ROUTES` only to build a notification link, while StudioFlow imports Master Data's public read, so an exact `requires ⇔ imports` rule would produce a `masterdata ⇄ studioflow` cycle. `requires` now means a runtime capability or data dependency; link imports (`@/apps/<B>/public/nav`, or only `*_ROUTES` specifiers) are excluded. Expected manifests: `masterdata: []`, `bq: ["masterdata"]`, `studioflow: ["masterdata"]`. The R8.495 cycle rejection is unchanged. Recorded in `PLAN.md` finding 2.

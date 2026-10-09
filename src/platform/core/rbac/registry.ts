@@ -37,6 +37,7 @@ export type RegisteredApp = {
   appId: string;
   version: string;
   kind: "core" | "optional";
+  requires: readonly string[];
   /** Launcher display name. */
   name: string;
   /** App root route, always absolute. */
@@ -56,6 +57,7 @@ export type AppPermissionRegistrationInput = {
   appId: string;
   version: string;
   kind: "core" | "optional";
+  requires: readonly string[];
   name: string;
   rootPath: string;
   icon?: string;
@@ -89,7 +91,7 @@ export function composePermissionRegistry(
   const apps: RegisteredApp[] = [];
 
   for (const registration of registrations) {
-    const { appId, version, kind, name, rootPath, permissions, icon, positions = [] } = registration;
+    const { appId, version, kind, requires, name, rootPath, permissions, icon, positions = [] } = registration;
     if (!APP_ID_PATTERN.test(appId)) {
       throw new AppError("INVARIANT", "REGISTRY_INVALID_APP_ID", "An app registration is invalid.");
     }
@@ -125,6 +127,7 @@ export function composePermissionRegistry(
       appId,
       version,
       kind,
+      requires: Object.freeze([...requires]),
       name: name.trim(),
       rootPath,
       ...(typeof icon === "string" && icon.trim() ? { icon: icon.trim() } : {}),

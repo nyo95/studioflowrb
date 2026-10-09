@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { AppError } from "@platform/core/errors";
+import { requireModuleEnabled } from "@platform/core/modules";
 import { validationError } from "@platform/core/validation";
 import { studioFlow } from "@/apps/studioflow/runtime";
 
@@ -652,6 +653,7 @@ function refreshPresentation(projectId: string) {
 const PresentationBoardInput = z.strictObject({ projectId: Id, boardId: Id.optional(), title: z.string().min(1).max(200) });
 export async function createPresentationBoardAction(input: z.infer<typeof PresentationBoardInput>): Promise<ActionResult<{ boardId: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(PresentationBoardInput, input);
     const result = await studioFlow.presentation.createBoard({ ...ctx, projectId: data.projectId, title: data.title });
@@ -662,6 +664,7 @@ export async function createPresentationBoardAction(input: z.infer<typeof Presen
 
 export async function updatePresentationBoardAction(input: z.infer<typeof PresentationBoardInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(PresentationBoardInput, input);
     if (!data.boardId) throw new AppError("VALIDATION", "PRESENTATION_BOARD_REQUIRED", "Choose a presentation board.");
@@ -674,6 +677,7 @@ export async function updatePresentationBoardAction(input: z.infer<typeof Presen
 const PresentationBoardRef = z.strictObject({ projectId: Id, boardId: Id });
 export async function deletePresentationBoardAction(input: z.infer<typeof PresentationBoardRef>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(PresentationBoardRef, input);
     await studioFlow.presentation.deleteBoard({ ...ctx, ...data });
@@ -685,6 +689,7 @@ export async function deletePresentationBoardAction(input: z.infer<typeof Presen
 const PresentationSlidesOrder = z.strictObject({ projectId: Id, boardId: Id, orderedIds: z.array(Id).min(1).max(500) });
 export async function reorderPresentationSlidesAction(input: z.infer<typeof PresentationSlidesOrder>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(PresentationSlidesOrder, input);
     await studioFlow.presentation.reorderSlides({ ...ctx, ...data });
@@ -695,6 +700,7 @@ export async function reorderPresentationSlidesAction(input: z.infer<typeof Pres
 
 export async function addPresentationSlidesAction(formData: FormData): Promise<ActionResult<{ slideIds: string[] }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const projectId = parse(Id, formData.get("projectId"));
     const boardId = parse(Id, formData.get("boardId"));
@@ -713,6 +719,7 @@ export async function addPresentationSlidesAction(formData: FormData): Promise<A
 const PresentationSlideRef = z.strictObject({ projectId: Id, slideId: Id });
 export async function deletePresentationSlideAction(input: z.infer<typeof PresentationSlideRef>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(PresentationSlideRef, input);
     await studioFlow.presentation.deleteSlide({ ...ctx, ...data });
@@ -724,6 +731,7 @@ export async function deletePresentationSlideAction(input: z.infer<typeof Presen
 const PresentationAnnotationInput = z.strictObject({ projectId: Id, slideId: Id.optional(), annotationId: Id.optional(), pinX: z.number().min(0).max(100).optional(), pinY: z.number().min(0).max(100).optional(), scheduleEntryId: Id.nullish(), labelSide: z.enum(["auto", "left", "right"]).optional(), note: OptionalText });
 export async function addPresentationAnnotationAction(input: z.infer<typeof PresentationAnnotationInput>): Promise<ActionResult<{ annotationId: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(PresentationAnnotationInput, input);
     if (!data.slideId || data.pinX === undefined || data.pinY === undefined) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose a slide and pin position.");
@@ -735,6 +743,7 @@ export async function addPresentationAnnotationAction(input: z.infer<typeof Pres
 
 export async function updatePresentationAnnotationAction(input: z.infer<typeof PresentationAnnotationInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(PresentationAnnotationInput, input);
     if (!data.annotationId) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose a pin.");
@@ -747,6 +756,7 @@ export async function updatePresentationAnnotationAction(input: z.infer<typeof P
 const PresentationAnnotationRef = z.strictObject({ projectId: Id, annotationId: Id });
 export async function deletePresentationAnnotationAction(input: z.infer<typeof PresentationAnnotationRef>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
     const ctx = await context();
     const data = parse(PresentationAnnotationRef, input);
     await studioFlow.presentation.deleteAnnotation({ ...ctx, ...data });

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
+import { isModuleEnabled } from "@platform/core/modules";
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
@@ -12,6 +13,7 @@ import { PresentationBoardList } from "./presentation-board-list";
 export const dynamic = "force-dynamic";
 
 export default async function PresentationPage({ params }: { params: Promise<{ projectId: string }> }) {
+  if (!(await isModuleEnabled("presentation"))) notFound();
   const { projectId } = await params;
   const { grants } = await pageSession();
   const [project, boards, access] = await Promise.all([
