@@ -6,6 +6,7 @@ import { randomBytes } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
+import { hashPassword } from "@platform/core/auth/password";
 import { bootstrapFirstOwner } from "@platform/core/auth/bootstrap";
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePlatformTables } from "@platform/core/db/test-support";
 import { runSerializableTransaction } from "@platform/core/db/transactions";
@@ -160,11 +161,20 @@ async function main() {
     await sf.schedule.createEntry({ ...sfGrants, projectId: sfFixtures.codes, section: "MATERIAL", category: "Stone", snapshot: { productName: "ZZ-Test Code One" } });
     await sf.schedule.createEntry({ ...sfGrants, projectId: sfFixtures.codes, section: "MATERIAL", category: "Stone", snapshot: { productName: "ZZ-Test Code Two" } });
 
+    // A second person with every permission except the integration ones and no first-use guides done: the guide spec
+    // walks the tour as this person, and the token page must stay hidden from them.
+    const limitedEmail = "e2e-limited@example.test";
+    const limitedPassword = `E2e-${randomBytes(12).toString("hex")}!`;
+    const limitedRole = await db.role.create({ data: { code: "e2e-limited", name: "E2E limited" } });
+    await db.rolePermission.createMany({ data: registry.permissions.filter((permission) => !permission.startsWith("platform.integration.")).map((permission_id) => ({ role_id: limitedRole.id, permission_id })) });
+    const limitedUser = await db.user.create({ data: { email: limitedEmail, display_name: "Lia Limited", password_hash: await hashPassword(limitedPassword) } });
+    await db.userRole.create({ data: { user_id: limitedUser.id, role_id: limitedRole.id } });
+
     const bq = createBqService(db, { auditWriter: createAuditEventWriter(), runTransaction: (work) => db.$transaction((tx) => work(tx as unknown as PrismaClient)) });
     const bqProject = await bq.createProject({ grants: registry.permissions, actor, title: "E2E Long BQ Project Title For Phone Width Checks At The Breeze BSD Phase 2", clientName: "E2E Client" });
 
     mkdirSync("e2e/.tmp", { recursive: true });
-    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, projectId: project.projectId, sf: sfFixtures, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, sku3: sku3.skuId, workCategory: workCategory.categoryId, priceLess62: priceLess62.skuId, priceLess63: priceLess63.skuId, priceLess63Brand: priceLess63Brand.brandId, requestSku: requestSku.skuId } }));
+    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, limited: { email: limitedEmail, password: limitedPassword }, projectId: project.projectId, sf: sfFixtures, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, sku3: sku3.skuId, workCategory: workCategory.categoryId, priceLess62: priceLess62.skuId, priceLess63: priceLess63.skuId, priceLess63Brand: priceLess63Brand.brandId, requestSku: requestSku.skuId } }));
   } finally {
     await closeTestDb(testDb);
   }

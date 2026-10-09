@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.481 | 2026-10-09 | test(platform): browser acceptance Stage 4, WO-E2E-ACCEPT-01 complete (Lead)
+
+- `e2e/platform-acceptance.spec.ts`, 6 specs: 1.1 the first-use guide asks for a language, walks through and does not come back; 1.4 Help: replay guide (both on a second, fresh account in order); P.3 a person without the integration permission does not see the token section; P.4 a token is shown once, listed, revoked, and not recoverable after a reload; P.5 an image on the Ideas board becomes a card that goes to a project's moodboard; 0.3 Home, Pricing and a project page open with no console errors.
+- The seed gets a second account (all permissions except the integration ones, no guides done). Test slip worth remembering: `getByRole("button", { name: "Done" })` also matches "Bahasa Indonesia" (contains "done"), so exact names are used for the guide buttons.
+- **Whole suite:** `npm run test:e2e` 129 passed (3.6 min), 5 spec files from this work plus the existing ones. The backlog entry about the manual walk now lists only what still needs the owner's own eyes.
+- **Migrations/dependencies:** none. **Checks:** eslint on `e2e`, `tsc --noEmit`, the whole Playwright suite.
+
 ## R8.480 | 2026-10-09 | test(studioflow): browser acceptance Stage 3 (Lead took over); the add button shows the real next code (Lead)
 
 - **Owner decision 2026-10-09:** the Lead finishes the remaining acceptance stages. `e2e/studioflow-acceptance.spec.ts`, 8 specs, each in its own seeded project: 7.1 bold and a bullet list that Enter continues; 7.2 a PNG goes in and a PDF is refused; 8.5 the hide/show button for requirements and files, remembered after a reload; 7.6 a note image saved to Ideas, put on the moodboard and used in the schedule; 8.6 a deleted last code is not handed out again; 8.7 Add item from a product of a past project; 8.3 send to client, client answered, revision opens the next iteration; 8.1 Timeline to the Dates & plan dialog and Save. All 8 pass, twice in a row.

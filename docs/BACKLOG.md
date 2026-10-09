@@ -287,7 +287,12 @@ Order matters; each item is its own Work Order.
   apply valid rows for both imports; Lead afterwards: the screen). Folds in the next item (save the valid rows).
 - [ ] [PLANNED][P3] The workbook imports (SKU prices, price database) still reject the whole file when any row is invalid. Revisit a "apply the valid rows" option once WO-MD-ENTRY-01 has proven the grid version; the import's preview step makes it a separate decision.
 - [ ] [UNVERIFIED] WO-MD-ENTRY-01, still open after the 2026-10-08 walks (passed: auto-link on price save; the material, the labor and the several-suppliers grids each save what is valid and keep the failing row or cell with its reason; "Show those prices" opens the Pricing list filtered to those prices): only changing a Brand owner while its prices exist.
-- [ ] [UNVERIFIED] The ordered browser walk that closes every [UNVERIFIED] entry above is in `docs/BROWSER-ACCEPTANCE.md` (11 sections, about an hour). Run it once, record PASS/FAIL per section, then remove the entries that passed and file each FAIL as a [BUG].
+- [ ] [UNVERIFIED] Browser acceptance is now mostly automated (WO-E2E-ACCEPT-01, R8.469-R8.481): `npm run test:e2e` runs 129 checks
+  (Master Data pricing, archive and restore, the sample shelf, notes, images, Schedule codes, the moodboard, the token page, the first-use
+  guide, Ideas). What still needs the owner's own eyes, from `docs/BROWSER-ACCEPTANCE.md`: the BQ screens (section 9 part), Dark mode and
+  the 840 px rail (section 10), MOM print formatting, drop and paste of several images in the answer dialog, the Schedule right-click menu
+  and New category picker, the Google Sheets re-import, the manager completion override. Entries above for covered screens may be removed
+  once the owner agrees the automated result is enough.
 - [ ] [CLEANUP][P3] The unexpected-error branch of the several-suppliers grid (R8.421) has no fault-injection test, as the per-row isolation of R8.419 has none.
 - [ ] [UNVERIFIED] Walk 2026-10-08 did not cover: client-note images (a file upload cannot be driven from the built-in browser), formatted notes, Timeline and Schedule, re-layout on real data, the BQ screens, the sample shelf, Dark mode, the 840 px rail. Run them from `docs/BROWSER-ACCEPTANCE.md` sections 6 to 10 on the owner's own browser.
 - [ ] [CLEANUP][P3] The bullet and numbering buttons in the notes editor do nothing when the note is empty (they work on selected or typed lines); with an empty note they should insert the first marker.
