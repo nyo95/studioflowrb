@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.475 | 2026-10-09 | docs(review): R8.474 verdict PASS, Stage 1 complete (Lead)
+
+- **Review of R8.474 (`f1e706a`, WO-E2E-ACCEPT-01 Stage 1, second part):** the commit touches only `e2e/`, the seed and the changelog (no application code, migration or dependency). Lead ran the whole file in one process: **12 passed in 29 s**, `next-env.d.ts` stays clean. Verdict **PASS**. Stage 1 (walk sections 2, 3, 4) is complete and every step passes; the earlier finding 2.4 was closed by R8.473.
+- The browser walk sections 2, 3 and 4 no longer need the owner's time; the matching `[UNVERIFIED]` entries for those screens can be removed when the owner agrees. Next: Stage 2 (sections 5 and 6).
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.474 | 2026-10-09 | test(masterdata): complete Stage 1 browser-acceptance coverage (Executor)
 
 - Completed the six Stage 1 gaps in `WO-E2E-ACCEPT-01`. Each spec has its own seeded conflict or creates its own `ZZ-Test …` records; no spec depends on another spec's mutations. The shared fixture still provides `ZZ-Test SKU 1`, `2`, and `3`.
