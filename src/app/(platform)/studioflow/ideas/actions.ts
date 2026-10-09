@@ -153,3 +153,25 @@ export async function applyNoteImageToScheduleAction(input: z.infer<typeof NoteU
     return result;
   });
 }
+
+/** "Add to moodboard" on a card: a copy becomes a slide of the project Moodboard board. */
+export async function addIdeaToMoodboardAction(input: { cardId: string; projectId: string }): Promise<ActionResult<{ boardId: string; slideId: string; created: boolean }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(z.strictObject({ cardId: Id, projectId: Id }), input);
+    const result = await studioFlow.ideas.addIdeaToMoodboard({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+/** "Add to moodboard" from a phase-note image, in the note own project. */
+export async function addNoteImageToMoodboardAction(input: { projectId: string; phaseId: string; imageId: string }): Promise<ActionResult<{ boardId: string; slideId: string; created: boolean }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(z.strictObject(NoteImageRef), input);
+    const result = await studioFlow.ideas.addNoteImageToMoodboard({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}

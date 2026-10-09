@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.477 | 2026-10-09 | feat(studioflow): add an idea or a note image to the project's moodboard (Lead)
+
+- **Owner decision 2026-10-09:** the Ideas board gets a second branch next to the Product Schedule: the moodboard, for the team only. It is the project's **Moodboard board on the Presentation tab** (no new tables): "Add to moodboard" puts a copy of the image as the last slide of that board and creates the board the first time. A board the team already named "Moodboard" (any letter case) is reused. The image is copied, so deleting the card or the note never touches the slide.
+- On the Ideas board: card menu **Add to moodboard...** (choose the project; a link opens the board afterwards). On a phase note: open the image large, **Add to moodboard** (the note's own project). Needs the same access as editing that project's documents plus the Presentation permission; otherwise the refusal message shows.
+- Not done on purpose: the card does not show a "Used in" label for the moodboard (the label exists only for schedule options); recorded in the backlog.
+- Backend: `addStoredImageToMoodboard` in the presentation service; `addIdeaToMoodboard` and `addNoteImageToMoodboard` in the ideas service; the ideas service now receives the presentation service. Test added.
+- **Migrations/dependencies:** none. **Checks:** `npm test` (982), `tsc --noEmit`, eslint, `check:boundaries`. Not walked in the browser.
+
 ## R8.476 | 2026-10-09 | fix(studioflow): Presentation image upload shrinks big photos and shows why it failed (Lead)
 
 - **Owner report 2026-10-09:** "Add images" on a Presentation board did nothing visible. Cause: the server accepts a slide image up to 3 MB, the screen sent the file as it was (a phone photo or a big render is larger) and **ignored the server's answer**, so a refusal looked like nothing happened. Now each image is shrunk in the browser to fit (as the Ideas board already does), and any refusal is shown above the board ("This file is not a valid image.", wrong type, and so on).

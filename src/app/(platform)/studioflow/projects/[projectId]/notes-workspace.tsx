@@ -8,7 +8,7 @@ import { currentDateOnly, formatInstant } from "@platform/utilities/date";
 import { Badge, Button, FormattedInstant, FormattedText, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, SectionCard, Text, useConfirm, useFileIntake } from "@/platform/ui_engine";
 
 import { phaseNoteAction, type PhaseNoteCommandInput } from "../../actions";
-import { saveNoteImageToIdeasAction, applyNoteImageToScheduleAction } from "../../ideas/actions";
+import { addNoteImageToMoodboardAction, saveNoteImageToIdeasAction, applyNoteImageToScheduleAction } from "../../ideas/actions";
 import { UseInScheduleDialog } from "../../ideas/use-in-schedule-dialog";
 import { NOTE_MAX, NoteComposer, uploadNoteImages, useNoteDraft, type NoteImage } from "../../_components/phase-note-composer";
 import type { IterationView } from "../../_components/phase-commands";
@@ -276,6 +276,12 @@ function NoteImageActions({ image, projectId, phaseId }: { image: { id: string }
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [using, setUsing] = useState(false);
+  const [moodboard, setMoodboard] = useState<"idle" | "pending" | "done">("idle");
+  const addToMoodboard = async () => {
+    setMoodboard("pending"); setError(null);
+    const result = await addNoteImageToMoodboardAction({ projectId, phaseId, imageId: image.id });
+    if (result.ok) setMoodboard("done"); else { setMoodboard("idle"); setError(result.error.safeMessage); }
+  };
   const save = async () => {
     setPending(true); setError(null);
     const result = await saveNoteImageToIdeasAction({ projectId, phaseId, imageId: image.id });
@@ -286,6 +292,7 @@ function NoteImageActions({ image, projectId, phaseId }: { image: { id: string }
     <>
       <Button size="sm" variant="secondary" pending={pending} disabled={saved} onClick={() => void save()}>{saved ? "Saved to Ideas" : "Save to Ideas"}</Button>
       <Button size="sm" variant="secondary" onClick={() => setUsing(true)}>Use in schedule</Button>
+      <Button size="sm" variant="secondary" pending={moodboard === "pending"} disabled={moodboard === "done"} onClick={() => void addToMoodboard()}>{moodboard === "done" ? "Added to moodboard" : "Add to moodboard"}</Button>
       {error ? <InlineError>{error}</InlineError> : null}
       {using ? (
         <UseInScheduleDialog

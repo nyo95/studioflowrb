@@ -3373,6 +3373,42 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     await rejectsWith(sf.ideas.saveNoteImageToIdeas({ ...as(designer), projectId: other.projectId, phaseId: phase.id, imageId: image.id }), "NOTE_IMAGE_NOT_FOUND");
   });
 
+  it("adds a card or a note image to the project's Moodboard board, creating it once and copying the image", async () => {
+    const { projectId } = await newProject("Moodboard project");
+    const { cardId } = await sf.ideas.createIdeaCard({ ...as(designer), file: cardImage(7) });
+    const cardKey = (await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: cardId } })).image_key;
+
+    const first = await sf.ideas.addIdeaToMoodboard({ ...as(designer), cardId, projectId });
+    assert.equal(first.created, true);
+    const board = await testDb.prisma.sfPresentationBoard.findUniqueOrThrow({ where: { id: first.boardId } });
+    assert.equal(board.title, "Moodboard");
+    const slide = await testDb.prisma.sfPresentationSlide.findUniqueOrThrow({ where: { id: first.slideId } });
+    assert.ok(slide.image_key !== cardKey && slide.image_key.startsWith(`studioflow/presentation/${projectId}/`));
+    assert.deepEqual(bytesOf(slide.image_key), bytesOf(cardKey));
+
+    // A board the team already named "moodboard" (any letter case) is reused, never duplicated; the slide goes last.
+    await testDb.prisma.sfPresentationBoard.update({ where: { id: board.id }, data: { title: "moodboard" } });
+    const phase = await phaseOf(projectId, "moodboard");
+    await openIteration(phase.id);
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    const { noteId } = await sf.phases.postPhaseNote({ ...base, body: null, withImages: true });
+    await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
+    const image = await testDb.prisma.sfPhaseNoteImage.findFirstOrThrow({ where: { note_id: noteId } });
+    const second = await sf.ideas.addNoteImageToMoodboard({ ...base, imageId: image.id });
+    assert.deepEqual([second.created, second.boardId], [false, board.id]);
+    const slides = await testDb.prisma.sfPresentationSlide.findMany({ where: { board_id: board.id }, orderBy: { sort_order: "asc" } });
+    assert.deepEqual(slides.map((row) => row.id), [first.slideId, second.slideId]);
+    assert.equal(await testDb.prisma.sfPresentationBoard.count({ where: { project_id: projectId } }), 1);
+
+    // Deleting the card or the note never touches the slides' own copies.
+    await sf.ideas.deleteIdeaCard({ ...as(designer), cardId });
+    for (const row of slides) assert.ok(storage.objects.has(row.image_key));
+    // Another person's card is not reachable.
+    const other = await seedUser("Other Mood", ALL);
+    const mine = await sf.ideas.createIdeaCard({ ...as(designer), file: cardImage(8) });
+    await rejectsWith(sf.ideas.addIdeaToMoodboard({ ...as(other), cardId: mine.cardId, projectId }), "IDEA_CARD_NOT_FOUND");
+  });
+
   it("shows the current code after a reorder and drops a usage whose option is deleted, keeping the card", async () => {
     const { projectId } = await newProject("Reorder project");
     const first = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone", snapshot: { productName: "First" } });

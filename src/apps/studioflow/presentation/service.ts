@@ -26,6 +26,8 @@ const BOARD_ENTITY = "presentation-board";
 const SLIDE_ENTITY = "presentation-slide";
 const ANNOTATION_ENTITY = "presentation-annotation";
 const IMAGE_BYTES = 3 * 1024 * 1024;
+/** The board an image is put on by "Add to moodboard"; found by this title (any letter case), created when missing. */
+const MOODBOARD_TITLE = "Moodboard";
 const SIGNED_URL_SECONDS = 15 * 60;
 
 export type PresentationImageUpload = { body: Uint8Array; contentType: string; imageRatio?: number | null };
@@ -230,6 +232,37 @@ export function createPresentationService(db: Db, ports: StudioFlowPorts) {
         return { imageKeys: slides.map((slide) => slide.image_key) };
       });
       await removeUnreferenced(result.imageKeys);
+    },
+
+    /**
+     * Puts an image that already lives in storage (an Ideas card, a phase-note image) on the project's "Moodboard" board as its
+     * last slide, creating that board when the project has none. The object is copied, so removing either side never touches the other.
+     */
+    async addStoredImageToMoodboard(input: CommandContext & { projectId: string; source: { key: string; contentType: string } }) {
+      const userId = await requirePresentationCommand(input);
+      const extension = STUDIOFLOW_IMAGE_TYPES[input.source.contentType];
+      if (!extension) throw invalid("PRESENTATION_IMAGE_TYPE", "Use a PNG, JPEG, or WebP image.");
+      const key = createPrivateObjectKey(`studioflow/presentation/${input.projectId}`, extension);
+      await storage.copy({ fromKey: input.source.key, toKey: key });
+      try {
+        return await runTransaction(async (tx) => {
+          await loadWritableProject(tx, input.projectId);
+          let board = await tx.sfPresentationBoard.findFirst({ where: { project_id: input.projectId, title: { equals: MOODBOARD_TITLE, mode: "insensitive" } }, orderBy: { sort_order: "asc" } });
+          const created = !board;
+          if (!board) {
+            const max = await tx.sfPresentationBoard.aggregate({ where: { project_id: input.projectId }, _max: { sort_order: true } });
+            board = await tx.sfPresentationBoard.create({ data: { project_id: input.projectId, title: MOODBOARD_TITLE, sort_order: (max._max.sort_order ?? -1) + 1, created_by_id: userId } });
+            await writeAudit(ports, tx, { action: "studioflow.presentation.board-created", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, title: MOODBOARD_TITLE } });
+          }
+          const last = await tx.sfPresentationSlide.aggregate({ where: { board_id: board.id }, _max: { sort_order: true } });
+          const slide = await tx.sfPresentationSlide.create({ data: { board_id: board.id, image_key: key, image_ratio: null, sort_order: (last._max.sort_order ?? -1) + 1 } });
+          await writeAudit(ports, tx, { action: "studioflow.presentation.slides-added", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, count: 1, source: "moodboard" } });
+          return { boardId: board.id, slideId: slide.id, created };
+        });
+      } catch (error) {
+        await discardObjects(db, storage, [key]);
+        throw error;
+      }
     },
 
     async addSlides(input: CommandContext & { projectId: string; boardId: string; files: PresentationImageUpload[] }) {

@@ -13,6 +13,7 @@ import { createTaskService } from "./tasks/service";
 /** Composed StudioFlow application service (one module per capability). */
 export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
   const schedule = createScheduleService(db, ports);
+  const presentation = createPresentationService(db, ports);
   return {
     projects: createProjectService(db, ports),
     cdList: createCdListService(db, ports),
@@ -20,8 +21,8 @@ export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
     tasks: createTaskService(db, ports),
     mom: createMomService(db, ports),
     schedule,
-    ideas: createIdeaService(db, ports, schedule.writer),
-    presentation: createPresentationService(db, ports),
+    ideas: createIdeaService(db, ports, schedule.writer, presentation),
+    presentation,
     library: createLibraryService(ports),
   };
 }

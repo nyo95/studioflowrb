@@ -8,8 +8,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { Badge, Button, Dialog, EmptyState, Field, FormActions, ImageGallery, InlineError, Input, Notice, PillTabs, RadioGroup, RowActionMenu, Select, Text, Textarea, buttonClasses, shrinkImageFile, useConfirm, useFileIntake } from "@/platform/ui_engine";
 
+import { MoodboardDialog } from "./moodboard-dialog";
 import { UseInScheduleDialog } from "./use-in-schedule-dialog";
-import { createIdeaCardAction, ideaCardAction, listIdeaCategoryChoicesAction, listIdeaTargetEntriesAction, replaceIdeaImageAction, applyIdeaToScheduleAction, type IdeaCardView } from "./actions";
+import { addIdeaToMoodboardAction, createIdeaCardAction, ideaCardAction, listIdeaCategoryChoicesAction, listIdeaTargetEntriesAction, replaceIdeaImageAction, applyIdeaToScheduleAction, type IdeaCardView } from "./actions";
 
 /** Mirrors the server limits (WO-SF-IDEAS-01); the server stays the authority. */
 const IMAGE_BYTES = 3 * 1024 * 1024;
@@ -43,6 +44,7 @@ export function IdeasBoard({ cards, targets }: { cards: IdeaCardView[]; targets:
   const [view, setView] = useState<View>("all");
   const [editing, setEditing] = useState<IdeaCardView | null>(null);
   const [using, setUsing] = useState<IdeaCardView | null>(null);
+  const [moodboarding, setMoodboarding] = useState<IdeaCardView | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [rowError, setRowError] = useState<string | null>(null);
 
@@ -147,6 +149,7 @@ export function IdeasBoard({ cards, targets }: { cards: IdeaCardView[]; targets:
                   pending={busy === card.id}
                   items={[
                     { label: "Use in schedule…", onSelect: () => setUsing(card), disabled: targets.length === 0 },
+                    { label: "Add to moodboard…", onSelect: () => setMoodboarding(card), disabled: targets.length === 0 },
                     { label: "Edit details", onSelect: () => setEditing(card) },
                     { label: "Replace image", onSelect: () => replaceImage(card) },
                     { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void remove(card) },
@@ -170,6 +173,7 @@ export function IdeasBoard({ cards, targets }: { cards: IdeaCardView[]; targets:
       )}
 
       {editing ? <EditDialog key={editing.id} card={editing} onClose={() => setEditing(null)} /> : null}
+      {moodboarding ? <MoodboardDialog key={moodboarding.id} targets={targets} apply={(projectId) => addIdeaToMoodboardAction({ cardId: moodboarding.id, projectId })} onClose={() => setMoodboarding(null)} /> : null}
       {using ? <UseInScheduleDialog key={using.id} initialName={using.title ?? ""} initialNotes={using.note ?? ""} targets={targets} apply={(input) => applyIdeaToScheduleAction({ cardId: using.id, ...input })} onClose={() => setUsing(null)} /> : null}
       {confirm.dialog}
     </div>

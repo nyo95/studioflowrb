@@ -3,6 +3,7 @@ import { createPrivateObjectKey } from "@platform/core/storage";
 import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
 import { NOTE_IMAGE_BYTES, STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import { scheduleCode } from "../domain/schedule";
+import type { createPresentationService } from "../presentation/service";
 import type { createScheduleService } from "../schedule/service";
 import type { SnapshotInput } from "../schedule/sync";
 import { hasPermission, invalid, notFound, P, projectAccessFromFacts, requireCommand, writeAudit, type CommandContext, type Db, type StudioFlowPorts, type TxClient } from "../shared";
@@ -36,6 +37,7 @@ export type IdeaUseTarget =
   | { kind: "option"; entryId: string };
 
 type ScheduleWriter = ReturnType<typeof createScheduleService>["writer"];
+type PresentationService = ReturnType<typeof createPresentationService>;
 
 function text(value: string | null | undefined, max: number, code: string, label: string): string | null {
   const trimmed = value?.trim() ?? "";
@@ -81,7 +83,7 @@ function imageExtension(file: IdeaImageUpload): string {
  * card in a schedule copies its image into a new project object and creates the row through the schedule's own
  * writer, so the schedule stays the only authority for codes and options; the card keeps a usage row.
  */
-export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: ScheduleWriter) {
+export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: ScheduleWriter, presentation: Pick<PresentationService, "addStoredImageToMoodboard">) {
   const { runTransaction, storage } = ports;
 
   async function ownCard(tx: Db | TxClient, ownerId: string, cardId: string) {
@@ -284,6 +286,21 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
         await tx.sfIdeaUsage.create({ data: { card_id: card.id, option_id: created.optionId } });
         await writeAudit(ports, tx, { action: "studioflow.idea.used", entityType: CARD_ENTITY, entityId: card.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: created.entryId, optionId: created.optionId, code: created.code, label: created.label } });
       });
+    },
+
+    /** "Add to moodboard" on a card: a copy becomes the last slide of the project's Moodboard board (created when missing). */
+    async addIdeaToMoodboard(input: CommandContext & { cardId: string; projectId: string }) {
+      const userId = requireCommand(input, P.access);
+      const card = await ownCard(db, userId, input.cardId);
+      return presentation.addStoredImageToMoodboard({ ...input, source: { key: card.image_key, contentType: card.content_type } });
+    },
+
+    /** "Add to moodboard" from a phase-note image, in the note's own project. */
+    async addNoteImageToMoodboard(input: CommandContext & { projectId: string; phaseId: string; imageId: string }) {
+      requireCommand(input, P.access);
+      if (!hasPermission(input.grants, P.projectRead)) throw invalid("PERMISSION_DENIED", "You cannot open this project.");
+      const image = await noteImageOf(db, input);
+      return presentation.addStoredImageToMoodboard({ ...input, source: { key: image.key, contentType: image.contentType } });
     },
 
     /** "Save to Ideas" on a phase-note image: a private copy on the caller's own board, so deleting either side never touches the other. */

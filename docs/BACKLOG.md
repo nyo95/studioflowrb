@@ -43,6 +43,10 @@ Order matters; each item is its own Work Order.
 - [ ] [PLANNED][P3] Integration tokens, admin view: `platform.integration.admin` can list and revoke any
   token in the service (`listAny`, `revokeAny`) but there is no screen yet, and the list has no owner
   name. Add when a second person starts using tokens.
+- [ ] [UNVERIFIED] Moodboard branch (R8.477): on the Ideas board a card's menu **Add to moodboard...**; in a note, open an image
+  large and press **Add to moodboard**. Both land as the last slide of the project's Moodboard board on the Presentation tab
+  (created the first time). Follow-up if wanted: a "Used in: <project> moodboard" label on the card (needs a small table),
+  and a client-facing moodboard layout (owner said team-only for now).
 - [ ] [UNVERIFIED] Phase page (R8.470, R8.471): the "Hide requirements & files" button gives the notes the full width and
   is remembered after a reload; in a note, open an image large: "Save to Ideas" shows a new card on the Ideas board with
   the note "From the notes of <project>"; "Use in schedule" adds a new item or an extra option in that project (a person
