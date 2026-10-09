@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.460 | 2026-10-09 | docs(review): R8.459 verdict PASS with follow-up plan (Lead)
+
+- **Review of R8.459 (`470b5e6`):** all six findings of WO-PLAT-INTEGRATIONS-01b are closed (tests, no cached 5xx, stale-key lease, handler joins the ledger transaction, 1 MiB body cap, hygiene). Verdict **PASS**. Re-ran the new integration tests and the test-loader alias; no dependency was added (BLOCKED on `server-only` resolved by the Lead as an alias to Next's empty stub).
+- **Two gaps found, returned as WO-PLAT-INTEGRATIONS-01c (R8.461):** (1) a handler that throws a 4xx after writing keeps its partial writes, because only 5xx rolls back; (2) a concurrent request with the same key can hit a unique-constraint error and return 500, which `runSerializableTransaction` does not retry.
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.459 | 2026-10-09 | fix(platform): harden integration idempotency and prove route kit (Executor)
 
 - Added disposable-database integration coverage for personal token creation/listing/revocation and the reference route: safe authentication failures, disabled/lost-grant/scope denial, secret redaction, own-vs-admin boundaries, replay/conflict/in-progress/expiry behavior, and migration-seeded owner grants.
