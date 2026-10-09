@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.497 | 2026-10-09 | docs(plan): lock the module `requires` meaning after the Executor's dependency-cycle BLOCKED (Lead)
+
+- **BLOCKED resolved (option A):** Master Data imports `STUDIOFLOW_ROUTES` only to build a notification link, while StudioFlow imports Master Data's public read, so an exact `requires ⇔ imports` rule would produce a `masterdata ⇄ studioflow` cycle. `requires` now means a runtime capability or data dependency; link imports (`@/apps/<B>/public/nav`, or only `*_ROUTES` specifiers) are excluded. Expected manifests: `masterdata: []`, `bq: ["masterdata"]`, `studioflow: ["masterdata"]`. The R8.495 cycle rejection is unchanged. Recorded in `PLAN.md` finding 2.
+- **Checks:** read-only verification of the cross-app imports; no code changed.
+
 ## R8.496 | 2026-10-09 | docs(review): R8.495 verdict CORRECTION REQUIRED, WO-MODULES-M1 correction pass (Lead)
 
 - **Review of R8.495 (`99fdaaa`):** the module foundation is accepted as-is (manifest validation, version/kind, `platform.module_state`, runtime state cascade, System Owner command with `SYSTEM` audit, core refusal, role display rename, no new permission). The WO outcome is not met: the Executor split the plan into an unplanned "M1a" without a BLOCKED report.

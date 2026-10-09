@@ -7,7 +7,7 @@ Target revision: next unused after R8.494 (check `CHANGELOG.md`)
 Status: READY (correction pass after R8.495 review; see "Review of R8.495")
 Priority: P1
 Owner: owner decision 2026-10-09, `docs/apps/platform/MODULES-DECISION.md` (read it first)
-Last updated: 2026-10-09 (Lead, R8.496 review)
+Last updated: 2026-10-09 (Lead, R8.497 dependency rule locked)
 
 WO-AUDIT-FIX-01 is done (R8.490-R8.492, Lead executed at the owner's request).
 
@@ -146,6 +146,20 @@ one correction revision:
    `check:boundaries` rule (manifest `requires` ⇔ actual cross-app `public`
    imports, with fixtures in `scripts/test-boundaries-checker.mjs`) exists and
    passes. Cross-app imports from tests may be ignored by the rule.
+   **Locked after Executor BLOCKED (R8.497):** `requires` means "cannot run
+   without": a runtime capability or data dependency, not a link. Masterdata's
+   `sample-request-notifier.ts` imports `STUDIOFLOW_ROUTES` only to build a URL,
+   so it is a link, not a requirement. Rule, per app directory `src/apps/<A>`
+   (non-test files): an import from `@/apps/<B>/public…` with B ≠ A counts as a
+   requirement unless it is a **link import** — its source is
+   `@/apps/<B>/public/nav`, or every imported specifier name ends in `_ROUTES`.
+   Each counted B must be in A's `requires`, and each entry in A's `requires`
+   must be justified by at least one counted import (⇔). Expected result today:
+   `masterdata: []`, `bq: ["masterdata"]`, `studioflow: ["masterdata"]`; no
+   cycle; the R8.495 cycle rejection stays unchanged. `ideas`/`presentation`
+   live inside `src/apps/studioflow` and are not checked by this rule. Fixtures:
+   a counted import without `requires` fails, a `requires` without an import
+   fails, a `public/nav` import and a `*_ROUTES`-only import pass.
 3. **[Medium] Nothing stops app code from calling the state writer.**
    `src/platform/core/modules/admin.ts` is importable from any server action.
    Expected: a `check:boundaries` rule that only `scripts/**` and
