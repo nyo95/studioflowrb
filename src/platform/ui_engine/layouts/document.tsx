@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 
@@ -12,6 +12,12 @@ const PAPER_CSS_SIZE: Record<DocumentPaper, string> = { A4: "A4", LETTER: "lette
 const PAPER_PREVIEW_WIDTH: Record<DocumentPaper, Record<DocumentOrientation, string>> = {
   A4: { portrait: "210mm", landscape: "297mm" },
   LETTER: { portrait: "215.9mm", landscape: "279.4mm" },
+};
+
+/** Paper size in millimetres, for the fixed pages of a `paged` sheet. */
+const PAPER_MM: Record<DocumentPaper, Record<DocumentOrientation, readonly [number, number]>> = {
+  A4: { portrait: [210, 297], landscape: [297, 210] },
+  LETTER: { portrait: [215.9, 279.4], landscape: [279.4, 215.9] },
 };
 
 export type DocumentSheetProps = HTMLAttributes<HTMLDivElement> & {
@@ -28,6 +34,13 @@ export type DocumentSheetProps = HTMLAttributes<HTMLDivElement> & {
    * `@page` rule from the engine's global print CSS when omitted.
    */
   printFormat?: DocumentPrintFormat;
+  /**
+   * What-you-see-is-what-you-print mode for documents made of whole pages (a presentation, one slide per page).
+   * The children are `DocumentPage`s, each exactly one sheet of the chosen paper: the same box on screen and on paper,
+   * with the page margin set to zero so the padding of a `DocumentPage` is the only margin. Without it the sheet is one
+   * open-ended column that the browser cuts into pages.
+   */
+  paged?: boolean;
 };
 
 /**
@@ -35,7 +48,29 @@ export type DocumentSheetProps = HTMLAttributes<HTMLDivElement> & {
  * and print visibility; the app owns every word, number, and page break inside.
  * Server-safe: no client hooks.
  */
-export function DocumentSheet({ toolbar, format = "a4-portrait", printFormat, className, style, children, ...props }: DocumentSheetProps) {
+export function DocumentSheet({ toolbar, format = "a4-portrait", printFormat, paged = false, className, style, children, ...props }: DocumentSheetProps) {
+  if (paged) {
+    const chosen = printFormat ?? { paper: "A4" as const, orientation: format === "a4-landscape" ? ("landscape" as const) : ("portrait" as const) };
+    const [width, height] = PAPER_MM[chosen.paper][chosen.orientation];
+    return (
+      <div className="ui-document min-h-dvh bg-canvas px-4 py-6 [print-color-adjust:exact] print:bg-white print:p-0">
+        <style>{`@page { size: ${PAPER_CSS_SIZE[chosen.paper]} ${chosen.orientation}; margin: 0; }`}</style>
+        {toolbar ? (
+          <div className="ui-print-hidden mx-auto mb-4 flex flex-wrap items-center justify-between gap-2" style={{ maxWidth: `${width}mm` }}>{toolbar}</div>
+        ) : null}
+        <div
+          className={cx("mx-auto grid w-fit max-w-full gap-6 overflow-x-auto print:block print:w-auto print:max-w-none print:overflow-visible", className)}
+          style={{ "--doc-w": `${width}mm`, "--doc-h": `${height - 0.5}mm`, ...style } as CSSProperties}
+          data-paged="true"
+          data-paper={chosen.paper}
+          data-orientation={chosen.orientation}
+          {...props}
+        >
+          {children}
+        </div>
+      </div>
+    );
+  }
   const previewWidth = printFormat
     ? PAPER_PREVIEW_WIDTH[printFormat.paper][printFormat.orientation]
     : format === "a4-landscape" ? "297mm" : "210mm";
@@ -72,4 +107,18 @@ export function DocumentSheet({ toolbar, format = "a4-portrait", printFormat, cl
 /** Keeps a block on one printed page where possible. */
 export function DocumentBlock({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cx("break-inside-avoid", className)} {...props} />;
+}
+
+/**
+ * One whole sheet of a `paged` DocumentSheet. Its size is the paper's size (the half millimetre keeps a printer from
+ * spilling a blank page), so what is seen on screen is what comes out of the printer. `padding` is the page margin.
+ */
+export function DocumentPage({ className, style, ...props }: HTMLAttributes<HTMLElement>) {
+  return (
+    <section
+      className={cx("ui-document-page box-border overflow-hidden bg-white text-black shadow-[0_1px_3px_rgb(0_0_0/0.12)] print:shadow-none print:break-after-page print:last:break-after-auto", className)}
+      style={{ width: "var(--doc-w)", height: "var(--doc-h)", padding: "var(--doc-pad, 12mm)", ...style }}
+      {...props}
+    />
+  );
 }

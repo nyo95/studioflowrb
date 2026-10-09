@@ -118,6 +118,7 @@ describe("UI Engine foundation", () => {
       // R8.72 — activated by the StudioFlow MOM print view (SF-R2).
       "DocumentSheet",
       "DocumentBlock",
+      "DocumentPage",
       "PrintButton",
     ]) {
       const exported = ui[name as keyof typeof ui];
