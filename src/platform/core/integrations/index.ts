@@ -33,6 +33,9 @@ export type IntegrationTokenPublic = { id: string; label: string; tokenPrefix: s
 export type CreatedIntegrationToken = { token: IntegrationTokenPublic; secret: string };
 
 function sha256(value: string): string { return createHash("sha256").update(value).digest("hex"); }
+function isUniqueConstraintError(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && (error as { code?: unknown }).code === "P2002";
+}
 function statusFor(kind: SafeErrorPayload["kind"]): number { return kind === "VALIDATION" ? 400 : kind === "UNAUTHENTICATED" ? 401 : kind === "FORBIDDEN" ? 403 : kind === "NOT_FOUND" ? 404 : kind === "CONFLICT" ? 409 : 500; }
 function toPublic(row: { id: string; label: string; token_prefix: string; scopes: string[]; expires_at: Date | null; last_used_at: Date | null; revoked_at: Date | null; created_at: Date }): IntegrationTokenPublic {
   return { id: row.id, label: row.label, tokenPrefix: row.token_prefix, scopes: Object.freeze([...row.scopes]), expiresAt: row.expires_at, lastUsedAt: row.last_used_at, revokedAt: row.revoked_at, createdAt: row.created_at };
@@ -146,14 +149,26 @@ export function createIntegrationRouteHandler<T = undefined>(options: Integratio
         if (existing?.request_hash !== undefined && existing.request_hash !== requestHash) throw new AppError("CONFLICT", "IDEMPOTENCY_KEY_REUSED", "This Idempotency-Key was already used with a different request.");
         if (existing?.status === "COMPLETED") return { replay: existing };
         if (existing && existing.created_at > new Date(currentTime.getTime() - IDEMPOTENCY_LEASE_MS)) throw new AppError("CONFLICT", "IDEMPOTENCY_IN_PROGRESS", "This request is still being processed. Retry later.");
-        const row = existing
-          ? await tx.integrationRequest.update({ where: { id: existing.id }, data: { status: "IN_PROGRESS", response_status: null, response_body: undefined } })
-          : await tx.integrationRequest.create({ data: { token_id: principal.tokenId, key, method_path: `${request.method} ${new URL(request.url).pathname}`, request_hash: requestHash, status: "IN_PROGRESS" } });
+        let row;
+        if (existing) {
+          row = await tx.integrationRequest.update({ where: { id: existing.id }, data: { status: "IN_PROGRESS", response_status: null, response_body: undefined } });
+        } else {
+          try {
+            row = await tx.integrationRequest.create({ data: { token_id: principal.tokenId, key, method_path: `${request.method} ${new URL(request.url).pathname}`, request_hash: requestHash, status: "IN_PROGRESS" } });
+          } catch (error) {
+            if (isUniqueConstraintError(error)) throw new AppError("CONFLICT", "IDEMPOTENCY_IN_PROGRESS", "This request is still being processed. Retry later.");
+            throw error;
+          }
+        }
         let responseStatus = 200;
         let envelope: unknown;
+        await tx.$executeRawUnsafe("SAVEPOINT integration_handler");
         try {
           envelope = { ok: true, data: await options.handle({ principal, body, requestId, transaction: tx }) };
+          await tx.$executeRawUnsafe("RELEASE SAVEPOINT integration_handler");
         } catch (error) {
+          await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT integration_handler");
+          await tx.$executeRawUnsafe("RELEASE SAVEPOINT integration_handler");
           const payload = toSafeErrorPayload(error, { reportUnknownError: createOperationalErrorReporter("integration_write", requestId) });
           responseStatus = statusFor(payload.kind);
           if (responseStatus >= 500) throw error;

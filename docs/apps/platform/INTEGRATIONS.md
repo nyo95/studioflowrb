@@ -13,11 +13,12 @@ To add an endpoint, define its app-owned wire schema, declare one scope and its
 matching RBAC grant, then export a thin route using
 `createIntegrationRouteHandler`. A write must set `write: true`; its handler
 receives the open `transaction` client and must perform every extension write
-with that client. The kit then commits the extension write, replay record, and
-audit together (or rolls all three back). Successful and deterministic client
-error responses are replayable; server failures are deliberately not retained
-so the same key can be retried. Routes must not import Prisma or another app's
-internals.
+with that client. A failed handler is rolled back to a savepoint before the kit
+records a deterministic client error for replay, so an error response never
+leaves the handler's partial writes behind. Successful extension work, replay
+record, and audit then commit together; server failures are deliberately not
+retained so the same key can be retried. Routes must not import Prisma or
+another app's internals.
 
 Request bodies are limited to 1 MiB before JSON parsing. A route with a known
 larger contract, such as a future SketchUp snapshot, must explicitly set its

@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.461 | 2026-10-09 | fix(platform): roll back failed integration handler writes (Executor)
+
+- Integration write handlers now run behind a savepoint. Any handler failure first removes its own partial work; deterministic client errors still become replayable responses with their audit record, while server failures continue to roll back the entire request and leave the key retryable.
+- A simultaneous initial request that loses the idempotency-row unique race is now returned as the safe retryable `IDEMPOTENCY_IN_PROGRESS` conflict instead of a server error.
+- Added disposable-DB proofs for partial 4xx writes, database errors caught by a handler, retained 5xx rollback/retry behavior, and concurrent same-key requests. Updated the integration recipe with the savepoint rule.
+- **Migrations/dependencies:** none.
+- **Checks:** `npm test` (979 passed, 0 failed/cancelled); `npm run typecheck`; `npm run lint` (0 errors; 2 existing out-of-scope image warnings); `npm run check:boundaries`; `npm run check:legacy-runtime`; `npm run build`; `git diff --check` all passed.
+
 ## R8.460 | 2026-10-09 | docs(review): R8.459 verdict PASS with follow-up plan (Lead)
 
 - **Review of R8.459 (`470b5e6`):** all six findings of WO-PLAT-INTEGRATIONS-01b are closed (tests, no cached 5xx, stale-key lease, handler joins the ledger transaction, 1 MiB body cap, hygiene). Verdict **PASS**. Re-ran the new integration tests and the test-loader alias; no dependency was added (BLOCKED on `server-only` resolved by the Lead as an alias to Next's empty stub).

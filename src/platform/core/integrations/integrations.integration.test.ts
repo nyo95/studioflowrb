@@ -122,7 +122,7 @@ describe("integration route kit", () => {
     assert.equal((await POST(request("POST", created.secret, { value: "x" }, "old"))).status, 200);
   });
 
-  it("rolls back server failures with extension writes, retains client errors, takes over an expired lease, and limits bodies", async () => {
+  it("rolls back server failures with extension writes, takes over an expired lease, and limits bodies", async () => {
     const { user } = await owner();
     const created = await tokenFor(user);
     let calls = 0;
@@ -138,7 +138,6 @@ describe("integration route kit", () => {
         calls += 1;
         await transaction!.userPreference.upsert({ where: { user_id: principal.userId }, create: { user_id: principal.userId, language: "id" }, update: { language: "id" } });
         if (calls === 1) throw new Error("temporary");
-        if (calls === 3) throw new AppError("VALIDATION", "EXPECTED", "Expected client error.");
         return { calls };
       },
     });
@@ -148,11 +147,66 @@ describe("integration route kit", () => {
     assert.equal(await db.prisma.userPreference.count({ where: { user_id: user.id } }), 0);
     assert.equal((await handler(request("POST", created.secret, { value: "x" }, "retry"))).status, 200);
     assert.equal(await db.prisma.userPreference.count({ where: { user_id: user.id } }), 1);
-    assert.equal((await handler(request("POST", created.secret, { value: "x" }, "client"))).status, 400);
-    assert.equal((await handler(request("POST", created.secret, { value: "x" }, "client"))).headers.get("Idempotency-Replayed"), "true");
     await db.prisma.integrationRequest.create({ data: { token_id: created.token.id, key: "stale", method_path: "POST /api/integrations/v1/ping", request_hash: createHash("sha256").update("POST /api/integrations/v1/ping\n{\"value\":\"x\"}").digest("hex"), status: "IN_PROGRESS", created_at: new Date(clock.getTime() - 3 * 60 * 1000) } });
     assert.equal((await handler(request("POST", created.secret, { value: "x" }, "stale"))).status, 200);
     const oversized = await handler(new Request("http://localhost/api/integrations/v1/ping", { method: "POST", headers: { authorization: `Bearer ${created.secret}`, "idempotency-key": "large", "content-type": "application/json" }, body: JSON.stringify({ value: "this body is bigger than thirty-two bytes" }) }));
     assert.equal(oversized.status, 400);
+  });
+
+  it("rolls back partial and database-failed handler writes before storing replayable client errors", async () => {
+    const { user } = await owner();
+    const created = await tokenFor(user);
+    const handler = createIntegrationRouteHandler({
+      scope: INTEGRATION_PING_SCOPE,
+      grant: INTEGRATION_PING_GRANT,
+      write: true,
+      body: z.object({ mode: z.enum(["partial", "database"]) }),
+      handle: async ({ principal, body, transaction }) => {
+        const tourKey = `integration-${body.mode}`;
+        await transaction!.userTutorial.create({ data: { user_id: principal.userId, tour_key: tourKey, version: 1, state: "completed" } });
+        if (body.mode === "database") {
+          try {
+            await transaction!.userTutorial.create({ data: { user_id: principal.userId, tour_key: tourKey, version: 1, state: "completed" } });
+          } catch {
+            throw new AppError("VALIDATION", "EXPECTED", "Expected client error.");
+          }
+        }
+        throw new AppError("VALIDATION", "EXPECTED", "Expected client error.");
+      },
+    });
+    for (const mode of ["partial", "database"] as const) {
+      const key = `client-${mode}`;
+      const first = await handler(request("POST", created.secret, { mode }, key));
+      assert.equal(first.status, 400);
+      assert.equal(await db.prisma.userTutorial.count({ where: { user_id: user.id, tour_key: `integration-${mode}` } }), 0);
+      assert.equal(await db.prisma.auditEvent.count({ where: { action: "integration.write" } }), mode === "partial" ? 1 : 2);
+      const replay = await handler(request("POST", created.secret, { mode }, key));
+      assert.equal(replay.status, 400);
+      assert.equal(replay.headers.get("Idempotency-Replayed"), "true");
+    }
+  });
+
+  it("allows only one same-key concurrent handler execution and never returns a server error", async () => {
+    const { user } = await owner();
+    const created = await tokenFor(user);
+    let calls = 0;
+    const handler = createIntegrationRouteHandler({
+      scope: INTEGRATION_PING_SCOPE,
+      grant: INTEGRATION_PING_GRANT,
+      write: true,
+      body: z.object({ value: z.string() }),
+      handle: async () => {
+        calls += 1;
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return { ok: true };
+      },
+    });
+    const responses = await Promise.all([
+      handler(request("POST", created.secret, { value: "same" }, "concurrent")),
+      handler(request("POST", created.secret, { value: "same" }, "concurrent")),
+    ]);
+    assert.equal(calls, 1);
+    assert.ok(responses.every((response) => response.status !== 500));
+    assert.ok(responses.some((response) => response.status === 200));
   });
 });
