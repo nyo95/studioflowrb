@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.459 | 2026-10-09 | fix(platform): harden integration idempotency and prove route kit (Executor)
+
+- Added disposable-database integration coverage for personal token creation/listing/revocation and the reference route: safe authentication failures, disabled/lost-grant/scope denial, secret redaction, own-vs-admin boundaries, replay/conflict/in-progress/expiry behavior, and migration-seeded owner grants.
+- Integration writes now pass the open transaction to their handler, so extension changes, the replay record, and audit entry commit together. Server failures roll all of them back and leave the same key retryable; deterministic client failures remain replayable.
+- Stale in-progress keys older than two minutes are recovered, request bodies are bounded to 1 MiB before JSON parsing (with an explicit per-route override), and the integration recipe documents both contracts.
+- The test runtime now aliases Next's server-only marker to its official empty server stub without adding a dependency. Bootstrap verification now expects all 10 platform-owner grants, including the three locked integration permissions.
+- **Migrations/dependencies:** none.
+- **Checks:** `npm test` (977 passed, 0 failed/cancelled); `npm run typecheck`; `npm run lint`; `npm run check:boundaries`; `npm run check:legacy-runtime`; `npm run build`; `git diff --check` all passed.
+
 ## R8.458 | 2026-10-09 | feat(studioflow): Add item can start from a past project's product (Lead)
 
 - **Owner question 2026-10-09:** "From past project" only existed inside an existing item, so a new item could not start from another project's product. The Add item panel now has a "From a past project" box at the top: Search (2+ letters, all sections), "Use as start" on a hit. Choosing a hit switches the section and category to the hit's, shows the product as a summary with Remove, and keeps only Location (and Qty/Unit for Fixture). Save creates the item and then copies the product whole (photo and notes included) through the existing copy command; Remove returns to the normal fields.

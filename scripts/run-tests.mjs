@@ -46,7 +46,7 @@ await discoverTests("src");
 // clients and never release it, hanging the whole run. Capping concurrency avoids the race entirely.
 const result = spawnSync(
   process.execPath,
-  ["--import", "tsx", "--test", "--test-concurrency=1", ...testFiles, ...fixtureSuites],
+  ["--import", "tsx", "--import", "./scripts/test-server-only-loader.mjs", "--test", "--test-concurrency=1", ...testFiles, ...fixtureSuites],
   { stdio: "inherit", env: testEnvironment },
 );
 

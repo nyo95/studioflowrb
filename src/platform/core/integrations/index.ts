@@ -16,6 +16,8 @@ export const INTEGRATION_PING_GRANT = "platform.integration.ping" as const;
 const TOKEN_PREFIX_BYTES = 6;
 const SECRET_BYTES = 32;
 const IDEMPOTENCY_RETENTION_MS = 24 * 60 * 60 * 1000;
+const IDEMPOTENCY_LEASE_MS = 2 * 60 * 1000;
+const DEFAULT_BODY_LIMIT_BYTES = 1024 * 1024;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,200}$/;
 const SCOPE = /^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/;
 
@@ -110,7 +112,18 @@ async function authenticate(request: Request): Promise<AuthenticatedIntegration>
   return { tokenId: token.id, userId: token.user_id, displayName: token.user.display_name, grants, scopes: token.scopes };
 }
 
-export type IntegrationRouteOptions<T> = { scope: string; grant: PermissionId; body?: ZodType<T>; write?: boolean; handle: (context: { principal: AuthenticatedIntegration; body: T; requestId: string }) => Promise<unknown> | unknown };
+export type IntegrationRouteOptions<T> = {
+  scope: string;
+  grant: PermissionId;
+  body?: ZodType<T>;
+  /** Maximum request body size before JSON parsing. Defaults to 1 MiB. */
+  bodyLimitBytes?: number;
+  write?: boolean;
+  /** Write handlers must use `transaction` for their extension writes so the result and ledger commit together. */
+  handle: (context: { principal: AuthenticatedIntegration; body: T; requestId: string; transaction?: TransactionClient }) => Promise<unknown> | unknown;
+  /** Test-only clock injection; production routes use the current time. */
+  now?: () => Date;
+};
 export function createIntegrationRouteHandler<T = undefined>(options: IntegrationRouteOptions<T>): (request: Request) => Promise<Response> {
   return async (request) => {
     const requestId = randomUUID();
@@ -118,41 +131,69 @@ export function createIntegrationRouteHandler<T = undefined>(options: Integratio
       const principal = await authenticate(request);
       if (!principal.scopes.includes(options.scope)) throw new AppError("FORBIDDEN", "INTEGRATION_SCOPE_DENIED", "This token does not have the required scope.");
       requirePermission(principal.grants, options.grant);
-      const rawBody = options.body ? await request.text() : "";
+      const rawBody = options.body ? await readBodyWithinLimit(request, options.bodyLimitBytes ?? DEFAULT_BODY_LIMIT_BYTES) : "";
       let body: T;
       try { body = options.body ? options.body.parse(rawBody ? JSON.parse(rawBody) : undefined) : undefined as T; } catch { throw new AppError("VALIDATION", "INTEGRATION_BODY_INVALID", "The request body is invalid."); }
       if (!options.write) return respond(200, { ok: true, data: await options.handle({ principal, body, requestId }) }, requestId);
       const key = request.headers.get("idempotency-key");
       if (!key || !IDEMPOTENCY_KEY.test(key)) throw new AppError("VALIDATION", "IDEMPOTENCY_KEY_REQUIRED", "A valid Idempotency-Key is required for this request.");
       const requestHash = sha256(`${request.method} ${new URL(request.url).pathname}\n${rawBody}`);
-      const begin = await runSerializableTransaction(prisma, async (tx) => {
-        await tx.integrationRequest.deleteMany({ where: { created_at: { lt: new Date(Date.now() - IDEMPOTENCY_RETENTION_MS) } } });
+      const now = options.now ?? (() => new Date());
+      const result = await runSerializableTransaction(prisma, async (tx) => {
+        const currentTime = now();
+        await tx.integrationRequest.deleteMany({ where: { created_at: { lt: new Date(currentTime.getTime() - IDEMPOTENCY_RETENTION_MS) } } });
         const existing = await tx.integrationRequest.findUnique({ where: { token_id_key: { token_id: principal.tokenId, key } } });
-        if (existing) return { row: existing, created: false };
-        return { row: await tx.integrationRequest.create({ data: { token_id: principal.tokenId, key, method_path: `${request.method} ${new URL(request.url).pathname}`, request_hash: requestHash, status: "IN_PROGRESS" } }), created: true };
+        if (existing?.request_hash !== undefined && existing.request_hash !== requestHash) throw new AppError("CONFLICT", "IDEMPOTENCY_KEY_REUSED", "This Idempotency-Key was already used with a different request.");
+        if (existing?.status === "COMPLETED") return { replay: existing };
+        if (existing && existing.created_at > new Date(currentTime.getTime() - IDEMPOTENCY_LEASE_MS)) throw new AppError("CONFLICT", "IDEMPOTENCY_IN_PROGRESS", "This request is still being processed. Retry later.");
+        const row = existing
+          ? await tx.integrationRequest.update({ where: { id: existing.id }, data: { status: "IN_PROGRESS", response_status: null, response_body: undefined } })
+          : await tx.integrationRequest.create({ data: { token_id: principal.tokenId, key, method_path: `${request.method} ${new URL(request.url).pathname}`, request_hash: requestHash, status: "IN_PROGRESS" } });
+        let responseStatus = 200;
+        let envelope: unknown;
+        try {
+          envelope = { ok: true, data: await options.handle({ principal, body, requestId, transaction: tx }) };
+        } catch (error) {
+          const payload = toSafeErrorPayload(error, { reportUnknownError: createOperationalErrorReporter("integration_write", requestId) });
+          responseStatus = statusFor(payload.kind);
+          if (responseStatus >= 500) throw error;
+          envelope = { ok: false, error: payload };
+        }
+        await tx.integrationRequest.update({ where: { id: row.id }, data: { status: "COMPLETED", response_status: responseStatus, response_body: JSON.parse(JSON.stringify(envelope)) } });
+        await createAuditEventWriter().write(prepareAuditEvent({ appId: "platform", action: "integration.write", entityType: "integration_request", entityId: row.id, actor: { kind: "USER", userId: principal.userId, label: principal.displayName }, requestId, metadata: { method: request.method, path: new URL(request.url).pathname } }), tx);
+        return { responseStatus, envelope };
       });
-      if (begin.row.request_hash !== requestHash) throw new AppError("CONFLICT", "IDEMPOTENCY_KEY_REUSED", "This Idempotency-Key was already used with a different request.");
-      if (!begin.created && begin.row.status === "COMPLETED") return respond(begin.row.response_status ?? 500, begin.row.response_body, requestId, true);
-      if (!begin.created) throw new AppError("CONFLICT", "IDEMPOTENCY_IN_PROGRESS", "This request is still being processed. Retry later.");
-      let responseStatus = 200;
-      let envelope: unknown;
-      try {
-        envelope = { ok: true, data: await options.handle({ principal, body, requestId }) };
-      } catch (error) {
-        const payload = toSafeErrorPayload(error, { reportUnknownError: createOperationalErrorReporter("integration_write", requestId) });
-        responseStatus = statusFor(payload.kind);
-        envelope = { ok: false, error: payload };
-      }
-      await runSerializableTransaction(prisma, async (tx) => {
-        await tx.integrationRequest.update({ where: { id: begin.row.id }, data: { status: "COMPLETED", response_status: responseStatus, response_body: JSON.parse(JSON.stringify(envelope)) } });
-        await createAuditEventWriter().write(prepareAuditEvent({ appId: "platform", action: "integration.write", entityType: "integration_request", entityId: begin.row.id, actor: { kind: "USER", userId: principal.userId, label: principal.displayName }, requestId, metadata: { method: request.method, path: new URL(request.url).pathname } }), tx);
-      });
-      return respond(responseStatus, envelope, requestId);
+      if (result.replay) return respond(result.replay.response_status ?? 500, result.replay.response_body, requestId, true);
+      return respond(result.responseStatus, result.envelope, requestId);
     } catch (error) {
       const payload = toSafeErrorPayload(error, { reportUnknownError: createOperationalErrorReporter("integration_route", requestId) });
       return respond(statusFor(payload.kind), { ok: false, error: payload }, requestId);
     }
   };
+}
+async function readBodyWithinLimit(request: Request, limitBytes: number): Promise<string> {
+  if (!Number.isSafeInteger(limitBytes) || limitBytes < 0) throw new AppError("VALIDATION", "INTEGRATION_BODY_LIMIT_INVALID", "The request body limit is invalid.");
+  const declaredLength = request.headers.get("content-length");
+  if (declaredLength && Number(declaredLength) > limitBytes) throw new AppError("VALIDATION", "INTEGRATION_BODY_TOO_LARGE", "The request body is too large.");
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let bytes = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      if (bytes > limitBytes) throw new AppError("VALIDATION", "INTEGRATION_BODY_TOO_LARGE", "The request body is too large.");
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const combined = new Uint8Array(bytes);
+  let offset = 0;
+  for (const chunk of chunks) { combined.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(combined);
 }
 function respond(status: number, body: unknown, requestId: string, replayed = false): Response {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Request-Id": requestId, ...(replayed ? { "Idempotency-Replayed": "true" } : {}) } });

@@ -11,7 +11,14 @@ path requires `Idempotency-Key` and demonstrates safe replay.
 
 To add an endpoint, define its app-owned wire schema, declare one scope and its
 matching RBAC grant, then export a thin route using
-`createIntegrationRouteHandler`. A write must set `write: true`; the kit
-authenticates, validates, stores/replays the response, audits the write, and
-uses the standard safe envelope. Routes must not import Prisma or another
-app's internals.
+`createIntegrationRouteHandler`. A write must set `write: true`; its handler
+receives the open `transaction` client and must perform every extension write
+with that client. The kit then commits the extension write, replay record, and
+audit together (or rolls all three back). Successful and deterministic client
+error responses are replayable; server failures are deliberately not retained
+so the same key can be retried. Routes must not import Prisma or another app's
+internals.
+
+Request bodies are limited to 1 MiB before JSON parsing. A route with a known
+larger contract, such as a future SketchUp snapshot, must explicitly set its
+own `bodyLimitBytes` when it is introduced.
