@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.470 | 2026-10-09 | feat(studioflow): hide the requirements and files column, fix the account test (Lead)
+
+- **Owner request 2026-10-09:** the notes of a phase should be able to use the whole width. A small button above the phase ("Hide requirements & files" / "Show requirements & files") folds away the right column (Requirements, Deliverables); the choice is remembered per browser (kept for the visit if storage is blocked). Hidden below 1100 px, where the column already sits under the notes.
+- **Test repair:** the R8.465 token page imported `@platform/core/integrations` into the account actions, and `tutorial-actions.test.ts` stubs every dependency, so two tests failed. I committed R8.465 after type, lint and boundary checks only and did not run `npm test`; this revision adds the stub and the full suite is green again.
+- **Migrations/dependencies:** none. **Checks:** `npm test` (981), `tsc --noEmit`, eslint, `check:boundaries`. Not walked in the browser (UNVERIFIED in the backlog).
+
 ## R8.469 | 2026-10-09 | test(masterdata): add Stage 1 browser-acceptance coverage (Executor)
 
 - Added isolated Master Data fixtures and Playwright coverage for the Stage 1 material-price, supplier-capability, several-suppliers-entry, and duplicate Brand-input checks. The fixture uses only the disposable E2E database and `ZZ-Test …` names.

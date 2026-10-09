@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { Badge, Button, ButtonMenu, Dialog, Field, FormActions, InlineError, Input, RadioGroup, SectionCard, Text, Textarea } from "@/platform/ui_engine";
@@ -8,6 +9,19 @@ import { Badge, Button, ButtonMenu, Dialog, Field, FormActions, InlineError, Inp
 import { NotesWorkspace, ITERATION_STATE_LABEL as STATE_LABEL, ITERATION_STATE_TONE as STATE_TONE, type IterationRow, type PhaseNoteRow } from "./notes-workspace";
 import { IterationButtons, UndoBar, usePhaseCommands, VisitDialog, type IterationView, type PhaseView } from "../../_components/phase-commands";
 
+
+const ASIDE_HIDDEN_KEY = "studioflow.phase.aside-hidden";
+const asideListeners = new Set<() => void>();
+let asideMemory: boolean | null = null;
+const readAsideHidden = () => {
+  if (asideMemory !== null) return asideMemory;
+  try { return window.localStorage.getItem(ASIDE_HIDDEN_KEY) === "1"; } catch { return false; }
+};
+const subscribeAside = (listener: () => void) => {
+  asideListeners.add(listener);
+  window.addEventListener("storage", listener);
+  return () => { asideListeners.delete(listener); window.removeEventListener("storage", listener); };
+};
 
 export function PhasePanel({ projectId, phase, current, iterations, notes, skippedReason, startBlockedReason, canAct, canSkip, canOverride, archived, children, aside }: {
   projectId: string;
@@ -27,6 +41,13 @@ export function PhasePanel({ projectId, phase, current, iterations, notes, skipp
   const commands = usePhaseCommands(projectId);
   const { locale, timezone } = useDisplaySettings();
   const [visitOpen, setVisitOpen] = useState(false);
+  // The side column (Requirements, Deliverables) can be folded away so the notes get the whole width. Remembered per browser.
+  const asideHidden = useSyncExternalStore(subscribeAside, readAsideHidden, () => false);
+  const toggleAside = () => {
+    asideMemory = !asideHidden;
+    try { window.localStorage.setItem(ASIDE_HIDDEN_KEY, asideMemory ? "1" : "0"); } catch { /* kept for this visit only */ }
+    asideListeners.forEach((listener) => listener());
+  };
   const [renaming, setRenaming] = useState<IterationRow | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [skipOpen, setSkipOpen] = useState(false);
@@ -63,7 +84,14 @@ export function PhasePanel({ projectId, phase, current, iterations, notes, skipp
 
   return (
     <>
-      <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)] items-start gap-4 max-[1100px]:grid-cols-1">
+      {aside ? (
+        <div className="mb-2 flex justify-end max-[1100px]:hidden">
+          <Button type="button" variant="ghost" size="sm" leadingIcon={asideHidden ? <PanelRightOpen /> : <PanelRightClose />} aria-pressed={asideHidden} onClick={toggleAside}>
+            {asideHidden ? "Show requirements & files" : "Hide requirements & files"}
+          </Button>
+        </div>
+      ) : null}
+      <div className={asideHidden ? "grid grid-cols-1 items-start gap-4" : "grid grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)] items-start gap-4 max-[1100px]:grid-cols-1"}>
         <div className="grid min-w-0 gap-4">
           <SectionCard
             title={title}
@@ -83,9 +111,11 @@ export function PhasePanel({ projectId, phase, current, iterations, notes, skipp
           {children}
         </div>
 
-        <aside className="grid min-w-0 gap-4">
-          {aside}
-        </aside>
+        {asideHidden ? null : (
+          <aside className="grid min-w-0 gap-4">
+            {aside}
+          </aside>
+        )}
       </div>
 
       <VisitDialog open={visitOpen} onOpenChange={setVisitOpen} pending={commands.isPending("visit")} error={commands.error} onSave={(visitDate, visitNote) => commands.exec("visit", { command: "createVisit", phaseId: phase.id, visitDate, note: visitNote }, "Site visit added")} />

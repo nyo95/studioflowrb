@@ -35,6 +35,7 @@ function load(signedIn = true) {
       passwordSchema: z.string(),
     },
     "@platform/core/db": { prisma: { session: { findUnique: async () => null } } },
+    "@platform/core/integrations": { integrationTokens: {} },
     "@platform/runtime": {
       platformAccount: {}, storageUsage: {}, userPreferences: {},
       userTutorials: {
