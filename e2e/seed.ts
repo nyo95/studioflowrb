@@ -16,6 +16,7 @@ import { FakeObjectStorage } from "@platform/core/storage";
 import type { PrismaClient } from "@/generated/prisma/client";
 import { createBqService } from "@/apps/bq/service";
 import { createMasterDataPublicRead } from "@/apps/masterdata/public";
+import { createMasterDataService, MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 import { LEGACY_PHASE_DEFINITION_IDS as LEGACY } from "@/apps/studioflow/domain/phase";
 import { createStudioFlowService } from "@/apps/studioflow/service";
 import { APP_REGISTRATIONS } from "../src/app/app-registrations";
@@ -63,6 +64,36 @@ async function main() {
       now: () => new Date(),
     });
     const actor = { kind: "USER" as const, userId: owner.userId, label: "Eka Tester" };
+    // Stage 1 browser-acceptance fixtures.  They are created through the public
+    // Master Data service so the UI tests start from the same valid state as a
+    // real account, without depending on another spec's mutations.
+    await testDb.pool.query(`TRUNCATE TABLE "master_data"."Category", "master_data"."Vendor", "master_data"."Brand", "master_data"."Sku", "master_data"."ArchiveCause", "master_data"."DeletionRequest" RESTART IDENTITY CASCADE`);
+    await db.vendorType.deleteMany({ where: { code: { in: ["E2E_MATERIAL", "E2E_LABOR", "E2E_BOTH"] } } });
+    const masterData = createMasterDataService(db, {
+      runTransaction: (work) => db.$transaction(work),
+      auditWriter: createAuditEventWriter(),
+      sampleRequestNotifier: { resolved: async () => undefined },
+    });
+    const masterDataGrants = Object.values(MASTERDATA_PERMISSIONS);
+    const [materialType, laborType, bothType] = await Promise.all([
+      masterData.createVendorType({ grants: masterDataGrants, actor, code: "E2E_MATERIAL", name: "E2E Material", canSupplyMaterial: true }),
+      masterData.createVendorType({ grants: masterDataGrants, actor, code: "E2E_LABOR", name: "E2E Labor", canSupplyLabor: true }),
+      masterData.createVendorType({ grants: masterDataGrants, actor, code: "E2E_BOTH", name: "E2E Both", canSupplyMaterial: true, canSupplyLabor: true }),
+    ]);
+    const [productCategory, workCategory] = await Promise.all([
+      masterData.createCategory({ grants: masterDataGrants, actor, name: "ZZ-Test Product", kind: "PRODUCT" }),
+      masterData.createCategory({ grants: masterDataGrants, actor, name: "ZZ-Test Work", kind: "WORK" }),
+    ]);
+    const [matA, matB, both, labor] = await Promise.all([
+      masterData.createVendor({ grants: masterDataGrants, actor, name: "ZZ-Test Mat A", vendorTypeIds: [materialType.vendorTypeId] }),
+      masterData.createVendor({ grants: masterDataGrants, actor, name: "ZZ-Test Mat B", vendorTypeIds: [materialType.vendorTypeId] }),
+      masterData.createVendor({ grants: masterDataGrants, actor, name: "ZZ-Test Both", vendorTypeIds: [bothType.vendorTypeId] }),
+      masterData.createVendor({ grants: masterDataGrants, actor, name: "ZZ-Test Labor", vendorTypeIds: [laborType.vendorTypeId] }),
+    ]);
+    const brand = await masterData.createBrand({ grants: masterDataGrants, actor, name: "ZZ-Test Brand", ownerVendorId: matA.vendorId, suppliers: [{ vendorId: matA.vendorId }] });
+    const pcs = await db.unit.findUniqueOrThrow({ where: { code: "pcs" } });
+    const sku1 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 1", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "10000", currency: "IDR" }] });
+    const sku2 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 2", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
     const project = await sf.projects.createProject({
       grants: registry.permissions,
       actor,
@@ -76,7 +107,7 @@ async function main() {
     const bqProject = await bq.createProject({ grants: registry.permissions, actor, title: "E2E Long BQ Project Title For Phone Width Checks At The Breeze BSD Phase 2", clientName: "E2E Client" });
 
     mkdirSync("e2e/.tmp", { recursive: true });
-    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, projectId: project.projectId, bqProjectId: bqProject.id }));
+    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, projectId: project.projectId, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, workCategory: workCategory.categoryId } }));
   } finally {
     await closeTestDb(testDb);
   }

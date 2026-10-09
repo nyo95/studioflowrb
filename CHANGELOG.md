@@ -1,5 +1,26 @@
 # Changelog
 
+## R8.469 | 2026-10-09 | test(masterdata): add Stage 1 browser-acceptance coverage (Executor)
+
+- Added isolated Master Data fixtures and Playwright coverage for the Stage 1 material-price, supplier-capability, several-suppliers-entry, and duplicate Brand-input checks. The fixture uses only the disposable E2E database and `ZZ-Test …` names.
+- **Walk results:**
+
+  | Step | Result | Evidence |
+  | --- | --- | --- |
+  | 2.1–2.2 | PASS | A material price links the new supplier to its Brand. |
+  | 2.3 | PASS | A quoted amount saves and displays as text. |
+  | 2.4 | FAIL | Valid rows are not saved when another row has no amount; recorded in BACKLOG. |
+  | 2.5–2.6 | NOT COVERED | Brand guard/filter flow remains for a later Stage 1 extension. |
+  | 3.1 | PASS | Labor and Material + Labor supplier lists respect capabilities. |
+  | 3.2 | NOT COVERED | Saving the Material + Labor price remains for a later Stage 1 extension. |
+  | 3.3 | PASS | Several suppliers entry is available under its accessible screen label. |
+  | 3.4–3.5 | NOT COVERED | Matrix save and paste coverage remains for a later Stage 1 extension. |
+  | 4.1 | PASS | Duplicate link and hashtag input normalize on Brand creation. |
+  | 4.2 | NOT COVERED | Duplicate supplier-type selection remains for a later Stage 1 extension. |
+
+- **Migrations/dependencies:** none.
+- **Checks:** `tsc --noEmit`; `npm run lint`; `npm run test:e2e` (one expected Stage 1 failure: 2.4, recorded in BACKLOG); `npm run check:boundaries`.
+
 ## R8.468 | 2026-10-09 | docs(plan): template-first price import Work Order (Lead)
 
 - Owner decided to delete the company-layout Excel reader: the price database imports and exports one plain flat shape (Suppliers and Prices sheets) and the owner copies into the company workbook by hand. Work Order `docs/apps/masterdata/WO-MD-IMPORT-SIMPLE-01.md`: template, flat export without IDs, natural-key matching, apply the valid rows for the price database and the SKU workbook. Queued behind WO-E2E-ACCEPT-01 Stage 1.
