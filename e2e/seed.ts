@@ -94,6 +94,7 @@ async function main() {
     const pcs = await db.unit.findUniqueOrThrow({ where: { code: "pcs" } });
     const sku1 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 1", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "10000", currency: "IDR" }] });
     const sku2 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 2", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
+    const sku3 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 3", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
     const project = await sf.projects.createProject({
       grants: registry.permissions,
       actor,
@@ -107,7 +108,7 @@ async function main() {
     const bqProject = await bq.createProject({ grants: registry.permissions, actor, title: "E2E Long BQ Project Title For Phone Width Checks At The Breeze BSD Phase 2", clientName: "E2E Client" });
 
     mkdirSync("e2e/.tmp", { recursive: true });
-    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, projectId: project.projectId, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, workCategory: workCategory.categoryId } }));
+    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, projectId: project.projectId, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, sku3: sku3.skuId, workCategory: workCategory.categoryId } }));
   } finally {
     await closeTestDb(testDb);
   }

@@ -517,10 +517,12 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           : [!entry.skuId && "SKU", !entry.vendorId && "supplier", !entry.amount && "amount"].filter(Boolean);
         if (lacks.length > 0) missingM[entry.key] = `Needs ${lacks.join(", ")}.`;
       });
-      if (Object.keys(missingM).length > 0) { setRowProblems(missingM); setBulkError("Some rows are incomplete. Nothing was saved."); return; }
+      // Complete rows are saved even when others are not: an incomplete row stays in the table with what it lacks.
+      const sendRows = filledMRows.filter((entry) => !missingM[entry.key]);
+      if (sendRows.length === 0) { setRowProblems(missingM); setBulkError("Some rows are incomplete. Nothing was saved."); return; }
       setBulkPending(true);
       try {
-        const result = await saveMaterialSkuPricesBulkAction({ currency, rows: filledMRows.map((entry) => {
+        const result = await saveMaterialSkuPricesBulkAction({ currency, rows: sendRows.map((entry) => {
           const notes = entry.notes.trim() || null;
           if (!entry.newSku) return { kind: "existing" as const, skuId: entry.skuId, vendorId: entry.vendorId, amount: entry.amount, notes };
           const shape = newSkuShape(entry.newSku);
@@ -543,12 +545,12 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
         }) });
         if (result.ok) {
           const rejected = result.data.rejected ?? [];
-          if (rejected.length === 0) { onCancel(); return; }
-          // Keep only the rows that failed, with their reasons; the saved ones are already in the list.
-          const problems: Record<number, string> = {};
+          if (rejected.length === 0 && Object.keys(missingM).length === 0) { onCancel(); return; }
+          // Keep only the rows that failed or were incomplete, with their reasons; the saved ones are already in the list.
+          const problems: Record<number, string> = { ...missingM };
           const existing: Record<number, string> = {};
           for (const problem of rejected) {
-            const target = filledMRows[problem.index];
+            const target = sendRows[problem.index];
             if (!target) continue;
             problems[target.key] = problem.message;
             const existingSkuId = problem.code === "NEW_SKU_ALREADY_EXISTS" ? problem.details?.existingSkuId : undefined;
@@ -558,15 +560,16 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           if (keep.size > 0) setMRows((current) => current.filter((entry) => keep.has(entry.key)));
           setExistingMatch(existing);
           setRowProblems(problems);
-          setBulkError(`${result.data.ids.length} saved. ${rejected.length} row${rejected.length === 1 ? "" : "s"} ${rejected.length === 1 ? "needs" : "need"} fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
+          const left = keep.size;
+          setBulkError(`${result.data.ids.length} saved. ${left} row${left === 1 ? "" : "s"} ${left === 1 ? "needs" : "need"} fixing and ${left === 1 ? "is" : "are"} still here.`);
           return;
         }
         if (result.ok === false) {
           const details = (result.error.details as { rows?: Array<{ index: number; code: string; message: string; details?: { existingSkuId?: unknown } }> } | undefined)?.rows ?? [];
-          const problems: Record<number, string> = {};
+          const problems: Record<number, string> = { ...missingM };
           const existing: Record<number, string> = {};
           for (const problem of details) {
-            const target = filledMRows[problem.index];
+            const target = sendRows[problem.index];
             if (!target) continue;
             problems[target.key] = problem.message;
             if (problem.code === "NEW_SKU_ALREADY_EXISTS" && typeof problem.details?.existingSkuId === "string") existing[target.key] = problem.details.existingSkuId;
@@ -590,29 +593,32 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
       const lacks = [!entry.name.trim() && "name", !entry.unitId && "unit", !entry.amount && "amount"].filter(Boolean);
       if (lacks.length > 0) missing[entry.key] = `Needs ${lacks.join(", ")}.`;
     });
-    if (Object.keys(missing).length > 0) { setRowProblems(missing); setBulkError("Some rows are incomplete. Nothing was saved."); return; }
+    // Complete rows are saved even when others are not: an incomplete row stays in the table with what it lacks.
+    const sendWorkRows = filledRows.filter((entry) => !missing[entry.key]);
+    if (sendWorkRows.length === 0) { setRowProblems(missing); setBulkError("Some rows are incomplete. Nothing was saved."); return; }
     setBulkPending(true);
     try {
       const result = await saveBulkWorkPricesAction({
         kind: editor.kind === "material-labor" ? "material-labor" : "labor",
         vendorId, categoryId, currency,
-        rows: filledRows.map((entry) => ({ name: entry.name.trim(), unitId: entry.unitId, amount: entry.amount, notes: entry.notes.trim() || null, scopeNote: entry.scopeNote.trim() || null })),
+        rows: sendWorkRows.map((entry) => ({ name: entry.name.trim(), unitId: entry.unitId, amount: entry.amount, notes: entry.notes.trim() || null, scopeNote: entry.scopeNote.trim() || null })),
       });
       if (result.ok) {
         const rejected = result.data.rejected ?? [];
-        if (rejected.length === 0) { onCancel(); return; }
-        const problems: Record<number, string> = {};
-        for (const problem of rejected) { const target = filledRows[problem.rowIndex]; if (target) problems[target.key] = problem.message; }
+        if (rejected.length === 0 && Object.keys(missing).length === 0) { onCancel(); return; }
+        const problems: Record<number, string> = { ...missing };
+        for (const problem of rejected) { const target = sendWorkRows[problem.rowIndex]; if (target) problems[target.key] = problem.message; }
         const keep = new Set(Object.keys(problems).map(Number));
         if (keep.size > 0) setRows((current) => current.filter((entry) => keep.has(entry.key)));
         setRowProblems(problems);
-        setBulkError(`${result.data.ids.length} saved. ${rejected.length} row${rejected.length === 1 ? "" : "s"} ${rejected.length === 1 ? "needs" : "need"} fixing and ${rejected.length === 1 ? "is" : "are"} still here.`);
+        const left = keep.size;
+        setBulkError(`${result.data.ids.length} saved. ${left} row${left === 1 ? "" : "s"} ${left === 1 ? "needs" : "need"} fixing and ${left === 1 ? "is" : "are"} still here.`);
         return;
       }
       if (result.ok === false) {
         const details = (result.error.details as { rows?: BulkRowProblem[] } | undefined)?.rows ?? [];
-        const problems: Record<number, string> = {};
-        for (const problem of details) { const target = filledRows[problem.rowIndex]; if (target) problems[target.key] = problem.message; }
+        const problems: Record<number, string> = { ...missing };
+        for (const problem of details) { const target = sendWorkRows[problem.rowIndex]; if (target) problems[target.key] = problem.message; }
         setRowProblems(problems);
         setBulkError(result.error.safeMessage);
       }

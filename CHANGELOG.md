@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.473 | 2026-10-09 | fix(masterdata): complete price rows save even when other rows are incomplete (Lead)
+
+- **Owner decision 2026-10-09** (finding 2.4 of the browser acceptance run): in New price (material table and the labor/material+labor table), rows that are complete are saved even when another row lacks something. An incomplete row stays in the table with what it needs ("Needs amount."), next to rows the server rejected, and the message reads "N saved. M rows need fixing and are still here." If no row is complete nothing is sent and the message stays "Some rows are incomplete. Nothing was saved."
+- **Test repair (R8.469 spec):** 2.3 and 2.4 shared SKU 2 from Mat B, so 2.4 failed on the price 2.3 had created. The seed now has ZZ-Test SKU 3 and 2.3 uses it, which keeps each spec independent. All six Stage 1 specs pass. The `[BUG]` entry for 2.4 is removed; the six steps still NOT COVERED stay with the Executor.
+- **Migrations/dependencies:** none. **Checks:** `npm test` (981), `tsc --noEmit`, eslint, `playwright test e2e/masterdata-acceptance.spec.ts` (6 passed).
+
 ## R8.472 | 2026-10-09 | docs(review): R8.469 verdict PARTIAL, backlog for R8.470-R8.471 (Lead)
 
 - **Review of R8.469 (`e5f6af5`, WO-E2E-ACCEPT-01 Stage 1):** the harness was never the problem (Lead re-ran `settings.spec.ts`: 11 passed). The commit has working specs for 2.1-2.3, 3.1, 3.3 and 4.1 and one real finding (2.4, recorded as `[BUG]`). Six steps are NOT COVERED (2.5-2.6, 3.2, 3.4-3.5, 4.2), so Stage 1 is **PARTIAL**, not complete. Next correction pass: cover those six, then Stage 2.

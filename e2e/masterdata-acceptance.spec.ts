@@ -40,7 +40,8 @@ test("2.3 quoted text material amount saves as text", async ({ page }) => {
   await openPricing(page);
   await page.getByRole("button", { name: "New price" }).click();
   await chooseSearch(page, "Brand", "ZZ-Test Brand");
-  await chooseSearch(page, "SKU, row 1", "ZZ-Test SKU 2");
+  // SKU 3 keeps this spec independent: 2.4 later prices SKU 2 from Mat B and must find it free.
+  await chooseSearch(page, "SKU, row 1", "ZZ-Test SKU 3");
   await chooseSearch(page, "Supplier, row 1", "ZZ-Test Mat B");
   await page.getByLabel("Amount, row 1").fill('"By Request"');
   await page.getByRole("button", { name: /Create 1 price/ }).click();
