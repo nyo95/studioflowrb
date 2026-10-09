@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.466 | 2026-10-09 | docs(plan): browser acceptance as Playwright specs (Lead)
+
+- `PLAN.md` is now WO-E2E-ACCEPT-01: the owner's manual browser walk (`docs/BROWSER-ACCEPTANCE.md`) becomes Playwright specs in four stages (Master Data pricing; archive/restore and samples; StudioFlow; platform and the rest), one Executor commit per stage. Reuses the existing harness (:3101, disposable test database, seeded owner).
+- Rules: tests only, no application code changes, failures recorded as `[BUG]` findings, locators by role/label/text, uploads through `setInputFiles` with generated files, results reported per walk step.
+- **Migrations/dependencies:** none. Documentation only.
+
 ## R8.465 | 2026-10-09 | feat(platform): integration tokens page on My preferences (Lead)
 
 - New section "Integration tokens" on My preferences, shown only to people whose role has `platform.integration.manage`. Create a token with a name, what it may do (only what the person's own access allows) and a validity (30 days, 90 days default, 1 year, none); the secret appears once with a copy button. The list shows name, allowed actions, last used, expiry and status (Active, Expired, Revoked) with a Revoke button.
