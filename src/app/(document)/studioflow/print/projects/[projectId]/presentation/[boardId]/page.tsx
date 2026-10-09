@@ -48,6 +48,9 @@ export default async function PresentationPrintPage({ params, searchParams }: { 
   );
 
   return (
+    <>
+    {/* The browser names a saved PDF after the page title: "project - board", not the address. */}
+    <title>{`${project.name} - ${board.title}`}</title>
     <DocumentSheet
       paged
       printFormat={printFormat}
@@ -113,5 +116,6 @@ export default async function PresentationPrintPage({ params, searchParams }: { 
         );
       })}
     </DocumentSheet>
+    </>
   );
 }

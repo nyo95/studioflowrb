@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.486 | 2026-10-09 | fix(studioflow): a saved Presentation PDF is named after the project and the board (Lead)
+
+- **Owner report 2026-10-09:** Save as PDF from the Presentation print offered a name made from the web address (`localhost_3001_studioflow_print_projects_...pdf`). The print page now sets its title to "project - board title" (for example `2026-506 Sociolla SG Funan - Material Funan`), the same way the MOM, Schedule and quotation prints already name theirs. P.6 checks the title.
+- **Migrations/dependencies:** none. **Checks:** `tsc --noEmit`, eslint, `playwright test e2e/presentation-print.spec.ts`.
+
 ## R8.485 | 2026-10-09 | docs(platform): recommend safe storage cutover and remote access (Executor)
 
 - `DISCUSS-STORAGE-TUNNEL-01`: inspected the active local storage composition, every direct and injected storage consumer, signed/public reads, usage reporting, cleanup jobs, Platform settings persistence, login/session/proxy handling, and Windows unattended-operation evidence. The discussion report recommends an env-backed typed Platform override whose destination activates only after a resumable checksum-verified copy and guarded cutover.
