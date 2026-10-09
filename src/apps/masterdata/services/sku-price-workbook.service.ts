@@ -178,11 +178,15 @@ export function createSkuPriceWorkbookService(
       const parsed = await readRows(input.file); const check = await validate(parsed.rows); const totals = { create: check.rows.filter((x) => x.outcome === "create").length, update: check.rows.filter((x) => x.outcome === "update").length, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length, error: check.rows.filter((x) => x.outcome === "error").length };
       return { hash: createHash("sha256").update(parsed.data).digest("hex"), totals, rows: check.rows, errors: check.errors };
     },
-    async applySkuPriceImport(input: { grants: PermissionGrants; actor: AuditActor; file: WorkbookFile; hash: string }) {
+    /**
+     * Saves the file the preview checked. By default the valid rows are saved and each row with a problem is skipped and
+     * reported (`skipped`); with `applyValidRows: false` any problem refuses the whole file and nothing is saved.
+     */
+    async applySkuPriceImport(input: { grants: PermissionGrants; actor: AuditActor; file: WorkbookFile; hash: string; applyValidRows?: boolean }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.skuManage); requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       const parsed = await readRows(input.file); const actual = createHash("sha256").update(parsed.data).digest("hex"); if (actual !== input.hash) throw new AppError("CONFLICT", "SKU_PRICE_WORKBOOK_CHANGED", "The workbook changed after preview. Preview it again before applying.");
       return ports.runTransaction(async (tx) => {
-        const check = await validate(parsed.rows, asPrismaClient(tx)); if (check.errors.length) throw new AppError("VALIDATION", "SKU_PRICE_IMPORT_ERRORS", "Fix the workbook errors before applying.", { details: { errors: check.errors } });
+        const check = await validate(parsed.rows, asPrismaClient(tx)); if (check.errors.length && input.applyValidRows === false) throw new AppError("VALIDATION", "SKU_PRICE_IMPORT_ERRORS", "Fix the workbook errors before applying. Nothing was saved.", { details: { errors: check.errors } });
         const service = createScopedService(tx); let created = 0; let updated = 0;
         const newRows = new Map<string, ValidRow[]>();
         for (const row of check.valid) if (!row.sku) { const group = `${key(row.Code)}:${key(row.Name)}`; newRows.set(group, [...(newRows.get(group) ?? []), row]); }
@@ -196,7 +200,7 @@ export function createSkuPriceWorkbookService(
           else if (row.price && (!samePriceAmount(row.price, row.Amount) || row.price.currency !== requiredCurrency(row.Currency) || !same(row.price.notes, row["Price notes"] || null))) await service.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: row.price.id, amount: row.Amount, currency: row.Currency, notes: row["Price notes"] || null });
         }
         await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "sku-price-workbook.applied", entityType: "sku_price_workbook", entityId: actual, actor: input.actor, metadata: { created, updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length } }), tx);
-        return { totals: { create: created, update: updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length, error: 0 } };
+        return { totals: { create: created, update: updated, unchanged: check.rows.filter((x) => x.outcome === "unchanged").length, error: check.errors.length }, skipped: check.errors.slice(0, 200) };
       });
     },
   };

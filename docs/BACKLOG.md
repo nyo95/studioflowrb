@@ -282,11 +282,11 @@ Order matters; each item is its own Work Order.
   `studioflow/public/sample-request-command.ts`. Not a defect; revisit as one
   application-level workflow once two or three more cross-app workflows exist.
 - [ ] [UNVERIFIED] WO-MD-CRUD-01, still open after the 2026-10-08 walks (passed: Supplier archive and restore cascade through its owned Brand, SKU and price and leave a Brand that only lists it; a price-less SKU and its Brand archive and restore; Material+Labor shows material-, labor- and both-capable suppliers and Labor only labor-capable ones; the Material+Labor quick-add supplier offers all three Supplier Types and creates and selects the supplier; a Material+Labor price from a material-only supplier saves): a hand-archived Brand staying archived through a Supplier restore and a Brand with the same link typed twice. Renaming a Brand whose owner is archived is covered by a test only.
-- [ ] [PLANNED][P2] **Simple import: template first (owner, 2026-10-09; company-file reader to be deleted).** Work Order
-  written: `docs/apps/masterdata/WO-MD-IMPORT-SIMPLE-01.md` (Executor: flat template, flat export, natural-key matching,
-  apply valid rows for both imports; Lead afterwards: the screen). Folds in the next item (save the valid rows).
-- [ ] [PLANNED][P3] The workbook imports (SKU prices, price database) still reject the whole file when any row is invalid. Revisit a "apply the valid rows" option once WO-MD-ENTRY-01 has proven the grid version; the import's preview step makes it a separate decision.
 - [ ] [UNVERIFIED] WO-MD-ENTRY-01, still open after the 2026-10-08 walks (passed: auto-link on price save; the material, the labor and the several-suppliers grids each save what is valid and keep the failing row or cell with its reason; "Show those prices" opens the Pricing list filtered to those prices): only changing a Brand owner while its prices exist.
+- [ ] [UNVERIFIED] Template-first imports (R8.482): on Import & export prices, both cards read Download template, choose a file (checked at once),
+  Save (valid rows saved, problem rows skipped and listed). Automated for CSV; still to try by hand: an Excel file with the Suppliers sheet, the
+  current-data download edited and uploaded back, the PDF price list, and a real company file copied into the template.
+- [ ] [CLEANUP][P3] `createWorkbook`, `loadWorkbook` and `workbookToBuffer` in `platform/utilities/tabular` have no app consumer since R8.482; drop them or keep for the next raw-workbook layout (the `WorkbookCellValue` type is still used).
 - [ ] [UNVERIFIED] Browser acceptance is now mostly automated (WO-E2E-ACCEPT-01, R8.469-R8.481): `npm run test:e2e` runs 129 checks
   (Master Data pricing, archive and restore, the sample shelf, notes, images, Schedule codes, the moodboard, the token page, the first-use
   guide, Ideas). What still needs the owner's own eyes, from `docs/BROWSER-ACCEPTANCE.md`: the BQ screens (section 9 part), Dark mode and

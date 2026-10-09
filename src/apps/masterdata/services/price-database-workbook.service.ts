@@ -4,7 +4,7 @@ import { type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
-import { createWorkbook, loadWorkbook, workbookToBuffer, type Workbook, type WorkbookCellValue, type Worksheet, type WorksheetRow } from "@platform/utilities/tabular";
+import { exportTable, parseTabularFile, type FileResult, type ImportFormat, type TableColumn, type WorkbookCellValue } from "@platform/utilities/tabular";
 import { titleCaseWords } from "@platform/utilities/text-case";
 
 import type { createCategoryService } from "./category.service";
@@ -18,14 +18,11 @@ export type PriceWorkbookScopedService = Pick<ReturnType<typeof createCategorySe
   & Pick<ReturnType<typeof createPricingService>, "createWorkPricesBulk" | "updatePriceLabor" | "updatePriceMaterialLabor">;
 
 /**
- * The supplier-and-price database workbook, shaped like the owner's own Excel file so an existing file can be imported
- * and an export can be edited and brought back:
- * - "Database - <Supplier type>" sheets: Nama <type>, Kategori Pekerjaan, Alamat, No. HP / WA (1 and 2), Email,
- *   IG / Website, Nama PIC, Termin Pembayaran, Catatan. One sheet per supplier type.
- * - "Database Harga - <name>" sheets: a title, a header row (No, Nama Material, Spesifikasi, Satuan, one column per
- *   supplier, Catatan), section heading rows (FLOOR WORKS ...) that become the pricing category, and item rows with an
- *   amount per supplier. A "Harga Beli / Sumber" list layout (one supplier per row) is read too.
- * Importing is all or nothing and previewed first: the preview runs the real import and rolls it back.
+ * The supplier-and-work-price database as plain flat tables (owner decision 2026-10-09: no copy of the company's own Excel layout):
+ * - "Prices" (the first sheet, or the only table of a CSV): Category, Item, Unit, Supplier, Price, Notes - one row per price of one supplier.
+ * - "Suppliers" (optional second sheet of an .xlsx): Name, Type, Categories, Address, Phone, Email, PIC, Payment terms, Notes.
+ * One shared column description drives the template, the export of current data and the import, so a downloaded file can be edited and
+ * brought back, and its rows pasted into any other workbook. Importing is previewed first: the preview runs the real import and rolls it back.
  */
 
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -50,15 +47,6 @@ const fileError = (message: string): never => { throw new AppError("VALIDATION",
 const emptyText = (value: string) => value === "" || /^-+$/.test(value) || /^n\/a$/i.test(value);
 /** In the company's lists "By Request" (and a 0) means the price depends on the request: kept as a price of 0, shown as "By request". */
 const ON_REQUEST = /^(by request|tbc|tba|nego|negotiable)$/i;
-
-const SHOUTED_FILLER = new Set(["AND", "DAN", "THE", "FOR", "ATAU", "OF"]);
-
-/** Section headings are often typed in capitals ("FLOOR WORKS"). Make them a normal name; short words such as MEP or DB stay as acronyms. */
-function headingName(text: string): string {
-  const trimmed = text.trim();
-  if (trimmed !== trimmed.toLocaleUpperCase() || !/[A-Z]/.test(trimmed)) return titleCaseWords(trimmed);
-  return titleCaseWords(trimmed.split(/\s+/).map((word) => (word.length <= 3 && !SHOUTED_FILLER.has(word) ? word : word.charAt(0) + word.slice(1).toLocaleLowerCase())).join(" "));
-}
 
 function cellText(value: WorkbookCellValue): string {
   if (value === null || value === undefined) return "";
@@ -90,112 +78,78 @@ function readAmount(value: WorkbookCellValue): string | null | undefined {
   return undefined;
 }
 
-function findHeader(ws: Worksheet): { row: number; headers: string[] } | null {
-  for (let r = 1; r <= Math.min(ws.rowCount, 15); r += 1) {
-    const headers: string[] = [];
-    ws.getRow(r).eachCell({ includeEmpty: false }, (cell, col) => { headers[col] = cellText(cell.value); });
-    const lower = headers.map((header) => (header ?? "").toLocaleLowerCase());
-    if (lower.some((h) => /^nama (subcon|supplier|vendor|toko)/.test(h)) && lower.some((h) => h.startsWith("alamat"))) return { row: r, headers };
-    if (lower.some((h) => /^nama (material|item|pekerjaan)/.test(h))) return { row: r, headers };
-  }
-  return null;
-}
+const PRICE_COLUMNS: TableColumn[] = [
+  { key: "category", header: "Category", aliases: ["Kategori"], required: true, example: "Floor works", note: "The pricing category. It is created when it does not exist yet." },
+  { key: "item", header: "Item", aliases: ["Nama Item", "Name", "Nama"], required: true, example: "Screeding base", note: "The work or service being priced." },
+  { key: "unit", header: "Unit", aliases: ["Satuan"], example: "m2", note: "A unit code that already exists (m2, m, pcs ...). Blank rows use the default unit chosen on the page." },
+  { key: "supplier", header: "Supplier", required: true, example: "PT Contoh Subcon", note: "A supplier that can provide labor. One that does not exist yet is created." },
+  { key: "price", header: "Price", aliases: ["Harga", "Amount"], required: true, example: "135000", note: "A number. Use \"By Request\" in quotation marks for a price that depends on the request." },
+  { key: "notes", header: "Notes", aliases: ["Catatan", "Specification", "Spesifikasi"], example: "Include materials", note: "Optional specification or remark." },
+];
+const SUPPLIER_COLUMNS: TableColumn[] = [
+  { key: "name", header: "Name", aliases: ["Nama"], required: true, example: "PT Contoh Subcon" },
+  { key: "type", header: "Type", aliases: ["Jenis"], required: true, example: "Subcon", note: "A supplier type that already exists." },
+  { key: "categories", header: "Categories", aliases: ["Kategori"], example: "Floor works, Ceiling works", note: "Separated by commas." },
+  { key: "address", header: "Address", aliases: ["Alamat"] },
+  { key: "phone", header: "Phone", aliases: ["No. HP / WA", "HP"] },
+  { key: "email", header: "Email" },
+  { key: "pic", header: "PIC", aliases: ["Nama PIC", "Contact"] },
+  { key: "terms", header: "Payment terms", aliases: ["Termin Pembayaran"] },
+  { key: "notes", header: "Notes", aliases: ["Catatan"] },
+];
+const PRICES_SHEET = "Prices";
+const SUPPLIERS_SHEET = "Suppliers";
 
 function splitList(value: string): string[] {
-  return value.split(/[,;/]/).map((part) => part.trim()).filter((part) => part && !emptyText(part));
+  return value.split(/[,;]/).map((part) => part.trim()).filter((part) => part && !emptyText(part));
 }
 
-function parseWorkbook(workbook: Workbook): Parsed {
+/** Reads the flat tables of an uploaded .xlsx or .csv into the shape the import runs on. */
+async function parseFlat(data: Buffer, filename: string): Promise<Parsed> {
   const parsed: Parsed = { suppliers: [], items: [], messages: [] };
-  for (const ws of workbook.worksheets) {
-    const sheet = ws.name;
-    const header = findHeader(ws);
-    if (!header) { parsed.messages.push({ level: "info", sheet, message: "Ignored: no supplier or price table found." }); continue; }
-    const lower = header.headers.map((h) => (h ?? "").toLocaleLowerCase());
-    const col = (test: (h: string) => boolean) => lower.findIndex((h) => h !== undefined && test(h));
-    const isSupplierSheet = lower.some((h) => /^nama (subcon|supplier|vendor|toko)/.test(h)) && lower.some((h) => h.startsWith("alamat"));
-
-    if (isSupplierSheet) {
-      const typeMatch = /^database\s*[-–—]\s*(.+)$/i.exec(sheet.trim());
-      const nameCol = col((h) => /^nama (subcon|supplier|vendor|toko)/.test(h));
-      const typeName = typeMatch ? typeMatch[1]!.trim() : header.headers[nameCol]!.replace(/^nama\s+/i, "").trim();
-      const phoneCols = lower.map((h, i) => (/^no\.?\s*hp/.test(h) ? i : -1)).filter((i) => i >= 0);
-      const cols = { category: col((h) => h.startsWith("kategori")), address: col((h) => h.startsWith("alamat")), email: col((h) => h === "email"), links: col((h) => h.startsWith("ig")), pic: col((h) => /^nama pic/.test(h)), terms: col((h) => h.startsWith("termin")), notes: col((h) => h.startsWith("catatan")) };
-      for (let r = header.row + 1; r <= ws.rowCount; r += 1) {
-        const row = ws.getRow(r);
-        const get = (c: number) => (c > 0 ? cellText(row.getCell(c).value) : "");
-        const name = get(nameCol);
-        if (!name) continue;
-        const clean = (c: number) => { const text = get(c); return emptyText(text) ? null : text; };
-        const notes = [clean(cols.notes), clean(cols.terms) ? `Payment terms: ${clean(cols.terms)}` : null, clean(cols.links) ? `IG / Website: ${clean(cols.links)}` : null].filter(Boolean).join("\n");
-        parsed.suppliers.push({
-          sheet, row: r, typeName, name: titleCaseWords(name), categories: splitList(get(cols.category)), address: clean(cols.address),
-          phones: phoneCols.map((c) => get(c)).filter((phone) => !emptyText(phone)), email: clean(cols.email), pic: clean(cols.pic), notes: notes || null,
-        });
-      }
-      continue;
+  const isCsv = /\.csv$/i.test(filename);
+  if (!isCsv && !/\.xlsx$/i.test(filename)) fileError("Upload an .xlsx or .csv file made from the template.");
+  let prices;
+  try {
+    prices = await parseTabularFile({ data, filename, columns: PRICE_COLUMNS, sheetName: PRICES_SHEET, maxBytes: MAX_BYTES, maxRows: MAX_ITEMS });
+  } catch (error) {
+    if (!(error instanceof AppError)) throw error;
+    if (error.code === "TABULAR_XLSX_SHEET") return fileError('This file has no "Prices" sheet. Download the template from this page, fill it in, and upload that file.');
+    if (error.code === "TABULAR_ROW_LIMIT") return fileError(`The file has more than ${MAX_ITEMS} price rows.`);
+    return fileError(error.message);
+  }
+  for (const row of prices.rows) {
+    const v = row.values;
+    const price = readAmount(v.price ?? "");
+    const name = (v.item ?? "").trim();
+    if (!name && !(v.supplier ?? "").trim() && !(v.price ?? "").trim()) continue;
+    if (price === undefined) { parsed.messages.push({ level: "error", sheet: PRICES_SHEET, row: row.row, message: `Price "${v.price}" is not a number.` }); continue; }
+    if (price === null) { parsed.messages.push({ level: "info", sheet: PRICES_SHEET, row: row.row, message: `"${titleCaseWords(name)}" has no price and was skipped.` }); continue; }
+    parsed.items.push({
+      sheet: PRICES_SHEET, row: row.row, area: "", category: titleCaseWords((v.category ?? "").trim()), name: titleCaseWords(name), notes: (v.notes ?? "").trim(),
+      unitText: (v.unit ?? "").trim(), amounts: [{ supplier: titleCaseWords((v.supplier ?? "").trim()), pic: null, amount: price }],
+    });
+  }
+  if (!isCsv) {
+    let suppliers;
+    try {
+      suppliers = await parseTabularFile({ data, filename, columns: SUPPLIER_COLUMNS, sheetName: SUPPLIERS_SHEET, maxBytes: MAX_BYTES, maxRows: MAX_ITEMS });
+    } catch (error) {
+      if (!(error instanceof AppError) || error.code !== "TABULAR_XLSX_SHEET") { if (error instanceof AppError) parsed.messages.push({ level: "error", sheet: SUPPLIERS_SHEET, message: error.message }); else throw error; }
     }
-
-    // Price sheet.
-    if (lower.some((h) => /^harga (lama|baru)/.test(h))) { parsed.messages.push({ level: "warning", sheet, message: "Skipped: size-based sheets with old and new prices are not supported yet." }); continue; }
-    const nameCol = col((h) => /^nama (material|item|pekerjaan)/.test(h));
-    const specCol = col((h) => h.startsWith("spesifikasi"));
-    const unitCol = col((h) => h === "satuan");
-    const notesCol = col((h) => h.startsWith("catatan"));
-    const amountListCol = col((h) => h.startsWith("harga beli"));
-    const sourceCol = col((h) => h.startsWith("sumber"));
-    const typeCol = col((h) => h === "jenis");
-    const listLayout = amountListCol > 0 && sourceCol > 0;
-    const firstSupplierCol = Math.max(nameCol, specCol, unitCol) + 1;
-    const supplierCols: Array<{ col: number; name: string; pic: string | null }> = [];
-    if (!listLayout) {
-      for (let c = firstSupplierCol; c < header.headers.length; c += 1) {
-        const text = header.headers[c] ?? "";
-        if (!text || c === notesCol || /^(no|ukuran|jenis|sumber)\b/i.test(text)) continue;
-        const match = /^(.*?)\s*\(([^)]+)\)\s*$/.exec(text);
-        supplierCols.push({ col: c, name: titleCaseWords(match ? match[1]!.trim() : text), pic: match ? titleCaseWords(match[2]!.trim()) : null });
-      }
-      if (supplierCols.length === 0) { parsed.messages.push({ level: "warning", sheet, message: "Skipped: no supplier columns found after the Spesifikasi/Satuan columns." }); continue; }
-    }
-    const fallbackCategory = titleCaseWords((/^database harga\s*[-–—]\s*(.+)$/i.exec(sheet.trim())?.[1] ?? sheet).trim());
-    let section = "";
-    let area = "";
-    for (let r = header.row + 1; r <= ws.rowCount; r += 1) {
-      const row = ws.getRow(r);
-      const texts: string[] = [];
-      row.eachCell({ includeEmpty: false }, (cell, c) => { const t = cellText(cell.value); if (t) texts[c] = t; });
-      const filled = texts.filter((t) => t !== undefined);
-      if (filled.length === 0) continue;
-      const name = nameCol > 0 ? texts[nameCol] ?? "" : "";
-      // A merged heading repeats one non-numeric text across the row; real item rows carry an amount or differ cell to cell.
-      if (new Set(filled).size === 1 && readAmount(filled[0]!) === undefined) { section = headingName(filled[0]!); area = ""; continue; }
-      // A lone name with nothing else on the row is a sub-heading (an area such as "Store Area") for the rows below it.
-      if (name && filled.length === 1 && texts[nameCol] === name && readAmount(name) === undefined) { area = titleCaseWords(name); continue; }
-      if (!name || /^total\b/i.test(name)) continue;
-      const spec = specCol > 0 ? texts[specCol] ?? "" : "";
-      const ref = notesCol > 0 ? texts[notesCol] ?? "" : "";
-      const notes = [spec && !emptyText(spec) ? spec : "", ref && !emptyText(ref) ? `Ref: ${ref}` : ""].filter(Boolean).join(" · ");
-      const amounts: ParsedItem["amounts"] = [];
-      const item: ParsedItem = { sheet, row: r, area, category: section || (typeCol > 0 && texts[typeCol] ? headingName(texts[typeCol]!) : fallbackCategory), name: titleCaseWords(name), notes, unitText: unitCol > 0 ? texts[unitCol] ?? "" : "", amounts };
-      let bad = false;
-      if (listLayout) {
-        const amount = readAmount(row.getCell(amountListCol).value);
-        const supplier = texts[sourceCol] ?? "";
-        if (amount === undefined) { parsed.messages.push({ level: "error", sheet, row: r, message: `Amount "${texts[amountListCol]}" is not a number.` }); bad = true; }
-        else if (amount && supplier) amounts.push({ supplier: titleCaseWords(supplier), pic: null, amount });
-      } else {
-        for (const supplier of supplierCols) {
-          const amount = readAmount(row.getCell(supplier.col).value);
-          if (amount === undefined) { parsed.messages.push({ level: "error", sheet, row: r, message: `${supplier.name}: amount "${texts[supplier.col]}" is not a number.` }); bad = true; continue; }
-          if (amount) amounts.push({ supplier: supplier.name, pic: supplier.pic, amount });
-        }
-      }
-      if (bad) continue;
-      if (amounts.length === 0) { parsed.messages.push({ level: "info", sheet, row: r, message: `"${item.name}" has no amounts and was skipped.` }); continue; }
-      parsed.items.push(item);
+    for (const row of suppliers?.rows ?? []) {
+      const v = row.values;
+      const name = (v.name ?? "").trim();
+      if (!name) continue;
+      const clean = (value: string | undefined) => { const text = (value ?? "").trim(); return emptyText(text) ? null : text; };
+      const notes = [clean(v.notes), clean(v.terms) ? `Payment terms: ${clean(v.terms)}` : null].filter(Boolean).join("\n");
+      parsed.suppliers.push({
+        sheet: SUPPLIERS_SHEET, row: row.row, typeName: (v.type ?? "").trim(), name: titleCaseWords(name), categories: splitList(v.categories ?? ""), address: clean(v.address),
+        phones: clean(v.phone) ? [clean(v.phone)!] : [], email: clean(v.email), pic: clean(v.pic), notes: notes || null,
+      });
     }
   }
-  if (parsed.items.length > MAX_ITEMS) fileError(`The workbook has more than ${MAX_ITEMS} price rows.`);
+  if (parsed.items.length > MAX_ITEMS) fileError(`The file has more than ${MAX_ITEMS} price rows.`);
   return parsed;
 }
 
@@ -206,11 +160,8 @@ export function createPriceDatabaseWorkbookService(
 ) {
   async function load(file: WorkbookFile): Promise<{ data: Buffer; parsed: Parsed }> {
     const { data, name } = bytesOf(file);
-    if (data.length > MAX_BYTES) fileError("The workbook is larger than 8 MB.");
-    if (name && !/\.xlsx$/i.test(name)) fileError("Choose an .xlsx file.");
-    const workbook = await loadWorkbook(data).catch(() => null);
-    if (!workbook) return fileError("The file could not be read as an Excel workbook.");
-    return { data, parsed: parseWorkbook(workbook) };
+    if (data.length > MAX_BYTES) fileError("The file is larger than 8 MB.");
+    return { data, parsed: await parseFlat(data, name ?? "prices.xlsx") };
   }
 
   function requireImport(grants: PermissionGrants) {
@@ -364,60 +315,51 @@ export function createPriceDatabaseWorkbookService(
   const normalizeOptions = (options?: Partial<PriceDatabaseOptions>): PriceDatabaseOptions => ({ priceKind: options?.priceKind === "material-labor" ? "material-labor" : "labor", defaultUnitId: options?.defaultUnitId || null });
 
   return {
-    /** Downloads suppliers (one sheet per supplier type) and work prices (labor and material + labor matrices) in the import layout. */
-    async exportPriceDatabase(input: { grants: PermissionGrants }): Promise<{ filename: string; mimeType: string; data: Buffer }> {
+    /** A blank file in the flat shape with one example row: Prices (all a CSV has), and for .xlsx also Suppliers and a Notes sheet. */
+    async priceDatabaseTemplate(input: { grants: PermissionGrants; format?: ImportFormat }): Promise<FileResult> {
+      requireImport(input.grants);
+      const format = input.format ?? "xlsx";
+      const example = (columns: TableColumn[]) => Object.fromEntries(columns.map((column) => [column.key, column.example ?? ""]));
+      const sheetRows = (columns: TableColumn[], rows: Array<Record<string, string>>) => [columns.map((column) => column.header), ...rows.map((row) => columns.map((column) => row[column.key] ?? ""))];
+      const notes = [
+        ["How to use", ""],
+        ["Fill the Prices sheet: one row per price of one supplier. Delete the example row first.", ""],
+        ["Suppliers (optional): only for suppliers that do not exist yet. One that already exists is left unchanged.", ""],
+        ["Upload the file on the Import & export prices page; it is checked before anything is saved.", ""],
+        ["", ""],
+        ...[...PRICE_COLUMNS, ...SUPPLIER_COLUMNS].filter((column) => column.note).map((column) => [column.header, [column.required ? "Required. " : "", column.note ?? ""].join("")]),
+      ];
+      return exportTable({
+        format, filename: "price-database-template", sheetName: PRICES_SHEET, columns: PRICE_COLUMNS, rows: [example(PRICE_COLUMNS)],
+        extraSheets: format === "xlsx" ? [{ name: SUPPLIERS_SHEET, rows: sheetRows(SUPPLIER_COLUMNS, [example(SUPPLIER_COLUMNS)]) }, { name: "Notes", rows: notes }] : undefined,
+      });
+    },
+
+    /** The current work prices of one kind (and, for .xlsx, the suppliers) in exactly the template's shape, no IDs, so it can be edited and imported back. */
+    async exportPriceDatabase(input: { grants: PermissionGrants; priceKind?: "labor" | "material-labor"; format?: ImportFormat }): Promise<FileResult> {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.vendorRead);
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceWorkRead);
-      const [vendors, labor, materialLabor] = await Promise.all([
+      const format = input.format ?? "xlsx";
+      const include = { category: true, vendor: true, unit: true } as const;
+      const order = [{ category: { name: "asc" as const } }, { name: "asc" as const }];
+      const [vendors, prices] = await Promise.all([
         db.vendor.findMany({ where: { deleted_at: null }, orderBy: { name: "asc" }, include: { types: { include: { vendor_type: true } }, categories: { include: { category: true } }, contacts: true } }),
-        db.priceLabor.findMany({ where: { deleted_at: null }, include: { category: true, vendor: true, unit: true }, orderBy: [{ category: { name: "asc" } }, { name: "asc" }] }),
-        db.priceMaterialLabor.findMany({ where: { deleted_at: null }, include: { category: true, vendor: true, unit: true }, orderBy: [{ category: { name: "asc" } }, { name: "asc" }] }),
+        input.priceKind === "material-labor"
+          ? db.priceMaterialLabor.findMany({ where: { deleted_at: null }, include, orderBy: order })
+          : db.priceLabor.findMany({ where: { deleted_at: null }, include, orderBy: order }),
       ]);
-      const workbook = createWorkbook();
-      const styleHeader = (row: WorksheetRow) => { row.font = { bold: true }; row.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE7E5E4" } }; };
-
-      const typeNames = [...new Set(vendors.flatMap((vendor) => vendor.types.map((t) => t.vendor_type.name)))].sort();
-      for (const typeName of typeNames.length ? typeNames : ["Supplier"]) {
-        const ws = workbook.addWorksheet(`Database - ${typeName}`.slice(0, 31));
-        ws.addRow([`DATABASE ${typeName.toUpperCase()} — INTERIOR CONSTRUCTION`]);
-        ws.addRow(["Edit and import this sheet back. A supplier that already exists is left unchanged."]);
-        styleHeader(ws.addRow(["No", `Nama ${typeName}`, "Kategori Pekerjaan", "Alamat", "No. HP / WA", "No. HP / WA 2", "Email", "IG / Website", "Nama PIC", "Termin Pembayaran", "Catatan"]));
-        let n = 0;
-        for (const vendor of vendors.filter((v) => v.types.some((t) => t.vendor_type.name === typeName))) {
-          const contact = [...vendor.contacts].sort((a, b) => Number(b.is_primary) - Number(a.is_primary))[0];
-          const links = Array.isArray(vendor.info_links) ? (vendor.info_links as Array<{ url?: string }>).map((l) => l.url).filter(Boolean).join(", ") : "";
-          n += 1;
-          ws.addRow([n, vendor.name, vendor.categories.map((c) => c.category.name).join(", "), vendor.address ?? "", contact?.phone ?? "", contact?.extra_phones?.[0] ?? "", contact?.email ?? "", links, contact?.person_name ?? "", "", vendor.notes ?? ""]);
-        }
-        ws.columns.forEach((column, index) => { column.width = [5, 28, 24, 36, 18, 18, 28, 22, 22, 18, 40][index] ?? 18; });
-      }
-
-      const matrix = (title: string, sheetName: string, prices: typeof labor) => {
-        if (prices.length === 0) return;
-        const suppliers = [...new Map(prices.map((p) => [p.vendor.id, p.vendor.name] as const)).entries()].sort((a, b) => a[1].localeCompare(b[1]));
-        const ws = workbook.addWorksheet(sheetName);
-        ws.addRow([title]);
-        ws.addRow(["Prices in Rp. Section rows become the pricing category. Leave a supplier's cell blank when it has no price."]);
-        styleHeader(ws.addRow(["No", "Nama Material", "Spesifikasi", "Satuan", ...suppliers.map(([, name]) => name), "Catatan / Merk Referensi"]));
-        const byCategory = new Map<string, typeof prices>();
-        for (const price of prices) byCategory.set(price.category.name, [...(byCategory.get(price.category.name) ?? []), price]);
-        for (const [category, rows] of byCategory) {
-          const heading = ws.addRow([category.toUpperCase()]);
-          heading.font = { bold: true };
-          const items = new Map<string, typeof prices>();
-          for (const price of rows) items.set(key(price.name), [...(items.get(key(price.name)) ?? []), price]);
-          for (const group of items.values()) {
-            const first = group[0]!;
-            ws.addRow(["-", first.name, first.notes ?? "", first.unit.code, ...suppliers.map(([id]) => { const hit = group.find((p) => p.vendor.id === id); return hit ? (hit.amount_label ? `"${hit.amount_label}"` : Number(hit.amount.toString()) === 0 ? "By Request" : Number(hit.amount.toString())) : null; }), ""]);
-          }
-        }
-        ws.columns.forEach((column, index) => { column.width = index === 1 ? 36 : index === 2 ? 40 : index === 3 ? 10 : 18; });
-        ws.eachRow((row) => row.eachCell((cell) => { if (typeof cell.value === "number") cell.numFmt = "#,##0"; }));
-      };
-      matrix("DATABASE HARGA — LABOR ONLY", "Database Harga - Labor", labor);
-      matrix("DATABASE HARGA — MATERIAL + LABOR", "Database Harga - Material Labor", materialLabor);
-      const data = await workbookToBuffer(workbook);
-      return { filename: "masterdata-supplier-price-database.xlsx", mimeType: XLSX_MIME, data };
+      const priceRows = prices.map((price) => ({
+        category: price.category.name, item: price.name, unit: price.unit.code, supplier: price.vendor.name,
+        price: price.amount_label ? `"${price.amount_label}"` : Number(price.amount.toString()) === 0 ? "By Request" : String(Number(price.amount.toString())), notes: price.notes ?? "",
+      }));
+      const supplierRows = vendors.map((vendor) => {
+        const contact = [...vendor.contacts].sort((a, b) => Number(b.is_primary) - Number(a.is_primary))[0];
+        return { name: vendor.name, type: vendor.types[0]?.vendor_type.name ?? "", categories: vendor.categories.map((c) => c.category.name).join(", "), address: vendor.address ?? "", phone: contact?.phone ?? "", email: contact?.email ?? "", pic: contact?.person_name ?? "", terms: "", notes: vendor.notes ?? "" };
+      });
+      return exportTable({
+        format, filename: input.priceKind === "material-labor" ? "price-database-material-labor" : "price-database-labor", sheetName: PRICES_SHEET, columns: PRICE_COLUMNS, rows: priceRows,
+        extraSheets: format === "xlsx" ? [{ name: SUPPLIERS_SHEET, rows: [SUPPLIER_COLUMNS.map((column) => column.header), ...supplierRows.map((row) => SUPPLIER_COLUMNS.map((column) => (row as Record<string, string>)[column.key] ?? ""))] }] : undefined,
+      });
     },
 
     /** Runs the real import and rolls it back, so the preview and the apply cannot disagree. */
@@ -434,17 +376,21 @@ export function createPriceDatabaseWorkbookService(
       return { hash: hashOf(data, options), totals: result!.totals, messages: result!.messages, errors: result!.errors };
     },
 
-    async applyPriceDatabaseImport(input: { grants: PermissionGrants; actor: AuditActor; file: WorkbookFile; hash: string; options?: Partial<PriceDatabaseOptions> }) {
+    /**
+     * Saves the file the preview checked. By default the valid rows are saved and each row with a problem is skipped and reported
+     * (`skipped`); with `applyValidRows: false` any problem refuses the whole file and nothing is saved.
+     */
+    async applyPriceDatabaseImport(input: { grants: PermissionGrants; actor: AuditActor; file: WorkbookFile; hash: string; applyValidRows?: boolean; options?: Partial<PriceDatabaseOptions> }) {
       requireImport(input.grants);
       const options = normalizeOptions(input.options);
       const { data, parsed } = await load(input.file);
       const actual = hashOf(data, options);
-      if (actual !== input.hash) throw new AppError("CONFLICT", "PRICE_DATABASE_WORKBOOK_CHANGED", "The workbook or options changed after the preview. Preview it again.");
+      if (actual !== input.hash) throw new AppError("CONFLICT", "PRICE_DATABASE_WORKBOOK_CHANGED", "The file or options changed after the check. Check it again.");
       return ports.runTransaction(async (tx) => {
         const result = await run(asPrismaClient(tx), input.grants, input.actor, parsed, options);
-        if (result.errors.length) throw new AppError("VALIDATION", "PRICE_DATABASE_IMPORT_ERRORS", "Fix the workbook problems before applying. Nothing was saved.", { details: { errors: result.errors.slice(0, 200) } });
-        await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "price-database-workbook.applied", entityType: "price_database_workbook", entityId: actual, actor: input.actor, metadata: { ...result.totals, price_kind: options.priceKind } }), tx);
-        return { totals: result.totals, messages: result.messages };
+        if (result.errors.length && input.applyValidRows === false) throw new AppError("VALIDATION", "PRICE_DATABASE_IMPORT_ERRORS", "Fix the file problems before saving. Nothing was saved.", { details: { errors: result.errors.slice(0, 200) } });
+        await ports.auditWriter.write(prepareAuditEvent({ appId: "masterdata", action: "price-database-workbook.applied", entityType: "price_database_workbook", entityId: actual, actor: input.actor, metadata: { ...result.totals, skipped: result.errors.length, price_kind: options.priceKind } }), tx);
+        return { totals: result.totals, messages: result.messages, skipped: result.errors.slice(0, 200) };
       });
     },
   };

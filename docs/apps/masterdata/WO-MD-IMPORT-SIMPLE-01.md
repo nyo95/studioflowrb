@@ -1,6 +1,6 @@
 # WO-MD-IMPORT-SIMPLE-01 — template-first price import (QUEUED for Executor)
 
-Status: READY, queued behind WO-E2E-ACCEPT-01 Stage 1 (only one Executor job runs at a time; the Lead copies this into `PLAN.md` when it is the next job).
+Status: DONE (R8.482, built by the Lead at the owner's request instead of the Executor). Notes: the Prices table has no Specification column (Category, Item, Unit, Supplier, Price, Notes); the matching key stays supplier + item name as the old import did; `apply valid rows` is the default for both imports.
 Target revision: next unused. Executor does the backend and the tests; the Lead reshapes the screen afterwards.
 Owner decision 2026-10-09: the import must not copy the company's complex Excel. The flow is **download template -> fill -> upload (checked at once) -> save**. The company-file layout is **removed**, not kept as an option. Moving data into the company Excel is done by copy and paste from the plain sheets.
 

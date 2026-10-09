@@ -37,9 +37,11 @@ export default async function WorkbookPage() {
 
   return (
     <>
-      <PageHeader title="Import & export prices" description="Download SKUs and their material prices as Excel, CSV or PDF, or edit them in Excel and bring the changes back in. Nothing is saved until you confirm." divider />
-      {canExport || canImport ? <WorkbookImport canExport={canExport} canImport={canImport} /> : null}
-      {canExportDatabase || canImportDatabase ? <PriceDatabaseImport canExport={canExportDatabase} canImport={canImportDatabase} units={databaseUnits} /> : null}
+      <PageHeader title="Import & export prices" description="Download a plain template, fill it in, upload it: the file is checked at once and nothing is saved until you press Save. Rows with a problem are skipped and listed." divider />
+      <div className="grid gap-4 p-(--ui-section-px) lg:grid-cols-2 lg:items-start">
+        {canExport || canImport ? <WorkbookImport canExport={canExport} canImport={canImport} /> : null}
+        {canExportDatabase || canImportDatabase ? <PriceDatabaseImport canExport={canExportDatabase} canImport={canImportDatabase} units={databaseUnits} /> : null}
+      </div>
     </>
   );
 }

@@ -34,7 +34,7 @@ their app-owned duplicates. Owned by the Platform Foundation; created in
 | People directory | `src/platform/core/rbac/people.ts` | `createPeopleDirectory`, `PersonSummary` (runtime: `peopleDirectory`) | **ADD** (R8.71) | StudioFlow PIC/assignee pickers and name resolution |
 | Unit label display | `src/platform/utilities/unit` | `formatUnitLabel` | **ADD** (proven, pending consumer wiring) | its own test suite only; Master Data Units UI is the intended consumer plane |
 | Tabular export/import | `src/platform/utilities/tabular` | `exportTable`, `parseTabularFile`, `buildImportTemplate`, `readTabularGrid`, `parseCsvText`, `TableColumn`, `PdfTableTemplate` | **ADD** (R8.238) | Master Data SKU price workbook (xlsx/csv/pdf export, xlsx/csv import, template), StudioFlow schedule import (xlsx/csv, template). Apps must not import `exceljs`/`pdf-lib` directly (boundary checker). PDF layout is a plain-data `PdfTableTemplate` each caller may override. |
-| Workbook access | `src/platform/utilities/tabular` (`workbook.ts`) | `createWorkbook`, `loadWorkbook`, `workbookToBuffer` | **EXTEND** | Master Data supplier and price database workbook (multi-sheet, merged headings) |
+| Workbook access | `src/platform/utilities/tabular` (`workbook.ts`) | `createWorkbook`, `loadWorkbook`, `workbookToBuffer` | **EXTEND** | No app consumer since R8.482 (the price database import now uses the flat `exportTable` / `parseTabularFile` path); `[CLEANUP]` in the backlog to drop the unused workbook exports |
 
 ### Recorded candidates (not yet shared)
 

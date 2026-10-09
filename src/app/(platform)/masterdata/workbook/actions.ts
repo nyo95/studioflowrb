@@ -55,11 +55,21 @@ function databaseOptions(formData: FormData) {
   return { priceKind: formData.get("priceKind") === "material-labor" ? ("material-labor" as const) : ("labor" as const), defaultUnitId: String(formData.get("defaultUnitId") ?? "") || null };
 }
 
-/** Downloads the supplier and work-price database in the same layout the import reads. */
-export async function exportPriceDatabaseAction(): Promise<ActionResult<DownloadFile>> {
+/** The current suppliers and work prices (one price kind) in the template's own flat shape, ready to edit and import back. */
+export async function exportPriceDatabaseAction(formData?: { priceKind?: string; format?: string }): Promise<ActionResult<DownloadFile>> {
   return runSafeAction(async () => {
     const { grants } = await requirePrincipalGrants();
-    const file = await masterDataService.exportPriceDatabase({ grants });
+    const file = await masterDataService.exportPriceDatabase({ grants, priceKind: formData?.priceKind === "material-labor" ? "material-labor" : "labor", format: formData?.format === "csv" ? "csv" : "xlsx" });
+    return { filename: file.filename, mimeType: file.mimeType, base64: file.data.toString("base64") };
+  });
+}
+
+/** The blank, filled-by-hand file: one example row, instructions on a Notes sheet. */
+export async function priceDatabaseTemplateAction(format: "xlsx" | "csv" = "xlsx"): Promise<ActionResult<DownloadFile>> {
+  return runSafeAction(async () => {
+    const { grants } = await requirePrincipalGrants();
+    if (format !== "xlsx" && format !== "csv") throw new AppError("VALIDATION", "EXPORT_FORMAT_INVALID", "Choose Excel or CSV.");
+    const file = await masterDataService.priceDatabaseTemplate({ grants, format });
     return { filename: file.filename, mimeType: file.mimeType, base64: file.data.toString("base64") };
   });
 }

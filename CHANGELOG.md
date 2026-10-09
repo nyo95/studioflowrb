@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.482 | 2026-10-09 | feat(masterdata): template-first price imports, company layout removed (Lead)
+
+- **Owner decision 2026-10-09:** the price database import no longer copies the company's own Excel. Both imports on Import & export prices are now **download template, fill, upload (checked at once), save**. Rows with a problem are skipped and listed; the valid rows are saved (`applyValidRows`, default on; `false` refuses the whole file). Moving data into the company workbook is copy and paste.
+- **Price database:** one flat `Prices` table (Category, Item, Unit, Supplier, Price, Notes) for Excel and CSV, plus an optional `Suppliers` sheet in Excel (Name, Type, Categories, Address, Phone, Email, PIC, Payment terms, Notes) and a `Notes` sheet of instructions. `priceDatabaseTemplate` builds the blank file with an example row; `exportPriceDatabase` writes the current data in the same shape (no IDs, one price kind per file). The company-layout reader (`Database - ...`, `Database Harga - ...`, section headings, one column per supplier) is deleted; such a file is now refused with a pointer to the template.
+- **SKU prices:** same screen flow; the server saves the valid rows and reports `skipped`. The ID columns stay in the current-data download (they are how a row finds its SKU) but not in the template.
+- **Screen:** one `TemplateImport` component for both cards: 1 get the template (Excel or CSV, or the current data), 2 upload (auto-check, badges, the list of problems), 3 save. Price kind and a default unit stay as small options.
+- **Tests:** the price-database integration tests were rewritten for the flat shape (read, update, skipped rows and refuse mode, same item twice, template as Excel and CSV, old layout refused, export round trip as Excel and CSV); one SKU test for saving the valid rows; three Playwright specs (`e2e/masterdata-import.spec.ts`). `npm test` 984 passed; the whole Playwright suite 132 passed.
+- **Migrations/dependencies:** none. **Checks:** `tsc --noEmit`, eslint, `npm test`, `npm run test:e2e`.
+
 ## R8.481 | 2026-10-09 | test(platform): browser acceptance Stage 4, WO-E2E-ACCEPT-01 complete (Lead)
 
 - `e2e/platform-acceptance.spec.ts`, 6 specs: 1.1 the first-use guide asks for a language, walks through and does not come back; 1.4 Help: replay guide (both on a second, fresh account in order); P.3 a person without the integration permission does not see the token section; P.4 a token is shown once, listed, revoked, and not recoverable after a reload; P.5 an image on the Ideas board becomes a card that goes to a project's moodboard; 0.3 Home, Pricing and a project page open with no console errors.
