@@ -33,6 +33,8 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## Platform Foundation
 
+- [ ] [UNVERIFIED] Optional module switch (R8.495, R8.498, WO-MODULES-M1): code review passed. Still to walk in the browser on a migrated local database: disable Ideas with the System Owner command, then check that the rail entry and the note-image "Save to Ideas" / "Use in schedule" / "Add to moodboard" buttons are gone without breaking the layout and that `/studioflow/ideas` is not-found; enable it again and see the same cards. Repeat for Presentation (project tab, Ideas-card "Add to moodboard…", board and print URLs). Then the Lead's read-only Settings "Modules" section.
+
 - [ ] [UNVERIFIED] Add item "From a past project" (R8.458): the search box, the empty result and the toggle were walked in the browser on the local database, which has one project, so no hit could be chosen. Still to walk with two projects: pick a hit (section and category switch to the hit's, the product shows as a summary, Remove returns to the normal fields), Save creates the item and copies the product with its photo and notes, and a failure after the item is created leaves the item without the copy.
 
 ### Companion apps and integrations (owner, 2026-10-09: Codex builds them in isolation)

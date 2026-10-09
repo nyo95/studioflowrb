@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.499 | 2026-10-10 | docs(review): R8.498 verdict, WO-MODULES-M1 Executor work accepted (Lead)
+
+- **Review of R8.498 (`22710fd`):** code review PASS. Findings 1-5 from R8.496 are resolved: every Ideas/Presentation page, the print route and all 21 server actions are gated (`notFound()` / `MODULE_DISABLED`), the rail entry, the project Presentation tab and the note-image and Ideas-card entry points are hidden from the enabled-module list, core manifests declare `bq`/`studioflow → masterdata`, two new `check:boundaries` rules with fixtures, disposable-database integration tests, the no-module-permission assertion, and `next-env.d.ts` back in its development form. No other route, nav consumer or tour step reaches Ideas or Presentation.
+- **Not yet accepted:** the browser walk of the disabled state and the Lead's read-only Settings "Modules" section; recorded as `[UNVERIFIED]` in `docs/BACKLOG.md` and in `PLAN.md`. Note for that UI revision: module state is read 3-4 times per StudioFlow request; add a per-request cache.
+- **Checks:** diff and caller inspection only; no code changed.
+
 ## R8.498 | 2026-10-10 | fix(platform,studioflow): complete optional-module gates and dependency enforcement (Executor)
 
 - **WO-MODULES-M1 correction:** Ideas and Presentation now fail closed at every page/action boundary when disabled; the StudioFlow rail, project Presentation tab, note-image Ideas actions, and moodboard entry points disappear from the enabled-module list. Existing behavior and data stay unchanged while enabled, and disabling never deletes Ideas cards/usages or Presentation boards.

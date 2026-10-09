@@ -4,7 +4,12 @@ Plan ID: WO-MODULES-M1 (module registry, runtime switch, System Owner command)
 Scope: Platform module foundation; StudioFlow Ideas Board and Presentation gated as optional modules
 Module(s): platform (new module registry), studioflow, ideas, presentation
 Target revision: next unused after R8.494 (check `CHANGELOG.md`)
-Status: READY (correction pass after R8.495 review; see "Review of R8.495")
+Status: EXECUTOR DONE (R8.495 + R8.498 accepted by code review, R8.499).
+Remaining, Lead-owned: browser acceptance walk (BACKLOG [UNVERIFIED]) and the
+read-only Settings "Modules" section from the UI Contract. When the Lead does
+that UI revision, also wrap `enabledModuleIds`/`isModuleEnabled` in a
+per-request cache: today one StudioFlow page asks the database 3-4 times for the
+same answer (allowed by "cached per request at most", not a defect).
 Priority: P1
 Owner: owner decision 2026-10-09, `docs/apps/platform/MODULES-DECISION.md` (read it first)
 Last updated: 2026-10-09 (Lead, R8.497 dependency rule locked)
