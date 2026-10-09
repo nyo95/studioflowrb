@@ -1412,6 +1412,16 @@ describe("SF-R3 Product Schedule", () => {
     assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["PT-02", "PT-03"], "a new row takes one past the highest number");
   });
 
+  it("never hands a deleted code out again, even when the last entry of the group was the one deleted", async () => {
+    const { projectId } = await newProject();
+    await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Stone", prefix: "ST" });
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    const last = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: last.entryId });
+    await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Stone" });
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId })).map((e) => e.code), ["ST-01", "ST-03"], "ST-02 was used once, so it stays retired");
+  });
+
   it("reorders by handing the group's own numbers out again, so a deleted code stays empty", async () => {
     const { projectId } = await newProject();
     await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });

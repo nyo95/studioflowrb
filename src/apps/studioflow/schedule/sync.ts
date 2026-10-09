@@ -1,7 +1,6 @@
 import {
   fallbackPrefix,
   normalizeSchedulePrefix,
-  nextIncrement,
   normalizeExtraFields,
   orderCardFields,
   scheduleSearchKey,
@@ -120,6 +119,22 @@ export async function categoryPrefix(tx: TxClient, input: { projectId: string; s
   return { label: input.category, prefix };
 }
 
+/**
+ * The number a new entry of a code group gets: one above the highest number the group has ever used, so a
+ * number freed by deleting the last entry never returns for a different item. `wanted` (an imported sheet's
+ * own number) is kept when it is free.
+ */
+export async function allocateIncrement(tx: TxClient, scope: { projectId: string; section: ScheduleSection; prefix: string }, wanted?: number | null): Promise<number> {
+  const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: scope.projectId, section: scope.section, prefix: scope.prefix }, select: { increment: true } });
+  const key = { project_id_section_prefix: { project_id: scope.projectId, section: scope.section, prefix: scope.prefix } };
+  const mark = await tx.sfScheduleCodeMark.findUnique({ where: key, select: { last_increment: true } });
+  const highest = Math.max(mark?.last_increment ?? 0, ...siblings.map((row) => row.increment));
+  const increment = wanted != null && !siblings.some((row) => row.increment === wanted) ? wanted : highest + 1;
+  const last = Math.max(highest, increment);
+  await tx.sfScheduleCodeMark.upsert({ where: key, create: { project_id: scope.projectId, section: scope.section, prefix: scope.prefix, last_increment: last }, update: { last_increment: last } });
+  return increment;
+}
+
 export async function createEntryWithOptionalOption(tx: TxClient, input: {
   projectId: string;
   section: ScheduleSection;
@@ -135,9 +150,7 @@ export async function createEntryWithOptionalOption(tx: TxClient, input: {
   code?: { prefix: string; increment: number } | null;
 }) {
   const { label: categoryLabel, prefix } = await categoryPrefix(tx, { projectId: input.projectId, section: input.section, category: input.category, categoryKey: input.categoryKey });
-  const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: input.projectId, section: input.section, prefix }, orderBy: { increment: "asc" }, select: { increment: true } });
-  const keepCode = input.code && input.code.prefix === prefix && !siblings.some((row) => row.increment === input.code!.increment);
-  const increment = keepCode ? input.code!.increment : nextIncrement(siblings);
+  const increment = await allocateIncrement(tx, { projectId: input.projectId, section: input.section, prefix }, input.code && input.code.prefix === prefix ? input.code.increment : null);
   const entry = await tx.sfScheduleEntry.create({
     data: {
       project_id: input.projectId,

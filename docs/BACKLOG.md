@@ -201,10 +201,6 @@ Order matters; each item is its own Work Order.
 - [ ] [PLANNED][P3] Product Schedule: a per-project category order (drag a
   category). Today categories follow the studio template order, then A to Z;
   a project order needs its own stored field.
-- [ ] [PLANNED][P3] Product Schedule: codes are stable since R8.382, but the
-  highest number in a group can come back after its row is deleted (next =
-  highest + 1). Never reusing it needs a stored per-group high-water mark;
-  owner to say whether that matters in practice.
 
 - [ ] [UNVERIFIED] Re-layout (R8.347–R8.348) on real data: send → client
   answered with notes → Revision (the next round shows the brief) → OK; CD Mall

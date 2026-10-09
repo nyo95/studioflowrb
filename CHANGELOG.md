@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.464 | 2026-10-09 | fix(studioflow): a deleted Schedule code never comes back for a different item (Lead)
+
+- **Owner question 2026-10-09:** after adding a stone from a past project (ST-02) and deleting ST-01, is that a bug? ST-02 staying ST-02 is the locked R8.382 rule, not a bug. The real gap was the one already in the backlog: deleting the highest number of a group let the next new item take that number again.
+- Each code group (project, section, prefix) now remembers the highest number it ever handed out (`SfScheduleCodeMark`, backfilled from existing entries). New entries, entries moved into another category and imported codes all go through `allocateIncrement`; a freed number is never reissued. An imported sheet's own number is still kept when free.
+- Regression test: delete the last entry of a group, add a new one, and it gets the next number, not the freed one. The backlog entry is removed.
+- **Migrations/dependencies:** one additive migration `20261009120000_sf_schedule_code_mark`, applied to the dev and test databases (kantor); no dependency.
+- **Checks:** `npm test` (980 passed), `tsc --noEmit`, eslint on the schedule folder, `check:boundaries`. Not walked in the browser.
+
 ## R8.463 | 2026-10-09 | docs(plan): SketchUp sync Work Order written and deferred (Lead)
 
 - Owner decisions recorded in `docs/apps/sketchup/WO-SKETCHUP-01.md`: the Product Schedule owns the code; the plugin owns technical identity and geometry; project in the URL; legacy safeguards kept. Marked DEFERRED at the owner's request; no code and no `PLAN.md` change.

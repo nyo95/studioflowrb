@@ -11,7 +11,6 @@ import {
   compareOptionLabels,
   fallbackPrefix,
   isPermutation,
-  nextIncrement,
   nextOptionLabel,
   isScheduleCardFieldKey,
   normalizeExtraFields,
@@ -44,7 +43,7 @@ import {
   type TxClient,
 } from "../shared";
 
-import { categoryPrefix, cleanSnapshot, createEntryWithOptionalOption, optionData, seedScheduleFromTemplates, type SnapshotInput } from "./sync";
+import { allocateIncrement, categoryPrefix, cleanSnapshot, createEntryWithOptionalOption, optionData, seedScheduleFromTemplates, type SnapshotInput } from "./sync";
 
 /** `card_fields` is JSON on the row: null = no override, array = explicit (possibly empty). */
 function cardFieldsOf(value: unknown): string[] | null {
@@ -725,8 +724,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         if (prefix === entry.prefix) {
           await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key } });
         } else {
-          const siblings = await tx.sfScheduleEntry.findMany({ where: { project_id: input.projectId, section: entry.section, prefix }, select: { increment: true }, orderBy: { increment: "asc" } });
-          const increment = nextIncrement(siblings);
+          const increment = await allocateIncrement(tx, { projectId: input.projectId, section: entry.section, prefix });
           // The old code is left empty in its group; nothing there shifts.
           await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { category: category.label, category_key: category.key, prefix, increment, sort_order: increment } });
         }
