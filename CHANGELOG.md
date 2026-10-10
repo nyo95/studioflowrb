@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.502 | 2026-10-10 | docs(platform): module scope reset, System Owner web console cancelled, modules runbook (Lead)
+
+- **Owner decision 2026-10-10:** the module system is for decoupling, versioning, on/off and controlled updates, not licensing or protection. `docs/apps/platform/MODULES-DECISION.md` gains a Purpose paragraph (no licence server, DRM, signed entitlement, anti-copy, per-customer encryption or hardened console without a new owner decision); the D5 web-console amendment is replaced by "cancelled"; leftover entitlement/licensed wording removed from D3/D5; D10 updates become a server command; M5 code-stripped customer builds deferred; Non-goals extended. `AGENTS.md` Modules paragraph aligned.
+- **WO-SYSTEM-01 CANCELLED** before any code (the `qrcode` approval withdrawn); `PLAN.md` is IDLE. New `docs/operations/MODULES-RUNBOOK.md`: step-by-step `npm run studioflow -- module list|enable|disable` for a non-programmer. `docs/BACKLOG.md`: WO-SYSTEM-01 removed, WO-SYSTEM-02 reworded, M1 and its Settings page marked done (R8.495-R8.500), M4 entitlement entry removed.
+- **Checks:** documentation only.
+
 ## R8.501 | 2026-10-10 | docs(platform): System Owner web console decision, licence dropped, GitHub updates; WO-SYSTEM-01 (Lead)
 
 - **Owner decision 2026-10-10** (`docs/apps/platform/MODULES-DECISION.md`): the owner is not a programmer and must run the system without an AI assistant, so System Owner operations get a web console `/system` with authenticator-app (TOTP) sign-in and printed recovery codes, reachable from anywhere and protected by lockout, replay refusal, short sessions and full audit; enrolment/reset stay a server command; it is still not an app account or RBAC permission (D5 amended). Per-module licence/entitlement dropped (D7): a module runs when built in and switched on. Updates (D10): GitHub releases, installed only when the System Owner presses Install, with backup and automatic roll-back.

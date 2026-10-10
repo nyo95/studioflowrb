@@ -2,9 +2,20 @@
 
 Status: ACCEPTED (owner, 2026-10-09; recorded by the Lead in R8.494).
 Amended: owner, 2026-10-10 (D5 web console, D7 dropped, D10 updates; R8.501).
+Amended: owner, 2026-10-10 (scope reset: web console cancelled, M5 code-stripped
+builds deferred; R8.502).
 Scope: how StudioFlowRB becomes a platform of separately versioned, separately
 switchable modules, so a customer runs only what it has, and a new capability can
 be used on its own first and injected later.
+
+**Purpose (owner, 2026-10-10).** The module system exists for decoupling,
+versioning, switching modules on/off and controlled updates, so production at
+the office never receives development automatically. It is **not** a licensing,
+DRM, anti-copy or anti-tamper system: StudioFlowRB is custom internal software
+for one office, protected by a private repository and the owner's agreement
+with the office, not by technical locks. Do not add licence servers, signed
+entitlements, per-customer encryption, code obfuscation or hardened owner
+consoles without a new explicit owner decision.
 
 ## Why now
 
@@ -44,7 +55,7 @@ Shell (today `src/app/app-registrations.ts`): `id`, `name`, `version` (semver
 `MAJOR.MINOR.PATCH`), `kind` (`core` = cannot be disabled, `optional`),
 `parent` (optional: the app it extends, e.g. `ideas` → `studioflow`),
 `requires` (other modules it reads through their `public/`), permissions,
-launcher/nav metadata, and later its entitlement key. Platform validates the
+and launcher/nav metadata. Platform validates the
 graph at boot (unknown id, cycle, a required module missing → boot fails).
 
 **D4. Gates, in this order:** built in → enabled → RBAC (entitlement dropped, D7).
@@ -58,25 +69,19 @@ separate, explicit, audited purge by the System Owner, never a side effect.
 **D5. Two kinds of authority.**
 
 - **Company Administrator** (the business): users, roles, projects, company
-  data, every licensed feature. This is the existing `platform-owner` role,
+  data, every enabled module. This is the existing `platform-owner` role,
   shown as "Company Administrator". It stays an ordinary RBAC role.
 - **System Owner** (the developer): install/enable/disable modules, versions,
-  entitlements, purges, recovery. **System Owner rights are not RBAC
+  purges, recovery. **System Owner rights are not RBAC
   permissions.** They are not in the permission vocabulary, so no role can
   hold them and no Company Administrator can grant them, including to
   themselves. System operations are audited with a `system` actor; the app
   UI (Settings > Modules) shows module state read-only.
-- **Amended 2026-10-10 (owner):** the owner is not a programmer and must be
-  able to run the system without an AI assistant, so System Owner operations
-  get a **web console** (`/system`) in addition to the server command. It is
-  not an app account and not an RBAC role: it has its own sign-in, an
-  **authenticator app code** (TOTP, RFC 6238, scanned once as a QR) with
-  printed recovery codes, its own short session, and it is reachable from
-  anywhere (owner's choice), so it is protected by lockout after repeated
-  wrong codes, replay refusal, short sessions and an audit row for every
-  sign-in attempt and change. Enrolment and reset of the authenticator stay a
-  server command (`npm run studioflow -- system setup|reset`), so nobody who
-  only reaches the web can claim the console.
+- **Web console cancelled (owner, 2026-10-10, R8.502).** The `/system` web
+  console with authenticator sign-in (R8.501, WO-SYSTEM-01) is not built: it
+  was more protection than one office needs. System Owner operations stay a
+  server command, documented step by step for a non-programmer in
+  `docs/operations/MODULES-RUNBOOK.md`. Switching a module is rare.
 
 **D6. Versions.** Each module carries its own semver in the manifest; Platform
 records the version each module last ran with. Patch = fixes, minor =
@@ -88,8 +93,8 @@ Migrations stay in the one Prisma history (Prisma has a single migration
 folder); a module's migration directories are named with its id
 (`<timestamp>_<module>_<what>`) so a module's history can be listed.
 
-**D7. Entitlement — DROPPED (owner, 2026-10-10).** No license file and no
-per-module licence. A module runs when it is built in and the System Owner
+**D7. Entitlement — DROPPED (owner, 2026-10-10).** No licence server, no
+licence file, no signed entitlement and no per-module licence. A module runs when it is built in and the System Owner
 switched it on. The gates are built in → enabled → RBAC.
 
 **D8. New capabilities are born as modules** (effective now). Any new business
@@ -106,10 +111,11 @@ with a cleanup on delete.
 
 **D10. Updates (owner, 2026-10-10).** A finished module or app version is
 published by the owner as a GitHub release. The receiving server only decides
-**install now or not**: the System Owner console shows "version X available"
-with what changed, and **Install** backs up the database first, installs the
+**install now or not**: a server command shows the available versions with
+what changed, and installing one backs up the database first, installs the
 release, migrates, rebuilds and restarts, and goes back to the previous version
-and backup automatically if any step fails. Nothing installs by itself. The
+and backup automatically if any step fails. The office stays on the version
+agreed with it; a new major (e.g. Phase 2.x) reaches it only when agreed. Nothing installs by itself. The
 exact mechanism depends on how the office server runs the app and is planned
 in WO-SYSTEM-02.
 
@@ -122,14 +128,15 @@ in WO-SYSTEM-02.
 | M2 | Discovery report: every coupling of Ideas and Presentation, the exact public functions StudioFlow must expose, the migration that moves their tables, cost | Executor report, Lead locks |
 | M3 | Ideas Board extracted to its own module and schema; Presentation next | Executor |
 | M4 | ~~Signed entitlement~~ dropped (D7, 2026-10-10) | — |
-| S1 | System Owner web console: authenticator sign-in, modules On/Off (WO-SYSTEM-01) | Executor backend, Lead UI |
-| S2 | Updates from GitHub releases with backup and automatic roll-back (WO-SYSTEM-02, D10) | Lead plans after the office-server facts |
-| M5 | Customer build profiles that leave out code, release tags, Windows service installer | Lead plans, later |
+| S1 | ~~System Owner web console~~ cancelled (owner 2026-10-10); runbook for the server command instead | Lead, R8.502 |
+| S2 | Updates from GitHub releases with backup and automatic roll-back, as a server command (WO-SYSTEM-02, D10) | Lead plans after the office-server facts |
+| M5 | Release tags and a Windows service installer. Customer builds that leave out code: deferred, not planned (owner 2026-10-10) | Lead plans, later |
 
 ## Non-goals now
 
 Runtime code download, a public plugin marketplace, per-module databases,
-microservices, per-customer forks.
+microservices, per-customer forks, licensing, DRM, anti-copy or anti-tamper
+mechanisms, a hardened web console for the System Owner.
 
 ## Harness impact
 
