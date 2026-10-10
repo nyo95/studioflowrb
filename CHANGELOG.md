@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.503 | 2026-10-10 | docs(platform): updater downgrade rule from the 2026-10-10 audit (Lead)
+
+- **Audit finding (P2, verified):** `synchronizeModuleVersions` (`src/platform/core/modules/state.ts`) overwrites `module_state.last_version` with the running manifest version at boot, with no compatibility check, so a rolled-back build silently records the older version. Not a production bug today (nothing reads `last_version` for decisions and no updater exists), but unsafe as an updater foundation.
+- **Decision recorded, no code change:** `MODULES-DECISION.md` D10 now says the database only moves forward, a downgrade means restoring the pre-upgrade backup with its code, the updater refuses an older version over a newer database, and `last_version` is display-only. The requirement is added to the WO-SYSTEM-02 `[PLANNED]` entry in `docs/BACKLOG.md`.
+- **Checks:** read-only verification of `state.ts`, `admin.ts` and their callers; documentation only.
+
 ## R8.502 | 2026-10-10 | docs(platform): module scope reset, System Owner web console cancelled, modules runbook (Lead)
 
 - **Owner decision 2026-10-10:** the module system is for decoupling, versioning, on/off and controlled updates, not licensing or protection. `docs/apps/platform/MODULES-DECISION.md` gains a Purpose paragraph (no licence server, DRM, signed entitlement, anti-copy, per-customer encryption or hardened console without a new owner decision); the D5 web-console amendment is replaced by "cancelled"; leftover entitlement/licensed wording removed from D3/D5; D10 updates become a server command; M5 code-stripped customer builds deferred; Non-goals extended. `AGENTS.md` Modules paragraph aligned.

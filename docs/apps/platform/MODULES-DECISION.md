@@ -115,7 +115,18 @@ published by the owner as a GitHub release. The receiving server only decides
 what changed, and installing one backs up the database first, installs the
 release, migrates, rebuilds and restarts, and goes back to the previous version
 and backup automatically if any step fails. The office stays on the version
-agreed with it; a new major (e.g. Phase 2.x) reaches it only when agreed. Nothing installs by itself. The
+agreed with it; a new major (e.g. Phase 2.x) reaches it only when agreed.
+
+**Going back to an older version** (audit 2026-10-10, R8.503): the database
+moves forward only. A downgrade is never "install the older code on the current
+database"; it is restoring the backup taken right before the upgrade together
+with the code that ran on it. The updater refuses to install a version older
+than the one the database last ran. `module_state.last_version` is a display
+value that boot overwrites with the running code's version
+(`synchronizeModuleVersions`); it is not evidence that an upgrade or downgrade
+succeeded and must not be used as the compatibility check. WO-SYSTEM-02 keeps
+the code version, the applied migration history and the backup it pairs with as
+separate facts, and checks before installing. Nothing installs by itself. The
 exact mechanism depends on how the office server runs the app and is planned
 in WO-SYSTEM-02.
 
