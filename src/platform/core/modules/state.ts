@@ -68,6 +68,24 @@ export async function enabledModuleIds(db?: ModuleStateReader): Promise<readonly
   return Object.freeze(getModuleRegistry().modules.filter((moduleManifest) => enabled(moduleManifest, states, new Set())).map((moduleManifest) => moduleManifest.id));
 }
 
+/**
+ * Permission vocabulary the Platform Owner may grant right now. Permissions
+ * owned by an optional module become dormant while the Developer has it Off;
+ * core-app permissions are never switchable.
+ */
+export async function enabledPermissionIds(
+  permissionIds: readonly string[],
+  db?: ModuleStateReader,
+): Promise<readonly string[]> {
+  const states = await statesFrom(db);
+  const disabled = new Set(
+    getModuleRegistry().modules
+      .filter((moduleManifest) => moduleManifest.kind === "optional" && !enabled(moduleManifest, states, new Set()))
+      .flatMap((moduleManifest) => moduleManifest.permissionIds ?? []),
+  );
+  return Object.freeze(permissionIds.filter((permissionId) => !disabled.has(permissionId)));
+}
+
 /** Read-only view of every registered module for display; changing state is the Developer command only. */
 export async function listModuleOverview(db?: ModuleStateReader): Promise<readonly ModuleOverview[]> {
   const states = await statesFrom(db);

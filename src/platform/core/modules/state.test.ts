@@ -4,11 +4,11 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { isAppError } from "@platform/core/errors";
 
 import { initializeModuleRegistry, resetModuleRegistryForTests } from "./manifest";
-import { enabledModuleIds, isModuleEnabled, listModuleOverview, requireModuleEnabled, synchronizeModuleVersions } from "./state";
+import { enabledModuleIds, enabledPermissionIds, isModuleEnabled, listModuleOverview, requireModuleEnabled, synchronizeModuleVersions } from "./state";
 
 const manifests = [
   { id: "studioflow", name: "StudioFlow", version: "1.0.0", kind: "core" as const, requires: [] },
-  { id: "ideas", name: "Ideas", version: "1.1.0", kind: "optional" as const, parent: "studioflow", requires: ["studioflow"] },
+  { id: "ideas", name: "Ideas", version: "1.1.0", kind: "optional" as const, parent: "studioflow", requires: ["studioflow"], permissionIds: ["studioflow.ideas.manage"] },
 ];
 
 describe("module runtime state", () => {
@@ -25,6 +25,14 @@ describe("module runtime state", () => {
     const db = { moduleState: { findMany: async () => [{ module_id: "ideas", state: "DISABLED" }] } } as never;
     assert.equal(await isModuleEnabled("ideas", db), false);
     await assert.rejects(() => requireModuleEnabled("ideas", db), (error: unknown) => isAppError(error) && error.code === "MODULE_DISABLED");
+  });
+
+  it("removes only disabled optional-module permissions from the grantable vocabulary", async () => {
+    const permissions = ["platform.role.manage", "studioflow.access", "studioflow.ideas.manage"];
+    const enabledDb = { moduleState: { findMany: async () => [] } } as never;
+    const disabledDb = { moduleState: { findMany: async () => [{ module_id: "ideas", state: "DISABLED" }] } } as never;
+    assert.deepEqual(await enabledPermissionIds(permissions, enabledDb), permissions);
+    assert.deepEqual(await enabledPermissionIds(permissions, disabledDb), ["platform.role.manage", "studioflow.access"]);
   });
 
   it("lists every module read-only with its own switch and the effective result", async () => {

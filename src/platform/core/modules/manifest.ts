@@ -1,5 +1,5 @@
 import { AppError } from "@platform/core/errors";
-import { APP_ID_PATTERN } from "@platform/core/rbac/registry";
+import { isValidPermissionId } from "@platform/core/rbac";
 
 export type ModuleKind = "core" | "optional";
 
@@ -10,6 +10,8 @@ export type ModuleManifest = {
   kind: ModuleKind;
   parent?: string;
   requires: readonly string[];
+  /** RBAC permissions owned by this optional module. Core-app permissions are always available. */
+  permissionIds?: readonly string[];
 };
 
 export type ModuleRegistry = {
@@ -25,24 +27,47 @@ export const PLATFORM_MODULE_MANIFEST: ModuleManifest = Object.freeze({
   requires: Object.freeze([]),
 });
 
+const MODULE_ID_PATTERN = /^[a-z][a-z0-9-]*$/;
 const SEMVER_PATTERN = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
-export function composeModuleRegistry(manifests: readonly ModuleManifest[]): ModuleRegistry {
+export function composeModuleRegistry(
+  manifests: readonly ModuleManifest[],
+  registeredPermissionIds?: readonly string[],
+): ModuleRegistry {
   const modules = [PLATFORM_MODULE_MANIFEST, ...manifests].map((manifest) => Object.freeze({
     ...manifest,
     name: manifest.name.trim(),
     requires: Object.freeze([...manifest.requires]),
+    ...(manifest.permissionIds ? { permissionIds: Object.freeze([...manifest.permissionIds]) } : {}),
   }));
   const byId = new Map<string, ModuleManifest>();
+  const permissionOwners = new Map<string, string>();
+  const registeredPermissions = registeredPermissionIds ? new Set(registeredPermissionIds) : null;
   for (const moduleManifest of modules) {
-    if (!APP_ID_PATTERN.test(moduleManifest.id)) throw new AppError("INVARIANT", "MODULE_INVALID_ID", "A module manifest has an invalid id.");
+    if (!MODULE_ID_PATTERN.test(moduleManifest.id)) throw new AppError("INVARIANT", "MODULE_INVALID_ID", "A module manifest has an invalid id.");
     if (byId.has(moduleManifest.id)) throw new AppError("INVARIANT", "MODULE_DUPLICATE_ID", "A module is registered twice.");
     if (!moduleManifest.name) throw new AppError("INVARIANT", "MODULE_INVALID_NAME", "A module manifest has an invalid name.");
     if (!SEMVER_PATTERN.test(moduleManifest.version)) throw new AppError("INVARIANT", "MODULE_INVALID_VERSION", "A module manifest has an invalid version.");
     if (moduleManifest.kind !== "core" && moduleManifest.kind !== "optional") throw new AppError("INVARIANT", "MODULE_INVALID_KIND", "A module manifest has an invalid kind.");
     if (moduleManifest.kind === "core" && moduleManifest.parent !== undefined) throw new AppError("INVARIANT", "MODULE_CORE_PARENT", "A core module cannot have a parent.");
-    if (new Set(moduleManifest.requires).size !== moduleManifest.requires.length || moduleManifest.requires.some((id) => !APP_ID_PATTERN.test(id))) {
+    if (new Set(moduleManifest.requires).size !== moduleManifest.requires.length || moduleManifest.requires.some((id) => !MODULE_ID_PATTERN.test(id))) {
       throw new AppError("INVARIANT", "MODULE_INVALID_REQUIRES", "A module manifest has invalid requirements.");
+    }
+    const ownedPermissions = moduleManifest.permissionIds ?? [];
+    if (moduleManifest.kind === "core" && ownedPermissions.length > 0) {
+      throw new AppError("INVARIANT", "MODULE_CORE_PERMISSION_OWNER", "Core-app permissions cannot be switched off.");
+    }
+    if (new Set(ownedPermissions).size !== ownedPermissions.length || ownedPermissions.some((id) => !isValidPermissionId(id))) {
+      throw new AppError("INVARIANT", "MODULE_INVALID_PERMISSIONS", "A module manifest has invalid permissions.");
+    }
+    for (const permissionId of ownedPermissions) {
+      if (registeredPermissions && !registeredPermissions.has(permissionId)) {
+        throw new AppError("INVARIANT", "MODULE_UNKNOWN_PERMISSION", "A module owns a permission absent from the code registry.");
+      }
+      if (permissionOwners.has(permissionId)) {
+        throw new AppError("INVARIANT", "MODULE_DUPLICATE_PERMISSION_OWNER", "A permission is owned by more than one module.");
+      }
+      permissionOwners.set(permissionId, moduleManifest.id);
     }
     byId.set(moduleManifest.id, moduleManifest);
   }
@@ -70,8 +95,11 @@ export function composeModuleRegistry(manifests: readonly ModuleManifest[]): Mod
 
 const globalForModules = globalThis as unknown as { __studioflowModuleRegistry__?: ModuleRegistry };
 
-export function initializeModuleRegistry(manifests: readonly ModuleManifest[]): ModuleRegistry {
-  const composed = composeModuleRegistry(manifests);
+export function initializeModuleRegistry(
+  manifests: readonly ModuleManifest[],
+  registeredPermissionIds?: readonly string[],
+): ModuleRegistry {
+  const composed = composeModuleRegistry(manifests, registeredPermissionIds);
   const existing = globalForModules.__studioflowModuleRegistry__;
   if (existing) {
     if (JSON.stringify(existing.modules) === JSON.stringify(composed.modules)) return existing;

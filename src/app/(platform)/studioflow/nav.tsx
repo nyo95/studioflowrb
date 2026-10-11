@@ -21,10 +21,10 @@ function isActive(pathname: string, href: string, exact = false): boolean {
 }
 
 /** StudioFlow entries in the shared rail; shown only inside the app. */
-export function StudioFlowNav({ waitingOnYou = 0, enabledModuleIds }: { waitingOnYou?: number; enabledModuleIds: readonly string[] }) {
+export function StudioFlowNav({ waitingOnYou = 0, enabledModuleIds, canUseIdeas = false }: { waitingOnYou?: number; enabledModuleIds: readonly string[]; canUseIdeas?: boolean }) {
   const pathname = usePathname();
   if (!pathname.startsWith("/studioflow")) return null;
-  const links = STUDIOFLOW_NAV_LINKS.workspace.filter((link) => link.href !== "/studioflow/ideas" || enabledModuleIds.includes("ideas"));
+  const links = STUDIOFLOW_NAV_LINKS.workspace.filter((link) => link.href !== "/studioflow/ideas" || (enabledModuleIds.includes("ideas") && canUseIdeas));
   return (
     <NavGroup label="StudioFlow navigation" heading="StudioFlow">
       {links.map(({ href, label, exact }) => {

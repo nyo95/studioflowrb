@@ -3,6 +3,8 @@ import { cache } from "react";
 
 import { AppError } from "@platform/core/errors";
 import { prisma } from "@platform/core/db";
+import { enabledPermissionIds } from "@platform/core/modules";
+import { getPermissionRegistry } from "@platform/core/rbac/registry";
 
 import { SESSION_COOKIE_NAME } from "./cookie-name";
 export { SESSION_COOKIE_NAME } from "./cookie-name";
@@ -45,7 +47,8 @@ const resolvePrincipalGrantsForRequest = cache(async (rawToken: string): Promise
   const resolved = await resolveSession(prisma, rawToken, { window: DEFAULT_SESSION_WINDOW });
   if (!resolved.session) return null;
   const { session } = resolved;
-  const { grants } = await loadLiveGrants(prisma, session.user.id);
+  const grantable = await enabledPermissionIds(getPermissionRegistry().permissions);
+  const { grants } = await loadLiveGrants(prisma, session.user.id, grantable);
   return {
     principal: {
       userId: session.user.id,

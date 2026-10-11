@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { Client } from "pg";
 
 import { expect, test, type Page } from "@playwright/test";
 
@@ -80,4 +81,29 @@ test("access terminology distinguishes Platform Owner from Developer", async ({ 
 
   await open(page, "/settings/access/roles");
   await expect(page.getByText("Platform Owner", { exact: true }).first()).toBeVisible();
+});
+
+test("Role matrix follows the Developer module ceiling without hiding core apps", async ({ page }) => {
+  const connectionString = process.env.PLATFORM_TEST_DATABASE_URL;
+  if (!connectionString) throw new Error("PLATFORM_TEST_DATABASE_URL is required.");
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    await client.query(`INSERT INTO platform.module_state (module_id, state, last_version, updated_by)
+      VALUES ('ideas', 'ENABLED', '1.0.0', 'e2e')
+      ON CONFLICT (module_id) DO UPDATE SET state = EXCLUDED.state, updated_by = EXCLUDED.updated_by`);
+    await open(page, "/settings/access/roles");
+    await page.getByRole("button", { name: "New role" }).click();
+    await expect(page.locator('input[value="studioflow.ideas.manage"]')).toHaveCount(1);
+
+    await client.query(`UPDATE platform.module_state SET state = 'DISABLED', updated_by = 'e2e' WHERE module_id = 'ideas'`);
+    await page.reload();
+    await page.getByRole("button", { name: "New role" }).click();
+    await expect(page.locator('input[value="studioflow.ideas.manage"]')).toHaveCount(0);
+    await expect(page.locator('input[value="studioflow.access"]')).toHaveCount(1);
+    await expect(page.locator('input[value="studioflow.presentation.manage"]')).toHaveCount(1);
+  } finally {
+    await client.query(`UPDATE platform.module_state SET state = 'ENABLED', updated_by = 'e2e-cleanup' WHERE module_id = 'ideas'`);
+    await client.end();
+  }
 });

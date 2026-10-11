@@ -29,7 +29,7 @@ import { runSerializableTransaction } from "@platform/core/db/transactions";
 import type { StudioFlowPorts } from "./shared";
 
 const ALL = [...Object.values(P)];
-const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage, P.projectPicDrafter];
+const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage, P.projectPicDrafter, P.ideasManage];
 
 let testDb: TestDb;
 let sf: StudioFlowService;
@@ -3323,6 +3323,10 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
   const cardImage = (seed: number) => ({ body: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, seed, seed, seed]), contentType: "image/png" });
   const bytesOf = (key: string) => [...(storage.objects.get(key)?.body ?? [])];
 
+  it("requires the Ideas module permission in addition to base StudioFlow access", async () => {
+    await rejectsWith(sf.ideas.listIdeaCards(as(designer, [P.access, P.projectRead])), "PERMISSION_DENIED");
+  });
+
   it("keeps a card private to its owner and valid with only an image", async () => {
     const other = await seedUser("Other Owner", ALL);
     const { cardId } = await sf.ideas.createIdeaCard({ ...as(designer), file: cardImage(1) });
@@ -3483,7 +3487,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
   });
 
   it("offers and allows only the projects the user holds, never a completed or archived one", async () => {
-    const outsiderGrants = [P.access, P.projectRead, P.scheduleManage];
+    const outsiderGrants = [P.access, P.projectRead, P.scheduleManage, P.ideasManage];
     const outsider = await seedUser("Outside Designer", outsiderGrants);
     const held = await newProject("Held project");
     const completed = await newProject("Completed project");

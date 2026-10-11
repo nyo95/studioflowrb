@@ -22,8 +22,9 @@ describe("application permission registration", () => {
       { appId: "bq", version: "1.0.0", kind: "core", requires: ["masterdata"] },
       { appId: "studioflow", version: "1.0.0", kind: "core", requires: ["masterdata"] },
     ]);
-    const modules = composeModuleRegistry(MODULE_MANIFESTS);
+    const modules = composeModuleRegistry(MODULE_MANIFESTS, composePermissionRegistry(APP_REGISTRATIONS).permissions);
     assert.deepEqual(modules.modules.map((module) => module.id), ["platform", "masterdata", "bq", "studioflow", "ideas", "presentation"]);
-    assert.deepEqual(modules.find("ideas"), { id: "ideas", name: "Ideas Board", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"] });
+    assert.deepEqual(modules.find("ideas"), { id: "ideas", name: "Ideas Board", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"], permissionIds: ["studioflow.ideas.manage"] });
+    assert.deepEqual(modules.find("presentation")?.permissionIds, ["studioflow.presentation.manage"]);
   });
 });

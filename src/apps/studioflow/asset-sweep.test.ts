@@ -53,7 +53,7 @@ it("instrumentation starts cleanup only on Node and catches startup/import failu
       imports.push(id);
       if (id.endsWith("asset-signing")) return { assertAssetSigningConfigured() {} };
       if (id.endsWith("storage-root")) return { async assertStorageRootConfigured() {} };
-      if (id.endsWith("registry")) return { initializePermissionRegistry() {} };
+      if (id.endsWith("registry")) return { initializePermissionRegistry() { return { permissions: [] }; } };
       if (id.endsWith("manifest")) return { initializeModuleRegistry() {} };
       if (id.endsWith("state")) return { async synchronizeModuleVersions() {} };
       if (id.endsWith("app-registrations")) return { APP_REGISTRATIONS: [], MODULE_MANIFESTS: [] };

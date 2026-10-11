@@ -6,7 +6,7 @@ import { scheduleCode } from "../domain/schedule";
 import type { createPresentationService } from "../presentation/service";
 import type { createScheduleService } from "../schedule/service";
 import type { SnapshotInput } from "../schedule/sync";
-import { hasPermission, invalid, notFound, P, projectAccessFromFacts, requireCommand, writeAudit, type CommandContext, type Db, type StudioFlowPorts, type TxClient } from "../shared";
+import { hasPermission, invalid, notFound, P, projectAccessFromFacts, requireCommand, requirePermission, writeAudit, type CommandContext, type Db, type StudioFlowPorts, type TxClient } from "../shared";
 
 /** Same limits as schedule option photos, which a card's image is copied into. */
 export const IDEA_IMAGE_BYTES = NOTE_IMAGE_BYTES;
@@ -136,7 +136,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
   return {
     /** My cards, newest first, each with where it has been used (current project name, code and option label). */
     async listIdeaCards(input: CommandContext) {
-      const userId = requireCommand(input, P.access);
+      const userId = requireCommand(input, P.ideasManage);
       const cards = await db.sfIdeaCard.findMany({
         where: { owner_user_id: userId },
         orderBy: [{ created_at: "desc" }, { id: "desc" }],
@@ -170,7 +170,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
      * drafter, or a manager override; not archived, not completed). The same rule is enforced again on use.
      */
     async listIdeaTargets(input: CommandContext) {
-      const userId = requireCommand(input, P.access);
+      const userId = requireCommand(input, P.ideasManage);
       if (!hasPermission(input.grants, P.scheduleManage)) return [];
       const override = hasPermission(input.grants, P.projectOverride);
       const projects = await db.sfProject.findMany({
@@ -185,6 +185,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
 
     /** The items of one held project, for "extra option on an existing item": code, category and the product shown on it. */
     async listIdeaTargetEntries(input: CommandContext & { projectId: string }) {
+      requirePermission(input.grants, P.ideasManage);
       await schedule.requireAccess(input);
       const entries = await db.sfScheduleEntry.findMany({
         where: { project_id: input.projectId },
@@ -203,7 +204,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
 
     /** A card needs only its image; the text may stay empty forever. The object is written first and discarded if the row fails. */
     async createIdeaCard(input: CommandContext & IdeaCardText & { file: IdeaImageUpload }) {
-      const userId = requireCommand(input, P.access);
+      const userId = requireCommand(input, P.ideasManage);
       const extension = imageExtension(input.file);
       const data = cardText(input);
       const key = createPrivateObjectKey("studioflow/ideas", extension);
@@ -221,7 +222,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
     },
 
     async updateIdeaCard(input: CommandContext & IdeaCardText & { cardId: string }) {
-      const userId = requireCommand(input, P.access);
+      const userId = requireCommand(input, P.ideasManage);
       const data = cardText(input);
       return runTransaction(async (tx) => {
         const card = await ownCard(tx, userId, input.cardId);
@@ -238,7 +239,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
 
     /** The replaced object is released after commit; images already copied into schedules are separate objects. */
     async replaceIdeaImage(input: CommandContext & { cardId: string; file: IdeaImageUpload }) {
-      const userId = requireCommand(input, P.access);
+      const userId = requireCommand(input, P.ideasManage);
       const extension = imageExtension(input.file);
       await ownCard(db, userId, input.cardId);
       const key = createPrivateObjectKey("studioflow/ideas", extension);
@@ -261,7 +262,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
 
     /** Deleting a card never touches a schedule: its usages go with it, the options and their own images stay. */
     async deleteIdeaCard(input: CommandContext & { cardId: string }) {
-      const userId = requireCommand(input, P.access);
+      const userId = requireCommand(input, P.ideasManage);
       const result = await runTransaction(async (tx) => {
         const card = await ownCard(tx, userId, input.cardId);
         const usages = await tx.sfIdeaUsage.count({ where: { card_id: card.id } });
@@ -279,6 +280,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
      * own writer; the usage row is written in the same transaction. All or nothing.
      */
     async useIdeaInSchedule(input: CommandContext & { cardId: string; projectId: string; target: IdeaUseTarget; option: IdeaOptionText }) {
+      requirePermission(input.grants, P.ideasManage);
       const userId = await schedule.requireAccess(input);
       const card = await ownCard(db, userId, input.cardId);
       return placeInSchedule(input, { key: card.image_key, contentType: card.content_type }, { ideaCardId: card.id }, async (tx, created) => {
@@ -290,14 +292,14 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
 
     /** "Add to moodboard" on a card: a copy becomes the last slide of the project's Moodboard board (created when missing). */
     async addIdeaToMoodboard(input: CommandContext & { cardId: string; projectId: string }) {
-      const userId = requireCommand(input, P.access);
+      const userId = requireCommand(input, P.ideasManage);
       const card = await ownCard(db, userId, input.cardId);
       return presentation.addStoredImageToMoodboard({ ...input, source: { key: card.image_key, contentType: card.content_type } });
     },
 
     /** "Add to moodboard" from a phase-note image, in the note's own project. */
     async addNoteImageToMoodboard(input: CommandContext & { projectId: string; phaseId: string; imageId: string }) {
-      requireCommand(input, P.access);
+      requireCommand(input, P.ideasManage);
       if (!hasPermission(input.grants, P.projectRead)) throw invalid("PERMISSION_DENIED", "You cannot open this project.");
       const image = await noteImageOf(db, input);
       return presentation.addStoredImageToMoodboard({ ...input, source: { key: image.key, contentType: image.contentType } });
@@ -305,7 +307,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
 
     /** "Save to Ideas" on a phase-note image: a private copy on the caller's own board, so deleting either side never touches the other. */
     async saveNoteImageToIdeas(input: CommandContext & { projectId: string; phaseId: string; imageId: string }) {
-      const userId = requireCommand(input, P.access);
+      const userId = requireCommand(input, P.ideasManage);
       if (!hasPermission(input.grants, P.projectRead)) throw invalid("PERMISSION_DENIED", "You cannot open this project.");
       const image = await noteImageOf(db, input);
       const key = createPrivateObjectKey("studioflow/ideas", STUDIOFLOW_IMAGE_TYPES[image.contentType] ?? "png");
@@ -324,6 +326,7 @@ export function createIdeaService(db: Db, ports: StudioFlowPorts, schedule: Sche
 
     /** "Use in schedule" straight from a phase-note image: the project is the note's own, so only the item or option is chosen. */
     async useNoteImageInSchedule(input: CommandContext & { projectId: string; phaseId: string; imageId: string; target: IdeaUseTarget; option: IdeaOptionText }) {
+      requirePermission(input.grants, P.ideasManage);
       await schedule.requireAccess(input);
       const image = await noteImageOf(db, input);
       return placeInSchedule(input, { key: image.key, contentType: image.contentType }, { fromNoteImageId: image.id });

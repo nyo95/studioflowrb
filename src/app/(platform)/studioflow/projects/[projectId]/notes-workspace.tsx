@@ -43,7 +43,7 @@ type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K>
  * time, author and the iteration it was written in. Starred messages sit on top as the phase's pinned notes; a
  * message can be marked as client feedback, edited or deleted. Nothing here is a phase step, so there is no Undo bar.
  */
-export function NotesWorkspace({ projectId, phaseId, notes, iterations, currentId, closedBySkipId, canEdit, locale, timezone, onRename }: {
+export function NotesWorkspace({ projectId, phaseId, notes, iterations, currentId, closedBySkipId, canEdit, canUseIdeas, locale, timezone, onRename }: {
   projectId: string;
   phaseId: string;
   notes: readonly PhaseNoteRow[];
@@ -51,6 +51,7 @@ export function NotesWorkspace({ projectId, phaseId, notes, iterations, currentI
   currentId: string | null;
   closedBySkipId: string | null;
   canEdit: boolean;
+  canUseIdeas: boolean;
   locale: string;
   timezone: string;
   onRename: (iteration: IterationRow) => void;
@@ -94,7 +95,7 @@ export function NotesWorkspace({ projectId, phaseId, notes, iterations, currentI
   const iterationShown = ordered.find((item) => item.id === filter) ?? null;
   const outcomeOf = (row: IterationRow) => row.visitDate ? `Visit ${row.visitDate}` : row.id === closedBySkipId ? "Closed by skip" : row.id === currentId ? ITERATION_STATE_LABEL[row.state] : row.state === "DONE" ? "Approved" : row.state === "REVISED" ? "Revision asked" : "Closed";
 
-  const bubbleProps = { projectId, phaseId, canEdit, locale, timezone, busy, run, onDelete: (note: PhaseNoteRow) => void remove(note) };
+  const bubbleProps = { projectId, phaseId, canEdit, canUseIdeas, locale, timezone, busy, run, onDelete: (note: PhaseNoteRow) => void remove(note) };
   let lastDay: string | null = null;
   const today = currentDateOnly({ timeZone: timezone });
 
@@ -164,11 +165,12 @@ export function NotesWorkspace({ projectId, phaseId, notes, iterations, currentI
   );
 }
 
-function NoteBubble({ note, projectId, phaseId, canEdit, locale, timezone, busy, run, onDelete }: {
+function NoteBubble({ note, projectId, phaseId, canEdit, canUseIdeas, locale, timezone, busy, run, onDelete }: {
   note: PhaseNoteRow;
   projectId: string;
   phaseId: string;
   canEdit: boolean;
+  canUseIdeas: boolean;
   locale: string;
   timezone: string;
   busy: string | null;
@@ -262,7 +264,7 @@ function NoteBubble({ note, projectId, phaseId, canEdit, locale, timezone, busy,
       ) : (
         <>
           {note.body ? <FormattedText text={note.body} className="text-sm" /> : null}
-          <ImageGallery images={note.images} viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} phaseId={phaseId} />} />
+          <ImageGallery images={note.images} viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} phaseId={phaseId} canUseIdeas={canUseIdeas} />} />
         </>
       )}
     </article>
@@ -270,8 +272,8 @@ function NoteBubble({ note, projectId, phaseId, canEdit, locale, timezone, busy,
 }
 
 /** Under a note image in the large viewer: keep a copy on the person's Ideas board, or put it in this project's schedule. Both copy; the note is never changed. */
-function NoteImageActions({ image, projectId, phaseId }: { image: { id: string }; projectId: string; phaseId: string }) {
-  const ideasEnabled = useStudioFlowModuleEnabled("ideas");
+function NoteImageActions({ image, projectId, phaseId, canUseIdeas }: { image: { id: string }; projectId: string; phaseId: string; canUseIdeas: boolean }) {
+  const ideasEnabled = useStudioFlowModuleEnabled("ideas") && canUseIdeas;
   const presentationEnabled = useStudioFlowModuleEnabled("presentation");
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);

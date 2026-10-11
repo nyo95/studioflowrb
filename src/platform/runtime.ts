@@ -5,6 +5,8 @@ import { createNotificationCenter, createNotificationRetention, createNotificati
 import { createMessengerService } from "@platform/core/messenger";
 import { prisma, runSerializableTransaction } from "@platform/core/db";
 import { createPlatformAccessService } from "@platform/core/rbac/services";
+import { getPermissionRegistry } from "@platform/core/rbac/registry";
+import { enabledPermissionIds } from "@platform/core/modules";
 import { createPeopleDirectory } from "@platform/core/rbac/people";
 import { createPlatformSettingsService } from "@platform/core/settings";
 import { createPlatformAccountService } from "@platform/core/auth/account";
@@ -54,6 +56,7 @@ export const messenger = createMessengerService(prisma, objectStorage);
 
 export const platformAccess = createPlatformAccessService({
   db: prisma,
+  listGrantablePermissionIds: (db) => enabledPermissionIds(getPermissionRegistry().permissions, db),
   ...commonPorts,
 });
 

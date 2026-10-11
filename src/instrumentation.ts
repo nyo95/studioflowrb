@@ -26,8 +26,8 @@ export async function register(): Promise<void> {
   const { initializeModuleRegistry } = await import("@platform/core/modules/manifest");
   const { synchronizeModuleVersions } = await import("@platform/core/modules/state");
   const { APP_REGISTRATIONS, MODULE_MANIFESTS } = await import("./app/app-registrations");
-  initializePermissionRegistry(APP_REGISTRATIONS);
-  initializeModuleRegistry(MODULE_MANIFESTS);
+  const permissionRegistry = initializePermissionRegistry(APP_REGISTRATIONS);
+  initializeModuleRegistry(MODULE_MANIFESTS, permissionRegistry.permissions);
   await synchronizeModuleVersions();
   try {
     const { startStudioFlowAssetSweep } = await import("./apps/studioflow/runtime");

@@ -57,6 +57,7 @@ export async function PhaseCanvas({ projectId, phaseId, people, archived }: { pr
         canAct={canAct}
         canSkip={canTransition && caps.review}
         canOverride={caps.override}
+        canUseIdeas={hasPermission(grants, P.ideasManage)}
         archived={archived}
         aside={<>
           <SectionCard title="Requirements" count={`${completedPhaseRequirements}/${phaseRequirements.length}`}>

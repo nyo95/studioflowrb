@@ -29,6 +29,9 @@ in `docs/BACKLOG.md` (note-image buttons).
    module change is audited with a `SYSTEM` actor.
 5. No app account, role, or permission can open the console or change module
    state; the Platform Owner still sees Settings > Modules read-only.
+6. StudioFlow, BQ and Master Data remain one always-on core bundle. The
+   Developer switches only optional modules inside them; the Platform Owner's
+   Role matrix lists only permissions of modules currently On.
 
 ## Context and Evidence
 
@@ -87,6 +90,16 @@ in `docs/BACKLOG.md` (note-image buttons).
     `.locked`, `.recovery_code_used`, `.signed_out`, `.enrolled`, `.reset`;
     module changes keep `platform.module.enabled|disabled`. Never put a code,
     secret or token in audit metadata or logs.
+12. **RBAC ceiling (owner 2026-10-11; delivered in R8.504):** optional-module
+    manifests own their RBAC permission ids. Disabled-module permissions are
+    absent from the Role matrix and rejected by Role commands. Existing grants
+    become dormant rather than being deleted, and effective user/integration
+    grants exclude them until the module is On again. Core-app permissions are
+    always grantable because core apps cannot be switched off.
+13. **Ideas compatibility (delivered in R8.504):** Ideas owns
+    `studioflow.ideas.manage`. The migration grants it to every existing role
+    with `studioflow.access`, preserving current access while allowing future
+    custom roles to include or exclude Ideas explicitly.
 
 ## UI Contract
 
@@ -99,7 +112,8 @@ wording, and the confirmation dialog on Off.
 ## Boundaries and Non-goals
 
 No updates from GitHub (WO-DEVELOPER-02), no licence (D7 dropped), no purge, no
-change to app login, RBAC, or Settings > Modules. No email/SMS. No second owner.
+change to app login or Settings > Modules. Apart from the delivered RBAC
+permission ceiling above, no other RBAC redesign. No email/SMS. No second owner.
 
 ## Acceptance Criteria
 
@@ -116,6 +130,11 @@ change to app login, RBAC, or Settings > Modules. No email/SMS. No second owner.
   an auth error); an app user session with every permission is refused.
 - No permission id in the registry mentions `system` or `module` (existing test
   extended).
+- Role matrix and commands expose only Developer-enabled module permissions;
+  switching a module Off makes its live grants dormant without deleting them,
+  and switching it On restores them.
+- Core app manifests cannot own switchable permissions; StudioFlow, BQ and
+  Master Data remain always On.
 - `check:boundaries` passes with the new fixture.
 
 ## Verification

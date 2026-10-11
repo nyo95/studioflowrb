@@ -23,7 +23,7 @@ const subscribeAside = (listener: () => void) => {
   return () => { asideListeners.delete(listener); window.removeEventListener("storage", listener); };
 };
 
-export function PhasePanel({ projectId, phase, current, iterations, notes, skippedReason, startBlockedReason, canAct, canSkip, canOverride, archived, children, aside }: {
+export function PhasePanel({ projectId, phase, current, iterations, notes, skippedReason, startBlockedReason, canAct, canSkip, canOverride, canUseIdeas, archived, children, aside }: {
   projectId: string;
   phase: PhaseView;
   current: IterationView | null;
@@ -34,6 +34,7 @@ export function PhasePanel({ projectId, phase, current, iterations, notes, skipp
   canAct: boolean;
   canSkip: boolean;
   canOverride: boolean;
+  canUseIdeas: boolean;
   archived: boolean;
   children?: ReactNode;
   aside?: ReactNode;
@@ -107,7 +108,7 @@ export function PhasePanel({ projectId, phase, current, iterations, notes, skipp
             </div>
           </SectionCard>
 
-          <NotesWorkspace projectId={projectId} phaseId={phase.id} notes={notes} iterations={iterations} currentId={current?.id ?? null} closedBySkipId={closedBySkipId} canEdit={acting} locale={locale} timezone={timezone} onRename={openRename} />
+          <NotesWorkspace projectId={projectId} phaseId={phase.id} notes={notes} iterations={iterations} currentId={current?.id ?? null} closedBySkipId={closedBySkipId} canEdit={acting} canUseIdeas={canUseIdeas} locale={locale} timezone={timezone} onRename={openRename} />
           {children}
         </div>
 

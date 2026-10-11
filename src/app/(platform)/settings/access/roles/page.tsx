@@ -8,6 +8,7 @@ import { toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors
 import { platformAccess } from "@platform/runtime";
 import { listGrantIntegrityIssues } from "@platform/core/rbac/services";
 import { prisma } from "@platform/core/db";
+import { enabledPermissionIds } from "@platform/core/modules";
 import { SettingsSectionNav } from "../../settings-navigation";
 import { platformSettingsGroups } from "../../settings-sections";
 import { groupPermissionsByApp } from "./permission-grouping";
@@ -33,11 +34,13 @@ export default async function RolesPage() {
 
   let directory: Awaited<ReturnType<typeof platformAccess.listRoles>> | undefined;
   let integrityIssues: Awaited<ReturnType<typeof listGrantIntegrityIssues>> | undefined;
+  let grantablePermissionIds: readonly string[] | undefined;
   let failure: SafeErrorPayload | undefined;
   try {
-    [directory, integrityIssues] = await Promise.all([
+    [directory, integrityIssues, grantablePermissionIds] = await Promise.all([
       platformAccess.listRoles({ grants, includeArchived: true }),
       listGrantIntegrityIssues(prisma),
+      enabledPermissionIds(getPermissionRegistry().permissions),
     ]);
   } catch (error) {
     failure = toSafeErrorPayload(error);
@@ -52,7 +55,7 @@ export default async function RolesPage() {
         divider
       />
       <SettingsShell fill navigation={<SettingsSectionNav groups={platformSettingsGroups(grants)} active="roles" />}>
-        {failure || !directory || !integrityIssues ? (
+        {failure || !directory || !integrityIssues || !grantablePermissionIds ? (
           <SectionCard>
             <ErrorState title="Unable to load roles" description={failure?.safeMessage ?? "The role directory is unavailable."} />
           </SectionCard>
@@ -62,7 +65,7 @@ export default async function RolesPage() {
               ...role,
               archivedAt: role.archivedAt ? role.archivedAt.toISOString() : null,
             }))}
-            permissionGroups={groupPermissionsByApp(getPermissionRegistry().permissions, getPermissionRegistry())}
+            permissionGroups={groupPermissionsByApp(grantablePermissionIds, getPermissionRegistry())}
             canManage={grants.includes("platform.role.manage")}
             integrityIssues={integrityIssues}
           />

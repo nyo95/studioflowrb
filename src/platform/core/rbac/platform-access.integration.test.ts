@@ -11,7 +11,7 @@ import {
   truncatePlatformTables,
   type TestDb,
 } from "../db/test-support";
-import { initializePermissionRegistry, PLATFORM_PERMISSIONS, resetPermissionRegistryForTests } from "./registry";
+import { getPermissionRegistry, initializePermissionRegistry, PLATFORM_PERMISSIONS, resetPermissionRegistryForTests } from "./registry";
 import { createPlatformAccessService, loadLiveGrants, type PlatformAccessService } from "./services";
 import { hashPassword } from "../auth/password";
 
@@ -36,6 +36,7 @@ const REGISTRY_INPUT = [
 
 let db: TestDb;
 let service: PlatformAccessService;
+let grantablePermissionIds: readonly string[] = [];
 
 const ACTOR = { kind: "USER" as const, userId: "", label: "Owner" };
 const FULL_GRANTS = [...PLATFORM_PERMISSIONS, "masterdata.access", "masterdata.price.read"];
@@ -53,6 +54,7 @@ before(async () => {
     auditWriter: createAuditEventWriter(),
     now: () => new Date(),
     generateId: () => crypto.randomUUID(),
+    listGrantablePermissionIds: async () => grantablePermissionIds,
   });
   resetPermissionRegistryForTests();
   initializePermissionRegistry(REGISTRY_INPUT);
@@ -60,6 +62,7 @@ before(async () => {
 
 beforeEach(async () => {
   await truncatePlatformTables(db);
+  grantablePermissionIds = getPermissionRegistry().permissions;
 });
 
 after(async () => {
@@ -95,7 +98,7 @@ describe("live grant resolution", () => {
     });
     await db.prisma.userRole.create({ data: { user_id: user.id, role_id: second.id } });
 
-    const resolved = await loadLiveGrants(db.prisma, user.id);
+    const resolved = await loadLiveGrants(db.prisma, user.id, getPermissionRegistry().permissions);
     assert.deepEqual([...resolved.grants].sort(), [...new Set([...FULL_GRANTS, "masterdata.price.read"])].sort());
     assert.deepEqual(resolved.unknownGrantIds, ["ghost.permission.read"]);
     assert.equal(role.code.startsWith("admin-"), true);
@@ -104,8 +107,15 @@ describe("live grant resolution", () => {
   it("grants nothing when the assigned role is archived", async () => {
     const { user, role } = await seedAdmin("archived@example.com", "Archived");
     await db.prisma.role.update({ where: { id: role.id }, data: { archived_at: new Date() } });
-    const resolved = await loadLiveGrants(db.prisma, user.id);
+    const resolved = await loadLiveGrants(db.prisma, user.id, getPermissionRegistry().permissions);
     assert.deepEqual(resolved.grants, []);
+    assert.deepEqual(resolved.unknownGrantIds, []);
+  });
+
+  it("keeps a known persisted grant dormant when it is absent from the Developer-enabled vocabulary", async () => {
+    const { user } = await seedAdmin("dormant-module@example.com", "Dormant module", ["masterdata.access", "masterdata.price.read"]);
+    const resolved = await loadLiveGrants(db.prisma, user.id, ["masterdata.access"]);
+    assert.deepEqual(resolved.grants, ["masterdata.access"]);
     assert.deepEqual(resolved.unknownGrantIds, []);
   });
 });
@@ -274,6 +284,32 @@ describe("role commands and grants", () => {
           permissionIds: ["ghost.permission.write"],
         }),
       (error: unknown) => error instanceof AppError && error.code === "UNKNOWN_PERMISSION",
+    );
+  });
+
+  it("refuses disabled-module grants and preserves existing dormant grants while editing active ones", async () => {
+    grantablePermissionIds = getPermissionRegistry().permissions.filter((permissionId) => permissionId !== "masterdata.price.read");
+    await assert.rejects(
+      () => service.createRole({
+        grants: ["platform.role.manage"], actor: ACTOR, code: "disabled-module", name: "Disabled module",
+        permissionIds: ["masterdata.price.read"],
+      }),
+      (error: unknown) => error instanceof AppError && error.code === "PERMISSION_MODULE_DISABLED",
+    );
+    const role = await db.prisma.role.create({
+      data: { code: "dormant-grant", name: "Dormant grant", role_permissions: { create: [{ permission_id: "masterdata.price.read" }] } },
+    });
+    const changed = await service.replaceRoleGrants({
+      grants: ["platform.role.manage"], actor: ACTOR, roleId: role.id, permissionIds: ["masterdata.access"],
+    });
+    assert.equal(changed.changed, true);
+    const stored = await db.prisma.rolePermission.findMany({ where: { role_id: role.id }, orderBy: { permission_id: "asc" } });
+    assert.deepEqual(stored.map((grant) => grant.permission_id), ["masterdata.access", "masterdata.price.read"]);
+    await assert.rejects(
+      () => service.replaceRoleGrants({
+        grants: ["platform.role.manage"], actor: ACTOR, roleId: role.id, permissionIds: ["masterdata.price.read"],
+      }),
+      (error: unknown) => error instanceof AppError && error.code === "PERMISSION_MODULE_DISABLED",
     );
   });
 
@@ -488,7 +524,7 @@ describe("role commands and grants", () => {
       userId: first.user.id,
       roleId: first.role.id,
     });
-    const remaining = await loadLiveGrants(db.prisma, first.user.id);
+    const remaining = await loadLiveGrants(db.prisma, first.user.id, getPermissionRegistry().permissions);
     assert.deepEqual(remaining.grants, []);
     // Only second remains as administrator; removing their role must fail.
     await assert.rejects(

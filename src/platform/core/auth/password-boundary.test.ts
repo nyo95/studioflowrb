@@ -27,6 +27,7 @@ describe("password boundaries", () => {
         throw stopped;
       },
       auditWriter: { write: async () => undefined }, now: () => new Date(), generateId: () => "id",
+      listGrantablePermissionIds: async () => [],
     };
     try {
       const access = createPlatformAccessService(ports);

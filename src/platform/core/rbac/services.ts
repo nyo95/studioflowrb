@@ -38,6 +38,8 @@ export type PlatformAccessPorts = {
   auditWriter: AuditWriter;
   now: () => Date;
   generateId: () => string;
+  /** Developer-controlled vocabulary the Platform Owner may assign now. */
+  listGrantablePermissionIds: (db: DbClient) => Promise<readonly string[]>;
 };
 
 export type ResolvedLiveGrants = {
@@ -47,8 +49,13 @@ export type ResolvedLiveGrants = {
 };
 
 /** Union of live grants for a user, filtered through the code-owned registry. */
-export async function loadLiveGrants(db: DbClient, userId: string): Promise<ResolvedLiveGrants> {
+export async function loadLiveGrants(
+  db: DbClient,
+  userId: string,
+  enabledPermissionIds: readonly string[],
+): Promise<ResolvedLiveGrants> {
   const registry = getPermissionRegistry();
+  const enabled = new Set(enabledPermissionIds);
   const assignments = await db.userRole.findMany({
     where: { user_id: userId, role: { archived_at: null } },
     select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
@@ -60,8 +67,8 @@ export async function loadLiveGrants(db: DbClient, userId: string): Promise<Reso
   const grants: string[] = [];
   const unknownGrantIds: string[] = [];
   for (const id of seen) {
-    if (registry.has(id)) grants.push(id);
-    else unknownGrantIds.push(id);
+    if (!registry.has(id)) unknownGrantIds.push(id);
+    else if (enabled.has(id)) grants.push(id);
   }
   return { grants: Object.freeze(grants), unknownGrantIds: Object.freeze(unknownGrantIds) };
 }
@@ -81,7 +88,7 @@ export async function listGrantIntegrityIssues(db: DbClient): Promise<
 }
 
 export function createPlatformAccessService(ports: PlatformAccessPorts) {
-  const { db, runTransaction, auditWriter, now, generateId } = ports;
+  const { db, runTransaction, auditWriter, now, generateId, listGrantablePermissionIds } = ports;
 
   async function writeAudit(tx: Prisma.TransactionClient, event: Parameters<typeof prepareAuditEvent>[0]): Promise<void> {
     await auditWriter.write(prepareAuditEvent(event, { now }), tx);
@@ -197,6 +204,20 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
           "One or more selected permissions are not registered.",
         );
       }
+    }
+  }
+
+  async function grantablePermissionSet(tx: DbClient): Promise<ReadonlySet<string>> {
+    return new Set(await listGrantablePermissionIds(tx));
+  }
+
+  function assertGrantablePermissionIds(grantable: ReadonlySet<string>, permissionIds: readonly string[]): void {
+    if (permissionIds.some((permissionId) => !grantable.has(permissionId))) {
+      throw new AppError(
+        "FORBIDDEN",
+        "PERMISSION_MODULE_DISABLED",
+        "One or more selected permissions belong to a module disabled by the Developer.",
+      );
     }
   }
 
@@ -649,6 +670,7 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
       const permissionIds = [...new Set(input.permissionIds ?? [])];
       assertKnownPermissionIds(permissionIds);
       return runTransaction(async (tx) => {
+        assertGrantablePermissionIds(await grantablePermissionSet(tx), permissionIds);
         let role;
         try {
           role = await tx.role.create({
@@ -785,8 +807,12 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
         if (role.archived_at !== null) {
           throw new AppError("CONFLICT", "ROLE_ARCHIVED", "An archived role cannot be changed.");
         }
+        const grantable = await grantablePermissionSet(tx);
+        assertGrantablePermissionIds(grantable, permissionIds);
         const current = role.role_permissions.map((grant) => grant.permission_id).sort();
-        if (JSON.stringify(current) === JSON.stringify(permissionIds)) return { changed: false };
+        const dormant = current.filter((permissionId) => getPermissionRegistry().has(permissionId) && !grantable.has(permissionId));
+        const nextPermissionIds = [...new Set([...permissionIds, ...dormant])].sort();
+        if (JSON.stringify(current) === JSON.stringify(nextPermissionIds)) return { changed: false };
 
         const activeAssignees = role.user_roles
           .filter((assignment) => assignment.user.status === "ACTIVE")
@@ -794,13 +820,13 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
         await requireChangeKeepsAccessAdministrator(tx, {
           affectedUserIds: activeAssignees,
           simulate: (innerTx, userId) =>
-            userHasBothAdminPermissionsWithRoleGrants(innerTx, userId, role.id, permissionIds),
+            userHasBothAdminPermissionsWithRoleGrants(innerTx, userId, role.id, nextPermissionIds),
         });
 
         await tx.rolePermission.deleteMany({ where: { role_id: role.id } });
-        if (permissionIds.length > 0) {
+        if (nextPermissionIds.length > 0) {
           await tx.rolePermission.createMany({
-            data: permissionIds.map((permission_id) => ({
+            data: nextPermissionIds.map((permission_id) => ({
               id: generateId(),
               role_id: role.id,
               permission_id,
@@ -813,7 +839,7 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
           entityType: "role",
           entityId: role.id,
           actor: input.actor,
-          changes: { permission_ids: { from: current, to: permissionIds } },
+          changes: { permission_ids: { from: current, to: nextPermissionIds } },
         });
         return { changed: true };
       });

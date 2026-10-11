@@ -6,7 +6,7 @@ import { isAppError } from "@platform/core/errors";
 import { composeModuleRegistry, initializeModuleRegistry, resetModuleRegistryForTests, type ModuleManifest } from "./manifest";
 
 const STUDIOFLOW = { id: "studioflow", name: "StudioFlow", version: "1.0.0", kind: "core", requires: [] } as const satisfies ModuleManifest;
-const IDEAS = { id: "ideas", name: "Ideas", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"] } as const satisfies ModuleManifest;
+const IDEAS = { id: "ideas", name: "Ideas", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"], permissionIds: ["studioflow.ideas.manage"] } as const satisfies ModuleManifest;
 
 describe("module manifest registry", () => {
   afterEach(resetModuleRegistryForTests);
@@ -35,5 +35,15 @@ describe("module manifest registry", () => {
     const a = { id: "a", name: "A", version: "1.0.0", kind: "optional", requires: ["b"] } as const satisfies ModuleManifest;
     const b = { id: "b", name: "B", version: "1.0.0", kind: "optional", requires: ["a"] } as const satisfies ModuleManifest;
     assert.throws(() => composeModuleRegistry([a, b]), (error: unknown) => isAppError(error) && error.code === "MODULE_DEPENDENCY_CYCLE");
+  });
+
+  it("rejects invalid, unknown, duplicate and core-owned switchable permissions", () => {
+    assert.throws(() => composeModuleRegistry([{ ...IDEAS, permissionIds: ["bad"] }]), (error: unknown) => isAppError(error) && error.code === "MODULE_INVALID_PERMISSIONS");
+    assert.throws(() => composeModuleRegistry([IDEAS], ["studioflow.access"]), (error: unknown) => isAppError(error) && error.code === "MODULE_UNKNOWN_PERMISSION");
+    assert.throws(() => composeModuleRegistry([{ ...STUDIOFLOW, permissionIds: ["studioflow.access"] }]), (error: unknown) => isAppError(error) && error.code === "MODULE_CORE_PERMISSION_OWNER");
+    assert.throws(
+      () => composeModuleRegistry([IDEAS, { ...IDEAS, id: "ideas-two" }]),
+      (error: unknown) => isAppError(error) && error.code === "MODULE_DUPLICATE_PERMISSION_OWNER",
+    );
   });
 });

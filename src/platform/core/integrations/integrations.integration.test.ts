@@ -8,6 +8,7 @@ import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePl
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
 import { AppError } from "@platform/core/errors";
 import { initializePermissionRegistry, resetPermissionRegistryForTests } from "@platform/core/rbac/registry";
+import { initializeModuleRegistry, resetModuleRegistryForTests } from "@platform/core/modules";
 import type { PermissionGrants } from "@platform/core/rbac";
 
 import { createIntegrationRouteHandler, createIntegrationTokenService, INTEGRATION_PING_GRANT, INTEGRATION_PING_SCOPE } from "./index";
@@ -21,9 +22,11 @@ before(async () => {
   db = await createTestDb(requireDisposableTestDatabaseUrl());
   resetPermissionRegistryForTests();
   initializePermissionRegistry([]);
+  resetModuleRegistryForTests();
+  initializeModuleRegistry([]);
 });
 beforeEach(async () => { await truncatePlatformTables(db); });
-after(async () => { await closePrismaConnection(); await closeTestDb(db); });
+after(async () => { resetModuleRegistryForTests(); await closePrismaConnection(); await closeTestDb(db); });
 
 async function owner(grants: readonly string[] = MANAGE) {
   const user = await db.prisma.user.create({ data: { email: `${randomUUID()}@test.local`, display_name: "Integration Owner", password_hash: "x" } });

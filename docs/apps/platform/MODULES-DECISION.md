@@ -2,7 +2,8 @@
 
 Status: ACCEPTED (owner, 2026-10-09; recorded by the Lead in R8.494).
 Amended: owner, 2026-10-10 (D5 web console, D7 dropped, D10 updates; R8.501),
-and 2026-10-11 (D5 terminology: Platform Owner and Developer; R8.503).
+and 2026-10-11 (D5 terminology: Platform Owner and Developer; R8.503; core-app
+bundle and Developer-controlled module permission ceiling; R8.504).
 Scope: how StudioFlowRB becomes a platform of separately versioned, separately
 switchable modules, so a customer runs only what it has, and a new capability can
 be used on its own first and injected later.
@@ -33,10 +34,12 @@ Dropping a code package into a running server (WordPress-style) is **not** done:
 Next.js compiles routes at build time, and runtime code loading would be costly
 and unsafe. A new module reaches a customer as a new build plus an update.
 
-**D2. A module is a business capability**, not a component. Good: StudioFlow,
-Master Data, BQ, Ideas Board, Presentation, SketchUp, AI Assistant, Automation,
-Advanced Reporting. Not a module: a button, a filter, the notes composer.
-Existing apps are modules too. A module keeps today's layout
+**D2. A module is a business capability**, not a component. Good: Ideas Board,
+Presentation, SketchUp, AI Assistant, Automation, Advanced Reporting. Not a
+module: a button, a filter, the notes composer. **StudioFlow, Master Data and
+BQ are one core application bundle:** their manifests describe dependencies
+and versions, but they are always built in and cannot be switched off. The
+Developer switches only optional modules within those apps. A module keeps today's layout
 (`src/apps/<id>/`, its routes, its own `prisma/schema/<id>.prisma` and Postgres
 schema); folders are not reshuffled.
 
@@ -55,11 +58,16 @@ pages return not-found, its server actions and integration routes refuse with
 `MODULE_DISABLED`, its background jobs skip, other modules' reads of it return
 "not available" instead of failing. **Its data is kept.** Removing data is a
 separate, explicit, audited purge by the Developer, never a side effect.
+The Role matrix shows only permissions owned by modules currently enabled by
+the Developer. A crafted Role request for a disabled-module permission is
+refused server-side. Existing grants for a module switched Off remain stored
+but grant nothing; they return when the Developer switches the module On, so
+an operational switch never destroys the Platform Owner's role design.
 
 **D5. Two kinds of authority.**
 
-- **Platform Owner** (the business): users, roles, projects, company
-  data, every licensed feature. This is the existing `platform-owner` role,
+- **Platform Owner** (the business): users, custom roles, projects, company
+  data, and assignment of only the features the Developer has enabled. This is the existing `platform-owner` role,
   shown as "Platform Owner". It stays an ordinary RBAC role.
 - **Developer**: install/enable/disable modules, versions, purges, recovery.
   **Developer rights are not RBAC
@@ -76,7 +84,7 @@ separate, explicit, audited purge by the Developer, never a side effect.
   anywhere (owner's choice), so it is protected by lockout after repeated
   wrong codes, replay refusal, short sessions and an audit row for every
   sign-in attempt and change. Enrolment and reset of the authenticator stay a
-  server command (`npm run studioflow -- system setup|reset`), so nobody who
+  server command (`npm run studioflow -- developer setup|reset`), so nobody who
   only reaches the web can claim the console.
 
 **D6. Versions.** Each module carries its own semver in the manifest; Platform

@@ -8,6 +8,8 @@ import { createAuditEventWriter } from "@platform/core/audit/persistence";
 import { prisma, runSerializableTransaction, type TransactionClient } from "@platform/core/db";
 import { AppError, createOperationalErrorReporter, toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors";
 import { loadLiveGrants } from "@platform/core/rbac/services";
+import { getPermissionRegistry } from "@platform/core/rbac/registry";
+import { enabledPermissionIds } from "@platform/core/modules";
 import { requirePermission, type PermissionGrants, type PermissionId } from "@platform/core/rbac";
 import { getPrincipalGrants } from "@platform/core/auth";
 
@@ -110,7 +112,8 @@ async function authenticate(request: Request): Promise<AuthenticatedIntegration>
   const token = await prisma.integrationToken.findUnique({ where: { token_hash: sha256(match[1]) }, include: { user: true } });
   const now = new Date();
   if (!token || token.revoked_at || (token.expires_at && token.expires_at <= now) || token.user.status !== "ACTIVE") throw new AppError("UNAUTHENTICATED", "INTEGRATION_TOKEN_INVALID", "A valid integration token is required.");
-  const { grants } = await loadLiveGrants(prisma, token.user_id);
+  const grantable = await enabledPermissionIds(getPermissionRegistry().permissions);
+  const { grants } = await loadLiveGrants(prisma, token.user_id, grantable);
   await prisma.integrationToken.update({ where: { id: token.id }, data: { last_used_at: now } });
   return { tokenId: token.id, userId: token.user_id, displayName: token.user.display_name, grants, scopes: token.scopes };
 }

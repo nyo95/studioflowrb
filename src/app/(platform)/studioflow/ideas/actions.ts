@@ -7,8 +7,10 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { AppError } from "@platform/core/errors";
 import { requireModuleEnabled } from "@platform/core/modules";
+import { requirePermission } from "@platform/core/rbac";
 import { validationError } from "@platform/core/validation";
 import { studioFlow } from "@/apps/studioflow/runtime";
+import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 
 /**
  * Ideas board actions (WO-SF-IDEAS-01). Transport validation only: ownership, limits and the schedule rules
@@ -66,6 +68,7 @@ export async function listIdeaCategoryChoicesAction(): Promise<ActionResult<Arra
   return runSafeAction(async () => {
     await requireModuleEnabled("ideas");
     const { grants } = await context();
+    requirePermission(grants, STUDIOFLOW_PERMISSIONS.ideasManage);
     return (await studioFlow.schedule.listCategoryChoices({ grants })).map(({ section, category }) => ({ section, category }));
   });
 }

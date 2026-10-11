@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.504 | 2026-10-11 | feat(platform): enforce Developer module ceiling in RBAC (Lead)
+
+- **Owner decision:** StudioFlow, BQ and Master Data are one always-on core bundle. The Developer can switch only optional modules inside those apps; the Platform Owner manages users and custom roles, but its Role matrix can grant only permissions belonging to modules currently enabled by the Developer.
+- Optional-module manifests now declare the permission ids they own. Boot composition rejects malformed, unknown, or multiply-owned module permissions and refuses switchable permission ownership on core apps. The Role matrix filters against live module state, while Role create/replace commands independently reject a crafted disabled-module grant.
+- Disabled-module grants are non-destructive: they remain stored as dormant, are excluded from live browser and integration-token grants, survive an edit to the role's still-enabled permissions, and become effective again when the Developer enables the module. Unknown persisted ids remain separately reported as integrity failures.
+- Ideas now owns `studioflow.ideas.manage`; every Ideas service lane, navigation entry, and note-image entry point requires it. The forward-only migration grants it to every existing role with `studioflow.access`, preserving existing user behaviour. Presentation keeps its existing dedicated `studioflow.presentation.manage` ownership.
+- **TypeScript/modularity review:** replaced an RBAC-to-module dependency with an injected grantability port, removed the former module-manifest dependency on the permission registry, and kept module-state composition at the runtime boundary. No broad TypeScript rewrite was justified: strict `noUnusedLocals`, typecheck and architecture checks are clean. The core apps already stand behind public boundaries; Ideas and Presentation still have the known StudioFlow schema/service coupling scheduled for M3, so no risky extraction was attempted here.
+- Updated `MODULES-DECISION.md` and `WO-DEVELOPER-01` with the bundle, permission-ceiling, dormant-grant and compatibility decisions. **Migrations/dependencies:** one data-only migration; no dependency. **Checks:** all 100 migrations on disposable PostgreSQL 16; explicit existing-role backfill check; `npm test` (1,007 passed); typecheck; architecture boundaries; legacy-runtime check; eslint (0 errors, 1 existing Presentation `<img>` warning); production build; Settings Playwright (13 passed); whitespace checks.
+
 ## R8.503 | 2026-10-11 | refactor(platform): align owner and developer terminology (Lead)
 
 - **Owner terminology decision:** the highest in-app RBAC role is again displayed as **Platform Owner**; the separate out-of-band authority above RBAC is called **Developer**, not System Owner. Developer access remains impossible to grant through a Role or permission, and the `/system` route plus `SYSTEM` audit actor kind remain unchanged.

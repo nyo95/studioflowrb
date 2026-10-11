@@ -116,7 +116,7 @@ return (
       )}
 
       {/* Create */}
-      <DraftDialog pending={createPending} open={createOpen} onOpenChange={setCreateOpen} title="New role" description="Role codes are immutable lowercase identifiers.">
+      <DraftDialog pending={createPending} open={createOpen} onOpenChange={setCreateOpen} title="New role" description="Role codes are immutable lowercase identifiers. Only modules enabled by the Developer are available here.">
         <form action={createAction}>
           <Field id="role-code" label="Code">
             <Input id="role-code" name="code" required pattern="[a-z][a-z0-9-]{0,63}" placeholder="pricing-viewer" />
@@ -173,7 +173,7 @@ return (
       </DraftDialog>
 
       {/* Grants editor */}
-      <DraftDialog pending={grantsPending} open={grantsTarget !== null} onOpenChange={() => setGrantsTarget(null)} title={`Grants — ${grantsTarget?.name ?? ""}`} description="Every selected permission must be registered; the change is atomic.">
+      <DraftDialog pending={grantsPending} open={grantsTarget !== null} onOpenChange={() => setGrantsTarget(null)} title={`Grants — ${grantsTarget?.name ?? ""}`} description="Only modules enabled by the Developer are shown. Grants for disabled modules stay stored and return when the module is enabled.">
         {grantsTarget ? (
           <form
             action={(formData) => {

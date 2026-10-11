@@ -11,7 +11,7 @@ import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { brandMarkStorage, userPreferences, userTutorials } from "@platform/runtime";
 import { validateAppTutorial } from "@platform/core/tutorials";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
-import { STUDIOFLOW_TOUR } from "@/apps/studioflow/public";
+import { STUDIOFLOW_PERMISSIONS, STUDIOFLOW_TOUR } from "@/apps/studioflow/public";
 import { studioFlow, studioFlowSampleRequestRead } from "@/apps/studioflow/runtime";
 import { recordTutorialAction, setGuideLanguageAction } from "./account/actions";
 import { logoutAction } from "./logout-action";
@@ -45,7 +45,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const domainNavigation = <>
     {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav canManageSampleRequests={canManageSampleRequests} canReadSamples={hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRead)} openSampleRequests={openSampleRequests} canUseWorkbook={(hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) || (hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage))} /> : null}
     {apps.some((app) => app.appId === "bq") ? <BqNav /> : null}
-    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav waitingOnYou={waitingOnYou} enabledModuleIds={enabledModules} /> : null}
+    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav waitingOnYou={waitingOnYou} enabledModuleIds={enabledModules} canUseIdeas={hasPermission(grants, STUDIOFLOW_PERMISSIONS.ideasManage)} /> : null}
   </>;
 
   // Each app's Settings sits in the rail's utility area; each component renders only inside its own app.
