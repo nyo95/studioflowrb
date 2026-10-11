@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredSlug, requiredCurrency, requiredPriceAmount, resolveSkuIdentity, resolveSkuMeasurement, assertSkuRestorable, assertPriceMaterialRestorable, assertVendorMaterialCapable, ensurePriceMaterialBrandSupplierLink, assertWorkPriceRestorable, pruneOriginlessBrandCategories, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredCurrency, requiredPriceAmount, resolveSkuIdentity, resolveSkuMeasurement, assertSkuRestorable, assertPriceMaterialRestorable, assertVendorMaterialCapable, ensurePriceMaterialBrandSupplierLink, pruneOriginlessBrandCategories, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, createDeletionRequest, writeAudit } from "./shared";
 
 type CreateSkuInput = { grants: PermissionGrants; actor: AuditActor; name?: string | null; code?: string | null; notes?: string; brandId?: string | null; baseUnitId: string; purchaseUnitId?: string; dimensionLength?: string; dimensionWidth?: string; dimensionThickness?: string; dimensionUnitId?: string; categoryId: string; priceMaterials: Array<{ supplierVendorId: string; amount: string; currency: string; notes?: string }> };
 
@@ -133,7 +133,6 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         if (categories.length !== categoryIds.length) throw new AppError("VALIDATION", "SKU_CATEGORY_NOT_FOUND", "One or more categories not found.");
         for (const cat of categories) { if (cat.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_CATEGORY_INACTIVE", `Category ${cat.id} is not active.`); if (cat.kind !== "PRODUCT") throw new AppError("VALIDATION", "SKU_CATEGORY_KIND_INVALID", "SKU categories must be PRODUCT categories."); }
         const liveMaterialPriceCount = await tx.priceMaterial.count({ where: { sku_id: input.skuId, deleted_at: null } });
-        const nextMeasurement = { dimension_length: measurement.dimension_length, dimension_width: measurement.dimension_width, dimension_thickness: measurement.dimension_thickness, dimension_unit_id: measurement.dimension_unit_id, purchase_to_base_factor: measurement.purchase_to_base_factor };
         // Size corrections stay allowed (BQ lines snapshot their own numbers); the units a price is quoted in must not move under it.
         const unitLayoutChanged = existing.base_unit_id !== input.baseUnitId || (existing.purchase_unit_id || null) !== (input.purchaseUnitId || null);
         if (unitLayoutChanged && liveMaterialPriceCount > 0) throw new AppError("CONFLICT", "SKU_MEASUREMENT_LOCKED_BY_PRICES", "Base unit and purchase unit cannot change while live material prices exist. The size can still be corrected.");

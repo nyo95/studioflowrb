@@ -1,7 +1,6 @@
 import { ZodError } from "zod";
 
 import {
-  AppError,
   createOperationalErrorReporter,
   isFrameworkControlFlowError,
   toSafeErrorPayload,

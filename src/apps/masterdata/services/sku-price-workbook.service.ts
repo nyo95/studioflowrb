@@ -34,7 +34,6 @@ type ValidRow = ParsedRow & {
   brandId: string | null; categoryId: string; baseUnitId: string; purchaseUnitId: string | null; dimensionUnitId: string | null; supplierId: string | null;
 };
 
-function clean(value: unknown): string { return String(value ?? "").trim(); }
 function key(value: string): string { return value.trim().toLocaleLowerCase(); }
 function bytesOf(file: WorkbookFile): { data: Buffer; name?: string; type?: string } { return Buffer.isBuffer(file) ? { data: file } : file; }
 function fileError(message: string): never { throw new AppError("VALIDATION", "SKU_PRICE_WORKBOOK_INVALID", message); }

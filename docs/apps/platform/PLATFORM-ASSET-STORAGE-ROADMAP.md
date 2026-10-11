@@ -6,11 +6,9 @@
 UI Engine ImageWorkspace, the LocalFilesystemStorage adapter, the managed Brand mark, and the
 private StudioFlow consumers (MOM images, schedule photos, deliverables) exist; archived-project
 files are removed by the retention sweep (`asset-sweep.ts`, run at startup and on demand from
-Studio Settings). Phase 5 (cloud profile) stays parked. Earlier status text: **PARTIALLY ACTIVATED in R7.52.** The provider-neutral Core port, fake seam,
+Studio Settings). The unused cloud profile was removed by owner decision on 2026-10-11; it can be recovered from repository history if deployment direction changes. Earlier status text: **PARTIALLY ACTIVATED in R7.52.** The provider-neutral Core port, fake seam,
 UI Engine ImageWorkspace, and StudioFlow MOM consumer exist. The final target
 is now self-hosted/local; PF-1 activates the LocalFilesystemStorage adapter.
-The Supabase adapter is optional parked infrastructure and is not a Foundation
-release blocker.
 
 ## Objective
 
@@ -37,7 +35,7 @@ Legacy evidence was inspected read-only at:
 | Server validation and persistence | **KEEP** | Core ObjectStorage port plus deployment adapter |
 | Public writes under `public/uploads` | **PURGE** | Local provider with configured root and application-owned public read |
 | Caller-selected folders/paths | **PURGE** | Fixed server-owned keys; no client-selected root/path |
-| Cloud-specific Supabase provider | **DEFER** | Parked optional adapter; not required by the local Foundation target |
+| Cloud-specific Supabase provider | **PURGE** | Removed as unused infrastructure; recover from history only if a cloud deployment is approved |
 
 The legacy working tree was dirty when inspected. Only the committed reference
 above is evidence; no working-tree legacy file is a source of behavior.
@@ -61,18 +59,16 @@ above is evidence; no working-tree legacy file is a source of behavior.
    unknown prefixes, and symlink escapes. Domain code never sees or constructs
    physical paths; it passes storage keys through ObjectStorage.
 6. **Shared boundary.** Core owns the provider-neutral ObjectStorage contract,
-   opaque references, and fake seam. LocalFilesystemStorage and the parked
-   Supabase adapter remain infrastructure. UI Engine owns preparation
+   opaque references, and fake seam. LocalFilesystemStorage remains infrastructure. UI Engine owns preparation
    interaction; each application owns format, size, retention, and authorization
    policy.
 7. **Compensation.** Upload first, persist the key, then best-effort delete a
    replaced object. On persistence failure, remove the new object. On removal,
    clear the reference first. Cleanup failures are operationally reported and
    never leak raw provider/path details.
-8. **Supabase is deferred.** No Supabase bucket, credential, Vercel setting, or
-   cloud browser proof is required for Foundation completion. The adapter may be
-   selected later by a separate deployment profile without changing domain
-   storage keys.
+8. **Cloud adapter removed.** No Supabase bucket, credential, Vercel setting, or
+   cloud browser proof is part of this deployment. A future cloud deployment must
+   make a new explicit provider decision behind the existing ObjectStorage boundary.
 
 ## Delivery sequence
 
@@ -88,7 +84,7 @@ above is evidence; no working-tree legacy file is a source of behavior.
   subdirectories without placing private bytes under `public/`.
 - Implement safe key-to-file mapping, atomic enough writes, reads, removal,
   missing-root behavior, traversal/symlink protection, and sanitized errors.
-- Compose this adapter as the canonical runtime provider. Keep Supabase parked.
+- Compose this adapter as the canonical runtime provider.
 
 ### Phase 3 — General Settings Brand mark
 
@@ -103,10 +99,10 @@ above is evidence; no working-tree legacy file is a source of behavior.
 - Activate future StudioFlow file consumers only through their own approved
   work orders with explicit policy, retention, and lifecycle decisions.
 
-### Phase 5 — optional cloud deployment profile
+### Phase 5 — optional cloud deployment profile (removed 2026-10-11)
 
-- Revisit the parked Supabase adapter only if a future online deployment is
-  explicitly approved. It must remain behind the same ObjectStorage boundary.
+- No cloud adapter is kept in the active code. A future online deployment starts
+  from a fresh provider decision and the provider-neutral ObjectStorage boundary.
 
 ## Acceptance criteria for PF-1
 
@@ -119,5 +115,4 @@ above is evidence; no working-tree legacy file is a source of behavior.
 - Invalid, oversized, malformed, unauthorized, unavailable-root, traversal, and
   cleanup-failure cases produce safe behavior and operational evidence.
 - Unit/integration tests, typecheck, lint, boundary, legacy-runtime, build, and
-  local browser workflow evidence are recorded. Supabase provisioning is not a
-  required check.
+  local browser workflow evidence are recorded.

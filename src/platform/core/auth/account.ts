@@ -20,13 +20,12 @@ export type AccountPorts = {
   runTransaction: <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
   auditWriter: AuditWriter;
   now: () => Date;
-  generateId: () => string;
 };
 
 export type AccountService = ReturnType<typeof createPlatformAccountService>;
 
 export function createPlatformAccountService(ports: AccountPorts) {
-  const { db, runTransaction, auditWriter, now, generateId } = ports;
+  const { db, runTransaction, auditWriter, now } = ports;
 
   return {
     /** Updates the caller's own display name. Unchanged values are a safe no-op. */

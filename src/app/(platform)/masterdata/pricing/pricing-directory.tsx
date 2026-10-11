@@ -8,12 +8,12 @@ import { getPaginationSlice } from "@platform/utilities/pagination";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
 
-import { Badge,Button,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,PrefixedInput,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,PillTabPanels,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
+import { Badge,Button,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,PrefixedInput,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar,PillTabPanels,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
 import { blurDisplay, readTypedAmount, shouldShowAmountPrefix, storedAmountText } from "./amount-format";
 import { PriceMatrixDialog } from "./price-matrix-dialog";
 import { PriceEntryModes, type PriceEntry } from "./price-entry-modes";
-import { compareDecimals,formatDecimal,type DecimalString } from "@platform/utilities/decimal";
+import { formatDecimal,type DecimalString } from "@platform/utilities/decimal";
 import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { createMoney,currencyPrefix,formatMoney } from "@platform/utilities/money";
 import Link from "next/link";

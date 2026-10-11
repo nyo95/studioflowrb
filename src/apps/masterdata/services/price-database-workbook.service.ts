@@ -27,7 +27,6 @@ export type PriceWorkbookScopedService = Pick<ReturnType<typeof createCategorySe
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_ITEMS = 1500;
-const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const UNIT_ALIASES: Readonly<Record<string, string>> = { mtr: "m", nos: "pcs", no: "pcs", pc: "pcs", unit: "pcs", lembar: "sheet" };
 
 export type PriceDatabaseOptions = { priceKind: "labor" | "material-labor"; defaultUnitId?: string | null };

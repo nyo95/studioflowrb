@@ -385,8 +385,6 @@ function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDet
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [addOpen, setAddOpen] = useState(false);
-  const router = useRouter();
-
   const addLine = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);

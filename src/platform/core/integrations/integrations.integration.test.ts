@@ -3,7 +3,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 
-import { closePrismaConnection, type TransactionClient } from "@platform/core/db";
+import { closePrismaConnection } from "@platform/core/db";
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePlatformTables, type TestDb } from "@platform/core/db/test-support";
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
 import { AppError } from "@platform/core/errors";

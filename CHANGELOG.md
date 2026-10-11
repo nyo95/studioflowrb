@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.502 | 2026-10-11 | chore(repo): remove unused code, dependencies and parked Supabase adapter (Executor)
+
+- **Owner-approved cleanup from the full-code audit:** removed five unused server actions (`uploadDeliverableAction`, `saveBulkMaterialPricesAction`, `linkBrandToSupplierAction`, `listIdeaTargetsAction`, `getStorageUsageAction`) and the unused `getMyPreferences` server getter. The current streamed deliverable upload, pricing, Ideas, preferences and storage-usage paths are unchanged.
+- Removed the 82 unused local imports/declarations reported by TypeScript and enabled `noUnusedLocals` in the normal typecheck so the same residue cannot accumulate silently. Unused UI Engine fallback components were explicitly left in place per the owner decision.
+- Removed four unused direct dependencies (`class-variance-authority`, `clsx`, `date-fns`, `tailwind-merge`) and the obsolete raw-workbook helpers (`createWorkbook`, `loadWorkbook`, `workbookToBuffer`); the still-used `WorkbookCellValue` type remains.
+- **Owner decision 2026-10-11:** removed the parked Supabase adapter, its tests and example environment variables. Local filesystem storage remains the only active provider; the provider-neutral `ObjectStorage` boundary remains available if a future deployment needs a new cloud-provider decision.
+- **Migrations:** none. **Checks:** all 98 migrations applied to a disposable PostgreSQL 16 cloud database; `npm test` (1,002 passed); typecheck with `noUnusedLocals`; eslint (0 errors, 1 existing Presentation `<img>` warning); `check:boundaries`; `check:legacy-runtime`; production build; staged/unstaged whitespace checks. Browser checks not run because no screen or behavior changed.
+
 ## R8.501 | 2026-10-10 | docs(platform): System Owner web console decision, licence dropped, GitHub updates; WO-SYSTEM-01 (Lead)
 
 - **Owner decision 2026-10-10** (`docs/apps/platform/MODULES-DECISION.md`): the owner is not a programmer and must run the system without an AI assistant, so System Owner operations get a web console `/system` with authenticator-app (TOTP) sign-in and printed recovery codes, reachable from anywhere and protected by lockout, replay refusal, short sessions and full audit; enrolment/reset stay a server command; it is still not an app account or RBAC permission (D5 amended). Per-module licence/entitlement dropped (D7): a module runs when built in and switched on. Updates (D10): GitHub releases, installed only when the System Owner presses Install, with backup and automatic roll-back.

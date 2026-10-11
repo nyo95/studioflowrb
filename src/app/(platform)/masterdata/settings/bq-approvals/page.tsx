@@ -1,9 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
-import { hasPermission } from "@platform/core/rbac";
-import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
-import { masterDataService } from "@/apps/masterdata/runtime";
 import { SettingsFrame } from "@/app/(platform)/settings/settings-navigation";
 import { canOpenSettingsSection } from "@/app/(platform)/settings/settings-sections";
 import { promotionCoordinator } from "@/app/promotion-runtime";

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Banknote, Box, Plus, Ruler, Tags, TreePine, Truck, AlertCircle, ArrowUpRight } from "lucide-react";
+import { Banknote, Box, Plus, Ruler, Tags, TreePine, Truck, AlertCircle } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";

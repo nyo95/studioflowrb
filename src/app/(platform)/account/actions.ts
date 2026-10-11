@@ -7,7 +7,7 @@ import { AppError } from "@platform/core/errors";
 import { displayNameSchema, passwordSchema, requirePrincipal, requirePrincipalGrants, revokeSessionById, setSessionCookie } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
 import { integrationTokens, type IntegrationTokenPublic } from "@platform/core/integrations";
-import { platformAccount, storageUsage, userPreferences, userTutorials } from "@platform/runtime";
+import { platformAccount, userPreferences, userTutorials } from "@platform/runtime";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
 
@@ -95,11 +95,6 @@ export async function updateMyPreferencesAction(input: z.infer<typeof Preference
   });
 }
 
-export async function getMyPreferences() {
-  const principal = await requirePrincipal();
-  return userPreferences.get({ userId: principal.userId });
-}
-
 const TutorialRecordInput = z.strictObject({
   tourKey: z.string().max(40),
   version: z.number().int().positive(),
@@ -127,13 +122,6 @@ export async function clearTutorialAction(input: z.infer<typeof TutorialClearInp
     await userTutorials.clear({ userId: principal.userId, ...parsed.data });
     revalidatePath("/", "layout");
     return { cleared: true };
-  });
-}
-
-export async function getStorageUsageAction(): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const { grants } = await requirePrincipalGrants();
-    return storageUsage.getStorageUsage({ grants });
   });
 }
 

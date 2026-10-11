@@ -65,7 +65,7 @@ import {
   updateQuotationAction,
 } from "./actions";
 import { AssemblyPickerDialog } from "./assembly-picker-dialog";
-import { ImportDialog, type SourcePickOption } from "./source-picker-dialog";
+import { ImportDialog } from "./source-picker-dialog";
 import { QuotationDialog } from "./quotation-dialog";
 
 const KATEGORI_LABEL: Record<string, string> = {

@@ -1,4 +1,3 @@
-import { prisma } from "@/platform/core/db";
 import { userPreferences } from "@platform/runtime";
 
 import { redirect } from "next/navigation";

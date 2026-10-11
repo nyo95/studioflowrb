@@ -3,14 +3,14 @@
 import { ImagePlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
-import { Badge, Button, Dialog, EmptyState, Field, FormActions, ImageGallery, InlineError, Input, Notice, PillTabs, RadioGroup, RowActionMenu, Select, Text, Textarea, buttonClasses, shrinkImageFile, useConfirm, useFileIntake } from "@/platform/ui_engine";
+import { Badge, Button, Dialog, EmptyState, Field, FormActions, ImageGallery, InlineError, Input, PillTabs, RowActionMenu, Text, Textarea, shrinkImageFile, useConfirm, useFileIntake } from "@/platform/ui_engine";
 
 import { MoodboardDialog } from "./moodboard-dialog";
 import { UseInScheduleDialog } from "./use-in-schedule-dialog";
-import { addIdeaToMoodboardAction, createIdeaCardAction, ideaCardAction, listIdeaCategoryChoicesAction, listIdeaTargetEntriesAction, replaceIdeaImageAction, applyIdeaToScheduleAction, type IdeaCardView } from "./actions";
+import { addIdeaToMoodboardAction, createIdeaCardAction, ideaCardAction, replaceIdeaImageAction, applyIdeaToScheduleAction, type IdeaCardView } from "./actions";
 
 /** Mirrors the server limits (WO-SF-IDEAS-01); the server stays the authority. */
 const IMAGE_BYTES = 3 * 1024 * 1024;

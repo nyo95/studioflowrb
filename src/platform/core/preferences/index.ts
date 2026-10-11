@@ -11,8 +11,6 @@ export const USER_PREFERENCE_LANGUAGES = ["id", "en"] as const;
 export type UserPreferenceLanguage = (typeof USER_PREFERENCE_LANGUAGES)[number];
 /** Null means "not chosen": the organisation default from General Settings applies. */
 export type UserPreferences = { theme: UserPreferenceTheme | null; locale: string | null; timezone: string | null; startPage: string | null; language: UserPreferenceLanguage | null };
-type Db = PrismaClient | Prisma.TransactionClient;
-
 function plainInvalid(code: string, message: string): never { throw new AppError("VALIDATION", code, message); }
 function isGuideLanguage(value: string): value is UserPreferenceLanguage {
   return (USER_PREFERENCE_LANGUAGES as readonly string[]).includes(value);

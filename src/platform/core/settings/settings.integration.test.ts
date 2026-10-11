@@ -35,7 +35,6 @@ before(async () => {
     runTransaction: (work) => db.prisma.$transaction(work),
     auditWriter: createAuditEventWriter(),
     now: () => new Date(),
-    generateId: () => crypto.randomUUID(),
     objectStorage: storage,
     resolveBrandMarkUrl: (key) => `https://public.invalid/${encodeURIComponent(key)}`,
   });
@@ -283,7 +282,7 @@ describe("general settings service", () => {
       db: db.prisma,
       runTransaction: (work) => db.prisma.$transaction(work),
       auditWriter: { write: async () => { throw new Error("persistence failure"); } },
-      now: () => new Date(), generateId: () => crypto.randomUUID(), objectStorage: storage,
+      now: () => new Date(), objectStorage: storage,
       resolveBrandMarkUrl: (key) => `https://public.invalid/${encodeURIComponent(key)}`,
     });
     const values = parsePlatformGeneralSettingsInput({ organizationName: "StudioFlow", appTitle: "StudioFlow", locale: "id-ID", timezone: "Asia/Jakarta", currency: "IDR", weekStartsOn: 1, brandMarkUrl: null, theme: "system", mainAppId: null, landingAppId: null });

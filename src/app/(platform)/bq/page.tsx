@@ -5,7 +5,6 @@ import { FileText } from "lucide-react";
 
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead, bqService } from "@/apps/bq/runtime";
-import { prisma } from "@/platform/core/db";
 import { peopleDirectory, userPreferences } from "@platform/runtime";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { hasAnyPermission, hasPermission } from "@platform/core/rbac";

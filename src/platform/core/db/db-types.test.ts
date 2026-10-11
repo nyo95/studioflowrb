@@ -8,10 +8,6 @@ type Expect<T extends true> = T;
 type Equal<X, Y> =
   (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? true : false;
 
-type _exportedTypeIsPrismaNamespaceTransactionClient = Expect<
-  Equal<TransactionClient, Prisma.TransactionClient>
->;
-
 async function firstUserId(tx: TransactionClient): Promise<string | null> {
   const rows = await tx.user.findMany({ select: { id: true }, take: 1 });
   return rows[0]?.id ?? null;
@@ -25,6 +21,10 @@ function acceptSharedTransaction(client: PrismaClient): void {
 
 describe("core db type contracts", () => {
   it("holds under typecheck; recorded in the unit-test run", () => {
+    const exportedTypeIsPrismaNamespaceTransactionClient: Expect<
+      Equal<TransactionClient, Prisma.TransactionClient>
+    > = true;
+    void exportedTypeIsPrismaNamespaceTransactionClient;
     void acceptSharedTransaction;
     assert.ok(true);
   });

@@ -1,6 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
-import type { PermissionGrants } from "@platform/core/rbac";
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { AuditActor, AuditWriter } from "@platform/core/audit";
 import { prepareAuditEvent } from "@platform/core/audit";

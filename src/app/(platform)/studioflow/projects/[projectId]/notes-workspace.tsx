@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { currentDateOnly, formatInstant } from "@platform/utilities/date";
-import { Badge, Button, FormattedInstant, FormattedText, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, SectionCard, Text, useConfirm, useFileIntake } from "@/platform/ui_engine";
+import { Badge, Button, FormattedInstant, FormattedText, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, SectionCard, Text, useConfirm } from "@/platform/ui_engine";
 
 import { phaseNoteAction, type PhaseNoteCommandInput } from "../../actions";
 import { addNoteImageToMoodboardAction, saveNoteImageToIdeasAction, applyNoteImageToScheduleAction } from "../../ideas/actions";
@@ -32,8 +32,6 @@ export type PhaseNoteRow = {
 
 export const ITERATION_STATE_LABEL: Record<IterationView["state"], string> = { NOT_SENT: "In progress", SENT: "With client", ANSWERED: "Client answered", REVISED: "Revision asked", DONE: "Approved" };
 export const ITERATION_STATE_TONE: Record<IterationView["state"], "neutral" | "warning" | "success"> = { NOT_SENT: "neutral", SENT: "warning", ANSWERED: "success", REVISED: "neutral", DONE: "success" };
-
-const ACCEPTED = "image/png,image/jpeg,image/webp";
 
 type Filter = "all" | "starred" | "client" | string;
 

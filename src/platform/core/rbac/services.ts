@@ -117,10 +117,6 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
     return ACCESS_ADMINISTRATOR_PERMISSIONS.every((permission) => set.has(permission));
   }
 
-  async function isAccessAdministrator(tx: DbClient, userId: string): Promise<boolean> {
-    return (await listAccessAdministratorIds(tx)).includes(userId);
-  }
-
   /**
    * Refuses a change that would leave the platform with no access administrator.
    *

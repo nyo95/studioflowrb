@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, assertCategoryDeactivationSafe, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredTitleName, requiredSlug, assertCategoryDeactivationSafe, createDeletionRequest, writeAudit } from "./shared";
 
 export function createCategoryService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;

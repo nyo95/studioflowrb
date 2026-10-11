@@ -5,7 +5,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, optionalTitleName, requiredSlug, assertVendorTypeRemovalSafe, assertVendorCategoryRemovalSafe, assertVendorMaterialCapable, latestAuditActorLabels, createDeletionRequest, writeAudit, archiveBrandCascade, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertSkuRestorable, assertPriceMaterialRestorable, assertWorkPriceRestorable } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredTitleName, optionalTitleName, requiredSlug, assertVendorTypeRemovalSafe, assertVendorCategoryRemovalSafe, assertVendorMaterialCapable, latestAuditActorLabels, createDeletionRequest, writeAudit, archiveBrandCascade, addDirectCause, addParentCauses, removeDirectCause, removeParentCausesAndFindRestored, assertSkuRestorable, assertPriceMaterialRestorable, assertWorkPriceRestorable } from "./shared";
 
 import { type ContactInput, contactColumns, ensureVendorBrandRelation, sameContactColumns } from "./vendor-contact";
 

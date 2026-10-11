@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/core/audit";
-import { AppError, reportOperationalError } from "@platform/core/errors";
+import { reportOperationalError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 import type { ObjectStorage } from "@platform/core/storage";
 import { validationError } from "@platform/core/validation";
@@ -275,7 +275,6 @@ export type PlatformSettingsPorts = {
   runTransaction: <T>(work: (tx: Prisma.TransactionClient) => Promise<T>) => Promise<T>;
   auditWriter: AuditWriter;
   now: () => Date;
-  generateId: () => string;
   objectStorage?: ObjectStorage;
   resolveBrandMarkUrl?: (key: string) => string | Promise<string>;
 };
@@ -287,7 +286,7 @@ export type BrandMarkChange =
   | { kind: "external"; url: string | null };
 
 export function createPlatformSettingsService(ports: PlatformSettingsPorts) {
-  const { db, runTransaction, auditWriter, now, generateId, objectStorage, resolveBrandMarkUrl } = ports;
+  const { db, runTransaction, auditWriter, now, objectStorage, resolveBrandMarkUrl } = ports;
 
   return {
     /** Reads settings. Requires `platform.settings.read`. */

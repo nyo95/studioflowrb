@@ -73,7 +73,7 @@ describe("password boundaries", () => {
       db: {} as PrismaClient,
       runTransaction: async (work) => { transactions++; return work(tx); },
       auditWriter: { write: async () => assert.fail("no audit on failure") },
-      now: () => new Date(), generateId: () => "id",
+      now: () => new Date(),
     });
     await assert.rejects(account.changeOwnPassword({ userId: "user", currentPassword: password, newPassword: password }),
       (error) => error instanceof AppError && error.code === "CURRENT_PASSWORD_INCORRECT");

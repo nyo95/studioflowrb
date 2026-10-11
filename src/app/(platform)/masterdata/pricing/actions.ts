@@ -193,12 +193,6 @@ const bulkWorkInput = z.object({
   currency: z.string().length(3).default("IDR"),
   rows: z.array(z.object({ name: z.string().min(1).max(128), unitId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes, scopeNote: bulkRowNotes })).min(1).max(100),
 });
-const bulkMaterialInput = z.object({
-  vendorId: z.string().uuid(),
-  currency: z.string().length(3).default("IDR"),
-  rows: z.array(z.object({ skuId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes })).min(1).max(100),
-});
-
 /** Saves many labor or material + labor prices for one supplier and category. Valid rows are saved; rows that fail come back in `rejected` (or in `error.details.rows` when none could be saved). */
 export async function saveBulkWorkPricesAction(input: unknown): Promise<ActionResult<GridSaveResult>> {
   return runSafeAction(async () => {
@@ -207,35 +201,6 @@ export async function saveBulkWorkPricesAction(input: unknown): Promise<ActionRe
     const ctx = await context();
     const result = await masterDataService.createWorkPricesBulk({ ...ctx, ...parsed.data, onInvalid: "save-valid" });
     refreshPricing();
-    revalidatePath("/masterdata/vendors");
-    return result;
-  });
-}
-
-/** Saves many material prices (existing SKUs) for one supplier, all or nothing. */
-export async function saveBulkMaterialPricesAction(input: unknown): Promise<ActionResult<{ batchId: string; ids: string[] }>> {
-  return runSafeAction(async () => {
-    const parsed = bulkMaterialInput.safeParse(input);
-    if (!parsed.success) throw validationError(parsed.error);
-    const ctx = await context();
-    const result = await masterDataService.createMaterialPricesBulk({ ...ctx, ...parsed.data });
-    refreshPricing();
-    revalidatePath("/masterdata/vendors");
-    return result;
-  });
-}
-
-const linkBrandInput = z.object({ brandId: z.string().uuid(), vendorId: z.string().uuid() });
-
-/** The pricing form's "link this brand to the supplier" shortcut. Idempotent; needs brand-manage or supplier-manage. */
-export async function linkBrandToSupplierAction(input: unknown): Promise<ActionResult<{ brandId: string; vendorId: string }>> {
-  return runSafeAction(async () => {
-    const parsed = linkBrandInput.safeParse(input);
-    if (!parsed.success) throw validationError(parsed.error);
-    const ctx = await context();
-    const result = await masterDataService.linkBrandToSupplier({ ...ctx, ...parsed.data });
-    refreshPricing();
-    revalidatePath("/masterdata/brands");
     revalidatePath("/masterdata/vendors");
     return result;
   });

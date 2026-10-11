@@ -3,7 +3,7 @@ import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, requireAnyPermission, mapWriteError, hasPermission, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, actorIsUsable, mapWriteError, hasPermission, writeAudit } from "./shared";
 import { MASTERDATA_DELETION_TARGET_TYPES } from "./polymorphic-registry";
 
 export function createDeletionService(db: PrismaClient, ports: MasterDataServicePorts) {

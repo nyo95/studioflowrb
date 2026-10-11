@@ -10,7 +10,7 @@ import {
 
 import { cx } from "../internal/cx";
 
-import { buttonClasses, BUTTON_BASE_CLASSES, BUTTON_SIZE_CLASSES, BUTTON_VARIANT_CLASSES, type ButtonSize, type ButtonVariant, filterChipClasses } from "./button-classes";
+import { BUTTON_BASE_CLASSES, BUTTON_SIZE_CLASSES, BUTTON_VARIANT_CLASSES, type ButtonSize, type ButtonVariant, filterChipClasses } from "./button-classes";
 
 export type { ButtonVariant, ButtonSize } from "./button-classes";
 

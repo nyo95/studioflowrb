@@ -54,13 +54,6 @@ export async function listIdeaCardsAction(): Promise<ActionResult<IdeaCardView[]
   });
 }
 
-export async function listIdeaTargetsAction(): Promise<ActionResult<Array<{ id: string; name: string }>>> {
-  return runSafeAction(async () => {
-    await requireModuleEnabled("ideas");
-    return studioFlow.ideas.listIdeaTargets(await context());
-  });
-}
-
 export async function listIdeaTargetEntriesAction(projectId: string): Promise<ActionResult<Awaited<ReturnType<typeof studioFlow.ideas.listIdeaTargetEntries>>>> {
   return runSafeAction(async () => {
     await requireModuleEnabled("ideas");

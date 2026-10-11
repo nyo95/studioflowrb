@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { z, type ZodType } from "zod";
+import type { ZodType } from "zod";
 
 import { prepareAuditEvent, type AuditWriter } from "@platform/core/audit";
 import { createAuditEventWriter } from "@platform/core/audit/persistence";

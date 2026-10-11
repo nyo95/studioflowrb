@@ -2,7 +2,7 @@
 import { FilterSummary, StatusFilterSelect } from "../directory-filters";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { UpdatedCell } from "../updated-cell";
-import { PhoneNumbersField, contactPhoneList, phoneSummary } from "../contact-phones";
+import { PhoneNumbersField, contactPhoneList } from "../contact-phones";
 import { carriedBrandNames, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
 import { PhoneLinks } from "../phone-links";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
@@ -10,7 +10,6 @@ import { formatInstant } from "@platform/utilities/date";
 import {
   Checkbox,
   DirectoryShell,
-  DraftDialog,
   Pagination,
   RowActionMenu,
   RowActionsCell,

@@ -1,14 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import { Prisma, type PrismaClient } from "@/generated/prisma/client";
+import { type PrismaClient } from "@/generated/prisma/client";
 import { type AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
-import { hasPermission, requirePermission, type PermissionGrants } from "@platform/core/rbac";
-import { normalizeText } from "@platform/utilities/normalization";
+import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, TxClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredAmount, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
-
-type MasterDataServiceFactory = (db: PrismaClient, ports: MasterDataServicePorts) => object;
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 export function createUnitService(db: PrismaClient, ports: MasterDataServicePorts) {
   const { runTransaction } = ports;

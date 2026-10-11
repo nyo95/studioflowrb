@@ -299,7 +299,6 @@ Order matters; each item is its own Work Order.
 - [ ] [UNVERIFIED] Template-first imports (R8.482): on Import & export prices, both cards read Download template, choose a file (checked at once),
   Save (valid rows saved, problem rows skipped and listed). Automated for CSV; still to try by hand: an Excel file with the Suppliers sheet, the
   current-data download edited and uploaded back, the PDF price list, and a real company file copied into the template.
-- [ ] [CLEANUP][P3] `createWorkbook`, `loadWorkbook` and `workbookToBuffer` in `platform/utilities/tabular` have no app consumer since R8.482; drop them or keep for the next raw-workbook layout (the `WorkbookCellValue` type is still used).
 - [ ] [UNVERIFIED] Browser acceptance is now mostly automated (WO-E2E-ACCEPT-01, R8.469-R8.481): `npm run test:e2e` runs 129 checks
   (Master Data pricing, archive and restore, the sample shelf, notes, images, Schedule codes, the moodboard, the token page, the first-use
   guide, Ideas). What still needs the owner's own eyes, from `docs/BROWSER-ACCEPTANCE.md`: the BQ screens (section 9 part), Dark mode and

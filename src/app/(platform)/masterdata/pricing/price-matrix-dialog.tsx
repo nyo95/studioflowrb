@@ -4,7 +4,6 @@ import { Plus, Trash2 } from "lucide-react";
 import { useState, type ClipboardEvent, type FormEvent, type ReactNode } from "react";
 
 import { Button, ConfirmDialog, CreatableMultiSelect, CreatableSearch, Dialog, Field, FormActions, IconButton, InlineError, Input, PrefixedInput, Select, Text } from "@/platform/ui_engine";
-import { formatDecimal } from "@platform/utilities/decimal";
 import { currencyPrefix } from "@platform/utilities/money";
 
 import { blurDisplay, parsePastedAmount, readTypedAmount, shouldShowAmountPrefix } from "./amount-format";

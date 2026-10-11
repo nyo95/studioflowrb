@@ -6,7 +6,7 @@ import { AppError } from "@platform/core/errors";
 import { requirePermission, type PermissionGrants } from "@platform/core/rbac";
 
 import { parsePriceAmount } from "../domain/price-amount";
-import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, asPrismaClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredName, requiredTitleName, requiredSlug, requiredCurrency, requiredPriceAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertVendorWorkCapable, assertPriceMaterialBrandSupplierChain, ensurePriceMaterialBrandSupplierLink, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
+import { MASTERDATA_PERMISSIONS, type MasterDataServicePorts, type TxClient, asPrismaClient, actorIsUsable, requireAnyPermission, mapWriteError, requiredTitleName, requiredSlug, requiredCurrency, requiredPriceAmount, assertVendorMaterialCapable, assertVendorLaborCapable, assertVendorWorkCapable, assertPriceMaterialBrandSupplierChain, ensurePriceMaterialBrandSupplierLink, ensureVendorCategory, assertWorkPriceRestorable, assertPriceMaterialRestorable, addDirectCause, removeDirectCause, createDeletionRequest, writeAudit } from "./shared";
 
 /** A grid cell that is blank, "-" or "n/a" is not offered and skipped; unreadable text stays so its row reports the problem. */
 function isOffered(text: string): boolean {

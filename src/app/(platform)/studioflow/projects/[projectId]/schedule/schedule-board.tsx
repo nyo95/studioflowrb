@@ -451,7 +451,7 @@ export function ScheduleBoard({
 }) {
   const router = useRouter();
   const command = useCommand();
-  const { run, isPending, error } = command;
+  const { run, error } = command;
   const confirm = useConfirm();
   const [section, setSection] = useState<Section>(() => (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
   const [viewMode, setViewMode] = useState<"list" | "board">("board");

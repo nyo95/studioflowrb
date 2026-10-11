@@ -1,7 +1,6 @@
 "use client";
 
 import { ChevronDown,ChevronUp,ChevronsUpDown,Search,X } from "lucide-react";
-import Link from "next/link";
 import {
 forwardRef,
 type CSSProperties,
@@ -16,7 +15,7 @@ type ThHTMLAttributes,
 import { cx } from "../internal/cx";
 import type { SemanticTone } from "../primitives";
 import { StatusMarker } from "./feedback";
-import { IconButton,Input,Text } from "../primitives";
+import { IconButton,Input } from "../primitives";
 
 export type DataTableProps = TableHTMLAttributes<HTMLTableElement> & {
   framed?: boolean;

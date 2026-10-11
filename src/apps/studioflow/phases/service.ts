@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import type { AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
-import { createPrivateObjectKey } from "@platform/core/storage";
 
 import { fullBlockers, todoBlockers } from "../domain/blockers";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
@@ -28,13 +27,11 @@ import {
   getProjectAccess,
   hasPermission,
   invalid,
-  loadWritablePhase,
   loadWritableProject,
   notFound,
   nowOf,
   requireCommand,
   requireProjectAccess,
-  requirePermission,
   requireRead,
   optionalText,
   requiredText,
@@ -46,7 +43,6 @@ import {
   type TxClient,
 } from "../shared";
 import { readBlockerCounts, readBlockerCountsBatch, readBlockerItems } from "./blocker-query";
-import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
 import { assertProjectCompletionReady, readProjectCompletionReadiness } from "../projects/completion";
 import { createDeliverableService } from "./deliverables";
 import { createPhaseNoteService, insertPhaseNote, PHASE_NOTE_MAX } from "./notes";

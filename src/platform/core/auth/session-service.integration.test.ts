@@ -8,7 +8,7 @@ import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePl
 import { bootstrapFirstOwner } from "./bootstrap";
 import { PLATFORM_PERMISSIONS } from "@platform/core/rbac/registry";
 import { performLogin } from "./login";
-import { hashPassword, isValidPasswordLength, verifyPassword } from "./password";
+import { hashPassword, isValidPasswordLength } from "./password";
 import {
   DEFAULT_SESSION_WINDOW,
   createSession,

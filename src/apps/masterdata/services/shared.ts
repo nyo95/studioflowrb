@@ -4,7 +4,7 @@ import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/core/audit";
 import { latestAuditActorLabels as readLatestAuditActorLabels } from "@platform/core/audit/persistence";
 import { AppError, mapPrismaKnownError } from "@platform/core/errors";
-import { hasPermission, requirePermission, type PermissionGrants } from "@platform/core/rbac";
+import { hasPermission, type PermissionGrants } from "@platform/core/rbac";
 import { normalizeText } from "@platform/utilities/normalization";
 import { toSlug } from "@platform/utilities/slug";
 import { lowerCaseText, titleCaseWords } from "@platform/utilities/text-case";

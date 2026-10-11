@@ -1,8 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { isAppError, toSafeErrorPayload } from "@platform/core/errors";
-
 import { isSessionPrincipal } from "./principal";
 import {
   countCodePoints,

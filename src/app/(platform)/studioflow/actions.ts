@@ -1219,20 +1219,6 @@ export async function extendDeliverableExpiryAction(input: z.infer<typeof Delive
   });
 }
 
-const DeliverableUploadMeta = z.strictObject({ projectId: Id, phaseId: Id, name: z.string().min(1).max(200) });
-/** Multipart upload: `projectId`, `phaseId`, `name`, `file`. Size policy lives in the service. */
-export async function uploadDeliverableAction(formData: FormData): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(DeliverableUploadMeta, { projectId: formData.get("projectId"), phaseId: formData.get("phaseId"), name: formData.get("name") });
-    const file = formData.get("file");
-    if (!(file instanceof File)) throw new AppError("VALIDATION", "DELIVERABLE_FILE_REQUIRED", "Choose a file.");
-    const result = await studioFlow.phases.uploadDeliverable({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
-    refresh(data.projectId);
-    return result;
-  });
-}
-
 // ── Global search ─────────────────────────────────────────────────────────
 
 const SearchQuery = z.string().trim().min(1).max(200);

@@ -1669,7 +1669,7 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(listed.code, "PT-01", "Paint category defaults to PT prefix");
     assert.equal(listed.options[0].pattern, "Solid", "pattern roundtrips through create and list");
 
-    const updated = await sf.schedule.updateOption({
+    await sf.schedule.updateOption({
       ...as(designer),
       projectId,
       optionId: listed.options[0].id,
@@ -1763,7 +1763,7 @@ describe("SF-R3 Product Schedule", () => {
     const copied = (await sf.schedule.listSchedule({ grants: ALL, projectId: target.projectId })).find((r) => r.id === targetEntry.entryId)!;
     assert.equal(copied.options[0].pattern, "Flaming", "reuse copies pattern");
 
-    const edited = await sf.schedule.updateOption({
+    await sf.schedule.updateOption({
       ...as(designer),
       projectId: target.projectId,
       optionId: copied.options[0].id,
@@ -2957,7 +2957,6 @@ describe("WO-SF-ITER-01 screens support (Lead)", () => {
     await sf.phases.dismissRequirement({ ...base, itemId: dismissed.id });
     const after = await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: moodboard.id });
     assert.deepEqual(after.map((item) => [item.label, item.isChecked]), [["Late requirement", true]], "the dismissed requirement is gone and the ticked one stays");
-    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((item) => item.id === projectId)!;
   });
 
   it("offers the latest change for undo only to the same person within five minutes, and lists phase notes", async () => {
