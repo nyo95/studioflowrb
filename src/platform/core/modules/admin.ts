@@ -39,7 +39,7 @@ export async function changeModuleState(input: {
       if (current?.last_version !== moduleManifest.version) {
         await tx.moduleState.upsert({
           where: { module_id: moduleManifest.id },
-          create: { module_id: moduleManifest.id, state: input.state, last_version: moduleManifest.version, updated_by: "system-owner-cli" },
+          create: { module_id: moduleManifest.id, state: input.state, last_version: moduleManifest.version, updated_by: "developer-cli" },
           update: { last_version: moduleManifest.version },
         });
       }
@@ -47,15 +47,15 @@ export async function changeModuleState(input: {
     }
     await tx.moduleState.upsert({
       where: { module_id: moduleManifest.id },
-      create: { module_id: moduleManifest.id, state: input.state, last_version: moduleManifest.version, updated_by: "system-owner-cli" },
-      update: { state: input.state, last_version: moduleManifest.version, updated_by: "system-owner-cli" },
+      create: { module_id: moduleManifest.id, state: input.state, last_version: moduleManifest.version, updated_by: "developer-cli" },
+      update: { state: input.state, last_version: moduleManifest.version, updated_by: "developer-cli" },
     });
     await input.auditWriter.write(prepareAuditEvent({
       appId: "platform",
       action: input.state === "ENABLED" ? "platform.module.enabled" : "platform.module.disabled",
       entityType: "module",
       entityId: moduleManifest.id,
-      actor: { kind: "SYSTEM", label: "system-owner-cli" },
+      actor: { kind: "SYSTEM", label: "developer-cli" },
       changes: { state: { from: previous, to: input.state } },
       metadata: { version: moduleManifest.version },
     }, { now: input.now }), tx);

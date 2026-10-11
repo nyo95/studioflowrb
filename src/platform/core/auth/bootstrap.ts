@@ -75,7 +75,7 @@ export async function bootstrapFirstOwner(
         data: {
           id: generateId(),
           code: PLATFORM_OWNER_ROLE_CODE,
-          name: "Company Administrator",
+          name: "Platform Owner",
           description: "Initial owner role created by bootstrap with explicit registry grants.",
           is_system: true,
           role_permissions: {

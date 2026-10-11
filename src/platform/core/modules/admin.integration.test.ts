@@ -98,7 +98,7 @@ describe("module state database contract", () => {
 
       const audits = await db.prisma.auditEvent.findMany({ where: { entity_type: "module" }, orderBy: { occurred_at: "asc" } });
       assert.equal(audits.length, 4);
-      assert.ok(audits.every((event) => event.actor_kind === "SYSTEM" && event.actor_label === "system-owner-cli"));
+      assert.ok(audits.every((event) => event.actor_kind === "SYSTEM" && event.actor_label === "developer-cli"));
       assert.equal(await db.prisma.sfIdeaCard.count({ where: { id: cardId } }), 1);
       assert.equal(await db.prisma.sfIdeaUsage.count({ where: { id: usageId } }), 1);
       assert.equal(await db.prisma.sfPresentationBoard.count({ where: { id: boardId } }), 1);

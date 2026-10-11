@@ -6,7 +6,7 @@ import { isAppError } from "@platform/core/errors";
 import { changeModuleState } from "./admin";
 import { initializeModuleRegistry, resetModuleRegistryForTests } from "./manifest";
 
-describe("System Owner module state command", () => {
+describe("Developer module state command", () => {
   beforeEach(() => initializeModuleRegistry([
     { id: "studioflow", name: "StudioFlow", version: "1.0.0", kind: "core", requires: [] },
     { id: "ideas", name: "Ideas", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"] },
@@ -30,7 +30,7 @@ describe("System Owner module state command", () => {
     assert.deepEqual(result, { changed: true, state: "DISABLED" });
     assert.equal(writes.length, 1);
     assert.equal(audits.length, 1);
-    assert.deepEqual((audits[0] as { actor: unknown; action: string }).actor, { kind: "SYSTEM", label: "system-owner-cli" });
+    assert.deepEqual((audits[0] as { actor: unknown; action: string }).actor, { kind: "SYSTEM", label: "developer-cli" });
     assert.equal((audits[0] as { action: string }).action, "platform.module.disabled");
   });
 

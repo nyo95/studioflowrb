@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.503 | 2026-10-11 | refactor(platform): align owner and developer terminology (Lead)
+
+- **Owner terminology decision:** the highest in-app RBAC role is again displayed as **Platform Owner**; the separate out-of-band authority above RBAC is called **Developer**, not System Owner. Developer access remains impossible to grant through a Role or permission, and the `/system` route plus `SYSTEM` audit actor kind remain unchanged.
+- Bootstrap now creates the immutable `platform-owner` role with display name `Platform Owner`. A forward-only data migration changes only the previous default name `Company Administrator`, preserving any independently customized role name. New module state audit/source labels use `developer-cli`.
+- The active work order is now `WO-DEVELOPER-01`; its not-yet-built capability, CLI, storage names and audit vocabulary use Developer terminology. Settings > Modules now says changes are made only by the Developer. Historical changelog entries and already-applied migration files remain untouched as historical evidence.
+- Added browser regression coverage proving Settings > Modules shows Developer while Roles & Access shows Platform Owner. **Migrations/dependencies:** one data-only migration; no dependency. **Checks:** all 99 migrations on disposable PostgreSQL 16; migration default-name and custom-name cases; `npm test` (1,002 passed); typecheck; architecture boundaries; legacy-runtime check; eslint (0 errors, 1 existing Presentation `<img>` warning); production build; Settings Playwright (12 passed); whitespace checks.
+
 ## R8.502 | 2026-10-11 | chore(repo): remove unused code, dependencies and parked Supabase adapter (Executor)
 
 - **Owner-approved cleanup from the full-code audit:** removed five unused server actions (`uploadDeliverableAction`, `saveBulkMaterialPricesAction`, `linkBrandToSupplierAction`, `listIdeaTargetsAction`, `getStorageUsageAction`) and the unused `getMyPreferences` server getter. The current streamed deliverable upload, pricing, Ideas, preferences and storage-usage paths are unchanged.

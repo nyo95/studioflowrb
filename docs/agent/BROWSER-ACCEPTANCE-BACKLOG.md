@@ -287,7 +287,7 @@ this backlog's former SF-A entries.)_
 
 ### [R8.498] Optional StudioFlow module gates
 - Surface: StudioFlow rail, Ideas, project notes, Presentation, and Presentation print
-- Fixture: an Ideas card and a Presentation board with at least one slide; System Owner command access
+- Fixture: an Ideas card and a Presentation board with at least one slide; Developer command access
 - Viewport: desktop (default)
 - Steps: 1. With both modules enabled, open Ideas and Presentation and confirm their existing workflows. 2. Disable Ideas; reload and inspect the rail and project-note image actions, then open the old Ideas URL. 3. Re-enable Ideas and confirm the same card returns. 4. Repeat for Presentation, including its project tab, moodboard entry points, board URL, and print URL.
 - Acceptance: enabled behavior is unchanged; disabled entries disappear without breaking surrounding layouts; disabled URLs are not-found; enabling restores the same saved data.

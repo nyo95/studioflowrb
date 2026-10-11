@@ -72,3 +72,12 @@ test("app rails link to their own settings", async ({ page }) => {
   await expect(page.locator('a[href="/masterdata/settings"]').first()).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/_masterdata-rail.png` });
 });
+
+test("access terminology distinguishes Platform Owner from Developer", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await open(page, "/settings/modules");
+  await expect(page.getByText("Changed only by the Developer.", { exact: true })).toBeVisible();
+
+  await open(page, "/settings/access/roles");
+  await expect(page.getByText("Platform Owner", { exact: true }).first()).toBeVisible();
+});

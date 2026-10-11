@@ -10,8 +10,8 @@ import { canOpenSettingsSection, platformSettingsGroups } from "../settings-sect
 export const dynamic = "force-dynamic";
 
 /**
- * Read-only module list (WO-MODULES-M1 UI Contract). Module state is a System Owner operation on the server,
- * never an RBAC permission, so this page has no controls: a Company Administrator can see what is installed
+ * Read-only module list (WO-MODULES-M1 UI Contract). Module state is a Developer operation on the server,
+ * never an RBAC permission, so this page has no controls: a Platform Owner can see what is installed
  * and switched on, not change it.
  */
 export default async function ModulesSettingsPage() {
@@ -30,7 +30,7 @@ export default async function ModulesSettingsPage() {
     >
       <SectionCard>
         <div className="grid gap-3">
-          <Notice title="Changed only by the System Owner.">
+          <Notice title="Changed only by the Developer.">
             Modules are switched on or off on the server, not from this page. Switching a module off hides it for
             everyone and keeps all its data; switching it on brings everything back.
           </Notice>

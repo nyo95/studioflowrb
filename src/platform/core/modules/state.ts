@@ -68,7 +68,7 @@ export async function enabledModuleIds(db?: ModuleStateReader): Promise<readonly
   return Object.freeze(getModuleRegistry().modules.filter((moduleManifest) => enabled(moduleManifest, states, new Set())).map((moduleManifest) => moduleManifest.id));
 }
 
-/** Read-only view of every registered module for display; changing state is the System Owner command only. */
+/** Read-only view of every registered module for display; changing state is the Developer command only. */
 export async function listModuleOverview(db?: ModuleStateReader): Promise<readonly ModuleOverview[]> {
   const states = await statesFrom(db);
   return getModuleRegistry().modules.map((moduleManifest) => ({
