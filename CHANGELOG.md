@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.510 | 2026-10-12 | docs(platform): lock Ideas and Presentation extraction boundaries (Executor)
+
+- Completed M2's end-to-end coupling inventory for Ideas and Presentation: service composition, routes/actions/UI, database relations, permissions/module gates, project and Schedule access, source images, storage cleanup, archive retention, audit, print/navigation consumers and tests.
+- Defined the exact StudioFlow public reads/commands, module public lifecycle hooks, missing-reference behavior and composition coordinators needed to extract Ideas first and Presentation second without duplicating project authorization or exposing app internals.
+- Locked atomic schema moves that preserve ids, rows, timestamps, ordering and object keys with no dual-write period. Each extraction requires one narrowly named migration-isolation exception because an atomic table handoff necessarily touches the source and destination schemas; unrelated StudioFlow mutation remains forbidden.
+- **Runtime/migrations/dependencies:** none in M2. **Checks:** architecture boundaries; legacy-runtime check; documentation staged/unstaged whitespace checks.
+
 ## R8.509 | 2026-10-12 | docs(platform): accept owner access review and open module coupling discovery (Lead)
 
 - **Reviewer verdict: PASS.** The Platform Owner remains the only in-app authority with all Developer-enabled non-position access; custom roles cannot receive Platform permissions; the task-oriented role matrix, dependency expansion, module ceiling, legacy cleanup, and isolated Developer console match the accepted work order.

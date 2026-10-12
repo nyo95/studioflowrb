@@ -4,10 +4,10 @@ Plan ID: WO-MODULES-M2-01 (Ideas and Presentation coupling discovery)
 Scope: exhaustive coupling report and locked public-boundary/migration design
 Module(s): studioflow, ideas, presentation, platform registry
 Target revision: R8.510
-Status: READY
+Status: IMPLEMENTED — AWAITING REVIEW
 Priority: P1
 Owner: direct decision 2026-10-12; MODULES-DECISION D8-D9
-Last updated: 2026-10-12 (Lead; RBAC review passed in R8.509)
+Last updated: 2026-10-12 (Executor; coupling report delivered in R8.510)
 
 ## Outcome
 
