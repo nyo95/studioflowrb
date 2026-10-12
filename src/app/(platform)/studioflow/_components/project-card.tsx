@@ -28,7 +28,7 @@ export type ProjectCardPhase = {
   skipped_reason: string | null;
   can_add_round: boolean;
   last_visit_days_ago: number | null;
-  current_iteration: { id: string; name: string; short_name?: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[] } | null;
+  current_iteration: { id: string; name: string; short_name?: string; state: IterationView["state"]; waiting_days: number | null; available_choices: string[]; answer_choices: string[]; next_step_name?: string | null } | null;
 };
 
 export type ProjectCardData = {
@@ -68,7 +68,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
   const steps = card.phases.map((phase, index) => {
     const current = phase.current_iteration;
     const view: PhaseView = { id: phase.id, name: phase.name, status: phase.status, isSupervision: phase.is_supervision, canStart: phase.can_start };
-    const iteration: IterationView | null = current ? { id: current.id, name: current.short_name ?? current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices } : null;
+    const iteration: IterationView | null = current ? { id: current.id, name: current.short_name ?? current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices, nextStepName: current.next_step_name ?? null } : null;
     const canAct = !completed && projectActive && viewer.canWork && seatOwner(phase);
     const display = phaseStepPresentation({
       phaseName: phase.name,

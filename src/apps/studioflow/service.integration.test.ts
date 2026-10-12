@@ -2933,6 +2933,29 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     assert.equal(await testDb.prisma.sfRevision.count({ where: { id: next.nextIterationId } }), 0);
   });
 
+  it("runs a custom two-step phase by its own step names, not by CD Mall/CD Final (audit 2026-10-12)", async () => {
+    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.moodboard }, data: { default_iteration_kinds: [{ name: "Concept Study" }, { name: "Final Concept" }] } });
+    const { projectId } = await newProject("Custom two-step");
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const study = await openIteration(moodboard.id);
+    assert.equal(study.name, "Concept Study");
+    const base = { ...as(designer), projectId, phaseId: moodboard.id, iterationId: study.id };
+    await sf.phases.sendIteration(base);
+    await sf.phases.recordClientAnswer(base);
+    await assert.rejects(sf.phases.chooseIterationOutcome({ ...base, outcome: "DONE" }), (error: unknown) => error instanceof AppError && error.code === "PHASE_INVALID_STATE" && /Concept Study must be revised or continued to Final Concept/.test(error.message));
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: moodboard.id });
+    assert.equal(detail.currentIteration!.nextStepName, "Final Concept");
+    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((c) => c.id === projectId)!.phases.find((p) => p.id === moodboard.id)!;
+    assert.equal(card.current_iteration!.next_step_name, "Final Concept");
+    const next = await sf.phases.chooseIterationOutcome({ ...base, outcome: "CONTINUE_CD_FINAL" }) as { nextIterationId: string };
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: next.nextIterationId } })).name, "Final Concept");
+    const finalBase = { ...base, iterationId: next.nextIterationId };
+    await sf.phases.sendIteration(finalBase);
+    await sf.phases.recordClientAnswer(finalBase);
+    await sf.phases.chooseIterationOutcome({ ...finalBase, outcome: "DONE" });
+    assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: moodboard.id } })).status, "DONE");
+  });
+
   it("keeps the client's notes on the revised iteration, and undo of the Revision keeps them", async () => {
     const { projectId } = await newProject("Notes on revision");
     const mb = await phaseOf(projectId, "moodboard");

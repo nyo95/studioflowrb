@@ -80,6 +80,8 @@ export type IterationView = {
   choices: readonly string[];
   /** The outcomes offered once the client has answered (Revision / Done, or Continue to CD Final on CD Mall). */
   answerChoices?: readonly string[];
+  /** On a two-step phase's first step, the step "Continue to …" opens (e.g. CD Final). */
+  nextStepName?: string | null;
 };
 
 export type PhaseView = { id: string; name: string; status: "PENDING" | "ACTIVE" | "DONE"; isSupervision: boolean; canStart: boolean };
@@ -130,7 +132,7 @@ export function IterationButtons({
     done: phase.isSupervision
       ? { label: "Done (handover)", primary: true, run: () => run("done", { ...it, command: "chooseVisit", outcome: "DONE" }, `${phase.name} done`) }
       : { label: "Done", primary: true, run: () => run("done", { ...it, command: "chooseOutcome", outcome: "DONE" }, `${current.name} done`) },
-    continue_cd_final: { label: "Continue to CD Final", primary: true, run: () => run("continue", { ...it, command: "chooseOutcome", outcome: "CONTINUE_CD_FINAL" }, `${current.name} done, CD Final opened`) },
+    continue_cd_final: { label: `Continue to ${current.nextStepName ?? "CD Final"}`, primary: true, run: () => run("continue", { ...it, command: "chooseOutcome", outcome: "CONTINUE_CD_FINAL" }, `${current.name} done, ${current.nextStepName ?? "CD Final"} opened`) },
     // Closing a visit as "Next visit" goes straight on to planning the following one.
     next_visit: { label: "Next visit", run: () => void commands.exec(`${phase.id}:next`, { ...it, command: "chooseVisit", outcome: "NEXT_VISIT" }, `${current.name} closed`).then((ok) => { if (ok) onNewVisit(); }) },
   };
@@ -146,10 +148,10 @@ export function IterationButtons({
   );
 }
 
-const OUTCOME: Record<string, { label: string; outcome: "REVISION" | "DONE" | "CONTINUE_CD_FINAL"; primary?: boolean; summary: (name: string) => string }> = {
-  revision: { label: "Revision", outcome: "REVISION", summary: (name) => `${name} needs a revision` },
-  done: { label: "OK – done", outcome: "DONE", primary: true, summary: (name) => `${name} done` },
-  continue_cd_final: { label: "Continue to CD Final", outcome: "CONTINUE_CD_FINAL", primary: true, summary: (name) => `${name} done, CD Final opened` },
+const OUTCOME: Record<string, { label: (next: string) => string; outcome: "REVISION" | "DONE" | "CONTINUE_CD_FINAL"; primary?: boolean; summary: (name: string, next: string) => string }> = {
+  revision: { label: () => "Revision", outcome: "REVISION", summary: (name) => `${name} needs a revision` },
+  done: { label: () => "OK – done", outcome: "DONE", primary: true, summary: (name) => `${name} done` },
+  continue_cd_final: { label: (next) => `Continue to ${next}`, outcome: "CONTINUE_CD_FINAL", primary: true, summary: (name, next) => `${name} done, ${next} opened` },
 };
 
 const RETRY = "The answer is saved. Press the button again to retry the images left here, or remove them to go on.";
@@ -216,7 +218,7 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
       draft.clear();
       if (choice) {
         const picked = OUTCOME[choice]!;
-        if (!(await commands.exec(`${phase.id}:${choice}`, { ...it, command: "chooseOutcome", outcome: picked.outcome }, picked.summary(iteration.name)))) return;
+        if (!(await commands.exec(`${phase.id}:${choice}`, { ...it, command: "chooseOutcome", outcome: picked.outcome }, picked.summary(iteration.name, iteration.nextStepName ?? "CD Final")))) return;
       }
       onClose();
     } finally {
@@ -234,7 +236,7 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="ghost" disabled={Boolean(busyKey)} onClick={() => void answer(null)} pending={busyKey === "later"}>Save, decide later</Button>
           {choices.map((choice) => (
-            <Button key={choice} variant={OUTCOME[choice]!.primary ? "primary" : "secondary"} disabled={Boolean(busyKey)} pending={busyKey === choice} onClick={() => void answer(choice)}>{OUTCOME[choice]!.label}</Button>
+            <Button key={choice} variant={OUTCOME[choice]!.primary ? "primary" : "secondary"} disabled={Boolean(busyKey)} pending={busyKey === choice} onClick={() => void answer(choice)}>{OUTCOME[choice]!.label(iteration.nextStepName ?? "CD Final")}</Button>
           ))}
         </div>
       }

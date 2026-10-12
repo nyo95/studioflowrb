@@ -5,7 +5,7 @@ import { AppError } from "@platform/core/errors";
 
 import { fullBlockers, todoBlockers } from "../domain/blockers";
 import { dateOnlyToDate, dateToDateOnly } from "../domain/dates";
-import { isCdMall, iterationChoices, iterationKinds } from "../domain/iteration-kinds";
+import { isCdMall, iterationChoices, iterationKinds, nextIterationKind } from "../domain/iteration-kinds";
 import { phaseSkipReason } from "../domain/phase-display";
 import {
   canActivatePhase,
@@ -357,14 +357,14 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           return { iterationId: iteration.id, nextIterationId: next.id };
         }
         if (input.outcome === "CONTINUE_CD_FINAL") {
-          if (!isMall || !kinds[1]) throw invalidState("Only CD Mall can continue to CD Final.");
+          if (!isMall || !kinds[1]) throw invalidState(kinds.length >= 2 ? `Only ${kinds[0]} can continue to ${kinds[1]}.` : "This phase has no next step to continue to.");
           const at = nowOf(ports); await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "DONE", done_at: at } });
           const next = await createIteration(tx, phase, kinds[1]);
           await recordEvent(tx, input, phase, iteration.id, "ANSWERED", "DONE", { beforeIteration: iterationUndo(iteration), createdIteration: iterationUndo(next), cdContinuation: true });
           await audit(tx, input.actor, "iteration-continued", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id, nextIterationId: next.id });
           return { iterationId: iteration.id, nextIterationId: next.id };
         }
-        if (isMall) throw invalidState("CD Mall must be revised or continued to CD Final.");
+        if (isMall) throw invalidState(`${kinds[0]} must be revised or continued to ${kinds[1]}.`);
         return closePhase(tx, input, phase, project, iteration);
       });
     },
@@ -637,6 +637,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           choices: iterationChoices({ state: active.status, phaseStatus: status, iterationName: active.name, kinds: iterationKinds(phase.definition.default_iteration_kinds), supervision: isSupervision }),
           /** The outcomes offered once the client has answered (Revision / Done, or Continue to CD Final on CD Mall). */
           answerChoices: iterationChoices({ state: "ANSWERED", phaseStatus: status, iterationName: active.name, kinds: iterationKinds(phase.definition.default_iteration_kinds), supervision: isSupervision }),
+          /** The step "Continue to …" opens on a two-step phase's first step (e.g. CD Final), else null. */
+          nextStepName: nextIterationKind(iterationKinds(phase.definition.default_iteration_kinds), active.name),
         } : null,
         iterations: phase.revisions.map((rev) => ({
           id: rev.id, name: rev.name, shortName: iterationShortName(rev.name, snap.prefixSnapshot, rev, kindNames.includes(rev.name)), state: rev.status, createdAt: rev.created_at, sentAt: rev.sent_at, answeredAt: rev.answered_at, doneAt: rev.done_at,

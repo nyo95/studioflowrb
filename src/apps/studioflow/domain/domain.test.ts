@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { fullBlockers, todoBlockers } from "./blockers";
-import { iterationChoices } from "./iteration-kinds";
+import { iterationChoices, nextIterationKind } from "./iteration-kinds";
 import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot } from "./mom";
 import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
 import { DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, compareOptionLabels, fallbackPrefix, lowestFreeNumber, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
@@ -79,6 +79,20 @@ describe("phase policy (legacy parity)", () => {
     assert.deepEqual(iterationChoices({ ...base, state: "ANSWERED", iterationName: "CD Mall", kinds: ["CD Mall", "CD Final"] }), ["revision", "continue_cd_final"]);
     assert.deepEqual(iterationChoices({ ...base, state: "NOT_SENT", supervision: true }), ["next_visit", "done"]);
     assert.deepEqual(iterationChoices({ ...base, state: "DONE", phaseStatus: "DONE" }), ["add_iteration"]);
+  });
+
+  it("treats any phase with two or more iteration kinds as a two-step phase, by its own step names (audit 2026-10-12)", () => {
+    const base = { phaseStatus: "ACTIVE", state: "ANSWERED", supervision: false };
+    const custom = ["Concept Study", "Final Concept"];
+    assert.deepEqual(iterationChoices({ ...base, iterationName: "Concept Study", kinds: custom }), ["revision", "continue_cd_final"], "the first step must continue");
+    assert.deepEqual(iterationChoices({ ...base, iterationName: "Final Concept", kinds: custom }), ["revision", "done"], "the second step closes");
+    assert.equal(nextIterationKind(custom, "Concept Study"), "Final Concept", "the button names the phase's own next step, not CD Final");
+    assert.equal(nextIterationKind(custom, "Final Concept"), null);
+    assert.deepEqual(iterationChoices({ ...base, iterationName: "Option A", kinds: ["Option A"] }), ["revision", "done"], "one kind is only a name, never a step");
+    const three = ["Draft", "Review", "Issue"];
+    assert.deepEqual(iterationChoices({ ...base, iterationName: "Draft", kinds: three }), ["revision", "continue_cd_final"]);
+    assert.equal(nextIterationKind(three, "Draft"), "Review");
+    assert.deepEqual(iterationChoices({ ...base, iterationName: "Review", kinds: three }), ["revision", "done"], "only the first two kinds are steps; a third never adds a step");
   });
 
   it("numbers iterations from 1", () => {
