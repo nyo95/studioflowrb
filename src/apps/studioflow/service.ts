@@ -1,6 +1,5 @@
 import { createLibraryService } from "./library/service";
 import { createCdListService } from "./cd-list/service";
-import { createIdeaService } from "./ideas/service";
 import { createMomService } from "./mom/service";
 import { STUDIOFLOW_PERMISSIONS } from "./permissions";
 import { createPhaseService } from "./phases/service";
@@ -21,7 +20,6 @@ export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
     tasks: createTaskService(db, ports),
     mom: createMomService(db, ports),
     schedule,
-    ideas: createIdeaService(db, ports, schedule.writer, presentation),
     presentation,
     library: createLibraryService(ports),
   };

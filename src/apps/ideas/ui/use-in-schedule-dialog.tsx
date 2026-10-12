@@ -8,13 +8,14 @@ import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { Button, Dialog, Field, FormActions, InlineError, Input, Notice, RadioGroup, Select, Textarea, buttonClasses } from "@/platform/ui_engine";
 import type { ActionResult } from "@platform/core/actions";
 
-import { listIdeaCategoryChoicesAction, listIdeaTargetEntriesAction } from "./actions";
+import { listIdeaCategoryChoicesAction, listIdeaTargetEntriesAction } from "../actions";
 
 type Target = { id: string; name: string };
 
 type Entry = { id: string; section: string; category: string; code: string; productName: string | null; options: number };
 
 export type UseInScheduleInput = {
+  operationId: string;
   projectId: string;
   target: { kind: "new-item"; section: string; category: string } | { kind: "option"; entryId: string };
   option: { productName: string; notes: string };
@@ -39,6 +40,7 @@ export function UseInScheduleDialog({ initialName, initialNotes, targets, apply,
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ projectId: string; code: string; label: string } | null>(null);
+  const [operationId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     let live = true;
@@ -80,6 +82,7 @@ export function UseInScheduleDialog({ initialName, initialNotes, targets, apply,
         if (!ready) return;
         setPending(true); setError(null);
         const result = await apply({
+          operationId,
           projectId,
           target: mode === "new-item" ? { kind: "new-item", section, category } : { kind: "option", entryId },
           option: { productName, notes },

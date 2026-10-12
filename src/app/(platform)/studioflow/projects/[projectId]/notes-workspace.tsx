@@ -8,8 +8,8 @@ import { currentDateOnly, formatInstant } from "@platform/utilities/date";
 import { Badge, Button, FormattedInstant, FormattedText, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, SectionCard, Text, useConfirm } from "@/platform/ui_engine";
 
 import { phaseNoteAction, type PhaseNoteCommandInput } from "../../actions";
-import { addNoteImageToMoodboardAction, saveNoteImageToIdeasAction, applyNoteImageToScheduleAction } from "../../ideas/actions";
-import { UseInScheduleDialog } from "../../ideas/use-in-schedule-dialog";
+import { addNoteImageToMoodboardAction, saveNoteImageToIdeasAction, applyNoteImageToScheduleAction } from "@/apps/ideas/public/image-actions";
+import { UseInScheduleDialog } from "@/apps/ideas/public/use-in-schedule-dialog";
 import { NOTE_MAX, NoteComposer, uploadNoteImages, useNoteDraft, type NoteImage } from "../../_components/phase-note-composer";
 import type { IterationView } from "../../_components/phase-commands";
 import { useStudioFlowModuleEnabled } from "../../module-state";
@@ -302,7 +302,7 @@ function NoteImageActions({ image, projectId, phaseId, canUseIdeas }: { image: {
           initialName=""
           initialNotes=""
           targets={[{ id: projectId, name: "this project" }]}
-          apply={(input) => applyNoteImageToScheduleAction({ projectId, phaseId, imageId: image.id, target: input.target, option: input.option })}
+          apply={(input) => applyNoteImageToScheduleAction({ operationId: input.operationId, projectId, phaseId, imageId: image.id, target: input.target, option: input.option })}
           onClose={() => setUsing(false)}
         />
       ) : null}

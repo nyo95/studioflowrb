@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.512] Ideas module extraction parity
+- Surface: `/studioflow/ideas`, phase-note image viewer, Product Schedule, and project Presentation moodboard
+- Fixture: Designer PIC with Ideas and Schedule permissions; another user; editable, completed, and archived projects; Ideas/Presentation enabled and disabled in turn
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Create, edit, replace-image, and delete a private card; confirm another user cannot see it. 2. Use one card as a new Schedule item and as an option, then retry one submission. 3. Save a phase-note image to Ideas and place it in Schedule. 4. Add card and note images to Moodboard. 5. Delete the used Schedule option. 6. Repeat target selection against completed/archived projects and toggle Ideas/Presentation off.
+- Acceptance: URL and screen remain unchanged; cards stay private; each destination receives an independent image copy; retry creates one Schedule placement; deleted upstream rows leave no visible stale usage; completed/archived writes fail; disabled modules hide/refuse their own capability without breaking StudioFlow.
+- Status: PENDING
+
 ### [R8.376] StudioFlow Projects batch access read
 - Surface: `/studioflow/projects`
 - Fixture: an unassigned staff member with project read access; the project's designer PIC

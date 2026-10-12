@@ -1,5 +1,14 @@
 # Changelog
 
+## R8.512 | 2026-10-12 | feat(ideas): extract Ideas module (Executor)
+
+- Extracted Ideas into its own optional module, PostgreSQL schema, runtime, public boundary, server actions and UI implementation while preserving `/studioflow/ideas`, the existing permission and module switch, personal-card privacy, stored ids/timestamps/object keys, and all user-facing card, Schedule and Moodboard behavior. The old route is now only a thin module-owned entry point; StudioFlow no longer composes or persists Ideas internally.
+- Added an atomic data-preserving schema handoff for existing cards/usages and removed the cross-module Schedule foreign key. Usage references are now tolerant plain ids resolved in one StudioFlow public read; missing options disappear safely and their stale usage rows are cleaned. New image objects use `ideas/cards/*`; old keys remain valid and are never copied.
+- Added StudioFlow-owned public ports for target/access checks, phase-note image reads, live Schedule usage facts and idempotent external image placement. One operation id can create only one Schedule result; a later Ideas history-write failure cannot undo valid Schedule work and is reported with content-free audit metadata. Ideas now owns its cleanup retry ledger and `ideas.card.*` audit vocabulary.
+- Kept phase-note actions available through Ideas public doors and kept Moodboard integration behind the transitional Presentation public door. Route ownership and architecture checks now understand nested optional-module routes without permitting internal cross-module imports or database relations.
+- **Migrations/dependencies:** two forward-only migrations, no dependency. Both migrations applied incrementally to the verified disposable office test database; the complete 104-migration chain also applied from zero to a second fresh disposable database. Populated-data parity and browser journeys remain Reviewer acceptance items; the browser backlog records the Ideas route, permission, retry and module-toggle cases.
+- **Checks:** `npm test` (1,024 passed); typecheck; architecture boundaries; legacy-runtime check; eslint (0 errors, one existing Presentation `<img>` warning); production build; Prisma schema validation; staged/unstaged whitespace checks.
+
 ## R8.511 | 2026-10-12 | docs(platform): accept M2 and authorize Ideas extraction (Lead)
 
 - **Reviewer verdict: PASS.** The M2 report accounts for every live Ideas/Presentation database, service, route, media, access, audit, lifecycle and test edge and assigns each future interaction to one explicit public boundary.

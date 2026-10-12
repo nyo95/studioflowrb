@@ -14,7 +14,7 @@ import { toDecimalString } from "@platform/utilities/decimal";
  * undo/revert behavior, and operational/security logging of failed attempts.
  */
 
-export const AUDIT_APP_IDS = ["studioflow", "masterdata", "bq", "platform"] as const;
+export const AUDIT_APP_IDS = ["studioflow", "ideas", "masterdata", "bq", "platform"] as const;
 
 export type AuditAppId = (typeof AUDIT_APP_IDS)[number];
 

@@ -4,7 +4,7 @@ Plan ID: WO-MODULES-M3-IDEAS-01 (Extract Ideas Board)
 Scope: Ideas module/schema extraction with StudioFlow public Schedule and phase-image boundaries
 Module(s): ideas, studioflow, platform boundary harness
 Target revision: R8.512
-Status: READY
+Status: IMPLEMENTED — AWAITING REVIEW
 Priority: P1
 Owner: direct decision 2026-10-12; accepted M2 report R8.511
 Last updated: 2026-10-12 (Lead)

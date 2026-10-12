@@ -62,6 +62,7 @@ export const APP_DUPLICATE_PRIMITIVE_ALLOW_LIST = [
  * `settings/general/masterdata` (KB-037).
  */
 export const PLATFORM_ROUTE_OWNERS = [
+  { path: "studioflow/ideas", app: "ideas" },
   { path: "settings/general/masterdata", app: "masterdata" },
 ];
 
@@ -239,7 +240,6 @@ export function routeLaneApp(filePath, projectRoot, apps, routeOwners = PLATFORM
   const rel = relative(routePlatformRoot, filePath);
   if (rel.startsWith("..") || isAbsolute(rel)) return null;
   const segments = rel.split(sep);
-  if (apps.includes(segments[0])) return segments[0];
   // Longest owned prefix wins, so a nested app-owned route group (e.g. a
   // masterdata admin UI under settings/) is attributed to its app even though it
   // does not sit under that app's own `/<app>` root.
@@ -247,6 +247,7 @@ export function routeLaneApp(filePath, projectRoot, apps, routeOwners = PLATFORM
     const owner = routeOwners.find((candidate) => candidate.path === segments.slice(0, depth).join("/"));
     if (owner) return owner.app;
   }
+  if (apps.includes(segments[0])) return segments[0];
   return null;
 }
 
@@ -490,7 +491,15 @@ export async function collectModuleBoundaryViolations({ projectRoot = process.cw
   const violations = [];
 
   for (const app of apps) {
-    const declared = new Set(registrationRequires(registrations, app));
+    let declaredRequires = registrationRequires(registrations, app);
+    try {
+      const manifest = await readFile(join(appsRoot, app, "public", "manifest.ts"), "utf8");
+      const match = /\brequires\s*:\s*(?:Object\.freeze\()?\[([\s\S]*?)\]/.exec(manifest);
+      if (match) declaredRequires = [...match[1].matchAll(/["']([^"']+)["']/g)].map((entry) => entry[1]);
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+    const declared = new Set(declaredRequires);
     const observed = new Map();
     for (const file of await walkSources(join(appsRoot, app))) {
       if (/\.(test|spec)\.[jt]sx?$/.test(file)) continue;
@@ -821,7 +830,14 @@ export async function collectRouteOwnershipViolations({ projectRoot = process.cw
     for (const app of apps) {
       const block = findRegistrationBlock(registrationsSource, app);
       if (!block) {
-        push(RULE_ROUTE_OWNERSHIP, registrationsPath, `appId:"${app}"`, `App "${app}" has no entry in the composition root (${relative(projectRoot, registrationsPath)}). Every app must be registered with launcher metadata.`);
+        let manifest = null;
+        try { manifest = await readFile(join(srcDir, "apps", app, "public", "manifest.ts"), "utf8"); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+        const optional = manifest && new RegExp(`\\bid\\s*:\\s*"${app}"`).test(manifest) && /\bkind\s*:\s*"optional"/.test(manifest);
+        if (!optional) {
+          push(RULE_ROUTE_OWNERSHIP, registrationsPath, `appId:"${app}"`, `App "${app}" has no core registration or optional-module manifest.`);
+          continue;
+        }
+        registered.add(app);
         continue;
       }
       registered.add(app);
@@ -855,11 +871,17 @@ export async function collectRouteOwnershipViolations({ projectRoot = process.cw
       continue;
     }
     const routes = extractRouteConstantValues(navSource);
-    if (!routes.includes(`/${app}`)) {
-      push(RULE_ROUTE_OWNERSHIP, navPath, null, `App "${app}" navigation must declare its root route "/${app}".`);
+    let expectedRoot = `/${app}`;
+    try {
+      const manifest = await readFile(join(srcDir, "apps", app, "public", "manifest.ts"), "utf8");
+      const parent = /\bparent\s*:\s*"([^"]+)"/.exec(manifest)?.[1];
+      if (parent) expectedRoot = `/${parent}/${app}`;
+    } catch (error) { if (error?.code !== "ENOENT") throw error; }
+    if (!routes.includes(expectedRoot)) {
+      push(RULE_ROUTE_OWNERSHIP, navPath, null, `App "${app}" navigation must declare its root route "${expectedRoot}".`);
     }
-    for (const route of routes.filter((r) => r.startsWith("/") && !r.startsWith(`/${app}`))) {
-      push(RULE_ROUTE_OWNERSHIP, navPath, route, `App "${app}" navigation route "${route}" is not under its owned root "/${app}".`);
+    for (const route of routes.filter((r) => r.startsWith("/") && !r.startsWith(expectedRoot))) {
+      push(RULE_ROUTE_OWNERSHIP, navPath, route, `App "${app}" navigation route "${route}" is not under its owned root "${expectedRoot}".`);
     }
     for (const specifier of extractImportSpecifiers(navSource, navPath)) {
       const targetPath = resolveSpecifier(specifier, navPath, aliasMap, projectRoot);
@@ -870,7 +892,13 @@ export async function collectRouteOwnershipViolations({ projectRoot = process.cw
   }
 
   for (const app of registered) {
-    const routeDir = join(srcDir, "app", "(platform)", app);
+    let routeSegments = [app];
+    try {
+      const manifest = await readFile(join(srcDir, "apps", app, "public", "manifest.ts"), "utf8");
+      const parent = /\bparent\s*:\s*"([^"]+)"/.exec(manifest)?.[1];
+      if (parent) routeSegments = [parent, app];
+    } catch (error) { if (error?.code !== "ENOENT") throw error; }
+    const routeDir = join(srcDir, "app", "(platform)", ...routeSegments);
     try {
       const info = await stat(routeDir);
       if (!info.isDirectory()) {
@@ -1335,6 +1363,9 @@ export async function collectServerClientCallViolations({ projectRoot = process.
  * this list (split it per app instead), and an entry whose migration no longer spans two schemas fails as stale.
  */
 export const MIGRATION_ISOLATION_ALLOW_LIST = [
+  // Owner-approved M3 atomic ownership handoff: only the two Ideas tables move
+  // from StudioFlow to Ideas and the Schedule FK is removed (R8.511).
+  "20261012182000_ideas_extract",
   // Owner-approved, migration-time-only Master Data vocabulary normalization.
   // It is intentionally the sole cross-app write exception in WO-MD-PROGRAM-01.
   "20261001100000_masterdata_lowercase_unit_codes",

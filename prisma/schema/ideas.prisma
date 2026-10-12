@@ -1,0 +1,49 @@
+/// A personal Ideas card. Platform user identity is a plain id, not a cross-module relation.
+model SfIdeaCard {
+  id            String   @id @default(uuid())
+  owner_user_id String
+  title         String?
+  source_url    String?
+  note          String?
+  image_key     String   @unique
+  content_type  String
+  bytes         Int
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  usages SfIdeaUsage[]
+
+  @@index([owner_user_id, created_at])
+  @@map("sf_idea_card")
+  @@schema("ideas")
+}
+
+/// Live Schedule option reference. Missing options are hidden and cleaned through StudioFlow's public read.
+model SfIdeaUsage {
+  id         String   @id @default(uuid())
+  card_id    String
+  option_id  String
+  created_at DateTime @default(now())
+
+  card SfIdeaCard @relation(fields: [card_id], references: [id], onDelete: Cascade)
+
+  @@unique([card_id, option_id])
+  @@index([card_id, created_at])
+  @@index([option_id])
+  @@map("sf_idea_usage")
+  @@schema("ideas")
+}
+
+/// Durable retry ledger for card objects whose owning row was already replaced or deleted.
+model IdeaAssetCleanupFailure {
+  id              String    @id @default(uuid())
+  storage_key     String    @unique
+  attempts        Int       @default(0)
+  first_failed_at DateTime  @default(now())
+  last_attempt_at DateTime  @default(now())
+  resolved_at     DateTime?
+
+  @@index([resolved_at, first_failed_at])
+  @@map("asset_cleanup_failure")
+  @@schema("ideas")
+}

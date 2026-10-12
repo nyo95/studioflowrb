@@ -5,12 +5,12 @@ import { closePrismaConnection } from "@platform/core/db";
 import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePlatformTables, type TestDb } from "@platform/core/db/test-support";
 import { initializeModuleRegistry, resetModuleRegistryForTests, type ModuleManifest } from "@platform/core/modules";
 
-import PresentationPrintPage from "../../(document)/studioflow/print/projects/[projectId]/presentation/[boardId]/page";
-import { createPresentationBoardAction } from "./actions";
-import { listIdeaCardsAction } from "./ideas/actions";
-import IdeasPage from "./ideas/page";
-import PresentationPage from "./projects/[projectId]/presentation/page";
-import PresentationBoardPage from "./projects/[projectId]/presentation/[boardId]/page";
+import PresentationPrintPage from "./(document)/studioflow/print/projects/[projectId]/presentation/[boardId]/page";
+import { createPresentationBoardAction } from "./(platform)/studioflow/actions";
+import { listIdeaCardsAction } from "@/apps/ideas/public/actions";
+import IdeasPage from "./(platform)/studioflow/ideas/page";
+import PresentationPage from "./(platform)/studioflow/projects/[projectId]/presentation/page";
+import PresentationBoardPage from "./(platform)/studioflow/projects/[projectId]/presentation/[boardId]/page";
 
 const MANIFESTS: readonly ModuleManifest[] = [
   { id: "masterdata", name: "Master Data", version: "1.0.0", kind: "core", requires: [] },

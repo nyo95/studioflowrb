@@ -2,7 +2,8 @@ import type { AppPermissionRegistrationInput } from "@platform/core/rbac/registr
 import type { ModuleManifest } from "@platform/core/modules/manifest";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 import { BQ_PERMISSIONS } from "@/apps/bq/public";
-import { IDEAS_MODULE_MANIFEST, PRESENTATION_MODULE_MANIFEST, STUDIOFLOW_PERMISSIONS, STUDIOFLOW_POSITIONS } from "@/apps/studioflow/public";
+import { IDEAS_MODULE_MANIFEST } from "@/apps/ideas/public";
+import { PRESENTATION_MODULE_MANIFEST, STUDIOFLOW_PERMISSIONS, STUDIOFLOW_POSITIONS } from "@/apps/studioflow/public";
 
 /**
  * App registrations for the platform permission registry and app launcher

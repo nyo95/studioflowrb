@@ -10,7 +10,7 @@ import type { ActionResult } from "@platform/core/actions";
 type Target = { id: string; name: string };
 export type MoodboardResult = ActionResult<{ boardId: string; slideId: string; created: boolean }>;
 
-/** "Add to moodboard": pick the project, and a copy of the image becomes the last slide of its Moodboard board. */
+/** Ideas-owned moodboard picker: a copy of the image becomes the last slide of the selected project's board. */
 export function MoodboardDialog({ targets, apply, onClose }: { targets: Target[]; apply: (projectId: string) => Promise<MoodboardResult>; onClose: () => void }) {
   const [projectId, setProjectId] = useState(targets.length === 1 ? targets[0].id : "");
   const [pending, setPending] = useState(false);

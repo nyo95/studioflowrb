@@ -62,7 +62,7 @@ function recordingWriter() {
 
 describe("audit envelope validation", () => {
   it("accepts only the locked app identifiers", () => {
-    assert.deepEqual([...AUDIT_APP_IDS], ["studioflow", "masterdata", "bq", "platform"]);
+    assert.deepEqual([...AUDIT_APP_IDS], ["studioflow", "ideas", "masterdata", "bq", "platform"]);
     for (const appId of AUDIT_APP_IDS) {
       assert.doesNotThrow(() => validateAuditEventInput({ ...baseInput(), appId }));
     }

@@ -10,7 +10,7 @@ import { Badge, Button, Dialog, EmptyState, Field, FormActions, ImageGallery, In
 
 import { MoodboardDialog } from "./moodboard-dialog";
 import { UseInScheduleDialog } from "./use-in-schedule-dialog";
-import { addIdeaToMoodboardAction, createIdeaCardAction, ideaCardAction, replaceIdeaImageAction, applyIdeaToScheduleAction, type IdeaCardView } from "./actions";
+import { addIdeaToMoodboardAction, createIdeaCardAction, ideaCardAction, replaceIdeaImageAction, applyIdeaToScheduleAction, type IdeaCardView } from "../actions";
 
 /** Mirrors the server limits (WO-SF-IDEAS-01); the server stays the authority. */
 const IMAGE_BYTES = 3 * 1024 * 1024;
