@@ -275,6 +275,28 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   round notes and pinned notes were converted in R8.446 (round notes →
   client-feedback messages on their round, a visit's note → an unmarked
   message, pinned note → a starred message).
+- **Project Workspace** (`SfWorkspaceSection` + `SfWorkspaceCard` +
+  `SfWorkspaceCardImage`, WO-SF-WORKSPACE-01, owner 2026-10-12, R8.519): the
+  phase notes above now live as **cards** in **one Workspace per project**,
+  arranged in ordered, freely named **sections** (a project's first card
+  creates a "Notes" section; R8.519 moved every existing note, with its id,
+  text, images, author, time, pin and labels, into one "Notes" section per
+  project, oldest first). A card's **phase and round are labels** — where it
+  came from, never where it lives; the phase page shows the cards labelled
+  with that phase, and a label can be changed or cleared (clearing or changing
+  the phase also clears the round). A card's origin is `NOTE`,
+  `CLIENT_ANSWER` (what the client said; switchable with `NOTE` by hand) or
+  `SITE_VISIT` (written by a supervision visit). "Client answered" and a
+  visit's note create their card in the project's first section in the same
+  transaction as the phase step. Writes on a phase-labelled card follow that
+  phase's rule (`phaseWork` + `transition` access); unlabelled cards and
+  sections need `phaseWork` + `document` access; all need an open, active
+  project. Every card and section change names the `version` it read; a
+  mismatch is refused (`WORKSPACE_CARD_STALE` / `WORKSPACE_SECTION_STALE`). A
+  section is deleted only when empty. Audit: `studioflow.workspace-card.*`
+  and `studioflow.workspace-section.*` without card text. The final Workspace
+  screen is the Lead's next revision; R8.519 ships a plain functional
+  `/studioflow/projects/[projectId]/workspace` tab.
 - **Requirements** (§6.2): the standard checklist.
 
 `sf_activity` (legacy feedback rows) is closed history: no command writes it.

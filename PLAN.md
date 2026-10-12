@@ -4,7 +4,7 @@ Plan ID: WO-SF-WORKSPACE-01 (Workspace backend: one project Workspace of section
 Scope: StudioFlow phase Notes evolve into one Workspace per project with ordered sections and cards; phase and round are labels on a card; backend plus minimal functional UI wiring
 Module(s): studioflow (core; Workspace is not an optional module), ideas (caller update through the StudioFlow public bridge only)
 Target revision: R8.519
-Status: READY
+Status: IMPLEMENTED (R8.519, by the Lead on owner instruction) — AWAITING ACCEPTANCE
 Priority: P1
 Owner: owner Workspace plan 2026-10-12 (sequence: Executor backend first, Lead UI next); owner decisions 2026-10-12 recorded in R8.518; Presentation extraction accepted in R8.517
 Last updated: 2026-10-12 (Lead, R8.518)

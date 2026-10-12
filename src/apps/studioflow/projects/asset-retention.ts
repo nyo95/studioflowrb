@@ -45,7 +45,7 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
         if (claim.count === 0) return null;
         const [deliverables, iterationImages, images, options, revisions] = await Promise.all([
           tx.sfDeliverable.findMany({ where: { project_id: project.id }, select: { storage_key: true } }),
-          tx.sfPhaseNoteImage.findMany({ where: { note: { phase: { project_id: project.id } } }, select: { storage_key: true } }),
+          tx.sfWorkspaceCardImage.findMany({ where: { card: { project_id: project.id } }, select: { storage_key: true } }),
           tx.sfMomImage.findMany({ where: { item: { document: { project_id: project.id } } }, select: { storage_key: true } }),
           tx.sfScheduleOption.findMany({ where: { entry: { project_id: project.id }, image_key: { not: null } }, select: { image_key: true } }),
           tx.sfMomRevision.findMany({ where: { document: { project_id: project.id } }, select: { id: true, snapshot: true } }),
@@ -72,7 +72,7 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
           } });
         }
         await tx.sfDeliverable.deleteMany({ where: { project_id: project.id } });
-        await tx.sfPhaseNoteImage.deleteMany({ where: { note: { phase: { project_id: project.id } } } });
+        await tx.sfWorkspaceCardImage.deleteMany({ where: { card: { project_id: project.id } } });
         await tx.sfMomImage.deleteMany({ where: { item: { document: { project_id: project.id } } } });
         await tx.sfScheduleOption.updateMany({ where: { entry: { project_id: project.id }, image_key: { not: null } }, data: { image_key: null } });
         const counts = { deliverables: deliverables.length, iterationImages: iterationImages.length, momImages: images.length, momSnapshotImages, optionPhotos: options.length, unparseableRevisions };

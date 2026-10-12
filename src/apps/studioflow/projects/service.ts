@@ -737,7 +737,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           phases: { orderBy: { order_index: "asc" }, include: {
             definition: { select: { default_iteration_kinds: true } },
             revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true } },
-            _count: { select: { notes: { where: { is_starred: true } } } },
+            _count: { select: { workspace_cards: { where: { is_pinned: true } } } },
             events: { where: { to_state: "DONE", undone_at: null }, orderBy: { occurred_at: "desc" }, take: 1, select: { auto_created: true } },
           } },
         },
@@ -755,7 +755,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           return {
             id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,
             current_iteration: current ? { id: current.id, name: current.name, short_name: iterationShortName(current.name, phase.prefix_snapshot, current, kinds.includes(current.name)), state: current.status, sent_at: current.sent_at, waiting_days: current.status === "SENT" ? waitingDays(current.sent_at, now) : null, available_choices: choices, answer_choices: iterationChoices({ state: "ANSWERED", phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision }) } : null,
-            iteration_count: phase.revisions.length, starred_notes: phase._count.notes,
+            iteration_count: phase.revisions.length, starred_notes: phase._count.workspace_cards,
             skipped_reason: phaseSkipReason(phase.events[0]),
             can_add_round: choices.includes("add_iteration"),
             is_supervision: isSupervision,
@@ -774,7 +774,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           all_phases_done: allPhasesDone,
           dependents_review_suggested: earliestActive !== undefined && project.phases.some((phase) => phase.order_index > earliestActive && phase.status === "DONE" && !phase.allow_parallel),
           can_mark_completed: project.status !== "COMPLETED" && Boolean(input.actorId && (project.pic_designer_id === input.actorId || project.pic_drafter_id === input.actorId || hasPermission(input.grants, P.projectOverride))),
-          note_phases: project.phases.filter((phase) => phase._count.notes > 0).map((phase) => phase.id),
+          note_phases: project.phases.filter((phase) => phase._count.workspace_cards > 0).map((phase) => phase.id),
           last_update_at: [project.updated_at, ...project.phases.map((phase) => phase.updated_at)].reduce((latest, value) => latest > value ? latest : value),
           phases,
         };

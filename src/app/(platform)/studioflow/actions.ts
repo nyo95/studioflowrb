@@ -398,6 +398,50 @@ export async function phaseNoteAction(input: PhaseNoteCommandInput): Promise<Act
   });
 }
 
+// ── Project Workspace (WO-SF-WORKSPACE-01) ─────────────────────────────────
+// Minimal transport for the Workspace backend; every write that changes a card or section names the version it read.
+
+const Version = z.number().int().min(1);
+const WorkspaceCommand = z.discriminatedUnion("command", [
+  z.strictObject({ command: z.literal("createSection"), projectId: Id, title: z.string().max(200) }),
+  z.strictObject({ command: z.literal("renameSection"), projectId: Id, sectionId: Id, title: z.string().max(200), version: Version }),
+  z.strictObject({ command: z.literal("deleteSection"), projectId: Id, sectionId: Id, version: Version }),
+  z.strictObject({ command: z.literal("reorderSections"), projectId: Id, orderedIds: z.array(Id).min(1).max(200) }),
+  z.strictObject({ command: z.literal("createCard"), projectId: Id, sectionId: Id.optional(), phaseId: Id.nullable().optional(), body: NoteBody }),
+  z.strictObject({ command: z.literal("updateCard"), projectId: Id, cardId: Id, body: NoteBody, version: Version }),
+  z.strictObject({ command: z.literal("pinCard"), projectId: Id, cardId: Id, pinned: z.boolean(), version: Version }),
+  z.strictObject({ command: z.literal("setCardPhase"), projectId: Id, cardId: Id, phaseId: Id.nullable(), version: Version }),
+  z.strictObject({ command: z.literal("moveCard"), projectId: Id, cardId: Id, sectionId: Id, position: z.number().int().min(0).max(10_000), version: Version }),
+  z.strictObject({ command: z.literal("reorderCards"), projectId: Id, sectionId: Id, orderedIds: z.array(Id).min(1).max(2000) }),
+  z.strictObject({ command: z.literal("deleteCard"), projectId: Id, cardId: Id, version: Version }),
+]);
+export type WorkspaceCommandInput = z.infer<typeof WorkspaceCommand>;
+
+export async function workspaceAction(input: WorkspaceCommandInput): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(WorkspaceCommand, input);
+    const base = { ...ctx, projectId: data.projectId };
+    const workspace = studioFlow.workspace;
+    let result: unknown;
+    switch (data.command) {
+      case "createSection": result = await workspace.createWorkspaceSection({ ...base, title: data.title }); break;
+      case "renameSection": result = await workspace.renameWorkspaceSection({ ...base, sectionId: data.sectionId, title: data.title, version: data.version }); break;
+      case "deleteSection": result = await workspace.deleteWorkspaceSection({ ...base, sectionId: data.sectionId, version: data.version }); break;
+      case "reorderSections": result = await workspace.reorderWorkspaceSections({ ...base, orderedIds: data.orderedIds }); break;
+      case "createCard": result = await workspace.createWorkspaceCard({ ...base, sectionId: data.sectionId, phaseId: data.phaseId ?? null, body: data.body }); break;
+      case "updateCard": result = await workspace.updateWorkspaceCardText({ ...base, cardId: data.cardId, body: data.body, version: data.version }); break;
+      case "pinCard": result = await workspace.setWorkspaceCardFlags({ ...base, cardId: data.cardId, pinned: data.pinned, version: data.version }); break;
+      case "setCardPhase": result = await workspace.setWorkspaceCardPhase({ ...base, cardId: data.cardId, phaseId: data.phaseId, version: data.version }); break;
+      case "moveCard": result = await workspace.moveWorkspaceCard({ ...base, cardId: data.cardId, sectionId: data.sectionId, position: data.position, version: data.version }); break;
+      case "reorderCards": result = await workspace.reorderWorkspaceCards({ ...base, sectionId: data.sectionId, orderedIds: data.orderedIds }); break;
+      case "deleteCard": result = await workspace.deleteWorkspaceCard({ ...base, cardId: data.cardId, version: data.version }); break;
+    }
+    refresh(data.projectId);
+    return result;
+  });
+}
+
 const NoteImageForm = z.strictObject({ projectId: Id, phaseId: Id, noteId: Id });
 export async function addPhaseNoteImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
   return runSafeAction(async () => {

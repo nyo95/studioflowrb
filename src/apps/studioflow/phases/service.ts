@@ -45,7 +45,7 @@ import {
 import { readBlockerCounts, readBlockerCountsBatch, readBlockerItems } from "./blocker-query";
 import { assertProjectCompletionReady, readProjectCompletionReadiness } from "../projects/completion";
 import { createDeliverableService } from "./deliverables";
-import { createPhaseNoteService, insertPhaseNote, PHASE_NOTE_MAX } from "./notes";
+import { createWorkspaceService, insertWorkspaceCard, PHASE_NOTE_MAX } from "../workspace/service";
 import { createPhaseTemplateService } from "./templates";
 
 type PhaseRow = Awaited<ReturnType<TxClient["sfPhase"]["findUniqueOrThrow"]>>;
@@ -72,7 +72,7 @@ function resolvePhaseName(phase: { name_snapshot: string }): string {
 export function createPhaseService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction } = ports;
   const { referenceRevisionId, computeDeliverableStatus, ...deliverables } = createDeliverableService(db, ports, activeRevision);
-  const { readPhaseNotes, ...notes } = createPhaseNoteService(db, ports);
+  const { readPhaseNotes, phaseNotes: notes } = createWorkspaceService(db, ports);
 
   async function loadPhase(tx: TxClient, projectId: string, phaseId: string, access?: CommandContext): Promise<{ phase: PhaseRow; project: ProjectRow }> {
     const phase = await tx.sfPhase.findUnique({ where: { id: phaseId }, include: { project: true } });
@@ -125,7 +125,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           const [files, activities, noteCount] = await Promise.all([
             tx.sfDeliverable.count({ where: { revision_id: current.id } }),
             tx.sfActivity.count({ where: { revision_id: current.id } }),
-            tx.sfPhaseNote.count({ where: { iteration_id: current.id } }),
+            tx.sfWorkspaceCard.count({ where: { iteration_id: current.id } }),
           ]);
           // Only an iteration with nothing attached may be deleted; anything else is kept as closed history.
           const emptyNeverSent = current.status === "NOT_SENT" && files === 0 && activities === 0 && noteCount === 0;
@@ -335,7 +335,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           await recordEvent(tx, input, phase, iteration.id, "SENT", "ANSWERED", { beforeIteration: iterationUndo(iteration) });
           await audit(tx, input.actor, "client-answer-recorded", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id, notes: note !== null });
         }
-        const posted = note ? await insertPhaseNote(tx, { phaseId: phase.id, iterationId: iteration.id, body: note, clientFeedback: true, actor: input.actor, at: nowOf(ports) }) : null;
+        const posted = note ? await insertWorkspaceCard(tx, { projectId: phase.project_id, phaseId: phase.id, iterationId: iteration.id, body: note, origin: "CLIENT_ANSWER", actor: input.actor, at: nowOf(ports) }) : null;
         return { iterationId: iteration.id, noteId: posted?.id ?? null };
       });
     },
@@ -382,10 +382,10 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         await tx.sfRevision.update({ where: { id: iteration.id }, data: { name } }); await recordEvent(tx, input, phase, iteration.id, iteration.name, name, { beforeIteration: iterationUndo(iteration) }); await audit(tx, input.actor, "iteration-renamed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async deleteNeverSentIteration(input: PhaseCommandInput & { iterationId: string }) {
-      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id }, include: { _count: { select: { activities: true, deliverables: true, notes: true } } } }); if (!iteration) throw iterationNotFound(); if (iteration.status !== "NOT_SENT") throw invalidState("Only an iteration that was never sent can be deleted.");
+      return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id }, include: { _count: { select: { activities: true, deliverables: true, workspace_cards: true } } } }); if (!iteration) throw iterationNotFound(); if (iteration.status !== "NOT_SENT") throw invalidState("Only an iteration that was never sent can be deleted.");
       // Deleting the iteration would cascade-delete its activities and detach its files (SetNull), and undo only recreates
       // the iteration row — so an iteration with persisted work is never deleted.
-      if (iteration._count.activities + iteration._count.deliverables + iteration._count.notes > 0) throw conflict("ITERATION_HAS_ATTACHED_WORK", "This iteration has files or notes attached. Remove them first, then delete the iteration."); const snapshot = { iteration: iterationUndo(iteration) }; await tx.sfRevision.delete({ where: { id: iteration.id } }); await recordEvent(tx, input, phase, null, "NOT_SENT", "DELETED", { deletedIteration: snapshot }); await audit(tx, input.actor, "iteration-deleted", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
+      if (iteration._count.activities + iteration._count.deliverables + iteration._count.workspace_cards > 0) throw conflict("ITERATION_HAS_ATTACHED_WORK", "This iteration has files or notes attached. Remove them first, then delete the iteration."); const snapshot = { iteration: iterationUndo(iteration) }; await tx.sfRevision.delete({ where: { id: iteration.id } }); await recordEvent(tx, input, phase, null, "NOT_SENT", "DELETED", { deletedIteration: snapshot }); await audit(tx, input.actor, "iteration-deleted", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
     async dismissRequirement(input: PhaseCommandInput & { itemId: string }) {
       return runTransaction(async (tx) => { const { phase } = await writableIteration(tx, input); const item = await tx.sfChecklistItem.findFirst({ where: { id: input.itemId, phase_id: phase.id } }); if (!item) throw notFound("requirement"); if (item.dismissed_at) return { itemId: item.id }; await tx.sfChecklistItem.update({ where: { id: item.id }, data: { dismissed_at: nowOf(ports) } }); await recordEvent(tx, input, phase, null, "VISIBLE", "DISMISSED", { requirementId: item.id, dismissedAtBefore: null }); await audit(tx, input.actor, "requirement-dismissed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { requirementId: item.id }); return { itemId: item.id }; });
@@ -401,7 +401,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           const [files, activities, noteCount] = await Promise.all([
             tx.sfDeliverable.count({ where: { revision_id: current.id } }),
             tx.sfActivity.count({ where: { revision_id: current.id } }),
-            tx.sfPhaseNote.count({ where: { iteration_id: current.id } }),
+            tx.sfWorkspaceCard.count({ where: { iteration_id: current.id } }),
           ]);
           const emptyAutoStart = current.status === "NOT_SENT" && current.visit_date === null && files === 0 && activities === 0 && noteCount === 0;
           if (!emptyAutoStart) throw invalidState("Finish the current visit before adding another.");
@@ -410,7 +410,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const visitNote = input.note ? requiredText(input.note, "VISIT_NOTE_REQUIRED", "Visit note", 2000) : null;
         const visit = await createIteration(tx, phase, undefined, { date: dateOnlyToDate(input.visitDate) });
         // What was seen on site goes to the phase notes, labelled with this visit.
-        if (visitNote) await insertPhaseNote(tx, { phaseId: phase.id, iterationId: visit.id, body: visitNote, clientFeedback: false, actor: input.actor, at: nowOf(ports) });
+        if (visitNote) await insertWorkspaceCard(tx, { projectId: phase.project_id, phaseId: phase.id, iterationId: visit.id, body: visitNote, origin: "SITE_VISIT", actor: input.actor, at: nowOf(ports) });
         if (phase.status === "PENDING") await setPhase(tx, phase, { status: "ACTIVE", is_locked: false });
         await recordEvent(tx, input, phase, null, null, "NOT_SENT", { createdIteration: iterationUndo(visit), phaseBefore: phase.status });
         await audit(tx, input.actor, "visit-created", phase, phase.status as PhaseStatus, "ACTIVE", { iterationId: visit.id });
@@ -437,8 +437,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const p = (event.auto_created ?? {}) as { beforeIteration?: ReturnType<typeof iterationUndo>; createdIteration?: ReturnType<typeof iterationUndo>; deletedIteration?: { iteration: ReturnType<typeof iterationUndo> }; autoAdvance?: { phaseId: string; iterationId: string } | null; phaseBefore?: string; requirementId?: string; dismissedAtBefore?: string | null };
         for (const created of [p.createdIteration, p.autoAdvance ? { id: p.autoAdvance.iterationId } : undefined]) {
           if (!created) continue;
-          const attached = await tx.sfRevision.findUnique({ where: { id: created.id }, select: { _count: { select: { activities: true, deliverables: true, notes: true } } } });
-          if (attached && attached._count.activities + attached._count.deliverables + attached._count.notes > 0) throw conflict("UNDO_HAS_NEWER_DATA", "This change now has attached work and cannot be undone.");
+          const attached = await tx.sfRevision.findUnique({ where: { id: created.id }, select: { _count: { select: { activities: true, deliverables: true, workspace_cards: true } } } });
+          if (attached && attached._count.activities + attached._count.deliverables + attached._count.workspace_cards > 0) throw conflict("UNDO_HAS_NEWER_DATA", "This change now has attached work and cannot be undone.");
         }
         if (p.autoAdvance) { await tx.sfRevision.delete({ where: { id: p.autoAdvance.iterationId } }); await tx.sfPhase.update({ where: { id: p.autoAdvance.phaseId }, data: { status: "PENDING", is_locked: false } }); }
         if (p.createdIteration) await tx.sfRevision.delete({ where: { id: p.createdIteration.id } });

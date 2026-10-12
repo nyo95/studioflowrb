@@ -7,6 +7,7 @@ import { createProjectService } from "./projects/service";
 import { createScheduleService } from "./schedule/service";
 import type { Db, StudioFlowPorts } from "./shared";
 import { createTaskService } from "./tasks/service";
+import { createWorkspaceService } from "./workspace/service";
 
 /** Composed StudioFlow application service (one module per capability). */
 export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
@@ -15,6 +16,7 @@ export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
     projects: createProjectService(db, ports),
     cdList: createCdListService(db, ports),
     phases: createPhaseService(db, ports),
+    workspace: createWorkspaceService(db, ports).workspace,
     tasks: createTaskService(db, ports),
     mom: createMomService(db, ports),
     schedule,

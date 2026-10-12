@@ -85,15 +85,16 @@ export function createStudioFlowIdeasBridge(db: PrismaClient, ports: StudioFlowP
       }));
     },
 
-    async readPhaseNoteImageSource(input: CommandContext & { projectId: string; phaseId: string; imageId: string }) {
+    /** An image on a Workspace card of the project (the phase, when given, must be the card's phase label). */
+    async readWorkspaceImageSource(input: CommandContext & { projectId: string; phaseId?: string | null; imageId: string }) {
       requireCommand(input, P.ideasManage);
       requirePermission(input.grants, P.projectRead);
-      const image = await db.sfPhaseNoteImage.findFirst({
-        where: { id: input.imageId, note: { phase_id: input.phaseId, phase: { project_id: input.projectId } } },
-        select: { id: true, storage_key: true, content_type: true, bytes: true, note: { select: { phase: { select: { project: { select: { name: true } } } } } } },
+      const image = await db.sfWorkspaceCardImage.findFirst({
+        where: { id: input.imageId, card: { project_id: input.projectId, ...(input.phaseId ? { phase_id: input.phaseId } : {}) } },
+        select: { id: true, storage_key: true, content_type: true, bytes: true, card: { select: { project: { select: { name: true } } } } },
       });
       if (!image) throw invalid("NOTE_IMAGE_NOT_FOUND", "This note image no longer exists.");
-      return { id: image.id, key: image.storage_key, contentType: image.content_type, bytes: image.bytes, projectName: image.note.phase.project.name };
+      return { id: image.id, key: image.storage_key, contentType: image.content_type, bytes: image.bytes, projectName: image.card.project.name };
     },
 
     async placeExternalImageInSchedule(input: CommandContext & {

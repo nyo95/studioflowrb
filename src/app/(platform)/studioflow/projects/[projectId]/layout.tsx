@@ -20,6 +20,7 @@ export const dynamic = "force-dynamic";
 function navigation(projectId: string, presentationEnabled: boolean, counts?: { mom: number; schedule: number; presentation: number }): ProjectNavItem[] {
   return [
     { href: STUDIOFLOW_ROUTES.project(projectId), label: "Phases", exact: true, detail: null },
+    { href: STUDIOFLOW_ROUTES.projectWorkspace(projectId), label: "Workspace", detail: null },
     { href: STUDIOFLOW_ROUTES.projectMom(projectId), label: "MOM", detail: counts?.mom ? String(counts.mom) : null },
     { href: STUDIOFLOW_ROUTES.projectSchedule(projectId), label: "Schedule", detail: counts?.schedule ? String(counts.schedule) : null },
     ...(presentationEnabled ? [{ href: PRESENTATION_ROUTES.project(projectId), label: "Presentation", detail: counts?.presentation ? String(counts.presentation) : null }] : []),

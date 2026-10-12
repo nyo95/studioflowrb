@@ -150,6 +150,8 @@ model SfProject {
   deliverables     SfDeliverable[]
   phase_events     SfPhaseEvent[]
   external_schedule_placements SfExternalSchedulePlacement[]
+  workspace_sections SfWorkspaceSection[]
+  workspace_cards    SfWorkspaceCard[]
 
   @@index([status, archived_at])
   @@index([pic_designer_id])
@@ -191,7 +193,7 @@ model SfPhase {
   deliverables    SfDeliverable[]
   cd_items        SfCdItem[]
   events          SfPhaseEvent[]
-  notes           SfPhaseNote[]
+  workspace_cards SfWorkspaceCard[]
 
   @@unique([project_id, order_index])
   @@map("sf_phase")
@@ -229,7 +231,7 @@ model SfRevision {
   activities   SfActivity[]
   deliverables SfDeliverable[]
   events       SfPhaseEvent[]
-  notes        SfPhaseNote[]
+  workspace_cards SfWorkspaceCard[]
 
   @@unique([phase_id, major])
   @@index([phase_id, status])
@@ -237,37 +239,80 @@ model SfRevision {
   @@schema("studioflow")
 }
 
-/// One message in a phase's notes (owner, 2026-10-08: notes work like a chat to yourself). The iteration running when
-/// it was written labels it; starred messages are the phase's pinned notes (WO-SF-NOTEFEED-01).
-model SfPhaseNote {
-  id                 String    @id @default(uuid())
-  phase_id           String
-  /// Kept as a label only: hard-resetting a phase's iterations leaves its messages unlabelled, never deleted.
-  iteration_id       String?
-  /// The rich-text dialect `FormattedText` shows. Empty when the message is only images.
-  body               String    @default("")
-  is_starred         Boolean   @default(false)
-  is_client_feedback Boolean   @default(false)
-  author_id          String?
-  /// Snapshot, so the name survives the person being renamed or removed. Null on notes converted from the old fields.
-  author_name        String?
-  created_at         DateTime  @default(now())
-  edited_at          DateTime?
+/// Where a Workspace card came from. CLIENT_ANSWER is what the client said ("Client answered"); SITE_VISIT is what was
+/// seen on a supervision visit; NOTE is everything else. A person may switch NOTE and CLIENT_ANSWER by hand.
+enum SfWorkspaceCardOrigin {
+  NOTE
+  CLIENT_ANSWER
+  SITE_VISIT
 
-  phase     SfPhase            @relation(fields: [phase_id], references: [id], onDelete: Cascade)
-  iteration SfRevision?        @relation(fields: [iteration_id], references: [id], onDelete: SetNull)
-  images    SfPhaseNoteImage[]
-
-  @@index([phase_id, created_at])
-  @@index([iteration_id])
-  @@map("sf_phase_note")
+  @@map("sf_workspace_card_origin")
   @@schema("studioflow")
 }
 
-/// Screenshots and photos sent with one note message.
-model SfPhaseNoteImage {
+/// A free topic in a project's Workspace (owner, 2026-10-12: one Workspace per project; phases are only card labels).
+/// A section can be deleted only when empty.
+model SfWorkspaceSection {
+  id            String   @id @default(uuid())
+  project_id    String
+  title         String
+  sort_order    Int
+  created_by_id String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+  /// Optimistic concurrency: every change increments it; a write naming an older version is refused.
+  version       Int      @default(1)
+
+  project SfProject         @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  cards   SfWorkspaceCard[]
+
+  @@index([project_id, sort_order])
+  @@map("sf_workspace_section")
+  @@schema("studioflow")
+}
+
+/// One card in a project's Workspace (formerly a phase note, WO-SF-NOTEFEED-01; ids kept by WO-SF-WORKSPACE-01).
+/// The phase and round are labels: they say where the card came from and never decide where it lives.
+model SfWorkspaceCard {
+  id           String                @id @default(uuid())
+  project_id   String
+  section_id   String
+  sort_order   Int
+  /// Phase label. Clearing it (or deleting the phase) keeps the card.
+  phase_id     String?
+  /// Round label. Hard-resetting a phase's rounds leaves its cards unlabelled, never deleted. When set, `phase_id` is that round's phase.
+  iteration_id String?
+  /// The rich-text dialect `FormattedText` shows. Empty when the card is only images.
+  body         String                @default("")
+  is_pinned    Boolean               @default(false)
+  origin       SfWorkspaceCardOrigin @default(NOTE)
+  author_id    String?
+  /// Snapshot, so the name survives the person being renamed or removed. Null on notes converted from the old fields.
+  author_name  String?
+  created_at   DateTime              @default(now())
+  edited_at    DateTime?
+  updated_at   DateTime              @updatedAt
+  /// Optimistic concurrency: every change increments it; a write naming an older version is refused.
+  version      Int                   @default(1)
+
+  project   SfProject              @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  section   SfWorkspaceSection     @relation(fields: [section_id], references: [id], onDelete: Restrict)
+  phase     SfPhase?               @relation(fields: [phase_id], references: [id], onDelete: SetNull)
+  iteration SfRevision?            @relation(fields: [iteration_id], references: [id], onDelete: SetNull)
+  images    SfWorkspaceCardImage[]
+
+  @@index([section_id, sort_order])
+  @@index([project_id, created_at])
+  @@index([phase_id, created_at])
+  @@index([iteration_id])
+  @@map("sf_workspace_card")
+  @@schema("studioflow")
+}
+
+/// Screenshots and photos on one Workspace card.
+model SfWorkspaceCardImage {
   id               String   @id @default(uuid())
-  note_id          String
+  card_id          String
   storage_key      String   @unique
   content_type     String
   bytes            Int
@@ -277,10 +322,10 @@ model SfPhaseNoteImage {
   uploaded_by_name String
   created_at       DateTime @default(now())
 
-  note SfPhaseNote @relation(fields: [note_id], references: [id], onDelete: Cascade)
+  card SfWorkspaceCard @relation(fields: [card_id], references: [id], onDelete: Cascade)
 
-  @@index([note_id, sort_order])
-  @@map("sf_phase_note_image")
+  @@index([card_id, sort_order])
+  @@map("sf_workspace_card_image")
   @@schema("studioflow")
 }
 
