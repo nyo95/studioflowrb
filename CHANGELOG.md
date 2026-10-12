@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.511 | 2026-10-12 | docs(platform): accept M2 and authorize Ideas extraction (Lead)
+
+- **Reviewer verdict: PASS.** The M2 report accounts for every live Ideas/Presentation database, service, route, media, access, audit, lifecycle and test edge and assigns each future interaction to one explicit public boundary.
+- Accepted the narrow atomic-migration exception for each module extraction: preserving ids and eliminating dual truth requires a recorded source-to-destination schema handoff. The exception may move only the named module tables/constraints and cannot mutate unrelated StudioFlow data.
+- Replaced M2 with the READY Ideas-only M3 work order. Presentation remains untouched until the Ideas extraction is independently accepted. **Checks:** report-to-repository symbol sampling, architecture boundaries, legacy-runtime and whitespace checks.
+
 ## R8.510 | 2026-10-12 | docs(platform): lock Ideas and Presentation extraction boundaries (Executor)
 
 - Completed M2's end-to-end coupling inventory for Ideas and Presentation: service composition, routes/actions/UI, database relations, permissions/module gates, project and Schedule access, source images, storage cleanup, archive retention, audit, print/navigation consumers and tests.
