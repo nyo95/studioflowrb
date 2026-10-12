@@ -36,7 +36,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default) and 375 px
 - Steps: 1. Create, edit, replace-image, and delete a private card; confirm another user cannot see it. 2. Use one card as a new Schedule item and as an option, then retry one submission. 3. Save a phase-note image to Ideas and place it in Schedule. 4. Add card and note images to Moodboard. 5. Delete the used Schedule option. 6. Repeat target selection against completed/archived projects and toggle Ideas/Presentation off.
 - Acceptance: URL and screen remain unchanged; cards stay private; each destination receives an independent image copy; retry creates one Schedule placement; deleted upstream rows leave no visible stale usage; completed/archived writes fail; disabled modules hide/refuse their own capability without breaking StudioFlow.
-- Status: PENDING
+- Status: PASS 2026-10-12 (R8.513) — dedicated Ideas CRUD/Schedule/responsive journey plus the existing note-image, Moodboard, module-gate and full 138-scenario browser suite all passed on the disposable rebuild fixture; the Lead also visually checked the migrated office Ideas route.
 
 ### [R8.376] StudioFlow Projects batch access read
 - Surface: `/studioflow/projects`

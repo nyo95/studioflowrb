@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.513 | 2026-10-12 | test(ideas): accept extraction and open Presentation work (Lead)
+
+- **Reviewer verdict for R8.512: PASS after one Lead-owned fixture correction.** Schema ownership, public boundaries, preserved permission/module identity, idempotent Schedule placement, tolerant usage cleanup, storage rollback/retry, audit separation and the retained Ideas URL match the accepted M3 contract. Both new migrations were also applied successfully to the verified office `studioflow_rebuild` database, bringing it to all 104 migrations with its existing Ideas card intact.
+- Fixed the disposable browser seed to clear the newly independent Ideas schema explicitly; the old StudioFlow project cascade can no longer do that after correct module extraction. Added a permanent browser journey covering card upload/edit, Schedule placement, live usage display, deletion and 375 px horizontal-overflow protection.
+- Browser acceptance passed the focused Ideas journey and the complete 138-scenario suite, including existing phase-note → Ideas/Schedule/Moodboard flows, Presentation print/upload, module ceiling, all standard responsive breakpoints and no page-level regressions. The R8.512 browser-backlog item is closed.
+- Replaced the accepted Ideas work order with READY `WO-MODULES-M3-PRESENTATION-01` targeting R8.514. Workspace remains blocked until Presentation extraction receives its own independent PASS. **Migrations/dependencies:** none in this Lead revision. **Checks:** full Playwright suite (138 passed); typecheck; lint (0 errors, one existing Presentation `<img>` warning); architecture boundaries; legacy-runtime; production build; staged/unstaged whitespace.
+
 ## R8.512 | 2026-10-12 | feat(ideas): extract Ideas module (Executor)
 
 - Extracted Ideas into its own optional module, PostgreSQL schema, runtime, public boundary, server actions and UI implementation while preserving `/studioflow/ideas`, the existing permission and module switch, personal-card privacy, stored ids/timestamps/object keys, and all user-facing card, Schedule and Moodboard behavior. The old route is now only a thin module-owned entry point; StudioFlow no longer composes or persists Ideas internally.
