@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.509 | 2026-10-12 | docs(platform): accept owner access review and open module coupling discovery (Lead)
+
+- **Reviewer verdict: PASS.** The Platform Owner remains the only in-app authority with all Developer-enabled non-position access; custom roles cannot receive Platform permissions; the task-oriented role matrix, dependency expansion, module ceiling, legacy cleanup, and isolated Developer console match the accepted work order.
+- Re-ran the complete automated suite (1,021 passed), typecheck, lint (0 errors, one existing Presentation `<img>` warning), architecture boundaries, legacy-runtime check, and production build. Focused browser acceptance for Developer isolation and Roles & Access passed all 14 scenarios.
+- Replaced the completed RBAC work order with the READY M2 Ideas/Presentation coupling-discovery work order. No schema, runtime behavior, dependency, or remote state changed in this revision.
+
 ## R8.508 | 2026-10-12 | fix(platform): keep Developer console outside app login (Executor)
 
 - Exempted the isolated `/system` route family from the optimistic application-session proxy. Anonymous Developer requests now reach the console's own authenticator/recovery-code boundary instead of being redirected to the ordinary user login.

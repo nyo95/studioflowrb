@@ -1,58 +1,49 @@
 # Active Plan
 
-Plan ID: WO-RBAC-UX-01 (Owner authority and task-based role matrix)
-Scope: Platform RBAC resolution, Role commands, Roles & Access UI, compatibility migration
-Module(s): platform (composition UI labels StudioFlow/BQ/Master Data permissions)
-Target revision: R8.508
-Status: IMPLEMENTED — AWAITING REVIEW
+Plan ID: WO-MODULES-M2-01 (Ideas and Presentation coupling discovery)
+Scope: exhaustive coupling report and locked public-boundary/migration design
+Module(s): studioflow, ideas, presentation, platform registry
+Target revision: R8.510
+Status: READY
 Priority: P1
-Owner: direct decision 2026-10-11
-Last updated: 2026-10-12 (Executor; R8.508 corrects the local anonymous `/system` proxy path found during integration verification)
+Owner: direct decision 2026-10-12; MODULES-DECISION D8-D9
+Last updated: 2026-10-12 (Lead; RBAC review passed in R8.509)
 
 ## Outcome
 
-1. Platform Owner always receives every non-position permission currently allowed by the Developer module ceiling. Its grants cannot be edited and its role row explains this instead of showing raw permission ids.
-2. Platform settings, users, roles, audit and integration authority are Platform Owner-only. They do not appear in custom-role creation or editing, and crafted requests cannot grant them.
-3. Custom roles use a task-oriented matrix with plain labels and short consequences. Technical app-access permissions are hidden and added automatically when a selected task needs them.
-4. StudioFlow `project.override` is presented as **Manage every project**, with an explicit warning that it bypasses PIC assignment. Designer and Drafter remain positions, not administrative authority.
-5. Existing role design is preserved except for two owner-approved legacy cleanups: Platform permissions are removed from non-system roles, and only the exact `project.override` rows auto-created by the 2026-09-30 compatibility migration are removed from non-system roles. A manually re-added override has a different id and remains.
-6. MOM and Product Schedule remain StudioFlow core. Ideas and Presentation remain the only current optional StudioFlow modules. Their Developer switch stays installation-wide, not per project/user.
+Produce the M2 evidence needed to extract Ideas first and Presentation second without changing behavior. The report must trace every route, service, database relation, media lifecycle, permission/module gate, audit write, project lifecycle hook, test, and UI caller; define the exact public StudioFlow functions and module-owned ports; and lock the forward-only migration and compatibility order.
 
 ## Locked Rules
 
-- The exact system role code `platform-owner` is the only RBAC role with implicit owner authority. An active owner role assignment is required before compatibility cleanup on an installation that already has active users; migration must fail rather than silently lock out the office.
-- Effective Platform Owner grants are the Developer-enabled registry vocabulary minus app positions. Positions describe job eligibility and are never implied by ownership.
-- Disabled optional-module permissions remain outside effective grants and outside the matrix. Dormant stored custom-role grants remain preserved by the existing module mechanism.
-- System-role grants cannot be replaced through the service, not merely hidden in the UI.
-- Custom roles may contain app permissions only. New or replacement requests containing any `platform.*` id are refused server-side.
-- Selecting an app task automatically adds its `<app>.access` dependency. Manage capabilities also add their corresponding read capability where the current routes require it. Positions alone add no app access.
-- The UI may translate and group permission ids but must not invent a second authorization engine; persisted/effective authority remains the existing permission vocabulary.
-- Compatibility cleanup is additive migration history, never a destructive reset of roles or users.
+- This revision is discovery and contract only. It changes no runtime, schema, migration, dependency, permission, or UI behavior.
+- Ideas and Presentation become sibling optional modules with their own manifests, schemas, runtimes, public doors, tests, and module-owned persistence.
+- StudioFlow remains the owner of projects, project access/PIC rules, Schedule, phases/workspace source media, and project lifecycle. Optional modules may call only StudioFlow public functions and may not import StudioFlow internals.
+- Cross-module database foreign keys are replaced with plain ids plus the minimum historical snapshot required by the current product meaning. Missing upstream records must degrade safely.
+- Cross-module writes use explicit public commands/coordinators. No implicit database write, internal import, duplicate authorization engine, or shared mutable transaction across module schemas is introduced.
+- Existing permissions remain `studioflow.ideas.manage` and `studioflow.presentation.manage` unless the report proves a compatibility-safe ownership move; no new role or permission is invented.
+- Disabled modules retain data, expose no route/action capability, and do not break StudioFlow project reads. Project archive/delete/purge and object cleanup remain explicit, auditable coordination.
+- The report must distinguish current coupling, required public contract, migration step, deletion/cleanup behavior, tests, risk, and estimated implementation cost for each edge.
 
-## UI Contract
+## Required Evidence
 
-- Platform Owner row: “All Developer-enabled access”; no Permissions/Edit/Archive action.
-- Custom role summary shows friendly capability names, never raw ids.
-- Matrix has app headings, a separate Position row, and human task labels. At minimum:
-  - `studioflow.project.override` → “Manage every project”, warning “Can change projects even when the user is not assigned as PIC.”
-  - project, phase, MOM, Product Schedule, Ideas and Presentation labels state the work they enable.
-  - BQ and Master Data read/manage labels use business names rather than identifier fragments.
-- Platform permissions and technical app `access` rows are absent.
-- Copy states that Developer-disabled modules are absent and necessary access dependencies are added automatically.
-- Use existing UI Engine components and retain keyboard/accessibility behavior.
+- Ideas: private cards, usage links to Schedule options, save phase-note image, use image in Schedule, add image to Presentation moodboard, target-project listing, storage copy/cleanup, audit, module/RBAC gates, routes/actions/UI, and tests.
+- Presentation: project boards, slides/images, Schedule-linked annotations, project navigation counts, print route, moodboard writer used by Ideas/Notes, storage cleanup, audit, module/RBAC gates, routes/actions/UI, and tests.
+- StudioFlow public surface needed for project facts/access, writable target projects, Schedule reads/writes, authorized phase-note image reads, project lifecycle notifications, and any post-Workspace replacement needed by the approved plan.
+- Exact schema move from `studioflow` to module-owned schemas, including enum/table/index names, plain-id snapshots, data copy/verification, old-object cleanup ownership, rollback boundary, and removal order.
+- Boundary-check changes that forbid optional modules from importing StudioFlow internals while allowing only declared `public/` doors.
 
 ## Verification
 
-- Pure UI-model tests: owner-only/platform and technical access permissions hidden; positions separate; friendly labels; override warning; dependency expansion.
-- RBAC integration: owner gets every enabled non-position permission even when stored grants are stale; disabled module grant stays absent; ordinary roles do not gain implicit permissions; custom-role Platform grants and system-role grant replacement are refused.
-- Migration on disposable PostgreSQL: all migrations apply; non-system Platform grants and only legacy-generated override rows are removed; system/manual override grants remain.
-- Browser: owner row has no permission editor; new custom role matrix has no Platform/access checkboxes; “Manage every project” warning is visible; Ideas disappears when Developer disables it; role save persists expanded dependencies.
-- Mandatory repository gates: `npm test`, typecheck, lint, boundary check, legacy-runtime check, production build, staged and unstaged whitespace checks.
+- Repository-wide import/caller/schema search with exact symbol inventory.
+- Each existing Ideas/Presentation user journey maps to one future owner and one explicit public boundary.
+- Migration design preserves row counts, ids where safe, timestamps, object keys, ordering, links/snapshots, and disabled-module data.
+- Lead reviews and locks the report before M3. No implementation begins from unresolved alternatives.
+- Documentation whitespace checks and local revision commit.
 
 ## Non-goals
 
-No new role hierarchy or hardcoded Manager role; no per-project module switch; no MOM/Schedule modularization; no change to PIC rules; no new permission ids; no Ideas/Presentation extraction; no deployment or push.
+No Ideas or Presentation extraction yet; no Workspace schema/UI; no permission redesign; no Schedule/MOM modularization; no new dependency; no database command; no push, deployment, or release.
 
 ## Executor Prompt
 
-You are the Backend Executor working in cloud on the same checkout. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `PLAN.md`, and `docs/apps/platform/MODULES-DECISION.md` D4/D5. Implement WO-RBAC-UX-01 exactly as R8.507: implicit Developer-enabled non-position authority for the locked Platform Owner role, owner-only Platform permissions, system-role immutability, safe compatibility cleanup, automatic app dependency expansion, tests and minimal functional UI wiring. Do not modularize MOM/Schedule or introduce per-project module state. Use only a verified disposable rebuild database for migrations, run mandatory gates, update the changelog, and commit locally without pushing.
+You are the Backend Executor on the same checkout. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `PLAN.md`, `docs/MODULE-BOUNDARIES.md`, `docs/apps/platform/MODULES-DECISION.md`, and the active StudioFlow contract. Execute WO-MODULES-M2-01 as a read-only code/schema discovery plus documentation revision R8.510. Trace every Ideas and Presentation coupling end to end, write the precise public-boundary and forward migration design, update the changelog, run documentation/boundary checks that apply, and commit locally without changing runtime behavior or pushing.
