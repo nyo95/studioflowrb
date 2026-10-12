@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.516 | 2026-10-12 | fix(studioflow): archive retention keeps a restored project's Presentation slides (Executor, by the Lead on owner instruction)
+
+- **WO-MODULES-M3-PRESENTATION-01-C1:** `purgeExpiredArchivedAssets` re-reads each selected project against the same eligibility filter immediately before the Presentation purge hook and skips it entirely (no hook, no claim, no counts) when it was restored since the batch was selected. The claim-transaction re-check is unchanged; Presentation still runs first and also while disabled; a hook failure still leaves the project eligible.
+- The Presentation hook is now a required parameter of `purgeExpiredArchivedAssets` and `runAssetCleanup`, so no caller can mark a project purged without Presentation cleanup. Core-only retention tests pass an explicit no-op hook.
+- New disposable-database tests: a project restored during another project's hook keeps its slide row and object and stays unmarked (fails without the fix, passes with it); a throwing hook leaves the project unmarked with core and Presentation assets intact, and the next run purges it. The accepted millisecond residual window is recorded as `[CLEANUP][P3]` in `docs/BACKLOG.md`.
+- **Migrations/dependencies:** none. **Checks:** `npm test` (1,029 passed); typecheck; architecture boundaries; legacy-runtime; eslint (0 errors, one known `<img>` warning); production build; staged/unstaged whitespace.
+- Lane note: the owner asked the Lead to take over this Executor slice in the same session; the R8.517 acceptance below is therefore a self-review backed by the failing-then-passing regression test.
+
 ## R8.515 | 2026-10-12 | docs(review): R8.514 verdict CORRECTION REQUIRED, Presentation retention restore race (Lead)
 
 - **Reviewer verdict for R8.514 (`6e53966`): CORRECTION REQUIRED, one finding.** The Presentation module, schema move, public doors, retained URLs, permission/module identity, Schedule link tolerance, Moodboard coordination, audit prefix, cleanup ledger, module gates, print and boundary ownership are accepted as built.

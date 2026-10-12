@@ -14,8 +14,8 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
   }
 
   async function purgeExpiredArchivedAssets(
-    input: { now?: Date; limit?: number } = {},
-    beforeProject?: (projectId: string) => Promise<{ presentationSlides: number }>,
+    input: { now?: Date; limit?: number },
+    beforeProject: (projectId: string) => Promise<{ presentationSlides: number }>,
   ) {
     const now = input.now ?? nowOf(ports);
     const limit = input.limit ?? 25;
@@ -35,7 +35,10 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
     for (const project of projects) {
       // Composition invokes each independently owned module before StudioFlow claims
       // the project. A hook failure therefore leaves this project eligible for retry.
-      const external = beforeProject ? await beforeProject(project.id) : { presentationSlides: 0 };
+      // Re-check first: the batch was selected earlier, and a project restored since
+      // must not lose module data that the claim below would no longer cover.
+      if (await db.sfProject.count({ where: { id: project.id, ...eligible } }) === 0) continue;
+      const external = await beforeProject(project.id);
       const claimed = await ports.runTransaction(async (tx) => {
         // Re-check archive eligibility in the claim, including a concurrent restore.
         const claim = await tx.sfProject.updateMany({ where: { id: project.id, ...eligible }, data: { assets_purged_at: now } });
@@ -98,7 +101,7 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
 
   return {
     purgeExpiredArchivedAssets,
-    async runAssetCleanup(input: CommandContext & { now?: Date; limit?: number }, beforeProject?: (projectId: string) => Promise<{ presentationSlides: number }>) {
+    async runAssetCleanup(input: CommandContext & { now?: Date; limit?: number }, beforeProject: (projectId: string) => Promise<{ presentationSlides: number }>) {
       requireCommand(input, P.projectManage);
       return purgeExpiredArchivedAssets(input, beforeProject);
     },

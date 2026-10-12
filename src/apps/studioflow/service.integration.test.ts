@@ -503,6 +503,9 @@ describe("WO-SF-CDLIST-01 Construction Drawing list", () => {
 
 describe("WO-BE-02 archived asset retention", () => {
   afterEach(() => storage.objects.clear());
+  /** Core-only retention tests: no optional module holds data for these projects. */
+  const noModules = async () => ({ presentationSlides: 0 });
+
   function retention(overrides: Partial<StudioFlowPorts> = {}) {
     const db = testDb.prisma;
     return createAssetRetentionService(db, {
@@ -546,7 +549,7 @@ describe("WO-BE-02 archived asset retention", () => {
     await storage.put({ key: "template-photo", body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
     await db.sfClient.update({ where: { id: client.id }, data: { logo_storage_key: "client-logo" } });
     await db.sfScheduleTemplateItem.create({ data: { section: "MATERIAL", category: "Floor", category_key: "floor", product_name: "Template", image_key: "template-photo" } });
-    const result = await retention().purgeExpiredArchivedAssets();
+    const result = await retention().purgeExpiredArchivedAssets({}, noModules);
     assert.deepEqual(result, { projectsPurged: 1, deliverables: 1, iterationImages: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, presentationSlides: 0, blobsRemoved: 5, blobsKeptShared: 0, blobFailures: 0, unparseableRevisions: 0, previousFailuresResolved: 0, previousFailuresStillFailing: 0 });
     for (const key of Object.values(expired.keys)) assert.equal(storage.objects.has(key), false);
     for (const kept of [inside, boundary, live]) {
@@ -566,7 +569,7 @@ describe("WO-BE-02 archived asset retention", () => {
     assert.ok(events.every((event) => event.actor_kind === "SYSTEM"));
     assert.deepEqual(events[0].metadata, { projectId: expired.projectId, deliverables: 1, iterationImages: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, unparseableRevisions: 0, keysCollected: 5 });
     assert.deepEqual(events[1].metadata, { projectId: expired.projectId, blobsRemoved: 5, blobsKeptShared: 0, blobFailures: 0 });
-    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+    assert.equal((await retention().purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 0);
     await sf.projects.restoreProject({ ...as(designer), projectId: inside.projectId });
     for (const key of Object.values(inside.keys)) assert.ok(storage.objects.has(key));
     await sf.projects.restoreProject({ ...as(designer), projectId: expired.projectId });
@@ -594,6 +597,49 @@ describe("WO-BE-02 archived asset retention", () => {
     assert.equal(await db.sfPresentationBoard.count({ where: { id: board.id } }), 1, "the board itself is kept; only its slides are purged");
   });
 
+  async function presentationSlide(projectId: string) {
+    const db = testDb.prisma;
+    const board = await db.sfPresentationBoard.create({ data: { project_id: projectId, title: "Board", sort_order: 0, created_by_id: designer.id } });
+    const key = `${projectId}/slide`;
+    await storage.put({ key, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
+    const slide = await db.sfPresentationSlide.create({ data: { board_id: board.id, image_key: key, sort_order: 0 } });
+    return { slideId: slide.id, key };
+  }
+
+  it("keeps the Presentation slides of a project restored while the batch is running", async () => {
+    const db = testDb.prisma;
+    const first = await fixture("Purged first", 92);
+    const restored = await fixture("Restored meanwhile", 91);
+    const firstSlide = await presentationSlide(first.projectId);
+    const restoredSlide = await presentationSlide(restored.projectId);
+    const result = await retention().purgeExpiredArchivedAssets({}, async (projectId) => {
+      // A user restores the second project while the first one is being cleaned up.
+      if (projectId === first.projectId) await db.sfProject.update({ where: { id: restored.projectId }, data: { archived_at: null } });
+      return presentation.purgeArchivedProjectAssets(projectId);
+    });
+    assert.equal(result.projectsPurged, 1);
+    assert.equal(result.presentationSlides, 1);
+    assert.equal(await db.sfPresentationSlide.count({ where: { id: firstSlide.slideId } }), 0);
+    assert.equal(await db.sfPresentationSlide.count({ where: { id: restoredSlide.slideId } }), 1, "the restored project keeps its slide row");
+    assert.equal(storage.objects.has(restoredSlide.key), true, "and its image");
+    assert.equal((await db.sfProject.findUniqueOrThrow({ where: { id: restored.projectId } })).assets_purged_at, null);
+  });
+
+  it("leaves the project eligible and untouched when the Presentation hook fails, then purges it on the next run", async () => {
+    const db = testDb.prisma;
+    const expired = await fixture("Hook fails once", 91);
+    const slide = await presentationSlide(expired.projectId);
+    await assert.rejects(retention().purgeExpiredArchivedAssets({}, async () => { throw new Error("presentation unavailable"); }));
+    assert.equal((await db.sfProject.findUniqueOrThrow({ where: { id: expired.projectId } })).assets_purged_at, null);
+    assert.equal(await db.sfPresentationSlide.count({ where: { id: slide.slideId } }), 1);
+    assert.equal(storage.objects.has(expired.keys.deliverable), true, "core assets are not touched either");
+    const result = await retention().purgeExpiredArchivedAssets({}, (projectId) => presentation.purgeArchivedProjectAssets(projectId));
+    assert.equal(result.projectsPurged, 1);
+    assert.equal(result.presentationSlides, 1);
+    assert.notEqual((await db.sfProject.findUniqueOrThrow({ where: { id: expired.projectId } })).assets_purged_at, null);
+    assert.equal(storage.objects.has(slide.key), false);
+  });
+
   it("retries a delete that failed in an earlier run before starting new work, instead of losing the key", async () => {
     const db = testDb.prisma;
     const expired = await fixture("Flaky delete", 91);
@@ -610,7 +656,7 @@ describe("WO-BE-02 archived asset retention", () => {
       },
     };
 
-    const first = await retention({ storage: flaky }).purgeExpiredArchivedAssets();
+    const first = await retention({ storage: flaky }).purgeExpiredArchivedAssets({}, noModules);
     assert.equal(first.blobFailures, 1);
     assert.equal(first.previousFailuresResolved, 0);
     assert.ok(storage.objects.has(flakyKey), "the failed delete left the object in place, not silently dropped");
@@ -618,7 +664,7 @@ describe("WO-BE-02 archived asset retention", () => {
     assert.equal(failure.resolved_at, null);
     assert.equal(failure.attempts, 1);
 
-    const second = await retention().purgeExpiredArchivedAssets();
+    const second = await retention().purgeExpiredArchivedAssets({}, noModules);
     assert.equal(second.previousFailuresResolved, 1);
     assert.equal(second.previousFailuresStillFailing, 0);
     assert.equal(storage.objects.has(flakyKey), false, "the retry finally removed the leaked object");
@@ -635,7 +681,7 @@ describe("WO-BE-02 archived asset retention", () => {
     await db.sfMomRevision.create({ data: { document_id: expired.documentId, number: 2, snapshot: malformed, created_by_id: designer.id, created_by_name: "Designer" } });
     const legacy = { topic: "Legacy", meetingDate: "2026-09-01", venue: null, attendees: null, preparedByName: "Designer", items: [{ isTextOnly: true, listStyle: "DASH", points: [{ text: "Exact text", style: "DEFAULT" }], images: [] }] };
     const legacyRow = await db.sfMomRevision.create({ data: { document_id: expired.documentId, number: 3, snapshot: legacy, created_by_id: designer.id, created_by_name: "Designer" } });
-    const result = await retention().purgeExpiredArchivedAssets();
+    const result = await retention().purgeExpiredArchivedAssets({}, noModules);
     assert.equal(result.blobsKeptShared, 3); assert.equal(result.blobsRemoved, 2); assert.equal(result.unparseableRevisions, 1);
     for (const key of [expired.keys.option, expired.keys.deliverable, expired.keys.mom]) assert.ok(storage.objects.has(key));
     assert.deepEqual((await db.sfMomRevision.findFirstOrThrow({ where: { document_id: expired.documentId, number: 2 } })).snapshot, malformed);
@@ -646,22 +692,22 @@ describe("WO-BE-02 archived asset retention", () => {
     assert.equal((await sf.projects.getStudioSettings({ grants: ALL })).archiveRetentionDays, 90);
     for (const archiveRetentionDays of [6, 731, 7.5, NaN]) await rejectsWith(sf.projects.setArchiveRetention({ ...as(designer), archiveRetentionDays }), "ARCHIVE_RETENTION_INVALID");
     await rejectsWith(sf.projects.setArchiveRetention({ ...as(drafter, DRAFTER_GRANTS), archiveRetentionDays: 7 }), "PERMISSION_DENIED");
-    await rejectsWith(retention().runAssetCleanup(as(drafter, DRAFTER_GRANTS)), "PERMISSION_DENIED");
+    await rejectsWith(retention().runAssetCleanup(as(drafter, DRAFTER_GRANTS), noModules), "PERMISSION_DENIED");
     const older = await fixture("Older", 20);
     const newer = await fixture("Newer", 10);
-    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+    assert.equal((await retention().purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 0);
     await sf.projects.setArchiveRetention({ ...as(designer), archiveRetentionDays: 7 });
-    assert.equal((await retention().runAssetCleanup({ ...as(designer), limit: 1 })).projectsPurged, 1);
+    assert.equal((await retention().runAssetCleanup({ ...as(designer), limit: 1 }, noModules)).projectsPurged, 1);
     assert.ok((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: older.projectId } })).assets_purged_at);
     assert.equal((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: newer.projectId } })).assets_purged_at, null);
     assert.deepEqual(await sf.projects.getStudioSettings({ grants: ALL }), { archiveRetentionDays: 7, cdMall: 5, cdFinal: 5, gap: 5, fitOutToHandover: 40, handoverToOpening: 10 });
     await sf.projects.setArchiveRetention({ ...as(designer), archiveRetentionDays: 730 });
-    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+    assert.equal((await retention().purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 0);
   });
 
   it("claims each project exactly once across concurrent serializable sweeps", async () => {
     const expired = await fixture("Concurrent purge", 91);
-    const results = await Promise.all([retention().purgeExpiredArchivedAssets(), retention().purgeExpiredArchivedAssets()]);
+    const results = await Promise.all([retention().purgeExpiredArchivedAssets({}, noModules), retention().purgeExpiredArchivedAssets({}, noModules)]);
     assert.equal(results.reduce((n, result) => n + result.projectsPurged, 0), 1);
     assert.equal(results.reduce((n, result) => n + result.blobsRemoved, 0), 5);
     assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purged" } }), 1);
@@ -670,7 +716,7 @@ describe("WO-BE-02 archived asset retention", () => {
 
   it("rolls back the claim and all records if the primary audit fails, before any storage removal", async () => {
     const expired = await fixture("Rollback", 91);
-    await assert.rejects(retention({ auditWriter: { write: async () => { throw Error("audit unavailable"); } } }).purgeExpiredArchivedAssets());
+    await assert.rejects(retention({ auditWriter: { write: async () => { throw Error("audit unavailable"); } } }).purgeExpiredArchivedAssets({}, noModules));
     assert.equal((await testDb.prisma.sfProject.findUniqueOrThrow({ where: { id: expired.projectId } })).assets_purged_at, null);
     assert.equal(await testDb.prisma.sfDeliverable.count({ where: { project_id: expired.projectId } }), 1);
     assert.deepEqual(await testDb.prisma.sfMomRevision.findUniqueOrThrow({ where: { id: expired.revision.id } }), expired.revision);
@@ -687,7 +733,7 @@ describe("WO-BE-02 archived asset retention", () => {
       }
       return runSerializableTransaction(testDb.prisma, work);
     } });
-    assert.equal((await service.purgeExpiredArchivedAssets()).projectsPurged, 0);
+    assert.equal((await service.purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 0);
     for (const key of Object.values(expired.keys)) assert.ok(storage.objects.has(key));
     assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purged" } }), 0);
   });
@@ -705,11 +751,11 @@ describe("WO-BE-02 archived asset retention", () => {
           await storage.remove(key);
         } },
         auditWriter: { write: async (event, tx) => { if (event.action.endsWith("assets_purge_completed")) throw Error("secret audit details"); await writer.write(event, tx); } },
-      }).purgeExpiredArchivedAssets();
+      }).purgeExpiredArchivedAssets({}, noModules);
       assert.equal(result.projectsPurged, 1); assert.equal(result.blobFailures, 1); assert.equal(result.blobsRemoved, 4);
       assert.deepEqual(logs, [["StudioFlow asset cleanup completion audit failed."]]);
       assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: expired.projectId, action: "studioflow.project.assets_purged" } }), 1);
-      assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+      assert.equal((await retention().purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 0);
     } finally { logger.mock.restore(); }
   });
 
@@ -720,7 +766,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const purgeEvents = (action: string) => db.auditEvent.count({ where: { entity_id: cycle.projectId, action } });
     await sf.projects.archiveProject({ ...as(designer), projectId: cycle.projectId, reason: "First archive" });
     clock = new Date(clock.getTime() + 91 * day);
-    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 1);
+    assert.equal((await retention().purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 1);
     assert.ok((await db.sfProject.findUniqueOrThrow({ where: { id: cycle.projectId } })).assets_purged_at);
 
     await sf.projects.restoreProject({ ...as(designer), projectId: cycle.projectId });
@@ -734,16 +780,16 @@ describe("WO-BE-02 archived asset retention", () => {
     await sf.projects.archiveProject({ ...as(designer), projectId: cycle.projectId, reason: "Second archive" });
     assert.equal((await db.sfProject.findUniqueOrThrow({ where: { id: cycle.projectId } })).assets_purged_at, null, "a new archive clears the marker");
     clock = new Date(clock.getTime() + 89 * day);
-    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
+    assert.equal((await retention().purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 0);
     assert.ok(storage.objects.has(newKey), "still inside the second window");
     clock = new Date(clock.getTime() + 2 * day);
-    const second = await retention().purgeExpiredArchivedAssets();
+    const second = await retention().purgeExpiredArchivedAssets({}, noModules);
     assert.equal(second.projectsPurged, 1);
     assert.equal(second.deliverables, 1);
     assert.equal(storage.objects.has(newKey), false, "the second-cycle file is purged");
     assert.equal(await purgeEvents("studioflow.project.assets_purged"), 2);
     assert.equal(await purgeEvents("studioflow.project.assets_purge_completed"), 2);
-    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0, "a project archived once is purged once per cycle");
+    assert.equal((await retention().purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 0, "a project archived once is purged once per cycle");
   });
 
   it("WO-BE-03 C3/C5: preview counts what the purge would purge and writes nothing; reads expose assetsPurgedAt", async () => {
@@ -759,7 +805,7 @@ describe("WO-BE-02 archived asset retention", () => {
     assert.equal((await db.sfProject.findUniqueOrThrow({ where: { id: expired.projectId } })).assets_purged_at, null);
     assert.equal((await sf.projects.getProject({ grants: ALL, projectId: expired.projectId })).assetsPurgedAt, null);
 
-    assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 1, "the purge acts on exactly what the preview counted");
+    assert.equal((await retention().purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 1, "the purge acts on exactly what the preview counted");
     assert.deepEqual(await retention().previewAssetCleanup(as(designer)), { eligibleProjects: 0, retentionDays: 90 });
     assert.ok((await sf.projects.getProject({ grants: ALL, projectId: expired.projectId })).assetsPurgedAt instanceof Date);
     const archivedRows = await sf.projects.listProjects({ grants: ALL, archived: true });
