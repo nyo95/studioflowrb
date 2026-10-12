@@ -16,6 +16,7 @@ import {
   RULE_SERVER_CALLS_CLIENT_FUNCTION,
   RULE_INTEGRATION_ROUTE_IMPORTS,
   RULE_MODULE_ADMIN_IMPORT,
+  RULE_DEVELOPER_ACCESS_IMPORT,
   RULE_MODULE_MANIFEST_REQUIRES,
   RULE_DUPLICATE_MACHINERY,
   RULE_UNSCANNED_FILE,
@@ -218,6 +219,8 @@ const FOUNDATION_FILES = {
   "src/apps/sun/public/nav.ts": `export const SUN_ROUTES = { root: "/sun", projects: "/sun/projects" };\n`,
   "src/apps/sun/runtime-dependency.ts": `import { MOON_PERMISSIONS } from "@/apps/moon/public";\nexport const moonPermissions = MOON_PERMISSIONS;\n`,
   "src/apps/sun/bad-module-admin.ts": `import { changeModuleState } from "@platform/core/modules/admin";\nexport const bad = changeModuleState;\n`,
+  "src/app/(platform)/settings/bad-developer.ts": `import { developerAccess } from "@platform/core/developer-access";\nexport const bad = developerAccess;\n`,
+  "src/app/(system)/system/legal-developer.ts": `import { developerAccess } from "@platform/core/developer-access";\nexport const legal = developerAccess;\n`,
   "src/app/(platform)/sun/page.tsx": `import { something } from "@/apps/moon/public";\nexport const page = something;\n`,
   "src/app/(platform)/sun/bad.tsx": `import { Widget } from "@/apps/moon/ui/widget";\nexport const bad = Widget;\n`,
 
@@ -256,6 +259,8 @@ const FOUNDATION_FILES = {
   "src/platform/core/rbac/index.ts": `export const UNUSED = true;\n`,
   "src/platform/core/modules/admin.ts": `export const changeModuleState = true;\n`,
   "src/platform/core/modules/legal.ts": `import { changeModuleState } from "./admin";\nexport const legal = changeModuleState;\n`,
+  "src/platform/core/developer-access/legal.ts": `import { changeModuleState } from "@platform/core/modules/admin";\nexport const legal = changeModuleState;\n`,
+  "src/platform/core/developer-access/index.ts": `export const developerAccess = {};\n`,
   "scripts/legal-module-admin.ts": `import { changeModuleState } from "../src/platform/core/modules/admin";\nexport const legal = changeModuleState;\n`,
   "src/platform/core/rbac/registry.ts": `export const PLATFORM_PERMISSIONS = [ "platform.settings.read" ] as const;\n`,
   "src/platform/infrastructure/storage.ts": `export const storage = {};\n`,
@@ -300,6 +305,7 @@ try {
     modules.map((v) => violationKey(foundationRoot, v)).sort(),
     [
       `src/apps/sun/bad-module-admin.ts | ${RULE_MODULE_ADMIN_IMPORT} | @platform/core/modules/admin`,
+      `src/app/(platform)/settings/bad-developer.ts | ${RULE_DEVELOPER_ACCESS_IMPORT} | @platform/core/developer-access`,
       `src/apps/sun/runtime-dependency.ts | ${RULE_MODULE_MANIFEST_REQUIRES} | @/apps/moon/public`,
       `src/app/app-registrations.ts | ${RULE_MODULE_MANIFEST_REQUIRES} | moon -> sun`,
     ].sort(),

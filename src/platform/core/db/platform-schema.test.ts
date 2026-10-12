@@ -133,6 +133,23 @@ describe("platform schema: sessions", () => {
   });
 });
 
+describe("platform schema: Developer authority", () => {
+  it("pins the Developer singleton and declares session cleanup indexes", async () => {
+    await truncatePlatformTables(db);
+    await db.prisma.developerAccess.create({ data: { id: "developer", totp_secret_enc: "fixture" } });
+    await expectReject(
+      () => db.prisma.developerAccess.create({ data: { id: "another", totp_secret_enc: "fixture" } }),
+      /check/i,
+    );
+    const indexes = await db.prisma.$queryRawUnsafe<{ indexname: string }[]>(
+      `SELECT indexname FROM pg_indexes WHERE schemaname = 'platform' AND tablename = 'developer_session'`,
+    );
+    const names = indexes.map((row) => row.indexname);
+    assert.ok(names.includes("developer_session_last_seen_at_idx"));
+    assert.ok(names.includes("developer_session_expires_at_idx"));
+  });
+});
+
 describe("platform schema: settings singleton", () => {
   it("pins the singleton identity in SQL, not only application code", async () => {
     await truncatePlatformTables(db);

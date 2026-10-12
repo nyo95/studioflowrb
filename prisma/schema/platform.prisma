@@ -30,6 +30,46 @@ model ModuleState {
   @@schema("platform")
 }
 
+/// Out-of-band Developer authority. This singleton is deliberately unrelated
+/// to User/Role: no application account can inherit or grant this access.
+model DeveloperAccess {
+  id              String    @id @default("developer")
+  totp_secret_enc String
+  last_step       BigInt?
+  failed_count    Int       @default(0)
+  locked_until    DateTime?
+  enrolled_at     DateTime  @default(now())
+
+  @@map("developer_access")
+  @@schema("platform")
+}
+
+/// One-time emergency codes for the Developer console. Only SHA-256 digests
+/// are persisted; the printable values exist only during enrolment.
+model DeveloperRecoveryCode {
+  code_hash String    @id
+  used_at   DateTime?
+
+  @@map("developer_recovery_code")
+  @@schema("platform")
+}
+
+/// Independent short-lived Developer browser session. The raw token is kept
+/// only in the Path=/system cookie and never reaches persistence.
+model DeveloperSession {
+  token_hash String   @id
+  created_at DateTime @default(now())
+  last_seen_at DateTime
+  expires_at DateTime
+  ip          String?
+  user_agent  String?
+
+  @@index([last_seen_at])
+  @@index([expires_at])
+  @@map("developer_session")
+  @@schema("platform")
+}
+
 /// Platform user identity. Email is stored already normalized (trimmed,
 /// lowercase); race-safe uniqueness is the unique index itself.
 ///

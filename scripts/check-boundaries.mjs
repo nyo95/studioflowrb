@@ -23,6 +23,7 @@ export const RULE_SERVER_CALLS_CLIENT_FUNCTION = "server code -> function in a \
 export const RULE_INTEGRATION_ROUTE_IMPORTS = "integration route import allow-list";
 export const RULE_MODULE_MANIFEST_REQUIRES = "module manifest requires";
 export const RULE_MODULE_ADMIN_IMPORT = "module state writer import";
+export const RULE_DEVELOPER_ACCESS_IMPORT = "Developer authority import";
 
 /**
  * App layers a composition/shell file (anything under `src/app` or
@@ -520,6 +521,8 @@ export async function collectModuleBoundaryViolations({ projectRoot = process.cw
 
   const aliasMap = await readAliasMap(projectRoot);
   const modulesRoot = join(srcDir, "platform", "core", "modules");
+  const developerAccessRoot = join(srcDir, "platform", "core", "developer-access");
+  const developerRouteRoot = join(srcDir, "app", "(system)", "system");
   const scriptsRoot = join(projectRoot, "scripts");
   let scripts = [];
   try {
@@ -529,17 +532,39 @@ export async function collectModuleBoundaryViolations({ projectRoot = process.cw
   }
   const adminTarget = join(modulesRoot, "admin");
   for (const file of [...await walkSources(srcDir), ...scripts]) {
-    if (isEqualToOrInside(modulesRoot, file) || isEqualToOrInside(scriptsRoot, file)) continue;
     const source = await readFile(file, "utf8");
     for (const specifier of extractImportSpecifiers(source, file)) {
       const target = resolveSpecifier(specifier, file, aliasMap, projectRoot);
-      if (!target || target.replace(/\.[^.\\/]+$/, "") !== adminTarget) continue;
-      violations.push({
-        rule: RULE_MODULE_ADMIN_IMPORT,
-        file,
-        specifier,
-        detail: "Only repository scripts and platform/core/modules may import the module state writer. Application code must use the read-only public module API.",
-      });
+      if (!target) continue;
+      const targetWithoutExtension = target.replace(/\.[^.\\/]+$/, "");
+      if (
+        targetWithoutExtension === adminTarget &&
+        !isEqualToOrInside(modulesRoot, file) &&
+        !isEqualToOrInside(developerAccessRoot, file) &&
+        !isEqualToOrInside(scriptsRoot, file)
+      ) {
+        violations.push({
+          rule: RULE_MODULE_ADMIN_IMPORT,
+          file,
+          specifier,
+          detail: "Only repository scripts, platform/core/modules and platform/core/developer-access may import the module state writer. Application code must use the read-only public module API.",
+        });
+      }
+      if (
+        isEqualToOrInside(developerAccessRoot, targetWithoutExtension) &&
+        !isEqualToOrInside(developerAccessRoot, file) &&
+        !isEqualToOrInside(scriptsRoot, file)
+      ) {
+        const publicTarget = targetWithoutExtension === developerAccessRoot || targetWithoutExtension === join(developerAccessRoot, "index");
+        if (!isEqualToOrInside(developerRouteRoot, file) || !publicTarget) {
+          violations.push({
+            rule: RULE_DEVELOPER_ACCESS_IMPORT,
+            file,
+            specifier,
+            detail: "Developer authority is reachable only from the isolated /system route through its public index. Application routes and roles cannot import it.",
+          });
+        }
+      }
     }
   }
   return violations;

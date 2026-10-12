@@ -3,11 +3,11 @@
 Plan ID: WO-DEVELOPER-01 (Developer web console: authenticator sign-in, modules On/Off)
 Scope: Platform capability `developer-access` (new, domain-neutral) and a `/system` console
 Module(s): platform
-Target revision: next unused after R8.503 (check `CHANGELOG.md`)
-Status: READY
+Target revision: R8.506
+Status: IMPLEMENTED — REVIEWER PASS
 Priority: P1
 Owner: owner decisions 2026-10-10 and terminology clarification 2026-10-11, `docs/apps/platform/MODULES-DECISION.md` D5 amendment, D7, D10 (read it first)
-Last updated: 2026-10-11 (Lead)
+Last updated: 2026-10-12 (Executor; imported from accepted cloud implementation and renumbered R8.506 to avoid the local R8.505 collision)
 
 WO-MODULES-M1 is done (R8.495, R8.498 Executor; R8.500 Lead). One walk remains
 in `docs/BACKLOG.md` (note-image buttons).

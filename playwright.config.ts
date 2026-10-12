@@ -34,6 +34,7 @@ export default defineConfig({
     env: {
       DATABASE_URL: testDatabaseUrl,
       PLATFORM_TEST_DATABASE_URL: testDatabaseUrl,
+      SESSION_SECRET: process.env.SESSION_SECRET ?? "playwright-developer-console-secret",
       NEXT_DIST_DIR: ".next-e2e",
     },
   },

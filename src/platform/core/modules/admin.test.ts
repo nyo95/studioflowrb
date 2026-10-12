@@ -42,4 +42,19 @@ describe("Developer module state command", () => {
       auditWriter: { write: async () => undefined },
     }), (error: unknown) => isAppError(error) && error.code === "MODULE_CORE_STATE_REFUSED");
   });
+
+  it("attributes web console changes to the Developer web actor", async () => {
+    const writes: Array<{ actor?: unknown }> = [];
+    await changeModuleState({
+      moduleId: "ideas",
+      state: "DISABLED",
+      actorLabel: "developer-web",
+      runTransaction: async (work) => work({ moduleState: {
+        findUnique: async () => null,
+        upsert: async () => ({}),
+      } } as never),
+      auditWriter: { write: async (event) => { writes.push(event); } },
+    });
+    assert.deepEqual(writes[0]?.actor, { kind: "SYSTEM", label: "developer-web" });
+  });
 });

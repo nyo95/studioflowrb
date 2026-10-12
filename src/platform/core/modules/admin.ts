@@ -28,18 +28,20 @@ export async function changeModuleState(input: {
   runTransaction: ModuleTransactionRunner;
   auditWriter: AuditWriter;
   now?: () => Date;
+  actorLabel?: "developer-cli" | "developer-web";
 }): Promise<{ changed: boolean; state: ModuleStateValue }> {
   const moduleManifest = getModuleRegistry().find(input.moduleId);
   if (!moduleManifest) throw new AppError("NOT_FOUND", "MODULE_UNKNOWN", "That module is not registered.");
   if (moduleManifest.kind === "core") throw new AppError("CONFLICT", "MODULE_CORE_STATE_REFUSED", "A core module cannot be enabled or disabled.");
   return input.runTransaction(async (tx) => {
+    const actorLabel = input.actorLabel ?? "developer-cli";
     const current = await tx.moduleState.findUnique({ where: { module_id: moduleManifest.id } });
     const previous: ModuleStateValue = current?.state ?? "ENABLED";
     if (previous === input.state) {
       if (current?.last_version !== moduleManifest.version) {
         await tx.moduleState.upsert({
           where: { module_id: moduleManifest.id },
-          create: { module_id: moduleManifest.id, state: input.state, last_version: moduleManifest.version, updated_by: "developer-cli" },
+          create: { module_id: moduleManifest.id, state: input.state, last_version: moduleManifest.version, updated_by: actorLabel },
           update: { last_version: moduleManifest.version },
         });
       }
@@ -47,15 +49,15 @@ export async function changeModuleState(input: {
     }
     await tx.moduleState.upsert({
       where: { module_id: moduleManifest.id },
-      create: { module_id: moduleManifest.id, state: input.state, last_version: moduleManifest.version, updated_by: "developer-cli" },
-      update: { state: input.state, last_version: moduleManifest.version, updated_by: "developer-cli" },
+      create: { module_id: moduleManifest.id, state: input.state, last_version: moduleManifest.version, updated_by: actorLabel },
+      update: { state: input.state, last_version: moduleManifest.version, updated_by: actorLabel },
     });
     await input.auditWriter.write(prepareAuditEvent({
       appId: "platform",
       action: input.state === "ENABLED" ? "platform.module.enabled" : "platform.module.disabled",
       entityType: "module",
       entityId: moduleManifest.id,
-      actor: { kind: "SYSTEM", label: "developer-cli" },
+      actor: { kind: "SYSTEM", label: actorLabel },
       changes: { state: { from: previous, to: input.state } },
       metadata: { version: moduleManifest.version },
     }, { now: input.now }), tx);

@@ -3,7 +3,8 @@
 Status: ACCEPTED (owner, 2026-10-09; recorded by the Lead in R8.494).
 Amended: owner, 2026-10-10 (D5 web console, D7 dropped, D10 updates; R8.501),
 and 2026-10-11 (D5 terminology: Platform Owner and Developer; R8.503; core-app
-bundle and Developer-controlled module permission ceiling; R8.504).
+bundle and Developer-controlled module permission ceiling; R8.504; isolated
+Developer web console delivered in R8.506).
 Scope: how StudioFlowRB becomes a platform of separately versioned, separately
 switchable modules, so a customer runs only what it has, and a new capability can
 be used on its own first and injected later.
