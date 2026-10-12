@@ -63,6 +63,8 @@ export const APP_DUPLICATE_PRIMITIVE_ALLOW_LIST = [
  */
 export const PLATFORM_ROUTE_OWNERS = [
   { path: "studioflow/ideas", app: "ideas" },
+  { path: "studioflow/projects/[projectId]/presentation", app: "presentation" },
+  { path: "studioflow/print/projects/[projectId]/presentation", app: "presentation" },
   { path: "settings/general/masterdata", app: "masterdata" },
 ];
 
@@ -230,10 +232,15 @@ export async function listAppsInDir(appsRoot) {
 
 export function routeLaneApp(filePath, projectRoot, apps, routeOwners = PLATFORM_ROUTE_OWNERS) {
   for (const group of APP_ROUTE_GROUPS) {
-    if (group === "(platform)") continue;
     const groupRel = relative(join(resolve(projectRoot), "src", "app", group), filePath);
     if (groupRel.startsWith("..") || isAbsolute(groupRel)) continue;
-    const first = groupRel.split(sep)[0];
+    const groupSegments = groupRel.split(sep);
+    for (let depth = groupSegments.length; depth > 0; depth--) {
+      const owner = routeOwners.find((candidate) => candidate.path === groupSegments.slice(0, depth).join("/"));
+      if (owner) return owner.app;
+    }
+    if (group === "(platform)") continue;
+    const first = groupSegments[0];
     if (apps.includes(first)) return first;
   }
   const routePlatformRoot = join(resolve(projectRoot), "src", "app", "(platform)");
@@ -809,7 +816,7 @@ export async function collectPermissionVocabularyViolations({ projectRoot = proc
   return violations;
 }
 
-export async function collectRouteOwnershipViolations({ projectRoot = process.cwd(), srcDir } = {}) {
+export async function collectRouteOwnershipViolations({ projectRoot = process.cwd(), srcDir, routeOwners = PLATFORM_ROUTE_OWNERS } = {}) {
   projectRoot = resolve(projectRoot);
   srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
   const violations = [];
@@ -877,10 +884,11 @@ export async function collectRouteOwnershipViolations({ projectRoot = process.cw
       const parent = /\bparent\s*:\s*"([^"]+)"/.exec(manifest)?.[1];
       if (parent) expectedRoot = `/${parent}/${app}`;
     } catch (error) { if (error?.code !== "ENOENT") throw error; }
-    if (!routes.includes(expectedRoot)) {
+    const explicitOwners = routeOwners.filter((owner) => owner.app === app);
+    if (explicitOwners.length === 0 && !routes.includes(expectedRoot)) {
       push(RULE_ROUTE_OWNERSHIP, navPath, null, `App "${app}" navigation must declare its root route "${expectedRoot}".`);
     }
-    for (const route of routes.filter((r) => r.startsWith("/") && !r.startsWith(expectedRoot))) {
+    for (const route of routes.filter((r) => r.startsWith("/") && explicitOwners.length === 0 && !r.startsWith(expectedRoot))) {
       push(RULE_ROUTE_OWNERSHIP, navPath, route, `App "${app}" navigation route "${route}" is not under its owned root "${expectedRoot}".`);
     }
     for (const specifier of extractImportSpecifiers(navSource, navPath)) {
@@ -892,6 +900,18 @@ export async function collectRouteOwnershipViolations({ projectRoot = process.cw
   }
 
   for (const app of registered) {
+    const explicitOwners = routeOwners.filter((owner) => owner.app === app);
+    if (explicitOwners.length > 0) {
+      for (const owner of explicitOwners) {
+        const groups = owner.path.includes("/print/") ? ["(document)"] : ["(platform)"];
+        for (const group of groups) {
+          const ownedDir = join(srcDir, "app", group, ...owner.path.split("/"));
+          try { if (!(await stat(ownedDir)).isDirectory()) throw new Error("not a directory"); }
+          catch (error) { push(RULE_ROUTE_OWNERSHIP, ownedDir, null, `Mapped route owner for app "${app}" does not exist at ${relative(projectRoot, ownedDir)}.`); }
+        }
+      }
+      continue;
+    }
     let routeSegments = [app];
     try {
       const manifest = await readFile(join(srcDir, "apps", app, "public", "manifest.ts"), "utf8");
@@ -1363,6 +1383,9 @@ export async function collectServerClientCallViolations({ projectRoot = process.
  * this list (split it per app instead), and an entry whose migration no longer spans two schemas fails as stale.
  */
 export const MIGRATION_ISOLATION_ALLOW_LIST = [
+  // Owner-approved M3 atomic ownership handoff: Presentation tables and enum move
+  // from StudioFlow and the two cross-module foreign keys are removed (R8.513).
+  "20261012200000_presentation_extract",
   // Owner-approved M3 atomic ownership handoff: only the two Ideas tables move
   // from StudioFlow to Ideas and the Schedule FK is removed (R8.511).
   "20261012182000_ideas_extract",

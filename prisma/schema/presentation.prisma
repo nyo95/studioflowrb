@@ -1,0 +1,77 @@
+enum SfPresentationLabelSide {
+  AUTO  @map("auto")
+  LEFT  @map("left")
+  RIGHT @map("right")
+
+  @@map("sf_presentation_label_side")
+  @@schema("presentation")
+}
+
+/// Project and creator identities are plain cross-module snapshots.
+model SfPresentationBoard {
+  id            String   @id @default(uuid())
+  project_id    String
+  title         String
+  sort_order    Int
+  created_by_id String
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  slides SfPresentationSlide[]
+
+  @@index([project_id, sort_order])
+  @@map("sf_presentation_board")
+  @@schema("presentation")
+}
+
+model SfPresentationSlide {
+  id          String   @id @default(uuid())
+  board_id    String
+  image_key   String   @unique
+  image_ratio Float?
+  sort_order  Int
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  board       SfPresentationBoard        @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  annotations SfPresentationAnnotation[]
+
+  @@index([board_id, sort_order])
+  @@map("sf_presentation_slide")
+  @@schema("presentation")
+}
+
+model SfPresentationAnnotation {
+  id                String                  @id @default(uuid())
+  slide_id          String
+  /// Live StudioFlow Schedule entry id. Missing entries resolve as unlinked.
+  schedule_entry_id String?
+  pin_x             Float
+  pin_y             Float
+  label_side        SfPresentationLabelSide @default(AUTO)
+  note              String?
+  sort_order        Int
+  created_at        DateTime                @default(now())
+  updated_at        DateTime                @updatedAt
+
+  slide SfPresentationSlide @relation(fields: [slide_id], references: [id], onDelete: Cascade)
+
+  @@index([slide_id, sort_order])
+  @@index([schedule_entry_id])
+  @@map("sf_presentation_annotation")
+  @@schema("presentation")
+}
+
+/// Durable retry ledger for slide objects whose owning row has already gone.
+model PresentationAssetCleanupFailure {
+  id              String    @id @default(uuid())
+  storage_key     String    @unique
+  attempts        Int       @default(0)
+  first_failed_at DateTime  @default(now())
+  last_attempt_at DateTime  @default(now())
+  resolved_at     DateTime?
+
+  @@index([resolved_at, first_failed_at])
+  @@map("asset_cleanup_failure")
+  @@schema("presentation")
+}

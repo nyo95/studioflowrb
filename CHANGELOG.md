@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.514 | 2026-10-12 | feat(presentation): extract Presentation module (Executor)
+
+- Extracted Presentation into its own optional module, PostgreSQL schema, runtime, public boundary, server actions, UI and print ownership while preserving its permission/module identity, retained URLs, board/slide/pin behavior, Schedule labels, Moodboard actions, navigation count and historical object keys. StudioFlow no longer composes the Presentation service, owns its routes, or reaches into its persistence.
+- Added typed StudioFlow public project/Schedule facts and composition-owned image and archive-retention coordination. Presentation reads tolerate and clear missing Schedule links; post-commit Schedule cleanup is best effort without exposing stale labels. Archive purge calls Presentation first even when disabled and cannot mark StudioFlow core assets purged after a Presentation failure.
+- Presentation now owns new `presentation/*` image keys, content-safe `presentation.*` audits, its object-cleanup retry ledger, independent project purge, and all board/slide/pin validation. Ideas no longer depends directly on Presentation internals; Moodboard copies pass through the composition coordinator and both module public doors.
+- **Migration/dependency:** one forward-only extraction migration; no dependency. Incremental deploy reached all 105 migrations on the standard disposable office test database. A populated pre-extraction fixture retained byte/field-equivalent board, slide and annotation ids, links, keys, ratios, order, creators and timestamps with no old Presentation tables left in StudioFlow; the complete 105-migration chain also applied from zero to a fresh disposable database.
+- **Checks:** `npm test` (1,027 passed); typecheck; architecture boundaries; legacy-runtime check; eslint (0 errors, one retained Presentation `<img>` warning); production build; Prisma generation; populated/fresh migration verification; unstaged and staged whitespace checks. Reviewer browser and retention acceptance is queued in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`; Workspace remains blocked until that review records PASS.
+
 ## R8.513 | 2026-10-12 | test(ideas): accept extraction and open Presentation work (Lead)
 
 - **Reviewer verdict for R8.512: PASS after one Lead-owned fixture correction.** Schema ownership, public boundaries, preserved permission/module identity, idempotent Schedule placement, tolerant usage cleanup, storage rollback/retry, audit separation and the retained Ideas URL match the accepted M3 contract. Both new migrations were also applied successfully to the verified office `studioflow_rebuild` database, bringing it to all 104 migrations with its existing Ideas card intact.

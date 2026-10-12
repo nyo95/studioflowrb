@@ -14,7 +14,6 @@ export type IdeasPorts = {
   auditWriter: AuditWriter;
   storage: ObjectStorage;
   studioFlow: StudioFlowIdeasBridge;
-  addStoredImageToMoodboard(input: IdeasContext & { projectId: string; source: { key: string; contentType: string } }): Promise<{ boardId: string; slideId: string; created: boolean }>;
 };
 
 export function requireIdeas(input: IdeasContext): string {

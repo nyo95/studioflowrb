@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { printTitle } from "./print-title";
+import { printTitle } from "@/apps/studioflow/public/print-title";
 
 describe("Presentation print title", () => {
   const at = new Date("2026-10-09T03:00:00Z");

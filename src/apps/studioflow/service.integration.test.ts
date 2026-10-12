@@ -29,6 +29,8 @@ import { runSerializableTransaction } from "@platform/core/db/transactions";
 import type { StudioFlowPorts } from "./shared";
 import { createIdeaService, type IdeasService } from "@/apps/ideas/public/service";
 import { createStudioFlowIdeasBridge } from "./public/ideas-bridge";
+import { createPresentationService, type PresentationService } from "@/apps/presentation/public/service";
+import { createStudioFlowPresentationBridge } from "./public/presentation-bridge";
 
 const ALL = [...Object.values(P)];
 const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage, P.projectPicDrafter, P.ideasManage];
@@ -36,6 +38,7 @@ const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage, P.pr
 let testDb: TestDb;
 let sf: StudioFlowService;
 let ideas: IdeasService;
+let presentation: PresentationService;
 let storage: FakeObjectStorage;
 let designer: { id: string; actor: { kind: "USER"; userId: string; label: string } };
 let drafter: { id: string; actor: { kind: "USER"; userId: string; label: string } };
@@ -89,6 +92,7 @@ async function reset() {
     "sf_external_schedule_placement", "sf_project", "sf_client", "sf_settings", "sf_holiday",
   ].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
   await testDb.pool.query('TRUNCATE TABLE "ideas"."sf_idea_usage", "ideas"."sf_idea_card", "ideas"."asset_cleanup_failure" RESTART IDENTITY CASCADE');
+  await testDb.pool.query('TRUNCATE TABLE "presentation"."sf_presentation_annotation", "presentation"."sf_presentation_slide", "presentation"."sf_presentation_board", "presentation"."asset_cleanup_failure" RESTART IDENTITY CASCADE');
   await truncatePlatformTables(testDb);
   await testDb.prisma.notification.deleteMany();
   await seedDefaultTemplate();
@@ -112,7 +116,8 @@ before(async () => {
     now: () => clock,
   };
   sf = createStudioFlowService(db, ports);
-  ideas = createIdeaService(db, { runTransaction: ports.runTransaction, auditWriter: ports.auditWriter, storage, studioFlow: createStudioFlowIdeasBridge(db, ports), addStoredImageToMoodboard: (input) => sf.presentation.addStoredImageToMoodboard(input) });
+  presentation = createPresentationService(db, { runTransaction: ports.runTransaction, auditWriter: ports.auditWriter, storage, studioFlow: createStudioFlowPresentationBridge(db) });
+  ideas = createIdeaService(db, { runTransaction: ports.runTransaction, auditWriter: ports.auditWriter, storage, studioFlow: createStudioFlowIdeasBridge(db, ports) });
 });
 beforeEach(reset);
 after(async () => closeTestDb(testDb));
@@ -559,7 +564,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const events = await db.auditEvent.findMany({ where: { entity_id: expired.projectId, action: { startsWith: "studioflow.project.assets_" } }, orderBy: { occurred_at: "asc" } });
     assert.deepEqual(events.map((event) => event.action), ["studioflow.project.assets_purged", "studioflow.project.assets_purge_completed"]);
     assert.ok(events.every((event) => event.actor_kind === "SYSTEM"));
-    assert.deepEqual(events[0].metadata, { projectId: expired.projectId, deliverables: 1, iterationImages: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, presentationSlides: 0, unparseableRevisions: 0, keysCollected: 5 });
+    assert.deepEqual(events[0].metadata, { projectId: expired.projectId, deliverables: 1, iterationImages: 1, momImages: 1, momSnapshotImages: 2, optionPhotos: 1, unparseableRevisions: 0, keysCollected: 5 });
     assert.deepEqual(events[1].metadata, { projectId: expired.projectId, blobsRemoved: 5, blobsKeptShared: 0, blobFailures: 0 });
     assert.equal((await retention().purgeExpiredArchivedAssets()).projectsPurged, 0);
     await sf.projects.restoreProject({ ...as(designer), projectId: inside.projectId });
@@ -581,7 +586,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const slideKey = `${expired.projectId}/slide`;
     await storage.put({ key: slideKey, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
     const slide = await db.sfPresentationSlide.create({ data: { board_id: board.id, image_key: slideKey, sort_order: 0 } });
-    const result = await retention().purgeExpiredArchivedAssets();
+    const result = await retention().purgeExpiredArchivedAssets({}, (projectId) => presentation.purgeArchivedProjectAssets(projectId));
     assert.equal(result.projectsPurged, 1);
     assert.equal(result.presentationSlides, 1);
     assert.equal(storage.objects.has(slideKey), false, "the slide's image is removed once unreferenced");
@@ -924,7 +929,7 @@ describe("SF-R1 bootstrap and naming", () => {
     await rejectsWith(sf.phases.sendIteration({ ...as(outsider, unassignedGrants), projectId, phaseId: moodboard.id, iterationId: (await openIteration(moodboard.id)).id }), "PERMISSION_DENIED");
     await rejectsWith(sf.mom.createDocument({ ...as(outsider, unassignedGrants), projectId, topic: "Denied" }), "PERMISSION_DENIED");
     await rejectsWith(sf.schedule.createEntry({ ...as(outsider, unassignedGrants), projectId, section: "MATERIAL", category: "Panel" }), "PERMISSION_DENIED");
-    await rejectsWith(sf.presentation.createBoard({ ...as(outsider, unassignedGrants), projectId, title: "Denied" }), "PERMISSION_DENIED");
+    await rejectsWith(presentation.createBoard({ ...as(outsider, unassignedGrants), projectId, title: "Denied" }), "PERMISSION_DENIED");
 
     await sf.projects.setProjectPriority({ ...as(designer), projectId, priority: "URGENT" });
     await sf.mom.createDocument({ ...as(drafter, [...DRAFTER_GRANTS, P.momManage]), projectId, topic: "Drafter can edit documents" });
@@ -3427,7 +3432,6 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     });
     const fragile = createIdeaService(testDb.prisma, {
       auditWriter: createAuditEventWriter(), storage, studioFlow: bridge,
-      addStoredImageToMoodboard: (input) => sf.presentation.addStoredImageToMoodboard(input),
       runTransaction: async <T>(work: (tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]) => Promise<T>) => {
         transaction += 1;
         if (transaction === 1) throw new Error("usage database unavailable");
@@ -3488,12 +3492,12 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     const { cardId } = await ideas.createIdeaCard({ ...as(designer), file: cardImage(7) });
     const cardKey = (await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: cardId } })).image_key;
 
-    const first = await ideas.addIdeaToMoodboard({ ...as(designer), cardId, projectId });
+    const first = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await ideas.readIdeaImageSource({ ...as(designer), cardId }) });
     assert.equal(first.created, true);
     const board = await testDb.prisma.sfPresentationBoard.findUniqueOrThrow({ where: { id: first.boardId } });
     assert.equal(board.title, "Moodboard");
     const slide = await testDb.prisma.sfPresentationSlide.findUniqueOrThrow({ where: { id: first.slideId } });
-    assert.ok(slide.image_key !== cardKey && slide.image_key.startsWith(`studioflow/presentation/${projectId}/`));
+    assert.ok(slide.image_key !== cardKey && slide.image_key.startsWith(`presentation/${projectId}/`));
     assert.deepEqual(bytesOf(slide.image_key), bytesOf(cardKey));
 
     // A board the team already named "moodboard" (any letter case) is reused, never duplicated; the slide goes last.
@@ -3504,7 +3508,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     const { noteId } = await sf.phases.postPhaseNote({ ...base, body: null, withImages: true });
     await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
     const image = await testDb.prisma.sfPhaseNoteImage.findFirstOrThrow({ where: { note_id: noteId } });
-    const second = await ideas.addNoteImageToMoodboard({ ...base, imageId: image.id });
+    const second = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await ideas.readNoteImageSource({ ...base, imageId: image.id }) });
     assert.deepEqual([second.created, second.boardId], [false, board.id]);
     const slides = await testDb.prisma.sfPresentationSlide.findMany({ where: { board_id: board.id }, orderBy: { sort_order: "asc" } });
     assert.deepEqual(slides.map((row) => row.id), [first.slideId, second.slideId]);
@@ -3516,7 +3520,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     // Another person's card is not reachable.
     const other = await seedUser("Other Mood", ALL);
     const mine = await ideas.createIdeaCard({ ...as(designer), file: cardImage(8) });
-    await rejectsWith(ideas.addIdeaToMoodboard({ ...as(other), cardId: mine.cardId, projectId }), "IDEA_CARD_NOT_FOUND");
+    await rejectsWith(ideas.readIdeaImageSource({ ...as(other), cardId: mine.cardId }), "IDEA_CARD_NOT_FOUND");
   });
 
   it("shows the current code after a reorder and drops a usage whose option is deleted, keeping the card", async () => {

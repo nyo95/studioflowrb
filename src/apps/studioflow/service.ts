@@ -3,7 +3,6 @@ import { createCdListService } from "./cd-list/service";
 import { createMomService } from "./mom/service";
 import { STUDIOFLOW_PERMISSIONS } from "./permissions";
 import { createPhaseService } from "./phases/service";
-import { createPresentationService } from "./presentation/service";
 import { createProjectService } from "./projects/service";
 import { createScheduleService } from "./schedule/service";
 import type { Db, StudioFlowPorts } from "./shared";
@@ -12,7 +11,6 @@ import { createTaskService } from "./tasks/service";
 /** Composed StudioFlow application service (one module per capability). */
 export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
   const schedule = createScheduleService(db, ports);
-  const presentation = createPresentationService(db, ports);
   return {
     projects: createProjectService(db, ports),
     cdList: createCdListService(db, ports),
@@ -20,7 +18,6 @@ export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
     tasks: createTaskService(db, ports),
     mom: createMomService(db, ports),
     schedule,
-    presentation,
     library: createLibraryService(ports),
   };
 }

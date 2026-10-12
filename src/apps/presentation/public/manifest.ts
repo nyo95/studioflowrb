@@ -1,5 +1,5 @@
 import type { ModuleManifest } from "@platform/core/modules/manifest";
-import { STUDIOFLOW_PERMISSIONS } from "../permissions";
+import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 
 export const PRESENTATION_MODULE_MANIFEST = Object.freeze({
   id: "presentation",

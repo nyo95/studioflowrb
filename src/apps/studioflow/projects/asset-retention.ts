@@ -13,7 +13,10 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
     return { retentionDays, eligible };
   }
 
-  async function purgeExpiredArchivedAssets(input: { now?: Date; limit?: number } = {}) {
+  async function purgeExpiredArchivedAssets(
+    input: { now?: Date; limit?: number } = {},
+    beforeProject?: (projectId: string) => Promise<{ presentationSlides: number }>,
+  ) {
     const now = input.now ?? nowOf(ports);
     const limit = input.limit ?? 25;
     if (!Number.isInteger(limit) || limit < 1) throw invalid("PURGE_LIMIT_INVALID", "Cleanup limit must be a positive whole number.");
@@ -30,19 +33,21 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
     };
     const actor = { kind: "SYSTEM" as const, label: "StudioFlow asset retention" };
     for (const project of projects) {
+      // Composition invokes each independently owned module before StudioFlow claims
+      // the project. A hook failure therefore leaves this project eligible for retry.
+      const external = beforeProject ? await beforeProject(project.id) : { presentationSlides: 0 };
       const claimed = await ports.runTransaction(async (tx) => {
         // Re-check archive eligibility in the claim, including a concurrent restore.
         const claim = await tx.sfProject.updateMany({ where: { id: project.id, ...eligible }, data: { assets_purged_at: now } });
         if (claim.count === 0) return null;
-        const [deliverables, iterationImages, images, options, revisions, slides] = await Promise.all([
+        const [deliverables, iterationImages, images, options, revisions] = await Promise.all([
           tx.sfDeliverable.findMany({ where: { project_id: project.id }, select: { storage_key: true } }),
           tx.sfPhaseNoteImage.findMany({ where: { note: { phase: { project_id: project.id } } }, select: { storage_key: true } }),
           tx.sfMomImage.findMany({ where: { item: { document: { project_id: project.id } } }, select: { storage_key: true } }),
           tx.sfScheduleOption.findMany({ where: { entry: { project_id: project.id }, image_key: { not: null } }, select: { image_key: true } }),
           tx.sfMomRevision.findMany({ where: { document: { project_id: project.id } }, select: { id: true, snapshot: true } }),
-          tx.sfPresentationSlide.findMany({ where: { board: { project_id: project.id } }, select: { image_key: true } }),
         ]);
-        const keys = new Set([...deliverables.map((row) => row.storage_key), ...iterationImages.map((row) => row.storage_key), ...images.map((row) => row.storage_key), ...options.map((row) => row.image_key!), ...slides.map((row) => row.image_key)]);
+        const keys = new Set([...deliverables.map((row) => row.storage_key), ...iterationImages.map((row) => row.storage_key), ...images.map((row) => row.storage_key), ...options.map((row) => row.image_key!)]);
         let momSnapshotImages = 0;
         let unparseableRevisions = 0;
         const unreadableSnapshots: string[] = [];
@@ -67,8 +72,7 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
         await tx.sfPhaseNoteImage.deleteMany({ where: { note: { phase: { project_id: project.id } } } });
         await tx.sfMomImage.deleteMany({ where: { item: { document: { project_id: project.id } } } });
         await tx.sfScheduleOption.updateMany({ where: { entry: { project_id: project.id }, image_key: { not: null } }, data: { image_key: null } });
-        await tx.sfPresentationSlide.deleteMany({ where: { board: { project_id: project.id } } });
-        const counts = { deliverables: deliverables.length, iterationImages: iterationImages.length, momImages: images.length, momSnapshotImages, optionPhotos: options.length, presentationSlides: slides.length, unparseableRevisions };
+        const counts = { deliverables: deliverables.length, iterationImages: iterationImages.length, momImages: images.length, momSnapshotImages, optionPhotos: options.length, unparseableRevisions };
         await writeAudit(ports, tx, { action: "studioflow.project.assets_purged", entityType: "project", entityId: project.id, actor, metadata: { projectId: project.id, ...counts, keysCollected: keys.size } });
         // An unreadable retained snapshot may still contain a known candidate key.
         // Preserve that object rather than leave its untouched reference dangling.
@@ -78,6 +82,7 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
       if (!claimed) continue;
       const blobs = await removeUnreferenced(db, ports.storage, claimed.keys, claimed.retainedSnapshotKeys);
       summary.projectsPurged++;
+      summary.presentationSlides += external.presentationSlides;
       for (const key of Object.keys(claimed.counts) as Array<keyof typeof claimed.counts>) summary[key] += claimed.counts[key];
       summary.blobsRemoved += blobs.blobsRemoved;
       summary.blobsKeptShared += blobs.blobsKeptShared;
@@ -93,9 +98,9 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
 
   return {
     purgeExpiredArchivedAssets,
-    async runAssetCleanup(input: CommandContext & { now?: Date; limit?: number }) {
+    async runAssetCleanup(input: CommandContext & { now?: Date; limit?: number }, beforeProject?: (projectId: string) => Promise<{ presentationSlides: number }>) {
       requireCommand(input, P.projectManage);
-      return purgeExpiredArchivedAssets(input);
+      return purgeExpiredArchivedAssets(input, beforeProject);
     },
     /** How many archived projects the next cleanup would purge right now. Reads only; deletes and writes nothing. */
     async previewAssetCleanup(input: CommandContext & { now?: Date }) {

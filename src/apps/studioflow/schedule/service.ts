@@ -671,14 +671,14 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       await requireScheduleCommand(input);
       const result = await runTransaction(async (tx) => {
         const entry = await loadEntry(tx, input.projectId, input.entryId, true);
-        const images = await tx.sfScheduleOption.findMany({ where: { entry_id: entry.id }, select: { image_key: true } });
+        const images = await tx.sfScheduleOption.findMany({ where: { entry_id: entry.id }, select: { id: true, image_key: true } });
         // Later codes keep their number: the deleted code is left empty, never shifted into.
         await tx.sfScheduleEntry.delete({ where: { id: entry.id } });
         await writeAudit(ports, tx, { action: "studioflow.schedule.entry-deleted", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) } });
-        return { entryId: entry.id, imageKeys: images.map((row) => row.image_key) };
+        return { entryId: entry.id, optionIds: images.map((row) => row.id), imageKeys: images.map((row) => row.image_key) };
       });
       await removeUnreferenced(result.imageKeys);
-      return { entryId: result.entryId };
+      return { entryId: result.entryId, optionIds: result.optionIds };
     },
 
     async reorderEntries(input: CommandContext & { projectId: string; section: string; prefix: string; orderedIds: string[] }) {

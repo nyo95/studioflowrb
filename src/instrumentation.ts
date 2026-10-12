@@ -31,7 +31,10 @@ export async function register(): Promise<void> {
   await synchronizeModuleVersions();
   try {
     const { startStudioFlowAssetSweep } = await import("./apps/studioflow/runtime");
+    const { startAssetSweep } = await import("./apps/studioflow/asset-sweep");
+    const { purgeStudioFlowArchivedAssets } = await import("./application/studioflow-asset-retention");
     startStudioFlowAssetSweep();
+    startAssetSweep(() => purgeStudioFlowArchivedAssets({ limit: 25 }), process.env, 25);
   } catch {
     console.error("StudioFlow asset cleanup startup failed.");
   }

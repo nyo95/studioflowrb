@@ -36,6 +36,7 @@ async function main() {
   try {
     await testDb.pool.query(`TRUNCATE TABLE ${["sf_project", "sf_client", "sf_phase_definition", "sf_phase_template", "sf_settings", "sf_checklist_template", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix"].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
     await testDb.pool.query('TRUNCATE TABLE "ideas"."sf_idea_usage", "ideas"."sf_idea_card", "ideas"."asset_cleanup_failure" RESTART IDENTITY CASCADE');
+    await testDb.pool.query('TRUNCATE TABLE "presentation"."sf_presentation_annotation", "presentation"."sf_presentation_slide", "presentation"."sf_presentation_board", "presentation"."asset_cleanup_failure" RESTART IDENTITY CASCADE');
     await testDb.pool.query('TRUNCATE TABLE "bq"."bq_project" RESTART IDENTITY CASCADE');
     await truncatePlatformTables(testDb);
 

@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.514] Presentation module extraction parity
+- Surface: project Presentation list/editor, Presentation print, Ideas/phase-note Moodboard actions, project navigation, and archived-file cleanup
+- Fixture: Designer PIC and viewer/other PIC; editable, completed, and archived projects; boards with several slides and pins with and without Product Schedule links; Presentation enabled and disabled in turn
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Create, rename, open, and delete a board. 2. Upload several images, reorder and delete slides. 3. Create, move, edit, and delete pins with free notes and Product Schedule links. 4. Add Ideas-card and phase-note images to Moodboard. 5. Compare editor and print content. 6. Toggle Presentation off and on, then verify the existing data returns and project navigation count remains safe. 7. Archive a project and run retention once while Presentation is enabled and once while disabled, including one forced retryable cleanup failure.
+- Acceptance: retained URLs and visible behavior are unchanged; board/slide/pin order and Schedule labels remain correct; Moodboard receives independent image copies; editor and print agree; disabled Presentation hides/refuses only its own capability without data loss or StudioFlow breakage; archive cleanup owns Presentation data independently, retries failures, and never lets StudioFlow mark the project purged after a partial failure; neither viewport has page-level horizontal overflow.
+- Status: PENDING
+
 ### [R8.512] Ideas module extraction parity
 - Surface: `/studioflow/ideas`, phase-note image viewer, Product Schedule, and project Presentation moodboard
 - Fixture: Designer PIC with Ideas and Schedule permissions; another user; editable, completed, and archived projects; Ideas/Presentation enabled and disabled in turn

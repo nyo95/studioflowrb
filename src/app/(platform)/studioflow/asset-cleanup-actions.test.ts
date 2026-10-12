@@ -29,6 +29,8 @@ function loadActions() {
     "@platform/core/errors": { AppError },
     "@platform/core/modules": { requireModuleEnabled: async () => undefined },
     "@platform/core/validation": { validationError },
+    "@/apps/presentation/public/lifecycle": { purgeArchivedProjectAssets: async () => ({ presentationSlides: 0 }), clearScheduleEntryLink: async () => ({ count: 0 }), retryPresentationAssetCleanup: async () => ({ attempted: 0, resolved: 0, failed: 0 }) },
+    "@/apps/ideas/public/lifecycle": { removeScheduleOptionUsage: async () => ({ count: 0 }) },
     "@/apps/studioflow/runtime": {
       studioFlow: {
         projects: {

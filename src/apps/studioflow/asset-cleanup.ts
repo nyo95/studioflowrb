@@ -40,10 +40,6 @@ async function isReferenced(db: Db | TxClient, key: string): Promise<boolean> {
     db.sfScheduleOption.count({ where: { image_key: key } }),
     db.sfScheduleTemplateItem.count({ where: { image_key: key } }),
     db.sfClient.count({ where: { logo_storage_key: key } }),
-    // Same guard as below for the isolated storage tests' delegate subset.
-    // Older isolated storage tests deliberately provide only the pre-Presentation
-    // delegate subset. Runtime Prisma always has this delegate after the migration.
-    ...(db.sfPresentationSlide ? [db.sfPresentationSlide.count({ where: { image_key: key } })] : []),
   ]);
   return references.some((count) => count > 0);
 }
@@ -99,7 +95,7 @@ export async function enqueueUnreferencedCleanup(tx: Db | TxClient, keys: readon
   return enqueueObjectCleanup(tx, orphaned);
 }
 
-/** Shared by schedule/presentation deletes and archive retention. Never remove a still-referenced object. */
+/** Shared by StudioFlow-owned deletes and archive retention. Never remove a still-referenced object. */
 export async function removeUnreferenced(db: Db, storage: ObjectStorage, keys: readonly (string | null | undefined)[], retainedSnapshotKeys: ReadonlySet<string> = new Set()) {
   const result = { blobsRemoved: 0, blobsKeptShared: 0, blobFailures: 0 };
   for (const key of uniqueKeys(keys)) {

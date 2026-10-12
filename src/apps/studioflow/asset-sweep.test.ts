@@ -32,7 +32,7 @@ it("sweep defaults off outside production, unrefs both timers, and catches run e
   }
 });
 
-it("shared cleanup protects all six live key owners and deduplicates removal candidates", async () => {
+it("StudioFlow cleanup protects its five live key owners and deduplicates removal candidates", async () => {
   const owners = ["sfDeliverable", "sfMomImage", "sfPhaseNoteImage", "sfScheduleOption", "sfScheduleTemplateItem", "sfClient"];
   for (const owner of owners) {
     const db = Object.fromEntries(owners.map((name) => [name, { count: async () => name === owner ? 1 : 0 }])) as unknown as Db;

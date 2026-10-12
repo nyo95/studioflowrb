@@ -3,7 +3,8 @@ import type { ModuleManifest } from "@platform/core/modules/manifest";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 import { BQ_PERMISSIONS } from "@/apps/bq/public";
 import { IDEAS_MODULE_MANIFEST } from "@/apps/ideas/public";
-import { PRESENTATION_MODULE_MANIFEST, STUDIOFLOW_PERMISSIONS, STUDIOFLOW_POSITIONS } from "@/apps/studioflow/public";
+import { PRESENTATION_MODULE_MANIFEST } from "@/apps/presentation/public";
+import { STUDIOFLOW_PERMISSIONS, STUDIOFLOW_POSITIONS } from "@/apps/studioflow/public";
 
 /**
  * App registrations for the platform permission registry and app launcher

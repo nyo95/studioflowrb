@@ -6,7 +6,7 @@ import { closeTestDb, createTestDb, requireDisposableTestDatabaseUrl, truncatePl
 import { initializeModuleRegistry, resetModuleRegistryForTests, type ModuleManifest } from "@platform/core/modules";
 
 import PresentationPrintPage from "./(document)/studioflow/print/projects/[projectId]/presentation/[boardId]/page";
-import { createPresentationBoardAction } from "./(platform)/studioflow/actions";
+import { createPresentationBoardAction } from "@/apps/presentation/public/actions";
 import { listIdeaCardsAction } from "@/apps/ideas/public/actions";
 import IdeasPage from "./(platform)/studioflow/ideas/page";
 import PresentationPage from "./(platform)/studioflow/projects/[projectId]/presentation/page";

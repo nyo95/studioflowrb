@@ -4,14 +4,15 @@ import { notFound } from "next/navigation";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { AppError } from "@platform/core/errors";
 import { isModuleEnabled } from "@platform/core/modules";
-import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
-import { studioFlow } from "@/apps/studioflow/runtime";
+import { PRESENTATION_ROUTES } from "@/apps/presentation/public";
+import { studioFlowPresentationBridge } from "@/apps/studioflow/public/presentation-bridge-runtime";
+import { presentation } from "@/apps/presentation/runtime";
 import { DocumentPage, DocumentSheet, PrintButton, PrintFormatPicker, printFormatFromSearchParams } from "@/platform/ui_engine";
 import { prisma } from "@platform/core/db";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { formatInstant } from "@platform/utilities/date";
 
-import { printTitle } from "../../../../print-title";
+import { printTitle } from "@/apps/studioflow/public/print-title";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +37,10 @@ export default async function PresentationPrintPage({ params, searchParams }: { 
   if (!(await isModuleEnabled("presentation"))) notFound();
   const { projectId, boardId } = await params;
   const printFormat = printFormatFromSearchParams(await searchParams);
-  const { grants } = await requirePrincipalGrants();
+  const { principal, grants } = await requirePrincipalGrants();
   const [project, board] = await Promise.all([
-    studioFlow.projects.getProject({ grants, projectId }),
-    studioFlow.presentation.getBoard({ grants, projectId, boardId }),
+    studioFlowPresentationBridge.readProjectDocumentContext({ grants, actorId: principal.userId, projectId }),
+    presentation.getBoard({ grants, actorId: principal.userId, projectId, boardId }),
   ]).catch((error) => { if (error instanceof AppError && (error.kind === "NOT_FOUND" || error.kind === "FORBIDDEN")) notFound(); throw error; });
   const now = new Date();
   const printed = formatInstant(now, { locale: "id-ID", style: "date" });
@@ -62,7 +63,7 @@ export default async function PresentationPrintPage({ params, searchParams }: { 
     <DocumentSheet
       paged
       printFormat={printFormat}
-      toolbar={<><Link prefetch={false} href={STUDIOFLOW_ROUTES.projectPresentationBoard(projectId, boardId)} className="text-sm text-ink-secondary hover:underline">Back to presentation</Link><div className="flex items-center gap-3"><PrintFormatPicker value={printFormat} /><PrintButton /></div></>}
+      toolbar={<><Link prefetch={false} href={PRESENTATION_ROUTES.board(projectId, boardId)} className="text-sm text-ink-secondary hover:underline">Back to presentation</Link><div className="flex items-center gap-3"><PrintFormatPicker value={printFormat} /><PrintButton /></div></>}
     >
       {board.slides.length === 0 ? (
         <DocumentPage className="flex flex-col" style={{ "--doc-pad": "11mm 13mm" } as React.CSSProperties}>

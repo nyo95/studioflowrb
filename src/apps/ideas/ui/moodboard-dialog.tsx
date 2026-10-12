@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
+import { PRESENTATION_ROUTES } from "@/apps/presentation/public/nav";
 import { Button, Dialog, Field, FormActions, InlineError, Notice, Select, buttonClasses } from "@/platform/ui_engine";
 import type { ActionResult } from "@platform/core/actions";
 
@@ -25,7 +25,7 @@ export function MoodboardDialog({ targets, apply, onClose }: { targets: Target[]
           <Notice tone="success">{done.created ? `Started the Moodboard board of ${project?.name} and added the image.` : `Added the image to the Moodboard board of ${project?.name}.`}</Notice>
           <FormActions>
             <Button onClick={onClose}>Close</Button>
-            <Link href={STUDIOFLOW_ROUTES.projectPresentationBoard(done.projectId, done.boardId)} prefetch={false} className={buttonClasses("primary")}>Open moodboard</Link>
+            <Link href={PRESENTATION_ROUTES.board(done.projectId, done.boardId)} prefetch={false} className={buttonClasses("primary")}>Open moodboard</Link>
           </FormActions>
         </div>
       </Dialog>

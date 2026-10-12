@@ -234,16 +234,16 @@ export function createIdeaService(db: IdeasDb, ports: IdeasPorts) {
       return placed;
     },
 
-    async addIdeaToMoodboard(input: IdeasContext & { cardId: string; projectId: string }) {
+    async readIdeaImageSource(input: IdeasContext & { cardId: string }) {
       const userId = requireIdeas(input);
       const card = await ownCard(db, userId, input.cardId);
-      return ports.addStoredImageToMoodboard({ ...input, source: { key: card.image_key, contentType: card.content_type } });
+      return { key: card.image_key, contentType: card.content_type };
     },
 
-    async addNoteImageToMoodboard(input: IdeasContext & { projectId: string; phaseId: string; imageId: string }) {
+    async readNoteImageSource(input: IdeasContext & { projectId: string; phaseId: string; imageId: string }) {
       requireIdeas(input);
       const image = await ports.studioFlow.readPhaseNoteImageSource(input);
-      return ports.addStoredImageToMoodboard({ ...input, source: { key: image.key, contentType: image.contentType } });
+      return { key: image.key, contentType: image.contentType };
     },
 
     async saveNoteImageToIdeas(input: IdeasContext & { projectId: string; phaseId: string; imageId: string }) {
