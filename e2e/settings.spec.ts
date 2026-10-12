@@ -81,6 +81,10 @@ test("access terminology distinguishes Platform Owner from Developer", async ({ 
 
   await open(page, "/settings/access/roles");
   await expect(page.getByText("Platform Owner", { exact: true }).first()).toBeVisible();
+  const ownerRow = page.getByRole("row").filter({ hasText: "platform-owner" });
+  await expect(ownerRow.getByText("All Developer-enabled access", { exact: true })).toBeVisible();
+  await expect(ownerRow.getByText("Locked", { exact: true })).toBeVisible();
+  await expect(ownerRow.getByRole("button", { name: /Actions for/ })).toHaveCount(0);
 });
 
 test("Role matrix follows the Developer module ceiling without hiding core apps", async ({ page }) => {
@@ -89,20 +93,44 @@ test("Role matrix follows the Developer module ceiling without hiding core apps"
   const client = new Client({ connectionString });
   await client.connect();
   try {
+    await client.query(`DELETE FROM platform."RolePermission" WHERE role_id IN (SELECT id FROM platform."Role" WHERE code = 'e2e-project-manager')`);
+    await client.query(`DELETE FROM platform."Role" WHERE code = 'e2e-project-manager'`);
     await client.query(`INSERT INTO platform.module_state (module_id, state, last_version, updated_by)
       VALUES ('ideas', 'ENABLED', '1.0.0', 'e2e')
       ON CONFLICT (module_id) DO UPDATE SET state = EXCLUDED.state, updated_by = EXCLUDED.updated_by`);
     await open(page, "/settings/access/roles");
     await page.getByRole("button", { name: "New role" }).click();
     await expect(page.locator('input[value="studioflow.ideas.manage"]')).toHaveCount(1);
+    await expect(page.locator('input[value^="platform."]')).toHaveCount(0);
+    await expect(page.locator('input[value$=".access"]')).toHaveCount(0);
+    await expect(page.getByText("Manage every project", { exact: true })).toBeVisible();
+    await expect(page.getByText("Can change projects even when the user is not assigned as PIC.", { exact: true })).toBeVisible();
+    await page.getByLabel("Code").fill("e2e-project-manager");
+    await page.getByLabel("Name").fill("E2E Project Manager");
+    await page.getByLabel("Manage every project").check();
+    await page.getByRole("button", { name: "Create role" }).click();
+    await expect(page.getByText("E2E Project Manager", { exact: true })).toBeVisible();
+    const stored = await client.query<{ permission_id: string }>(`SELECT rp.permission_id
+      FROM platform."RolePermission" rp
+      JOIN platform."Role" r ON r.id = rp.role_id
+      WHERE r.code = 'e2e-project-manager'
+      ORDER BY rp.permission_id`);
+    expect(stored.rows.map((row) => row.permission_id)).toEqual([
+      "studioflow.access",
+      "studioflow.project.manage",
+      "studioflow.project.override",
+      "studioflow.project.read",
+    ]);
 
     await client.query(`UPDATE platform.module_state SET state = 'DISABLED', updated_by = 'e2e' WHERE module_id = 'ideas'`);
     await page.reload();
     await page.getByRole("button", { name: "New role" }).click();
     await expect(page.locator('input[value="studioflow.ideas.manage"]')).toHaveCount(0);
-    await expect(page.locator('input[value="studioflow.access"]')).toHaveCount(1);
+    await expect(page.locator('input[value="studioflow.access"]')).toHaveCount(0);
     await expect(page.locator('input[value="studioflow.presentation.manage"]')).toHaveCount(1);
   } finally {
+    await client.query(`DELETE FROM platform."RolePermission" WHERE role_id IN (SELECT id FROM platform."Role" WHERE code = 'e2e-project-manager')`);
+    await client.query(`DELETE FROM platform."Role" WHERE code = 'e2e-project-manager'`);
     await client.query(`UPDATE platform.module_state SET state = 'ENABLED', updated_by = 'e2e-cleanup' WHERE module_id = 'ideas'`);
     await client.end();
   }

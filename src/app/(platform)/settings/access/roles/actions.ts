@@ -7,6 +7,9 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { platformAccess } from "@platform/runtime";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
+import { getPermissionRegistry } from "@platform/core/rbac/registry";
+
+import { expandRolePermissionSelection } from "./permission-grouping";
 
 function revalidateRoles(): void {
   revalidatePath("/settings/access/roles");
@@ -28,7 +31,7 @@ export async function createRoleAction(_prev: ActionResult<{ changed?: boolean; 
       description: String(formData.get("description") ?? ""),
     });
     if (!parsed.success) throw validationError(parsed.error);
-    const permissionIds = formData.getAll("permissionIds").map(String).filter(Boolean);
+    const permissionIds = expandRolePermissionSelection(formData.getAll("permissionIds").map(String).filter(Boolean), getPermissionRegistry());
     const result = await platformAccess.createRole({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
@@ -77,7 +80,7 @@ export async function replaceRoleGrantsAction(
     const { principal, grants } = await requirePrincipalGrants();
     const roleId = z.string().uuid().safeParse(String(formData.get("roleId") ?? ""));
     if (!roleId.success) throw validationError(roleId.error);
-    const permissionIds = formData.getAll("permissionIds").map(String).filter(Boolean);
+    const permissionIds = expandRolePermissionSelection(formData.getAll("permissionIds").map(String).filter(Boolean), getPermissionRegistry());
     const result = await platformAccess.replaceRoleGrants({
       grants,
       actor: { kind: "USER", userId: principal.userId, label: principal.displayName },

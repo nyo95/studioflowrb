@@ -28,11 +28,14 @@ before(async () => {
 beforeEach(async () => { await truncatePlatformTables(db); });
 after(async () => { resetModuleRegistryForTests(); await closePrismaConnection(); await closeTestDb(db); });
 
-async function owner(grants: readonly string[] = MANAGE) {
+async function owner() {
   const user = await db.prisma.user.create({ data: { email: `${randomUUID()}@test.local`, display_name: "Integration Owner", password_hash: "x" } });
-  const role = await db.prisma.role.create({ data: { code: `integration-${randomUUID()}`, name: "Integration role" } });
+  const role = await db.prisma.role.upsert({
+    where: { code: "platform-owner" },
+    create: { code: "platform-owner", name: "Platform Owner", is_system: true },
+    update: {},
+  });
   await db.prisma.userRole.create({ data: { user_id: user.id, role_id: role.id } });
-  await Promise.all(grants.map((permission_id) => db.prisma.rolePermission.create({ data: { role_id: role.id, permission_id } })));
   return { user, role };
 }
 
@@ -98,9 +101,9 @@ describe("integration route kit", () => {
     await db.prisma.user.update({ where: { id: user.id }, data: { status: "DISABLED", disabled_at: new Date() } });
     assert.equal((await GET(request("GET", valid.secret))).status, 401);
     await db.prisma.user.update({ where: { id: user.id }, data: { status: "ACTIVE", disabled_at: null } });
-    await db.prisma.rolePermission.deleteMany({ where: { role_id: role.id, permission_id: INTEGRATION_PING_GRANT } });
+    await db.prisma.userRole.delete({ where: { user_id_role_id: { user_id: user.id, role_id: role.id } } });
     assert.equal((await GET(request("GET", valid.secret))).status, 403);
-    await db.prisma.rolePermission.create({ data: { role_id: role.id, permission_id: INTEGRATION_PING_GRANT } });
+    await db.prisma.userRole.create({ data: { user_id: user.id, role_id: role.id } });
     await db.prisma.integrationToken.update({ where: { id: valid.token.id }, data: { scopes: [] } });
     const noScope = valid;
     assert.equal((await GET(request("GET", noScope.secret))).status, 403);

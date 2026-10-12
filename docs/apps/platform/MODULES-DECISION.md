@@ -4,7 +4,8 @@ Status: ACCEPTED (owner, 2026-10-09; recorded by the Lead in R8.494).
 Amended: owner, 2026-10-10 (D5 web console, D7 dropped, D10 updates; R8.501),
 and 2026-10-11 (D5 terminology: Platform Owner and Developer; R8.503; core-app
 bundle and Developer-controlled module permission ceiling; R8.504; isolated
-Developer web console delivered in R8.506).
+Developer web console delivered in R8.506; locked Platform Owner authority and
+task-based custom-role matrix in R8.507).
 Scope: how StudioFlowRB becomes a platform of separately versioned, separately
 switchable modules, so a customer runs only what it has, and a new capability can
 be used on its own first and injected later.
@@ -77,9 +78,12 @@ an operational switch never destroys the Platform Owner's role design.
 
 **D5. Two kinds of authority.**
 
-- **Platform Owner** (the business): users, custom roles, projects, company
-  data, and assignment of only the features the Developer has enabled. This is the existing `platform-owner` role,
-  shown as "Platform Owner". It stays an ordinary RBAC role.
+- **Platform Owner** (the business): users, custom roles, projects and company
+  data. The exact system role `platform-owner`, shown as "Platform Owner",
+  automatically receives every non-position permission currently allowed by
+  the Developer module ceiling. Its access is not editable, and custom roles
+  cannot hold `platform.*` authority. The owner may grant app work only within
+  that Developer-controlled ceiling; Designer/Drafter positions remain explicit.
 - **Developer**: install/enable/disable modules, versions, purges, recovery.
   **Developer rights are not RBAC
   permissions.** They are not in the permission vocabulary, so no role can

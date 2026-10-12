@@ -11,7 +11,7 @@ import { prisma } from "@platform/core/db";
 import { enabledPermissionIds } from "@platform/core/modules";
 import { SettingsSectionNav } from "../../settings-navigation";
 import { platformSettingsGroups } from "../../settings-sections";
-import { groupPermissionsByApp } from "./permission-grouping";
+import { friendlyPermissionLabels, groupPermissionsByApp } from "./permission-grouping";
 import { RolesDirectory } from "./roles-directory";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +64,7 @@ export default async function RolesPage() {
             roles={directory.roles.map((role) => ({
               ...role,
               archivedAt: role.archivedAt ? role.archivedAt.toISOString() : null,
+              capabilityLabels: friendlyPermissionLabels(role.permissionIds, getPermissionRegistry()),
             }))}
             permissionGroups={groupPermissionsByApp(grantablePermissionIds, getPermissionRegistry())}
             canManage={grants.includes("platform.role.manage")}

@@ -30,7 +30,8 @@ const REGISTRY_INPUT = [
     requires: [],
     name: "Master Data",
     rootPath: "/masterdata",
-    permissions: ["masterdata.access", "masterdata.price.read"],
+    permissions: ["masterdata.access", "masterdata.price.read", "masterdata.worker.assign"],
+    positions: [{ permission: "masterdata.worker.assign", label: "Worker" }],
   },
 ];
 
@@ -90,16 +91,34 @@ async function seedAdmin(email: string, displayName: string, grants: readonly st
   return { user, role };
 }
 
+async function seedOwner(email: string, displayName: string, roleId?: string) {
+  const role = roleId
+    ? await db.prisma.role.findUniqueOrThrow({ where: { id: roleId } })
+    : await db.prisma.role.create({ data: {
+      code: "platform-owner",
+      name: "Platform Owner",
+      is_system: true,
+    } });
+  const user = await db.prisma.user.create({ data: {
+    email,
+    display_name: displayName,
+    password_hash: await hashPassword("correct horse battery staple"),
+    user_roles: { create: { role_id: role.id } },
+  } });
+  ACTOR.userId = ACTOR.userId || user.id;
+  return { user, role };
+}
+
 describe("live grant resolution", () => {
   it("returns the union of grants over live roles and drops unknown persisted ids", async () => {
-    const { user, role } = await seedAdmin("grants@example.com", "Grants", [...FULL_GRANTS, "ghost.permission.read"]);
+    const { user, role } = await seedAdmin("grants@example.com", "Grants", ["masterdata.access", "ghost.permission.read"]);
     const second = await db.prisma.role.create({
       data: { code: "extra", name: "Extra", role_permissions: { create: [{ permission_id: "masterdata.price.read" }] } },
     });
     await db.prisma.userRole.create({ data: { user_id: user.id, role_id: second.id } });
 
     const resolved = await loadLiveGrants(db.prisma, user.id, getPermissionRegistry().permissions);
-    assert.deepEqual([...resolved.grants].sort(), [...new Set([...FULL_GRANTS, "masterdata.price.read"])].sort());
+    assert.deepEqual([...resolved.grants].sort(), ["masterdata.access", "masterdata.price.read"]);
     assert.deepEqual(resolved.unknownGrantIds, ["ghost.permission.read"]);
     assert.equal(role.code.startsWith("admin-"), true);
   });
@@ -117,6 +136,50 @@ describe("live grant resolution", () => {
     const resolved = await loadLiveGrants(db.prisma, user.id, ["masterdata.access"]);
     assert.deepEqual(resolved.grants, ["masterdata.access"]);
     assert.deepEqual(resolved.unknownGrantIds, []);
+  });
+
+  it("gives Platform Owner every enabled non-position permission even when its stored grants are stale", async () => {
+    const role = await db.prisma.role.create({ data: {
+      code: "platform-owner",
+      name: "Platform Owner",
+      is_system: true,
+      role_permissions: { create: [{ permission_id: "platform.user.read" }] },
+    } });
+    const user = await db.prisma.user.create({ data: {
+      email: "owner@example.com",
+      display_name: "Owner",
+      password_hash: "fixture",
+      user_roles: { create: { role_id: role.id } },
+    } });
+    const enabled = ["platform.user.read", "platform.role.manage", "masterdata.access", "masterdata.price.read", "masterdata.worker.assign"];
+    const resolved = await loadLiveGrants(db.prisma, user.id, enabled);
+    assert.deepEqual(resolved.grants, ["platform.user.read", "platform.role.manage", "masterdata.access", "masterdata.price.read"]);
+  });
+
+  it("never lets an ordinary role turn persisted Platform rows into effective owner authority", async () => {
+    const { user } = await seedAdmin("not-owner@example.com", "Not owner", ["platform.role.manage", "masterdata.access"]);
+    const resolved = await loadLiveGrants(db.prisma, user.id, ["platform.role.manage", "masterdata.access"]);
+    assert.deepEqual(resolved.grants, ["masterdata.access"]);
+  });
+
+  it("does not trust the Platform Owner code unless the role is system-owned", async () => {
+    const role = await db.prisma.role.create({ data: {
+      code: "platform-owner",
+      name: "Spoofed Owner",
+      is_system: false,
+      role_permissions: { create: [
+        { permission_id: "platform.role.manage" },
+        { permission_id: "masterdata.access" },
+      ] },
+    } });
+    const user = await db.prisma.user.create({ data: {
+      email: "spoofed-owner@example.com",
+      display_name: "Spoofed Owner",
+      password_hash: "fixture",
+      user_roles: { create: { role_id: role.id } },
+    } });
+    const resolved = await loadLiveGrants(db.prisma, user.id, ["platform.role.manage", "masterdata.access"]);
+    assert.deepEqual(resolved.grants, ["masterdata.access"]);
   });
 });
 
@@ -218,7 +281,7 @@ describe("user commands", () => {
   });
 
   it("refuses disabling the final access administrator and rolls back fully", async () => {
-    const { user } = await seedAdmin("last-admin@example.com", "Last Admin");
+    const { user } = await seedOwner("last-admin@example.com", "Last Admin");
     const before = await auditCount();
     await assert.rejects(
       () => service.disableUser({ grants: ["platform.user.manage"], actor: ACTOR, userId: user.id }),
@@ -230,8 +293,8 @@ describe("user commands", () => {
   });
 
   it("disables a user, revokes sessions, and audits when another administrator remains", async () => {
-    const first = await seedAdmin("admin-one@example.com", "Admin One");
-    const second = await seedAdmin("admin-two@example.com", "Admin Two");
+    const first = await seedOwner("admin-one@example.com", "Admin One");
+    const second = await seedOwner("admin-two@example.com", "Admin Two", first.role.id);
     await db.prisma.session.create({ data: { token_hash: "3".repeat(64), user_id: second.user.id, last_seen_at: new Date(), idle_expires_at: new Date(Date.now() + 1000), absolute_expires_at: new Date(Date.now() + 2000) } });
     const result = await service.disableUser({
       grants: ["platform.user.manage"],
@@ -387,11 +450,11 @@ describe("role commands and grants", () => {
       grants: ["platform.role.manage"],
       actor: ACTOR,
       roleId: role.id,
-      permissionIds: ["masterdata.price.read", "platform.audit.read", "masterdata.access"],
+      permissionIds: ["masterdata.price.read", "masterdata.access"],
     });
     assert.equal(changed.changed, true);
     const grants = await db.prisma.rolePermission.findMany({ where: { role_id: role.id }, orderBy: { permission_id: "asc" } });
-    assert.deepEqual(grants.map((grant) => grant.permission_id), ["masterdata.access", "masterdata.price.read", "platform.audit.read"]);
+    assert.deepEqual(grants.map((grant) => grant.permission_id), ["masterdata.access", "masterdata.price.read"]);
     assert.notEqual(await db.prisma.auditEvent.findFirst({ where: { action: "role.grants_replace" } }), null);
 
     await assert.rejects(
@@ -405,119 +468,50 @@ describe("role commands and grants", () => {
       (error: unknown) => error instanceof AppError && error.code === "UNKNOWN_PERMISSION",
     );
     const afterFailure = await db.prisma.rolePermission.findMany({ where: { role_id: role.id } });
-    assert.equal(afterFailure.length, 3);
+    assert.equal(afterFailure.length, 2);
   });
 
-  it("refuses grant replacement that would strip the last access administrator", async () => {
-    const { user, role } = await seedAdmin("solo-admin@example.com", "Solo Admin");
+  it("refuses Platform permissions on custom roles", async () => {
+    await assert.rejects(
+      () =>
+        service.createRole({
+          grants: ["platform.role.manage"],
+          actor: ACTOR,
+          code: "hidden-admin",
+          name: "Hidden Admin",
+          permissionIds: ["platform.role.manage"],
+        }),
+      (error: unknown) => error instanceof AppError && error.code === "ROLE_PERMISSION_OWNER_ONLY",
+    );
+    const role = await db.prisma.role.create({ data: { code: "worker", name: "Worker" } });
     await assert.rejects(
       () =>
         service.replaceRoleGrants({
           grants: ["platform.role.manage"],
           actor: ACTOR,
           roleId: role.id,
-          permissionIds: ["platform.settings.read"],
+          permissionIds: ["platform.user.read"],
         }),
-      (error: unknown) => error instanceof AppError && error.code === "LAST_ACCESS_ADMINISTRATOR",
+      (error: unknown) => error instanceof AppError && error.code === "ROLE_PERMISSION_OWNER_ONLY",
     );
-    const grants = await db.prisma.rolePermission.findMany({ where: { role_id: role.id } });
-    assert.equal(grants.length, FULL_GRANTS.length);
-    const stillActive = await db.prisma.user.findUnique({ where: { id: user.id } });
-    assert.equal(stillActive?.status, "ACTIVE");
   });
 
-  it("refuses stripping a shared admin role even when two administrators hold it", async () => {
-    // The realistic topology is one shared Administrator role held by several
-    // people. Both administrators are affected by the grant replacement, so the
-    // post-change administrator set is what decides, not any single user.
-    const role = await db.prisma.role.create({
-      data: {
-        code: "shared-admin",
-        name: "Administrator",
-        role_permissions: { create: FULL_GRANTS.map((permission_id) => ({ permission_id })) },
-      },
-    });
-    const passwordHash = await hashPassword("correct horse battery staple");
-    const first = await db.prisma.user.create({
-      data: { email: "shared-a@example.com", display_name: "Shared A", password_hash: passwordHash, user_roles: { create: { role_id: role.id } } },
-    });
-    const second = await db.prisma.user.create({
-      data: { email: "shared-b@example.com", display_name: "Shared B", password_hash: passwordHash, user_roles: { create: { role_id: role.id } } },
-    });
-    const before = await auditCount();
-
+  it("refuses changing the Platform Owner system role grants", async () => {
+    const { role } = await seedOwner("immutable-owner@example.com", "Immutable Owner");
     await assert.rejects(
-      () =>
-        service.replaceRoleGrants({
-          grants: ["platform.role.manage"],
-          actor: ACTOR,
-          roleId: role.id,
-          permissionIds: ["platform.settings.read"],
-        }),
-      (error: unknown) => error instanceof AppError && error.code === "LAST_ACCESS_ADMINISTRATOR",
+      () => service.replaceRoleGrants({
+        grants: ["platform.role.manage"],
+        actor: ACTOR,
+        roleId: role.id,
+        permissionIds: ["masterdata.access"],
+      }),
+      (error: unknown) => error instanceof AppError && error.code === "ROLE_SYSTEM_GRANTS_REFUSED",
     );
-
-    const grants = await db.prisma.rolePermission.findMany({ where: { role_id: role.id } });
-    assert.equal(grants.length, FULL_GRANTS.length);
-    for (const id of [first.id, second.id]) {
-      assert.equal((await db.prisma.user.findUnique({ where: { id } }))?.status, "ACTIVE");
-    }
-    assert.equal(await auditCount(), before);
   });
 
-  it("allows stripping a shared admin role when one holder keeps access another way", async () => {
-    const shared = await db.prisma.role.create({
-      data: {
-        code: "shared-admin",
-        name: "Administrator",
-        role_permissions: { create: FULL_GRANTS.map((permission_id) => ({ permission_id })) },
-      },
-    });
-    const fallback = await db.prisma.role.create({
-      data: {
-        code: "fallback-admin",
-        name: "Fallback",
-        role_permissions: {
-          create: ["platform.user.manage", "platform.role.manage"].map((permission_id) => ({ permission_id })),
-        },
-      },
-    });
-    const passwordHash = await hashPassword("correct horse battery staple");
-    await db.prisma.user.create({
-      data: { email: "stripped-a@example.com", display_name: "Stripped A", password_hash: passwordHash, user_roles: { create: { role_id: shared.id } } },
-    });
-    const survivor = await db.prisma.user.create({
-      data: {
-        email: "survivor@example.com",
-        display_name: "Survivor",
-        password_hash: passwordHash,
-        user_roles: { create: [{ role_id: shared.id }, { role_id: fallback.id }] },
-      },
-    });
-
-    const result = await service.replaceRoleGrants({
-      grants: ["platform.role.manage"],
-      actor: ACTOR,
-      roleId: shared.id,
-      permissionIds: ["platform.settings.read"],
-    });
-
-    assert.equal(result.changed, true);
-    const grants = await db.prisma.rolePermission.findMany({ where: { role_id: shared.id } });
-    assert.deepEqual(grants.map((grant) => grant.permission_id), ["platform.settings.read"]);
-    // The survivor is still an access administrator, through the untouched role.
-    const assignments = await db.prisma.userRole.findMany({
-      where: { user_id: survivor.id },
-      select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
-    });
-    const union = new Set(assignments.flatMap((a) => a.role.role_permissions.map((g) => g.permission_id)));
-    assert.ok(union.has("platform.user.manage"));
-    assert.ok(union.has("platform.role.manage"));
-  });
-
-  it("allows self-demotion only when another active access administrator remains", async () => {
-    const first = await seedAdmin("self-demo-a@example.com", "Self Demo A");
-    const second = await seedAdmin("self-demo-b@example.com", "Self Demo B");
+  it("allows removing one owner assignment but protects the last active owner", async () => {
+    const first = await seedOwner("self-demo-a@example.com", "Self Demo A");
+    const second = await seedOwner("self-demo-b@example.com", "Self Demo B", first.role.id);
     await service.removeUserRole({
       grants: ["platform.role.manage"],
       actor: ACTOR,
@@ -533,7 +527,7 @@ describe("role commands and grants", () => {
           grants: ["platform.role.manage"],
           actor: ACTOR,
           userId: second.user.id,
-          roleId: second.role.id,
+          roleId: first.role.id,
         }),
       (error: unknown) => error instanceof AppError && error.code === "LAST_ACCESS_ADMINISTRATOR",
     );

@@ -19,6 +19,8 @@ it("archiveRoleAction rejects malformed ids before calling the service and passe
     "@platform/runtime": { platformAccess: { archiveRole: async ({ roleId }: { roleId: string }) => { calls.push(roleId); return { changed: true }; } } },
     "@platform/core/actions": { runSafeAction },
     "@platform/core/validation": { validationError },
+    "@platform/core/rbac/registry": { getPermissionRegistry: () => ({}) },
+    "./permission-grouping": { expandRolePermissionSelection: (ids: string[]) => ids },
   };
   const exports: { archiveRoleAction?: (id: string) => Promise<ActionResult<{ changed: boolean }>> } = {};
   new Function("require", "exports", compiled)((id: string) => {

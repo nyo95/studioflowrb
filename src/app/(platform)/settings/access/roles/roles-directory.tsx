@@ -25,6 +25,7 @@ type RoleRow = {
   archivedAt: string | null;
   activeAssignmentCount: number;
   permissionIds: string[];
+  capabilityLabels: string[];
 };
 
 export function RolesDirectory({
@@ -55,7 +56,7 @@ export function RolesDirectory({
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const sortValues: Record<"Name" | "Code", (r: RoleRow) => string | number | null> = {"Name": (r) => r.name, "Code": (r) => r.code};
   const collator = new Intl.Collator(locale, { sensitivity: "base", numeric: true });
-  const filteredRecords = roles.filter(row => `${row.name} ${row.code}`.toLowerCase().includes(query.toLowerCase()));
+  const filteredRecords = roles.filter(row => `${row.name} ${row.code} ${row.capabilityLabels.join(" ")}`.toLowerCase().includes(query.toLowerCase()));
   const orderedRows = [...filteredRecords].sort((a, b) => {
     const left = sortValues[sortKey](a), right = sortValues[sortKey](b);
     if (left === null || right === null) return left === right ? a.id.localeCompare(b.id) : left === null ? 1 : -1;
@@ -93,7 +94,7 @@ return (
           <TableHeader>
             <TableRow>
               <TableHead sortable sortDirection={sortKey === "Name" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Name"); setSortDirection(direction); }}>Role</TableHead>
-              <TableHead>Permissions</TableHead>
+              <TableHead>Access</TableHead>
               <TableHead align="end">Members</TableHead>
               {canManage ? <TableHead stickyEnd align="end">Actions</TableHead> : null}
             </TableRow>
@@ -103,11 +104,20 @@ return (
               <TableRow key={role.id}>
                 <TableCell data-column="identifier"><EntityPrimaryCell tone={role.archivedAt ? "danger" : role.isSystem ? "warning" : "success"} statusLabel={role.archivedAt ? "Archived" : role.isSystem ? "System" : "Active"} name={role.name} secondary={<span>{role.code}{role.description ? ` · ${role.description}` : ""}</span>} /></TableCell>
                 <TableCell wrap>
-                  <TableCellContent primary={`${role.permissionIds.length} granted`} secondary={role.permissionIds.join(", ") || undefined} />
+                  <TableCellContent
+                    primary={role.code === "platform-owner" ? "All Developer-enabled access" : `${role.capabilityLabels.length} capabilities`}
+                    secondary={role.code === "platform-owner" ? "Automatically follows the modules enabled by the Developer." : role.capabilityLabels.join(", ") || "No access selected"}
+                  />
                 </TableCell>
                 <TableCell align="end"><TableCellContent align="end" primary={role.activeAssignmentCount.toLocaleString()} /></TableCell>
                 {canManage ? (
-                  <TableCell align="end" stickyEnd><RowActionMenu label={`Actions for ${role.name}`} pending={pendingId === role.id} items={role.archivedAt ? [] : [{label:"Permissions",onSelect:()=>setGrantsTarget(role)},...(!role.isSystem ? [{label:"Edit",onSelect:()=>setEditTarget(role)},{label:"Archive",danger:true,separatorBefore:true,onSelect:()=>setConfirmArchive(role)}] : [])]} /></TableCell>
+                  <TableCell align="end" stickyEnd>
+                    {role.archivedAt || role.isSystem ? (
+                      <Text size="sm" tone="secondary">Locked</Text>
+                    ) : (
+                      <RowActionMenu label={`Actions for ${role.name}`} pending={pendingId === role.id} items={[{label:"Access",onSelect:()=>setGrantsTarget(role)},{label:"Edit",onSelect:()=>setEditTarget(role)},{label:"Archive",danger:true,separatorBefore:true,onSelect:()=>setConfirmArchive(role)}]} />
+                    )}
+                  </TableCell>
                 ) : null}
               </TableRow>
             ))}
@@ -127,7 +137,7 @@ return (
           <Field id="role-description" label="Description">
             <Textarea id="role-description" name="description" maxLength={500} rows={2} />
           </Field>
-          <Field id="role-grants" label="Permissions">
+          <Field id="role-grants" label="Access" description="Choose work responsibilities. Required app access is added automatically.">
             <PermissionCheckboxes name="permissionIds" groups={permissionGroups} />
           </Field>
           {createState?.ok === false ? <InlineError>{createState.error.safeMessage}</InlineError> : null}
@@ -173,7 +183,7 @@ return (
       </DraftDialog>
 
       {/* Grants editor */}
-      <DraftDialog pending={grantsPending} open={grantsTarget !== null} onOpenChange={() => setGrantsTarget(null)} title={`Grants — ${grantsTarget?.name ?? ""}`} description="Only modules enabled by the Developer are shown. Grants for disabled modules stay stored and return when the module is enabled.">
+      <DraftDialog pending={grantsPending} open={grantsTarget !== null} onOpenChange={() => setGrantsTarget(null)} title={`Access — ${grantsTarget?.name ?? ""}`} description="Choose what this role can do. Required app access is added automatically; modules disabled by the Developer are not shown.">
         {grantsTarget ? (
           <form
             action={(formData) => {
@@ -197,7 +207,7 @@ return (
               </Button>
               <Button type="submit" variant="primary" pending={grantsPending}>
                 {grantsPending ? <Spinner aria-hidden="true" /> : null}
-                <span>Save grants</span>
+                <span>Save access</span>
               </Button>
             </FormActions>
           </form>
@@ -240,16 +250,16 @@ function PermissionCheckboxes({
 }) {
   const [query, setQuery] = useState("");
   const trimmed = query.trim().toLowerCase();
-  const matches = (label: string) => label.toLowerCase().includes(trimmed);
+  const matches = (label: string | undefined) => label?.toLowerCase().includes(trimmed) ?? false;
   const filteredGroups = trimmed
     ? groups
         .map((app) => ({
           ...app,
-          positions: app.positions.filter((p) => matches(p.id) || matches(p.actionLabel) || matches("position") || matches(app.appLabel)),
+          positions: app.positions.filter((p) => matches(p.id) || matches(p.actionLabel) || matches(p.description) || matches("position") || matches(app.appLabel)),
           resources: app.resources
             .map((resource) => ({
               ...resource,
-              permissions: resource.permissions.filter((p) => matches(p.id) || matches(resource.resourceLabel) || matches(app.appLabel)),
+              permissions: resource.permissions.filter((p) => matches(p.id) || matches(p.actionLabel) || matches(p.description) || matches(resource.resourceLabel) || matches(app.appLabel)),
             }))
             .filter((resource) => resource.permissions.length > 0),
         }))
@@ -261,13 +271,13 @@ function PermissionCheckboxes({
       <Input
         type="search"
         aria-label="Search permissions"
-        placeholder="Search permissions…"
+        placeholder="Search access…"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
       />
       <div className="grid max-h-[360px] gap-3 overflow-auto rounded-control border border-line p-2.5">
         {filteredGroups.length === 0 ? (
-          <Text tone="secondary" size="sm">No permissions match &ldquo;{query}&rdquo;.</Text>
+          <Text tone="secondary" size="sm">No access matches &ldquo;{query}&rdquo;.</Text>
         ) : (
           filteredGroups.map((app) => (
             <div key={app.appLabel} className="grid gap-1.5">
@@ -278,13 +288,10 @@ function PermissionCheckboxes({
                     <Text as="span" size="sm" tone="secondary" className="min-w-[9rem]">Position</Text>
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
                       {app.positions.map((position) => (
-                        <Checkbox
-                          key={position.id}
-                          name={name}
-                          value={position.id}
-                          defaultChecked={checkedIds.includes(position.id)}
-                          label={position.actionLabel}
-                        />
+                        <div key={position.id} className="grid gap-0.5">
+                          <Checkbox name={name} value={position.id} defaultChecked={checkedIds.includes(position.id)} label={position.actionLabel} />
+                          {position.description ? <Text size="sm" tone="secondary">{position.description}</Text> : null}
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -294,13 +301,10 @@ function PermissionCheckboxes({
                     <Text as="span" size="sm" tone="secondary" className="min-w-[9rem]">{resource.resourceLabel}</Text>
                     <div className="flex flex-wrap gap-x-3 gap-y-1">
                       {resource.permissions.map((permission) => (
-                        <Checkbox
-                          key={permission.id}
-                          name={name}
-                          value={permission.id}
-                          defaultChecked={checkedIds.includes(permission.id)}
-                          label={permission.actionLabel}
-                        />
+                        <div key={permission.id} className="grid min-w-[13rem] max-w-[22rem] gap-0.5">
+                          <Checkbox name={name} value={permission.id} defaultChecked={checkedIds.includes(permission.id)} label={permission.actionLabel} />
+                          {permission.description ? <Text size="sm" tone="secondary" className={permission.caution ? "text-danger" : undefined}>{permission.description}</Text> : null}
+                        </div>
                       ))}
                     </div>
                   </div>

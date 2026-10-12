@@ -2,8 +2,13 @@ import { Prisma, type PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditActor, type AuditWriter } from "@platform/core/audit";
 import { AppError, mapPrismaKnownError } from "@platform/core/errors";
 
-import { requirePermission, type PermissionGrants, type PermissionId } from "./index";
+import { requirePermission, type PermissionGrants } from "./index";
 import { getPermissionRegistry } from "./registry";
+import {
+  isPlatformOwnerOnlyPermission,
+  PLATFORM_OWNER_ROLE_CODE,
+  platformOwnerEffectivePermissionIds,
+} from "./owner-policy";
 import { parseDisplayName, parseIdentityEmail, parsePassword } from "../auth/identity-validation";
 
 /**
@@ -12,21 +17,15 @@ import { parseDisplayName, parseIdentityEmail, parsePassword } from "../auth/ide
  * resolution, and the last-access-administrator invariant. Apps own their own
  * permission IDs only.
  *
- * - effective permission is the union of explicit RolePermission rows over
- *   live (non-archived) assigned Roles;
+ * - custom-role permission is the union of explicit RolePermission rows over
+ *   live assignments; Platform Owner resolves the enabled non-position set;
  * - unknown persisted permission IDs grant nothing and are reported as
  *   integrity failures to authorized administrators;
- * - no admin bypass, no fallback role, no wildcard permission;
+ * - no custom-role admin bypass, no fallback role, no wildcard permission;
  * - every command validates permission at entry, opens ONE transaction,
  *   writes its audit event in the same transaction, and treats no-ops as
  *   safe (no write, no audit event).
  */
-
-/** The combined capability that must always retain at least one active holder. */
-export const ACCESS_ADMINISTRATOR_PERMISSIONS = [
-  "platform.user.manage",
-  "platform.role.manage",
-] as const satisfies readonly PermissionId[];
 
 export type DbClient = PrismaClient | Prisma.TransactionClient;
 
@@ -58,8 +57,11 @@ export async function loadLiveGrants(
   const enabled = new Set(enabledPermissionIds);
   const assignments = await db.userRole.findMany({
     where: { user_id: userId, role: { archived_at: null } },
-    select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
+    select: { role: { select: { code: true, is_system: true, role_permissions: { select: { permission_id: true } } } } },
   });
+  const isPlatformOwner = assignments.some(
+    (assignment) => assignment.role.is_system && assignment.role.code === PLATFORM_OWNER_ROLE_CODE,
+  );
   const seen = new Set<string>();
   for (const assignment of assignments) {
     for (const grant of assignment.role.role_permissions) seen.add(grant.permission_id);
@@ -68,9 +70,15 @@ export async function loadLiveGrants(
   const unknownGrantIds: string[] = [];
   for (const id of seen) {
     if (!registry.has(id)) unknownGrantIds.push(id);
+    else if (!isPlatformOwner && isPlatformOwnerOnlyPermission(id)) continue;
     else if (enabled.has(id)) grants.push(id);
   }
-  return { grants: Object.freeze(grants), unknownGrantIds: Object.freeze(unknownGrantIds) };
+  return {
+    grants: isPlatformOwner
+      ? platformOwnerEffectivePermissionIds(registry, enabledPermissionIds)
+      : Object.freeze(grants),
+    unknownGrantIds: Object.freeze(unknownGrantIds),
+  };
 }
 
 /** Integrity report for authorized administrators: persisted grants no longer in the registry. */
@@ -94,54 +102,28 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
     await auditWriter.write(prepareAuditEvent(event, { now }), tx);
   }
 
-  /** Active users holding BOTH access-administrator permissions via live roles. */
+  /** Active users assigned the one live Platform Owner system role. */
   async function listAccessAdministratorIds(tx: DbClient): Promise<string[]> {
     const assignments = await tx.userRole.findMany({
       where: {
         user: { status: "ACTIVE" },
-        role: { archived_at: null, role_permissions: { some: { permission_id: { in: [...ACCESS_ADMINISTRATOR_PERMISSIONS] } } } },
+        role: { archived_at: null, code: PLATFORM_OWNER_ROLE_CODE, is_system: true },
       },
-      select: {
-        user_id: true,
-        role: { select: { role_permissions: { select: { permission_id: true } } } },
-      },
+      select: { user_id: true },
     });
-    const byUser = new Map<string, Set<string>>();
-    for (const assignment of assignments) {
-      let set = byUser.get(assignment.user_id);
-      if (!set) byUser.set(assignment.user_id, (set = new Set()));
-      for (const grant of assignment.role.role_permissions) set.add(grant.permission_id);
-    }
-    return [...byUser.entries()]
-      .filter(([, permissionIds]) =>
-        ACCESS_ADMINISTRATOR_PERMISSIONS.every((permission) => permissionIds.has(permission)))
-      .map(([userId]) => userId);
-  }
-
-  /** Whether one user would still hold BOTH permissions over the given live role grant union. */
-  function unionHasBoth(permissionIds: Iterable<string>): boolean {
-    const set = new Set(permissionIds);
-    return ACCESS_ADMINISTRATOR_PERMISSIONS.every((permission) => set.has(permission));
+    return [...new Set(assignments.map((assignment) => assignment.user_id))];
   }
 
   /**
    * Refuses a change that would leave the platform with no access administrator.
    *
    * The invariant is about the *post-change* set, not about any single user: at
-   * least one active user must still hold every permission in
-   * ACCESS_ADMINISTRATOR_PERMISSIONS. So an administrator being degraded is only
-   * fatal when nobody else would remain.
+   * least one active user must still hold the Platform Owner role. Removing or
+   * disabling an owner is fatal only when nobody else would remain.
    *
-   * Administrators this change does not touch keep their capability by
-   * definition, so if any survives untouched the invariant already holds. Only
-   * when EVERY current administrator is affected do we have to ask `simulate`,
-   * and then it must be asked per administrator: one administrator retaining the
-   * capability through a different role is enough to allow the change.
-   *
-   * Note `simulate` models the post-change state for the user it is given. The
-   * single-user commands pass a closure that ignores that argument and answers
-   * for their own affected user, which is why the untouched-administrator
-   * shortcut above is required rather than optional.
+   * Owners this change does not touch keep their authority by definition. When
+   * every current owner is affected, `simulate` checks whether any still holds
+   * the exact live system role in the post-change state.
    */
   async function requireChangeKeepsAccessAdministrator(
     tx: DbClient,
@@ -161,37 +143,15 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
     );
   }
 
-  async function userHasBothAdminPermissionsExcludingRole(
+  async function userHasPlatformOwnerRoleExcludingRole(
     tx: DbClient,
     userId: string,
     excludedRoleId: string,
   ): Promise<boolean> {
-    const assignments = await tx.userRole.findMany({
-      where: { user_id: userId, role: { archived_at: null, id: { not: excludedRoleId } } },
-      select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
-    });
-    const permissionIds = assignments.flatMap((assignment) =>
-      assignment.role.role_permissions.map((grant) => grant.permission_id));
-    return unionHasBoth(permissionIds);
-  }
-
-  async function userHasBothAdminPermissionsWithRoleGrants(
-    tx: DbClient,
-    userId: string,
-    roleId: string,
-    rolePermissionIds: readonly string[],
-  ): Promise<boolean> {
-    const assignments = await tx.userRole.findMany({
-      where: { user_id: userId, role: { archived_at: null, id: { not: roleId } } },
-      select: { role: { select: { role_permissions: { select: { permission_id: true } } } } },
-    });
-    const permissionIds = assignments.flatMap((assignment) =>
-      assignment.role.role_permissions.map((grant) => grant.permission_id));
-    const registry = getPermissionRegistry();
-    for (const permissionId of rolePermissionIds) {
-      if (registry.has(permissionId)) permissionIds.push(permissionId);
-    }
-    return unionHasBoth(permissionIds);
+    return (await tx.userRole.count({ where: {
+      user_id: userId,
+      role: { id: { not: excludedRoleId }, archived_at: null, code: PLATFORM_OWNER_ROLE_CODE, is_system: true },
+    } })) > 0;
   }
 
   function assertKnownPermissionIds(permissionIds: readonly string[]): void {
@@ -204,6 +164,16 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
           "One or more selected permissions are not registered.",
         );
       }
+    }
+  }
+
+  function assertCustomRolePermissionIds(permissionIds: readonly string[]): void {
+    if (permissionIds.some(isPlatformOwnerOnlyPermission)) {
+      throw new AppError(
+        "FORBIDDEN",
+        "ROLE_PERMISSION_OWNER_ONLY",
+        "Platform administration belongs only to the Platform Owner.",
+      );
     }
   }
 
@@ -636,7 +606,7 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
         await requireChangeKeepsAccessAdministrator(tx, {
           affectedUserIds: [assignment.user_id],
           simulate: (innerTx) =>
-            userHasBothAdminPermissionsExcludingRole(innerTx, assignment.user_id, assignment.role_id),
+            userHasPlatformOwnerRoleExcludingRole(innerTx, assignment.user_id, assignment.role_id),
         });
         await tx.userRole.delete({ where: { id: assignment.id } });
         await writeAudit(tx, {
@@ -669,6 +639,7 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
       }
       const permissionIds = [...new Set(input.permissionIds ?? [])];
       assertKnownPermissionIds(permissionIds);
+      assertCustomRolePermissionIds(permissionIds);
       return runTransaction(async (tx) => {
         assertGrantablePermissionIds(await grantablePermissionSet(tx), permissionIds);
         let role;
@@ -793,17 +764,21 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
       userActorContext(input.actor);
       const permissionIds = [...new Set(input.permissionIds)].sort();
       assertKnownPermissionIds(permissionIds);
+      assertCustomRolePermissionIds(permissionIds);
       return runTransaction(async (tx) => {
         const role = await tx.role.findUnique({
           where: { id: input.roleId },
           select: {
             id: true,
+            is_system: true,
             archived_at: true,
             role_permissions: { select: { permission_id: true } },
-            user_roles: { select: { user_id: true, user: { select: { status: true } } } },
           },
         });
         if (!role) throw new AppError("NOT_FOUND", "ROLE_NOT_FOUND", "This role no longer exists.");
+        if (role.is_system) {
+          throw new AppError("CONFLICT", "ROLE_SYSTEM_GRANTS_REFUSED", "A system role's access cannot be changed.");
+        }
         if (role.archived_at !== null) {
           throw new AppError("CONFLICT", "ROLE_ARCHIVED", "An archived role cannot be changed.");
         }
@@ -813,15 +788,6 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
         const dormant = current.filter((permissionId) => getPermissionRegistry().has(permissionId) && !grantable.has(permissionId));
         const nextPermissionIds = [...new Set([...permissionIds, ...dormant])].sort();
         if (JSON.stringify(current) === JSON.stringify(nextPermissionIds)) return { changed: false };
-
-        const activeAssignees = role.user_roles
-          .filter((assignment) => assignment.user.status === "ACTIVE")
-          .map((assignment) => assignment.user_id);
-        await requireChangeKeepsAccessAdministrator(tx, {
-          affectedUserIds: activeAssignees,
-          simulate: (innerTx, userId) =>
-            userHasBothAdminPermissionsWithRoleGrants(innerTx, userId, role.id, nextPermissionIds),
-        });
 
         await tx.rolePermission.deleteMany({ where: { role_id: role.id } });
         if (nextPermissionIds.length > 0) {

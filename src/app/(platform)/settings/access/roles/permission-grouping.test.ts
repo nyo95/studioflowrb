@@ -3,7 +3,12 @@ import { describe, it } from "node:test";
 
 import { composePermissionRegistry } from "@platform/core/rbac/registry";
 
-import { appLabelOf, groupPermissionsByApp } from "./permission-grouping";
+import {
+  appLabelOf,
+  expandRolePermissionSelection,
+  friendlyPermissionLabels,
+  groupPermissionsByApp,
+} from "./permission-grouping";
 
 const registry = composePermissionRegistry([
   {
@@ -13,7 +18,7 @@ const registry = composePermissionRegistry([
     requires: [],
     name: "Master Data",
     rootPath: "/masterdata",
-    permissions: ["masterdata.access", "masterdata.brand.read", "masterdata.brand.manage", "masterdata.price-material.read"],
+    permissions: ["masterdata.access", "masterdata.brand.read", "masterdata.brand.manage"],
   },
   {
     appId: "studioflow",
@@ -22,105 +27,80 @@ const registry = composePermissionRegistry([
     requires: [],
     name: "StudioFlow",
     rootPath: "/studioflow",
-    permissions: ["studioflow.access", "studioflow.phase.work", "studioflow.phase.review", "studioflow.phase.override"],
+    permissions: [
+      "studioflow.access",
+      "studioflow.project.read",
+      "studioflow.project.manage",
+      "studioflow.project.override",
+      "studioflow.project.pic-designer",
+      "studioflow.project.pic-drafter",
+      "studioflow.phase.work",
+      "studioflow.mom.manage",
+      "studioflow.schedule.manage",
+    ],
+    positions: [
+      { permission: "studioflow.project.pic-designer", label: "Designer" },
+      { permission: "studioflow.project.pic-drafter", label: "Drafter" },
+    ],
   },
 ]);
 
-const ALL_IDS = [
-  "platform.settings.read",
-  "platform.settings.manage",
-  "platform.user.read",
-  "masterdata.access",
-  "masterdata.brand.read",
-  "masterdata.brand.manage",
-  "masterdata.price-material.read",
-  "studioflow.access",
-  "studioflow.phase.work",
-  "studioflow.phase.review",
-  "studioflow.phase.override",
-];
-
-describe("appLabelOf", () => {
-  it("labels platform.* as Platform and everything else from the registered app name", () => {
-    assert.equal(appLabelOf("platform", registry), "Platform");
+describe("task-based role matrix", () => {
+  it("uses registered app names", () => {
     assert.equal(appLabelOf("masterdata", registry), "Master Data");
-    assert.equal(appLabelOf("studioflow", registry), "StudioFlow");
+    assert.equal(appLabelOf("unknown", registry), "unknown");
   });
 
-  it("falls back to the raw appId for an unregistered prefix (integrity edge case)", () => {
-    assert.equal(appLabelOf("ghost-app", registry), "ghost-app");
-  });
-});
-
-describe("groupPermissionsByApp", () => {
-  const grouped = groupPermissionsByApp(ALL_IDS, registry);
-
-  it("preserves app order from the input list (Platform, then registration order) rather than alphabetizing", () => {
-    assert.deepEqual(grouped.map((app) => app.appLabel), ["Platform", "Master Data", "StudioFlow"]);
-  });
-
-  it("groups a resource's read/manage pair into one row instead of two separate lines", () => {
-    const masterdata = grouped.find((app) => app.appLabel === "Master Data")!;
-    const brand = masterdata.resources.find((r) => r.resourceLabel === "Brand")!;
-    assert.deepEqual(brand.permissions, [
-      { id: "masterdata.brand.read", actionLabel: "Read" },
-      { id: "masterdata.brand.manage", actionLabel: "Manage" },
+  it("hides owner-only Platform permissions and technical app access", () => {
+    const grouped = groupPermissionsByApp(registry.permissions, registry);
+    assert.deepEqual(grouped.map((group) => group.appLabel), ["Master Data", "StudioFlow"]);
+    const allIds = grouped.flatMap((app) => [
+      ...app.positions.map((position) => position.id),
+      ...app.resources.flatMap((resource) => resource.permissions.map((permission) => permission.id)),
     ]);
+    assert.equal(allIds.some((id) => id.startsWith("platform.")), false);
+    assert.equal(allIds.some((id) => id.endsWith(".access")), false);
   });
 
-  it("titlecases a hyphenated resource without mangling it", () => {
-    const masterdata = grouped.find((app) => app.appLabel === "Master Data")!;
-    assert.ok(masterdata.resources.some((r) => r.resourceLabel === "Price Material"));
+  it("keeps job positions separate from authority", () => {
+    const studioflow = groupPermissionsByApp(registry.permissions, registry).find((group) => group.appLabel === "StudioFlow")!;
+    assert.deepEqual(studioflow.positions.map((position) => position.actionLabel), ["Designer", "Drafter"]);
+    assert.ok(studioflow.positions.every((position) => position.description?.includes("PIC")));
   });
 
-  it("labels the two-segment app-access permission distinctly from a real resource", () => {
-    const masterdata = grouped.find((app) => app.appLabel === "Master Data")!;
-    const access = masterdata.resources.find((r) => r.resourceLabel === "Access this app")!;
-    assert.deepEqual(access.permissions, [{ id: "masterdata.access", actionLabel: "Access" }]);
+  it("names project override by its business consequence and warns about PIC bypass", () => {
+    const studioflow = groupPermissionsByApp(registry.permissions, registry).find((group) => group.appLabel === "StudioFlow")!;
+    const override = studioflow.resources.flatMap((resource) => resource.permissions).find((permission) => permission.id === "studioflow.project.override")!;
+    assert.equal(override.actionLabel, "Manage every project");
+    assert.equal(override.caution, true);
+    assert.match(override.description ?? "", /not assigned as PIC/u);
   });
 
-  it("keeps three unrelated actions on one resource as three checkboxes in declared order, not merged or dropped", () => {
-    const studioflow = grouped.find((app) => app.appLabel === "StudioFlow")!;
-    const phase = studioflow.resources.find((r) => r.resourceLabel === "Phase")!;
-    assert.deepEqual(phase.permissions.map((p) => p.actionLabel), ["Work", "Review", "Override"]);
-  });
-
-  it("accounts for every input permission exactly once", () => {
-    const flattened = grouped.flatMap((app) => app.resources.flatMap((r) => r.permissions.map((p) => p.id)));
-    assert.deepEqual(flattened.sort(), [...ALL_IDS].sort());
-  });
-});
-
-describe("groupPermissionsByApp positions", () => {
-  const withPositions = composePermissionRegistry([
-    {
-      appId: "studioflow",
-      version: "1.0.0",
-      kind: "core",
-      requires: [],
-      name: "StudioFlow",
-      rootPath: "/studioflow",
-      permissions: ["studioflow.access", "studioflow.project.read", "studioflow.project.pic-designer", "studioflow.project.pic-drafter"],
-      positions: [
-        { permission: "studioflow.project.pic-designer", label: "Designer" },
-        { permission: "studioflow.project.pic-drafter", label: "Drafter" },
-      ],
-    },
-  ]);
-  const grouped = groupPermissionsByApp(withPositions.permissions.filter((id) => id.startsWith("studioflow.")), withPositions);
-
-  it("lists position permissions apart from the resource rows", () => {
-    const app = grouped[0];
-    assert.deepEqual(app.positions, [
-      { id: "studioflow.project.pic-designer", actionLabel: "Designer" },
-      { id: "studioflow.project.pic-drafter", actionLabel: "Drafter" },
+  it("adds technical app and read dependencies without turning a position into access", () => {
+    assert.deepEqual(expandRolePermissionSelection(["studioflow.mom.manage"], registry), [
+      "studioflow.access",
+      "studioflow.mom.manage",
+      "studioflow.project.read",
     ]);
-    assert.deepEqual(app.resources.find((r) => r.resourceLabel === "Project")!.permissions.map((p) => p.actionLabel), ["Read"]);
+    assert.deepEqual(expandRolePermissionSelection(["studioflow.project.override"], registry), [
+      "studioflow.access",
+      "studioflow.project.manage",
+      "studioflow.project.override",
+      "studioflow.project.read",
+    ]);
+    assert.deepEqual(expandRolePermissionSelection(["masterdata.brand.manage"], registry), [
+      "masterdata.access",
+      "masterdata.brand.manage",
+      "masterdata.brand.read",
+    ]);
+    assert.deepEqual(expandRolePermissionSelection(["studioflow.project.pic-designer"], registry), ["studioflow.project.pic-designer"]);
   });
 
-  it("rejects a position that is not a registered permission", () => {
-    assert.throws(() => composePermissionRegistry([
-      { appId: "x", version: "1.0.0", kind: "core", requires: [], name: "X", rootPath: "/x", permissions: ["x.access"], positions: [{ permission: "x.thing.work", label: "Y" }] },
-    ]));
+  it("summarizes friendly capabilities without raw access grants", () => {
+    assert.deepEqual(friendlyPermissionLabels([
+      "studioflow.access",
+      "studioflow.project.pic-designer",
+      "studioflow.project.override",
+    ], registry), ["Designer", "Manage every project"]);
   });
 });

@@ -5,6 +5,7 @@ import { AppError } from "@platform/core/errors";
 import { hashPassword } from "./password";
 import { parseDisplayName, parseIdentityEmail, parsePassword } from "./identity-validation";
 import { isValidPermissionId } from "../rbac";
+import { PLATFORM_OWNER_ROLE_CODE } from "../rbac/owner-policy";
 
 /**
  * One-time first-owner bootstrap command (CORE.md §3, Foundation F0 §6).
@@ -21,7 +22,7 @@ import { isValidPermissionId } from "../rbac";
  *   grant customization.
  */
 
-export const PLATFORM_OWNER_ROLE_CODE = "platform-owner";
+export { PLATFORM_OWNER_ROLE_CODE } from "../rbac/owner-policy";
 
 export type BootstrapInput = {
   email: string;
