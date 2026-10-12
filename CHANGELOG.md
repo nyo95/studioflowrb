@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.517 | 2026-10-12 | docs(review): R8.514 and R8.516 accepted, Workspace backend work order (Lead)
+
+- **Reviewer verdict: PASS** for the Presentation extraction (R8.514) with its correction (R8.516). The retention restore race is closed by the eligibility re-check before the Presentation hook, proven by a regression test that fails without the fix; the hook is now required; the millisecond residual window is recorded as accepted `[CLEANUP][P3]`. All other R8.514 evidence from R8.515 stands. The R8.514 browser-backlog item is closed. Self-review note: R8.516 was written by the Lead on the owner's instruction, so this acceptance rests on the full gates (`npm test` 1,029 passed, typecheck, boundaries, legacy-runtime, eslint 0 errors, production build) and the failing-then-passing test rather than an independent reviewer.
+- M3 is complete. `PLAN.md` now holds READY `WO-SF-WORKSPACE-01` (target R8.518): the Executor backend slice that turns phase Notes into per-phase Workspace sections, cards and card images in one forward-only migration without a second source of truth, with version-based concurrency, atomic client-answer and site-visit cards, empty-round checks on cards, hard reset keeping cards, the `readWorkspaceImageSource` rename and minimal wiring; the Lead UI slice follows as its own revision. Three product defaults (sections per phase, existing notes into one "Notes" section, delete only empty sections) are marked for owner confirmation.
+- **Migrations/dependencies:** none. **Checks:** documentation only.
+
 ## R8.516 | 2026-10-12 | fix(studioflow): archive retention keeps a restored project's Presentation slides (Executor, by the Lead on owner instruction)
 
 - **WO-MODULES-M3-PRESENTATION-01-C1:** `purgeExpiredArchivedAssets` re-reads each selected project against the same eligibility filter immediately before the Presentation purge hook and skips it entirely (no hook, no claim, no counts) when it was restored since the batch was selected. The claim-transaction re-check is unchanged; Presentation still runs first and also while disabled; a hook failure still leaves the project eligible.
