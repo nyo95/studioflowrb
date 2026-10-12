@@ -8,6 +8,16 @@ Scope: how StudioFlowRB becomes a platform of separately versioned, separately
 switchable modules, so a customer runs only what it has, and a new capability can
 be used on its own first and injected later.
 
+**Purpose (owner, 2026-10-10).** The module system exists for decoupling,
+versioning, switching modules on/off and controlled updates, so production at
+the office never receives development automatically. It is **not** a licensing,
+DRM, anti-copy or anti-tamper system: StudioFlowRB is custom internal software
+for one office, protected by a private repository and the owner's agreement
+with the office, not by technical locks. Do not add licence servers, signed
+entitlements, per-customer encryption or code obfuscation without a new
+explicit owner decision. The Developer console is an operational control, not
+a licensing or copy-protection mechanism.
+
 ## Why now
 
 Every capability added inside StudioFlow makes a later split more expensive. The
@@ -48,7 +58,7 @@ Shell (today `src/app/app-registrations.ts`): `id`, `name`, `version` (semver
 `MAJOR.MINOR.PATCH`), `kind` (`core` = cannot be disabled, `optional`),
 `parent` (optional: the app it extends, e.g. `ideas` → `studioflow`),
 `requires` (other modules it reads through their `public/`), permissions,
-launcher/nav metadata, and later its entitlement key. Platform validates the
+and launcher/nav metadata. Platform validates the
 graph at boot (unknown id, cycle, a required module missing → boot fails).
 
 **D4. Gates, in this order:** built in → enabled → RBAC (entitlement dropped, D7).
@@ -118,8 +128,19 @@ published by the owner as a GitHub release. The receiving server only decides
 **install now or not**: the Developer console shows "version X available"
 with what changed, and **Install** backs up the database first, installs the
 release, migrates, rebuilds and restarts, and goes back to the previous version
-and backup automatically if any step fails. Nothing installs by itself. The
-exact mechanism depends on how the office server runs the app and is planned
+and backup automatically if any step fails.
+
+**Going back to an older version** (audit 2026-10-10): the database moves
+forward only. A downgrade is never "install the older code on the current
+database"; it restores the backup taken immediately before the upgrade together
+with the code that ran on it. The updater must refuse an older application over
+a newer database. `module_state.last_version` is display-only because boot
+updates it to the running manifest version; it is not proof that an upgrade or
+downgrade succeeded. The updater must track the code version, applied migration
+history and matching backup as separate facts before installing.
+
+Nothing installs by itself. The exact mechanism depends on how the office
+server runs the app and is planned
 in WO-DEVELOPER-02.
 
 ## Phases

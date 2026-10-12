@@ -50,10 +50,13 @@ Companion apps and injected features (SketchUp plugin, AI chatbot, and the like)
 product is a platform of separately versioned, separately switchable modules.
 Every new business capability is born as its own module (manifest, schema,
 `public/` door, no database relation into another module's schema); every plan
-names the module it changes. Module install/enable/disable, versions and
-entitlements are Developer operations outside RBAC: no role, including the
+names the module it changes. Module install/enable/disable and versions are
+Developer operations outside RBAC: no role, including the
 Platform Owner, can hold them, and no agent may turn them into a
 permission.
+The purpose is decoupling, versioning and controlled updates, not licensing:
+add no licence server, DRM, anti-copy, obfuscation or per-customer encryption
+without a new explicit owner decision.
 
 Read `docs/agent/README.md` to select scoped context. Never load every app contract, roadmap section, or legacy artifact merely because it exists.
 

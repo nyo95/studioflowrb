@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.505 | 2026-10-12 | docs(repo): integrate compatible remote branches and reconcile module operations (Executor)
+
+- Reviewed both remote branches from the shared R8.501 base. Fast-forwarded the accepted cleanup, Developer terminology and module-permission ceiling through R8.504. The conflicting `claude/modules-scope-reset` decision to cancel the Developer web console was not merged because `PLAN.md` and the later R8.503-R8.504 owner decisions retain that console.
+- Ported the compatible parts of that branch without importing its duplicate R8.502/R8.503 history: the module system is explicitly not licensing/DRM, the update contract refuses older code over a newer database and pairs rollback code with its pre-upgrade backup, and a Developer terminal runbook documents the current/fallback module switch path.
+- Reconciled stale backlog wording that still described M1 and its read-only Settings page as pending, and removed the obsolete entitlement wording from the active agent contract and module manifest decision.
+- **Migrations/dependencies:** no new migration or dependency in this revision. The four inherited migrations through R8.504 were applied to both verified office rebuild databases (`studioflow_rebuild` and `studioflow_rebuild_test`); Prisma Client regenerated.
+- **Checks:** `npm test` (1,007 passed); typecheck; architecture boundaries; legacy-runtime check; eslint (0 errors, 1 existing Presentation `<img>` warning); production build; Settings Playwright (13 passed); whitespace checks.
+
 ## R8.504 | 2026-10-11 | feat(platform): enforce Developer module ceiling in RBAC (Lead)
 
 - **Owner decision:** StudioFlow, BQ and Master Data are one always-on core bundle. The Developer can switch only optional modules inside those apps; the Platform Owner manages users and custom roles, but its Role matrix can grant only permissions belonging to modules currently enabled by the Developer.
