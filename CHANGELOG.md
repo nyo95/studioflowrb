@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.518 | 2026-10-12 | docs(plan): Workspace is one per project, phase is a card label (Lead)
+
+- **Owner decisions 2026-10-12 on WO-SF-WORKSPACE-01:** (1) one Workspace per project with free-topic sections; phase and round are labels on a card, set automatically where the card is written and changeable, never a filing rule; (2) existing notes go into one "Notes" section per project, oldest first, keeping their phase and round labels; (3) a section can be deleted only when empty.
+- **Lead analysis for decision 2:** one section per phase was rejected because it rebuilds the per-phase filing the owner dropped; one mixed "Notes" section loses nothing because every card keeps its phase label and the Workspace read takes a phase filter, and the per-phase feed (cards labelled with that phase) keeps today's phase notes view working.
+- `PLAN.md` updated: sections keyed by project; cards gain `project_id` and a nullable phase label (SetNull) with service invariants (same project; round implies its phase); write gates `transition` for phase-labelled cards and `document` for unlabelled cards and sections; set/clear phase label command; tests and migration fixture across phases and projects. Target moves to R8.519.
+- **Migrations/dependencies:** none. **Checks:** documentation only.
+
 ## R8.517 | 2026-10-12 | docs(review): R8.514 and R8.516 accepted, Workspace backend work order (Lead)
 
 - **Reviewer verdict: PASS** for the Presentation extraction (R8.514) with its correction (R8.516). The retention restore race is closed by the eligibility re-check before the Presentation hook, proven by a regression test that fails without the fix; the hook is now required; the millisecond residual window is recorded as accepted `[CLEANUP][P3]`. All other R8.514 evidence from R8.515 stands. The R8.514 browser-backlog item is closed. Self-review note: R8.516 was written by the Lead on the owner's instruction, so this acceptance rests on the full gates (`npm test` 1,029 passed, typecheck, boundaries, legacy-runtime, eslint 0 errors, production build) and the failing-then-passing test rather than an independent reviewer.
