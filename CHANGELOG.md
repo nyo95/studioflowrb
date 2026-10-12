@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.508 | 2026-10-12 | fix(platform): keep Developer console outside app login (Executor)
+
+- Exempted the isolated `/system` route family from the optimistic application-session proxy. Anonymous Developer requests now reach the console's own authenticator/recovery-code boundary instead of being redirected to the ordinary user login.
+- Added a proxy regression test proving `/system` and `/system/login` remain independent while anonymous application settings still redirect to `/login`.
+- **Migrations/dependencies:** none. **Checks:** `npm test` (1,021 passed); targeted proxy test (2 passed); typecheck; architecture boundaries; legacy-runtime check; eslint (0 errors, one existing Presentation `<img>` warning); production build; Developer Playwright (1 passed); live anonymous `/system` redirect check; staged/unstaged whitespace checks.
+
 ## R8.507 | 2026-10-12 | feat(platform): simplify owner and custom role access (Executor)
 
 - Platform Owner is now the one locked in-app authority: the exact `platform-owner` system role automatically receives every Developer-enabled non-position permission, even if its stored grant rows are stale. Disabled optional-module permissions stay unavailable, and Designer/Drafter remain explicit job positions rather than owner powers.

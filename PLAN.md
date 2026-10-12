@@ -3,11 +3,11 @@
 Plan ID: WO-RBAC-UX-01 (Owner authority and task-based role matrix)
 Scope: Platform RBAC resolution, Role commands, Roles & Access UI, compatibility migration
 Module(s): platform (composition UI labels StudioFlow/BQ/Master Data permissions)
-Target revision: R8.507
+Target revision: R8.508
 Status: IMPLEMENTED — AWAITING REVIEW
 Priority: P1
 Owner: direct decision 2026-10-11
-Last updated: 2026-10-12 (Executor; imported from the completed cloud implementation and renumbered R8.507 to avoid local revision collisions)
+Last updated: 2026-10-12 (Executor; R8.508 corrects the local anonymous `/system` proxy path found during integration verification)
 
 ## Outcome
 
