@@ -71,23 +71,21 @@ export function PhasePanel({ projectId, phase, current, iterations, skippedReaso
 
   return (
     <>
-      <SectionCard
-        title={title}
-        action={<div className="flex flex-wrap items-center gap-1.5">
-          <Button type="button" size="sm" leadingIcon={<PanelRight className="h-3.5 w-3.5" />} onClick={() => setDetailsOpen(true)}>Phase details <span className="text-ink-tertiary">{detailsSummary}</span></Button>
-          <IterationButtons phase={phase} current={current} commands={commands} canAct={acting} onNewVisit={() => setVisitOpen(true)} lead />
-          {currentMenu.length > 0 ? <ButtonMenu label="More" variant="ghost" items={currentMenu} /> : null}
-        </div>}
-      >
-        <div className="grid gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone={phase.status === "DONE" ? "success" : current ? STATE_TONE[current.state] : "neutral"} title={skippedReason ?? undefined}>{phase.status === "PENDING" ? "Not started" : phase.status === "DONE" ? (skippedReason ? "Skipped" : "Done") : current ? STATE_LABEL[current.state] : "In progress"}</Badge>
-            <Text tone="secondary" size="sm">{nextStep}</Text>
+      {/* The workflow bar sits inside the phase tabs card: round, state, what to do next, and the commands. */}
+      <div className="grid gap-2 px-4 py-2.5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Text size="md" weight="semibold">{title}</Text>
+          <Badge tone={phase.status === "DONE" ? "success" : current ? STATE_TONE[current.state] : "neutral"} title={skippedReason ?? undefined}>{phase.status === "PENDING" ? "Not started" : phase.status === "DONE" ? (skippedReason ? "Skipped" : "Done") : current ? STATE_LABEL[current.state] : "In progress"}</Badge>
+          <Text tone="secondary" size="sm" className="min-w-0 flex-1 truncate">{nextStep}</Text>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Button type="button" size="sm" variant="ghost" leadingIcon={<PanelRight className="h-3.5 w-3.5" />} onClick={() => setDetailsOpen(true)}>Phase details <span className="text-ink-tertiary">{detailsSummary}</span></Button>
+            <IterationButtons phase={phase} current={current} commands={commands} canAct={acting} onNewVisit={() => setVisitOpen(true)} lead />
+            {currentMenu.length > 0 ? <ButtonMenu label="More" variant="ghost" items={currentMenu} /> : null}
           </div>
-          <UndoBar commands={commands} />
-          {commands.error && !visitOpen && !renaming && !skipOpen && !resetOpen ? <InlineError>{commands.error}</InlineError> : null}
         </div>
-      </SectionCard>
+        <UndoBar commands={commands} />
+        {commands.error && !visitOpen && !renaming && !skipOpen && !resetOpen ? <InlineError>{commands.error}</InlineError> : null}
+      </div>
 
       <Drawer open={detailsOpen} onOpenChange={setDetailsOpen} title={`${phase.name} · Phase details`} description={detailsSummary}>
         <div className="grid gap-4">

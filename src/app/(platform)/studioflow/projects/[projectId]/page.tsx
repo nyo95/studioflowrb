@@ -5,16 +5,13 @@ import { AppError } from "@platform/core/errors";
 import { LEGACY_PHASE_DEFINITION_IDS } from "@/apps/studioflow/domain/phase";
 import { phaseStepPresentation } from "@/apps/studioflow/domain/phase-display";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import {
-  PipelineStrip,
-  SectionCard,
-  Text,
-} from "@/platform/ui_engine";
+import { SectionCard, Text } from "@/platform/ui_engine";
 
 
 import { PhaseCanvas } from "../../_components/phase-canvas";
 import { pageSession } from "../../_components/session";
 import { ProjectWorkspace } from "./_workspace-canvas/project-workspace";
+import { PhaseTabs } from "./phase-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -58,32 +55,25 @@ export default async function ProjectOverviewPage({
       label: phase.label,
       note: display.note,
       state: display.state,
-      href: `?phase=${phase.id}`,
-      selected: phase.id === selectedPhaseId,
     };
   });
 
   return (
     <div className="grid gap-4">
-      {/* Pipeline tabs — always immediate, no hero card */}
+      {/* One card: the phase tabs and the selected phase's workflow bar (owner, 2026-10-13). Switching a phase is a
+          transition, so the old bar stays until the new one is ready and the canvas below is never reloaded. */}
       <SectionCard padded={false}>
-        <PipelineStrip variant="track" steps={pipelineSteps} label="Phase tabs" />
+        <PhaseTabs steps={pipelineSteps} selectedId={selectedPhaseId} />
+        <div className="border-t border-line-subtle">
+          {selectedPhaseId ? (
+            <Suspense fallback={<PhaseBarSkeleton />}>
+              <PhaseCanvas projectId={projectId} phaseId={selectedPhaseId} archived={archived} />
+            </Suspense>
+          ) : (
+            <Text as="p" tone="secondary" size="sm" className="px-4 py-3">No phases found for this project.</Text>
+          )}
+        </div>
       </SectionCard>
-
-      {/* Canvas — suspends independently; key forces reset on phase switch */}
-      {selectedPhaseId ? (
-        <Suspense key={selectedPhaseId} fallback={<PhaseCanvasSkeleton />}>
-          <PhaseCanvas
-            projectId={projectId}
-            phaseId={selectedPhaseId}
-            archived={archived}
-          />
-        </Suspense>
-      ) : (
-        <SectionCard padded>
-          <Text tone="secondary" size="sm">No phases found for this project.</Text>
-        </SectionCard>
-      )}
 
       {/* One Workspace canvas for the whole project (board-first, owner 2026-10-13); the phase only sets context. */}
       <Suspense fallback={<SectionCard padded><SkeletonBlock className="h-[420px] w-full" /></SectionCard>}>
@@ -99,32 +89,14 @@ function SkeletonBlock({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded-md bg-surface-muted ${className}`} />;
 }
 
-function PhaseCanvasSkeleton() {
+function PhaseBarSkeleton() {
   return (
-    <div className="grid gap-4">
-      <SectionCard padded>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex gap-2">
-            <SkeletonBlock className="h-5 w-24" />
-            <SkeletonBlock className="h-5 w-12" />
-          </div>
-          <SkeletonBlock className="h-8 w-40" />
-        </div>
-      </SectionCard>
-      <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)] items-start gap-4 max-[1100px]:grid-cols-1">
-        <SectionCard title="Earlier iterations" padded>
-          <div className="grid gap-2">
-            <SkeletonBlock className="h-4 w-3/4" />
-            <SkeletonBlock className="h-4 w-1/2" />
-          </div>
-        </SectionCard>
-        <SectionCard title="Requirements" padded>
-          <div className="grid gap-2">
-            <SkeletonBlock className="h-4 w-full" />
-            <SkeletonBlock className="h-4 w-4/5" />
-          </div>
-        </SectionCard>
+    <div className="flex items-center justify-between gap-3 px-4 py-3">
+      <div className="flex gap-2">
+        <SkeletonBlock className="h-5 w-24" />
+        <SkeletonBlock className="h-5 w-16" />
       </div>
+      <SkeletonBlock className="h-8 w-56" />
     </div>
   );
 }

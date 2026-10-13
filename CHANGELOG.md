@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.533 | 2026-10-13 | feat(studioflow): Phases page as one fixed app screen, phase tabs without reload (Lead)
+
+- **Owner 2026-10-13:** make the Phases page a fixed page, merge the phase strip and the round card ("CD Mall") into one, and switch phases like tabs instead of moving to another page.
+- The phase strip and the selected phase's workflow bar are now one card: the round, its state, the next step, Phase details (with counts), the round commands and More on one row under the strip; Undo and errors under it.
+- Choosing a phase no longer reloads the page: the strip used plain links (a full document load each time). New client `PhaseTabs` selects in place (`router.push` with `scroll: false` in a transition, optimistic selection); the old workflow bar stays until the new one is ready, the Workspace canvas is not remounted, and `?phase=` still opens the same phase after a reload. UI Engine `PipelineStrip` steps gain `onSelect` (a button with `aria-pressed`) next to `href`, with a test.
+- On a desktop the page does not scroll: the canvas measures the room left under the cards above it in its scrolling container and fills it down to the page padding (minimum 420 px), following window resizes and the height of the card above (an Undo bar appearing). Phones keep the scrolling document view.
+- **Migrations/dependencies:** none. **Checks:** `npm test` 1,057 passed; typecheck; eslint 0 errors. Lead visual check not done: the in-app browser pane was hidden, so the page could not finish rendering; owner walk in their own browser. Dev server restarted on :3001 (owner instruction: always restart after coding).
+
 ## R8.532 | 2026-10-13 | feat(studioflow): Workspace canvas on the Phases page (Lead)
 
 - **Reviewer verdict on R8.531: PASS.** Geometry migration with range and pair checks, `placeWorkspaceItems` (batch, last write wins, no version bump, membership move audited, sort order following the canvas), optional geometry on create, `moveWorkspaceCard` clearing position, geometry on reads. Independent re-run: `npm test` 1,044 passed, typecheck clean, kantor dev database up to date. Lead decision recorded in the contract: a card's stored x/y are relative to its frame.

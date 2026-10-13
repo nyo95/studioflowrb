@@ -216,6 +216,18 @@ describe("UI Engine foundation", () => {
     assert.match(track, /rounded-full border-2/);
   });
 
+  it("selects a track step in place when it has onSelect, and still follows href otherwise", () => {
+    const track = renderToStaticMarkup(createElement(ui.PipelineStrip, {
+      variant: "track",
+      steps: [
+        { id: "tab", label: "Design", state: "current", selected: true, onSelect: () => undefined },
+        { id: "link", label: "Brief", state: "done", href: "?phase=brief" },
+      ],
+    }));
+    assert.match(track, /<button type="button" aria-pressed="true"/);
+    assert.match(track, /<a href="\?phase=brief"/);
+  });
+
   it("paginates by href for server-rendered directories and by callback for client ones", () => {
     const paginationSource = readFileSync(new URL("./components/pagination.tsx", import.meta.url), "utf8");
     // URL pagination is rendered by server pages; importing the client Button

@@ -42,7 +42,7 @@ export async function PhaseCanvas({ projectId, phaseId, archived }: { projectId:
 
   return (
     <>
-      {!archived && !access.completed && !canTransition && !canContent ? <ReadOnlyNotice scope={access.isDesigner || access.isDrafter ? "phase" : "project"} /> : null}
+      {!archived && !access.completed && !canTransition && !canContent ? <div className="px-4 pt-3"><ReadOnlyNotice scope={access.isDesigner || access.isDrafter ? "phase" : "project"} /></div> : null}
       <PhasePanel
         projectId={projectId}
         phase={{ id: phase.id, name: phase.label, status: phase.status, isSupervision: phase.isSupervision, canStart: phase.canStart }}

@@ -158,6 +158,8 @@ export type PipelineStep = {
   /** Optional domain accent for the leading marker; state remains available through label/note. */
   accentClass?: string;
   href?: string;
+  /** Selects the step in place (a tab), instead of following `href`; the app decides what selecting does. */
+  onSelect?: () => void;
   /** Marks this step as the currently viewed tab — renders a bottom border indicator. */
   selected?: boolean;
   /** Optional action below the note; the track variant aligns actions at the bottom. */
@@ -246,7 +248,9 @@ export function PipelineStrip({
                 step.selected && "shadow-[inset_0_-3px_0_0_theme(colors.ink.DEFAULT)]",
               )}
             >
-              {step.href ? <a href={step.href} className="grid flex-1 content-start gap-1 no-underline hover:underline">{body}</a> : <span className="grid flex-1 content-start gap-1">{body}</span>}
+              {step.onSelect
+                ? <button type="button" aria-pressed={step.selected ?? false} onClick={step.onSelect} className="grid flex-1 content-start gap-1 rounded-action text-left focus-visible:outline-2 focus-visible:outline-line-focus">{body}</button>
+                : step.href ? <a href={step.href} className="grid flex-1 content-start gap-1 no-underline hover:underline">{body}</a> : <span className="grid flex-1 content-start gap-1">{body}</span>}
               {step.action ? <span className="mt-2 flex min-h-8 flex-wrap items-end gap-1.5">{step.action}</span> : null}
             </li>
           );

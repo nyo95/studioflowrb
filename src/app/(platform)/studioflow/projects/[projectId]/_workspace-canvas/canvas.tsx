@@ -342,6 +342,28 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     };
   }, [lens, narrow]);
 
+  // The page does not scroll on a desktop (owner, 2026-10-13): the canvas fills the room left under the cards above
+  // it, down to the page's bottom padding, and follows when that room changes (window size, an Undo bar appearing).
+  const [fitHeight, setFitHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+    let scroller: HTMLElement | null = element.parentElement;
+    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+    const frame = scroller ?? document.documentElement;
+    const measure = () => {
+      const top = element.getBoundingClientRect().top - frame.getBoundingClientRect().top + frame.scrollTop;
+      const next = Math.max(420, Math.floor(frame.clientHeight - top - 24));
+      setFitHeight((current) => (current === next ? current : next));
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(frame);
+    const above = element.closest("section")?.previousElementSibling;
+    if (above) observer.observe(above);
+    window.addEventListener("resize", measure);
+    return () => { observer.disconnect(); window.removeEventListener("resize", measure); };
+  }, [lens, narrow]);
+
   const zoomBy = (factor: number) => setView((current) => {
     const element = viewportRef.current;
     const ox = (element?.clientWidth ?? 800) / 2, oy = (element?.clientHeight ?? 500) / 2;
@@ -531,7 +553,8 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
       <div
         ref={viewportRef}
         onPointerDown={onViewportPointerDown}
-        className={`relative h-[calc(100dvh-260px)] min-h-[520px] touch-none overflow-hidden bg-canvas ${drag?.kind === "pan" ? "cursor-grabbing" : ""}`}
+        style={{ height: fitHeight ?? 560 }}
+        className={`relative touch-none overflow-hidden bg-canvas ${drag?.kind === "pan" ? "cursor-grabbing" : ""}`}
         aria-label="Workspace canvas"
       >
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background-image:radial-gradient(var(--ui-border-default)_1px,transparent_1px)]" style={{ backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
