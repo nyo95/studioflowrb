@@ -271,8 +271,11 @@ function NoteBubble({ note, projectId, phaseId, canEdit, canUseIdeas, locale, ti
   );
 }
 
-/** Under a note image in the large viewer: keep a copy on the person's Ideas board, or put it in this project's schedule. Both copy; the note is never changed. */
-function NoteImageActions({ image, projectId, phaseId, canUseIdeas }: { image: { id: string }; projectId: string; phaseId: string; canUseIdeas: boolean }) {
+/**
+ * Under a note image in the large viewer: keep a copy on the person's Ideas board, or put it in this project's schedule.
+ * Both copy; the note is never changed. The Workspace uses it too, where a card may have no phase label.
+ */
+export function NoteImageActions({ image, projectId, phaseId, canUseIdeas }: { image: { id: string }; projectId: string; phaseId: string | null; canUseIdeas: boolean }) {
   const ideasEnabled = useStudioFlowModuleEnabled("ideas") && canUseIdeas;
   const presentationEnabled = useStudioFlowModuleEnabled("presentation");
   const [saved, setSaved] = useState(false);

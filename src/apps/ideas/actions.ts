@@ -141,10 +141,10 @@ export async function applyIdeaToScheduleAction(input: UseIdeaInput): Promise<Ac
   });
 }
 
-const NoteImageRef = { projectId: Id, phaseId: Id, imageId: Id };
+const NoteImageRef = { projectId: Id, phaseId: Id.nullable().optional(), imageId: Id };
 
 /** "Save to Ideas" on a phase-note image: a private copy on the signed-in user's own board. */
-export async function saveNoteImageToIdeasAction(input: { projectId: string; phaseId: string; imageId: string }): Promise<ActionResult<{ cardId: string }>> {
+export async function saveNoteImageToIdeasAction(input: { projectId: string; phaseId?: string | null; imageId: string }): Promise<ActionResult<{ cardId: string }>> {
   return runSafeAction(async () => {
     await requireModuleEnabled("ideas");
     const ctx = await context();
@@ -183,7 +183,7 @@ export async function addIdeaToMoodboardAction(input: { cardId: string; projectI
 }
 
 /** "Add to moodboard" from a phase-note image, in the note own project. */
-export async function addNoteImageToMoodboardAction(input: { projectId: string; phaseId: string; imageId: string }): Promise<ActionResult<{ boardId: string; slideId: string; created: boolean }>> {
+export async function addNoteImageToMoodboardAction(input: { projectId: string; phaseId?: string | null; imageId: string }): Promise<ActionResult<{ boardId: string; slideId: string; created: boolean }>> {
   return runSafeAction(async () => {
     await requireModuleEnabled("ideas");
     await requireModuleEnabled("presentation");

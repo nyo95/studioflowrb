@@ -407,13 +407,15 @@ const WorkspaceCommand = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("renameSection"), projectId: Id, sectionId: Id, title: z.string().max(200), version: Version }),
   z.strictObject({ command: z.literal("deleteSection"), projectId: Id, sectionId: Id, version: Version }),
   z.strictObject({ command: z.literal("reorderSections"), projectId: Id, orderedIds: z.array(Id).min(1).max(200) }),
-  z.strictObject({ command: z.literal("createCard"), projectId: Id, sectionId: Id.optional(), phaseId: Id.nullable().optional(), body: NoteBody }),
+  z.strictObject({ command: z.literal("createCard"), projectId: Id, sectionId: Id.optional(), phaseId: Id.nullable().optional(), body: NoteBody, clientAnswer: z.boolean().optional(), withImages: z.boolean().optional() }),
   z.strictObject({ command: z.literal("updateCard"), projectId: Id, cardId: Id, body: NoteBody, version: Version }),
   z.strictObject({ command: z.literal("pinCard"), projectId: Id, cardId: Id, pinned: z.boolean(), version: Version }),
+  z.strictObject({ command: z.literal("setClientAnswer"), projectId: Id, cardId: Id, clientAnswer: z.boolean(), version: Version }),
   z.strictObject({ command: z.literal("setCardPhase"), projectId: Id, cardId: Id, phaseId: Id.nullable(), version: Version }),
   z.strictObject({ command: z.literal("moveCard"), projectId: Id, cardId: Id, sectionId: Id, position: z.number().int().min(0).max(10_000), version: Version }),
   z.strictObject({ command: z.literal("reorderCards"), projectId: Id, sectionId: Id, orderedIds: z.array(Id).min(1).max(2000) }),
   z.strictObject({ command: z.literal("deleteCard"), projectId: Id, cardId: Id, version: Version }),
+  z.strictObject({ command: z.literal("removeCardImage"), projectId: Id, imageId: Id }),
 ]);
 export type WorkspaceCommandInput = z.infer<typeof WorkspaceCommand>;
 
@@ -429,16 +431,32 @@ export async function workspaceAction(input: WorkspaceCommandInput): Promise<Act
       case "renameSection": result = await workspace.renameWorkspaceSection({ ...base, sectionId: data.sectionId, title: data.title, version: data.version }); break;
       case "deleteSection": result = await workspace.deleteWorkspaceSection({ ...base, sectionId: data.sectionId, version: data.version }); break;
       case "reorderSections": result = await workspace.reorderWorkspaceSections({ ...base, orderedIds: data.orderedIds }); break;
-      case "createCard": result = await workspace.createWorkspaceCard({ ...base, sectionId: data.sectionId, phaseId: data.phaseId ?? null, body: data.body }); break;
+      case "createCard": result = await workspace.createWorkspaceCard({ ...base, sectionId: data.sectionId, phaseId: data.phaseId ?? null, body: data.body, clientAnswer: data.clientAnswer, withImages: data.withImages }); break;
       case "updateCard": result = await workspace.updateWorkspaceCardText({ ...base, cardId: data.cardId, body: data.body, version: data.version }); break;
       case "pinCard": result = await workspace.setWorkspaceCardFlags({ ...base, cardId: data.cardId, pinned: data.pinned, version: data.version }); break;
+      case "setClientAnswer": result = await workspace.setWorkspaceCardFlags({ ...base, cardId: data.cardId, clientAnswer: data.clientAnswer, version: data.version }); break;
       case "setCardPhase": result = await workspace.setWorkspaceCardPhase({ ...base, cardId: data.cardId, phaseId: data.phaseId, version: data.version }); break;
       case "moveCard": result = await workspace.moveWorkspaceCard({ ...base, cardId: data.cardId, sectionId: data.sectionId, position: data.position, version: data.version }); break;
       case "reorderCards": result = await workspace.reorderWorkspaceCards({ ...base, sectionId: data.sectionId, orderedIds: data.orderedIds }); break;
       case "deleteCard": result = await workspace.deleteWorkspaceCard({ ...base, cardId: data.cardId, version: data.version }); break;
+      case "removeCardImage": result = await workspace.removeWorkspaceCardImage({ ...base, imageId: data.imageId }); break;
     }
     refresh(data.projectId);
     return result;
+  });
+}
+
+const CardImageForm = z.strictObject({ projectId: Id, cardId: Id });
+/** One image onto a Workspace card; images go one request at a time so their order holds. */
+export async function addWorkspaceCardImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(CardImageForm, { projectId: formData.get("projectId"), cardId: formData.get("cardId") });
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new AppError("VALIDATION", "NOTE_IMAGE_REQUIRED", "Choose an image.");
+    const result = await studioFlow.workspace.addWorkspaceCardImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
+    refresh(data.projectId);
+    return { imageId: result.imageId };
   });
 }
 

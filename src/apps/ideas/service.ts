@@ -240,13 +240,13 @@ export function createIdeaService(db: IdeasDb, ports: IdeasPorts) {
       return { key: card.image_key, contentType: card.content_type };
     },
 
-    async readNoteImageSource(input: IdeasContext & { projectId: string; phaseId: string; imageId: string }) {
+    async readNoteImageSource(input: IdeasContext & { projectId: string; phaseId?: string | null; imageId: string }) {
       requireIdeas(input);
       const image = await ports.studioFlow.readWorkspaceImageSource(input);
       return { key: image.key, contentType: image.contentType };
     },
 
-    async saveNoteImageToIdeas(input: IdeasContext & { projectId: string; phaseId: string; imageId: string }) {
+    async saveNoteImageToIdeas(input: IdeasContext & { projectId: string; phaseId?: string | null; imageId: string }) {
       const userId = requireIdeas(input);
       const image = await ports.studioFlow.readWorkspaceImageSource(input);
       const key = createPrivateObjectKey("ideas/cards", IMAGE_TYPES[image.contentType] ?? "png");
@@ -260,7 +260,7 @@ export function createIdeaService(db: IdeasDb, ports: IdeasPorts) {
       } catch (error) { await discardNew(key); throw error; }
     },
 
-    async useNoteImageInSchedule(input: IdeasContext & { operationId?: string; projectId: string; phaseId: string; imageId: string; target: IdeaUseTarget; option: IdeaOptionText }) {
+    async useNoteImageInSchedule(input: IdeasContext & { operationId?: string; projectId: string; phaseId?: string | null; imageId: string; target: IdeaUseTarget; option: IdeaOptionText }) {
       requireIdeas(input);
       const image = await ports.studioFlow.readWorkspaceImageSource(input);
       return ports.studioFlow.placeExternalImageInSchedule({ ...input, operationId: input.operationId ?? randomUUID(), source: { key: image.key, contentType: image.contentType }, metadata: { source: "phase-note-image" } });

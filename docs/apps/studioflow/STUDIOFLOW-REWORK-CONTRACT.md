@@ -297,9 +297,12 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   project. Every card and section change names the `version` it read; a
   mismatch is refused (`WORKSPACE_CARD_STALE` / `WORKSPACE_SECTION_STALE`). A
   section is deleted only when empty. Audit: `studioflow.workspace-card.*`
-  and `studioflow.workspace-section.*` without card text. The final Workspace
-  screen is the Lead's next revision; R8.519 ships a plain functional
-  `/studioflow/projects/[projectId]/workspace` tab.
+  and `studioflow.workspace-section.*` without card text. The Workspace tab
+  (`/studioflow/projects/[projectId]/workspace`, R8.523) shows sections as
+  columns (stacked on a phone) with drag-and-drop of cards and sections, a
+  menu equivalent for each drag, a phase filter and a pinned filter (both turn
+  reordering off), inline section rename, and card edit that shows both texts
+  when someone else saved first.
 - **Requirements** (§6.2): the standard checklist.
 
 `sf_activity` (legacy feedback rows) is closed history: no command writes it.
