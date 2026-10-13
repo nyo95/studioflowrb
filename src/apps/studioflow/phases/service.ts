@@ -335,7 +335,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           await recordEvent(tx, input, phase, iteration.id, "SENT", "ANSWERED", { beforeIteration: iterationUndo(iteration) });
           await audit(tx, input.actor, "client-answer-recorded", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id, notes: note !== null });
         }
-        const posted = note ? await insertWorkspaceCard(tx, { projectId: phase.project_id, phaseId: phase.id, iterationId: iteration.id, body: note, origin: "CLIENT_ANSWER", actor: input.actor, at: nowOf(ports) }) : null;
+        const posted = note ? await insertWorkspaceCard(tx, ports, { projectId: phase.project_id, phaseId: phase.id, iterationId: iteration.id, body: note, origin: "CLIENT_ANSWER", actor: input.actor, at: nowOf(ports) }) : null;
         return { iterationId: iteration.id, noteId: posted?.id ?? null };
       });
     },
@@ -410,7 +410,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const visitNote = input.note ? requiredText(input.note, "VISIT_NOTE_REQUIRED", "Visit note", 2000) : null;
         const visit = await createIteration(tx, phase, undefined, { date: dateOnlyToDate(input.visitDate) });
         // What was seen on site goes to the phase notes, labelled with this visit.
-        if (visitNote) await insertWorkspaceCard(tx, { projectId: phase.project_id, phaseId: phase.id, iterationId: visit.id, body: visitNote, origin: "SITE_VISIT", actor: input.actor, at: nowOf(ports) });
+        if (visitNote) await insertWorkspaceCard(tx, ports, { projectId: phase.project_id, phaseId: phase.id, iterationId: visit.id, body: visitNote, origin: "SITE_VISIT", actor: input.actor, at: nowOf(ports) });
         if (phase.status === "PENDING") await setPhase(tx, phase, { status: "ACTIVE", is_locked: false });
         await recordEvent(tx, input, phase, null, null, "NOT_SENT", { createdIteration: iterationUndo(visit), phaseBefore: phase.status });
         await audit(tx, input.actor, "visit-created", phase, phase.status as PhaseStatus, "ACTIVE", { iterationId: visit.id });

@@ -255,6 +255,8 @@ enum SfWorkspaceCardOrigin {
 model SfWorkspaceSection {
   id            String   @id @default(uuid())
   project_id    String
+  /// Fixed system identity for the project's default loose-card destination. Ordinary sections stay null.
+  system_key    String?
   title         String
   sort_order    Int
   created_by_id String
@@ -267,6 +269,7 @@ model SfWorkspaceSection {
   cards   SfWorkspaceCard[]
 
   @@index([project_id, sort_order])
+  @@unique([project_id, system_key])
   @@map("sf_workspace_section")
   @@schema("studioflow")
 }

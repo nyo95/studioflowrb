@@ -3671,39 +3671,82 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     return { projectId, moodboard, cd, base: { ...as(designer), projectId } };
   }
 
-  it("creates the first section on the first card, orders sections and cards, and refuses to delete a section with cards", async () => {
+  it("creates the fixed default section on the first loose card and keeps using it after sections are reordered", async () => {
     const { projectId, moodboard, base } = await setup();
     const general = await sf.workspace.createWorkspaceCard({ ...base, body: "Client prefers warm wood" });
     let workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    assert.deepEqual(workspace.map((section) => section.title), ["Notes"]);
+    assert.deepEqual(workspace.map((section) => [section.title, section.isDefault]), [["Workspace", true]]);
     assert.deepEqual(workspace[0]!.cards.map((card) => [card.id, card.phaseId, card.origin]), [[general.cardId, null, "NOTE"]]);
 
     const materials = await sf.workspace.createWorkspaceSection({ ...base, title: "Materials" });
+    assert.equal((await testDb.prisma.sfWorkspaceSection.findUniqueOrThrow({ where: { id: materials.sectionId } })).system_key, null, "a person never creates the default section");
     const labelled = await sf.workspace.createWorkspaceCard({ ...base, sectionId: materials.sectionId, phaseId: moodboard.id, body: "Terrazzo sample" });
     const labelledRow = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: labelled.cardId } });
     assert.equal(labelledRow.iteration_id, (await openIteration(moodboard.id)).id, "a phase-labelled card takes the phase's latest round as its round label");
 
-    const notes = workspace[0]!;
-    await sf.workspace.reorderWorkspaceSections({ ...base, orderedIds: [materials.sectionId, notes.id] });
+    const defaultWorkspace = workspace[0]!;
+    await sf.workspace.reorderWorkspaceSections({ ...base, orderedIds: [materials.sectionId, defaultWorkspace.id] });
     workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    assert.deepEqual(workspace.map((section) => section.title), ["Materials", "Notes"]);
+    assert.deepEqual(workspace.map((section) => [section.title, section.isDefault]), [["Materials", false], ["Workspace", true]]);
     await rejectsWith(sf.workspace.reorderWorkspaceSections({ ...base, orderedIds: [materials.sectionId] }), "WORKSPACE_ORDER_INVALID");
+
+    const loose = await sf.workspace.createWorkspaceCard({ ...base, body: "Still goes to Workspace" });
+    assert.equal((await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: loose.cardId } })).section_id, defaultWorkspace.id);
 
     const materialsSection = workspace[0]!;
     await rejectsWith(sf.workspace.deleteWorkspaceSection({ ...base, sectionId: materialsSection.id, version: materialsSection.version }), "WORKSPACE_SECTION_NOT_EMPTY");
     const card = materialsSection.cards[0]!;
-    await sf.workspace.moveWorkspaceCard({ ...base, cardId: card.id, sectionId: notes.id, position: 0, version: card.version });
+    await sf.workspace.moveWorkspaceCard({ ...base, cardId: card.id, sectionId: defaultWorkspace.id, position: 0, version: card.version });
     workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    assert.deepEqual(workspace[1]!.cards.map((row) => [row.id, row.sortOrder]), [[labelled.cardId, 0], [general.cardId, 1]]);
+    assert.deepEqual(workspace[1]!.cards.map((row) => [row.id, row.sortOrder]), [[labelled.cardId, 0], [general.cardId, 1], [loose.cardId, 2]]);
     await rejectsWith(sf.workspace.deleteWorkspaceSection({ ...base, sectionId: materialsSection.id, version: materialsSection.version - 1 }), "WORKSPACE_SECTION_STALE");
     await sf.workspace.deleteWorkspaceSection({ ...base, sectionId: materialsSection.id, version: workspace[0]!.version });
-    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId })).map((section) => section.title), ["Notes"]);
+    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId })).map((section) => section.title), ["Workspace"]);
 
-    await sf.workspace.reorderWorkspaceCards({ ...base, sectionId: notes.id, orderedIds: [general.cardId, labelled.cardId] });
-    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards.map((row) => row.id), [general.cardId, labelled.cardId]);
-    const actions = (await testDb.prisma.auditEvent.findMany({ where: { action: { startsWith: "studioflow.workspace-" } } })).map((event) => event.action);
+    await sf.workspace.reorderWorkspaceCards({ ...base, sectionId: defaultWorkspace.id, orderedIds: [general.cardId, loose.cardId, labelled.cardId] });
+    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards.map((row) => row.id), [general.cardId, loose.cardId, labelled.cardId]);
+    const events = await testDb.prisma.auditEvent.findMany({ where: { action: { startsWith: "studioflow.workspace-" } } });
+    const actions = events.map((event) => event.action);
     for (const action of ["studioflow.workspace-card.created", "studioflow.workspace-section.created", "studioflow.workspace-section.reordered", "studioflow.workspace-card.moved", "studioflow.workspace-section.deleted", "studioflow.workspace-section.cards-reordered"]) assert.ok(actions.includes(action), action);
-    for (const event of await testDb.prisma.auditEvent.findMany({ where: { action: { startsWith: "studioflow.workspace-" } } })) assert.doesNotMatch(JSON.stringify(event.metadata), /warm wood|Terrazzo/, "audit never carries card text");
+    assert.ok(events.some((event) => {
+      const metadata = event.metadata as { projectId?: string; isDefault?: boolean; bySystem?: boolean };
+      return event.action === "studioflow.workspace-section.created" && event.entity_id === defaultWorkspace.id && metadata.projectId === projectId && metadata.isDefault === true && metadata.bySystem === true;
+    }));
+    assert.ok(events.some((event) => {
+      const metadata = event.metadata as { projectId?: string; isDefault?: boolean };
+      return event.action === "studioflow.workspace-section.created" && event.entity_id === materials.sectionId && metadata.projectId === projectId && metadata.isDefault === false;
+    }));
+    assert.ok(events.some((event) => event.action === "studioflow.workspace-section.cards-reordered" && event.entity_id === defaultWorkspace.id && (event.metadata as { isDefault?: boolean }).isDefault === true));
+    assert.ok(events.some((event) => event.action === "studioflow.workspace-section.deleted" && event.entity_id === materials.sectionId && (event.metadata as { isDefault?: boolean }).isDefault === false));
+    for (const event of events) assert.doesNotMatch(JSON.stringify(event.metadata), /warm wood|Terrazzo/, "audit never carries card text");
+  });
+
+  it("creates exactly one default section for concurrent first cards and never lets that section be deleted", async () => {
+    const { projectId, base } = await setup();
+    const ordinary = await sf.workspace.createWorkspaceSection({ ...base, title: "Ordinary" });
+    const [first, second] = await Promise.all([
+      sf.workspace.createWorkspaceCard({ ...base, body: "First concurrent card" }),
+      sf.workspace.createWorkspaceCard({ ...base, body: "Second concurrent card" }),
+    ]);
+    let workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    assert.equal(workspace.length, 2);
+    assert.deepEqual(workspace.map((section) => [section.title, section.isDefault]), [["Workspace", true], ["Ordinary", false]], "the lazily created default goes in front of existing ordinary sections");
+    assert.deepEqual(workspace[0]!.cards.map((card) => card.id).sort(), [first.cardId, second.cardId].sort());
+    assert.equal(await testDb.prisma.sfWorkspaceSection.count({ where: { project_id: projectId, system_key: "DEFAULT" } }), 1);
+
+    for (const card of workspace[0]!.cards) {
+      await sf.workspace.moveWorkspaceCard({ ...base, cardId: card.id, sectionId: ordinary.sectionId, position: 0, version: card.version });
+    }
+    workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    const defaultSection = workspace.find((section) => section.isDefault)!;
+    assert.equal(defaultSection.cards.length, 0);
+    await rejectsWith(sf.workspace.deleteWorkspaceSection({ ...base, sectionId: defaultSection.id, version: defaultSection.version }), "WORKSPACE_SECTION_DEFAULT");
+    const renamed = await sf.workspace.renameWorkspaceSection({ ...base, sectionId: defaultSection.id, title: "Inbox", version: defaultSection.version });
+    await sf.workspace.reorderWorkspaceSections({ ...base, orderedIds: [ordinary.sectionId, defaultSection.id] });
+    workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    assert.deepEqual(workspace.map((section) => [section.title, section.isDefault]), [["Ordinary", false], ["Inbox", true]]);
+    assert.ok((await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.workspace-section.renamed", entity_id: defaultSection.id } })).some((event) => (event.metadata as { isDefault?: boolean }).isDefault === true));
+    assert.equal(renamed.version, defaultSection.version + 1);
   });
 
   it("filters by phase label, sets and clears the label (clearing the round too), and refuses another project's phase", async () => {
@@ -3767,15 +3810,19 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     await assert.rejects(sf.workspace.createWorkspaceCard({ ...base, body: "after archive" }));
   });
 
-  it("puts a client answer and a site visit into the first section with their labels, atomically", async () => {
+  it("puts a client answer and a site visit into the default section with their labels, atomically", async () => {
     const { projectId, moodboard, base } = await setup();
+    await sf.workspace.createWorkspaceCard({ ...base, body: "Creates the default" });
+    let workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    const defaultSection = workspace.find((section) => section.isDefault)!;
     const materials = await sf.workspace.createWorkspaceSection({ ...base, title: "Materials" });
+    await sf.workspace.reorderWorkspaceSections({ ...base, orderedIds: [materials.sectionId, defaultSection.id] });
     const iteration = await openIteration(moodboard.id);
     const phaseBase = { ...base, phaseId: moodboard.id };
     await sf.phases.sendIteration({ ...phaseBase, iterationId: iteration.id });
     const answered = await sf.phases.recordClientAnswer({ ...phaseBase, iterationId: iteration.id, note: "Warmer, please" });
     const card = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: answered.noteId! } });
-    assert.deepEqual([card.section_id, card.phase_id, card.iteration_id, card.origin], [materials.sectionId, moodboard.id, iteration.id, "CLIENT_ANSWER"], "the project's first section takes it");
+    assert.deepEqual([card.section_id, card.phase_id, card.iteration_id, card.origin], [defaultSection.id, moodboard.id, iteration.id, "CLIENT_ANSWER"], "the project's default section takes it even when another section is first");
 
     const failingAudit = createStudioFlowService(testDb.prisma, {
       runTransaction: (work) => testDb.prisma.$transaction((tx) => work(tx)), auditWriter: { write: async () => { throw new Error("audit down"); } },
@@ -3788,6 +3835,6 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     assert.equal(await testDb.prisma.sfWorkspaceCard.count(), before, "a failed visit leaves no card behind");
     const visit = await sf.phases.createSupervisionVisit({ ...base, phaseId: supervision.id, visitDate: "2026-09-20", note: "Ceiling checked" });
     const visitCard = await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { iteration_id: visit.iterationId } });
-    assert.deepEqual([visitCard.phase_id, visitCard.origin, visitCard.body], [supervision.id, "SITE_VISIT", "Ceiling checked"]);
+    assert.deepEqual([visitCard.section_id, visitCard.phase_id, visitCard.origin, visitCard.body], [defaultSection.id, supervision.id, "SITE_VISIT", "Ceiling checked"]);
   });
 });

@@ -11,7 +11,7 @@ import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 import { CardComposer, ReadOnlyBoardNotice, WorkspaceCard, runWorkspaceCommand, type PhaseOption, type RunCommand, type WorkspaceCardView } from "./workspace-card";
 import type { WorkspaceCommandInput } from "../../../actions";
 
-type Section = { id: string; title: string; version: number; cards: WorkspaceCardView[] };
+type Section = { id: string; title: string; version: number; isDefault: boolean; cards: WorkspaceCardView[] };
 type CardDragState = { id: string; from: string };
 type CardDrop = { sectionId: string; index: number };
 

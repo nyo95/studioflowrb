@@ -44,6 +44,7 @@ export default async function ProjectWorkspacePage({ params, searchParams }: { p
         id: section.id,
         title: section.title,
         version: section.version,
+        isDefault: section.isDefault,
         cards: section.cards.map((card) => ({
           id: card.id,
           version: card.version,

@@ -36,8 +36,9 @@ import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
 /** One card's text; the old per-iteration notes had the same limit. */
 export const PHASE_NOTE_MAX = 4000;
 export const WORKSPACE_SECTION_TITLE_MAX = 80;
-/** The section a project's first card goes into when it has none. */
-export const DEFAULT_WORKSPACE_SECTION = "Notes";
+export const WORKSPACE_DEFAULT_SECTION_KEY = "DEFAULT";
+/** Initial display name only; the fixed system identity survives a later rename or reorder. */
+export const DEFAULT_WORKSPACE_SECTION = "Workspace";
 
 export type NoteImageUpload = { body: Uint8Array; contentType: string };
 export type WorkspaceCardOrigin = "NOTE" | "CLIENT_ANSWER" | "SITE_VISIT";
@@ -77,12 +78,14 @@ async function lockSection(tx: TxClient, sectionId: string) {
   await tx.$queryRaw`SELECT id FROM studioflow.sf_workspace_section WHERE id = ${sectionId} FOR UPDATE`;
 }
 
-/** The project's first section, created as "Notes" when the project has none yet. */
-async function firstSection(tx: TxClient, projectId: string, createdById: string, at: Date) {
+/** The project's fixed loose-card destination, created lazily by the system when absent. */
+async function defaultSection(tx: TxClient, ports: StudioFlowPorts, projectId: string, createdById: string, actor: AuditActor, at: Date) {
   await lockProject(tx, projectId);
-  const existing = await tx.sfWorkspaceSection.findFirst({ where: { project_id: projectId }, orderBy: [{ sort_order: "asc" }, { created_at: "asc" }, { id: "asc" }], select: { id: true } });
+  const existing = await tx.sfWorkspaceSection.findUnique({ where: { project_id_system_key: { project_id: projectId, system_key: WORKSPACE_DEFAULT_SECTION_KEY } }, select: { id: true } });
   if (existing) return existing.id;
-  const created = await tx.sfWorkspaceSection.create({ data: { id: randomUUID(), project_id: projectId, title: DEFAULT_WORKSPACE_SECTION, sort_order: 0, created_by_id: createdById, created_at: at } });
+  const first = await tx.sfWorkspaceSection.aggregate({ where: { project_id: projectId }, _min: { sort_order: true } });
+  const created = await tx.sfWorkspaceSection.create({ data: { id: randomUUID(), project_id: projectId, system_key: WORKSPACE_DEFAULT_SECTION_KEY, title: DEFAULT_WORKSPACE_SECTION, sort_order: first._min.sort_order === null ? 0 : first._min.sort_order - 1, created_by_id: createdById, created_at: at } });
+  await writeAudit(ports, tx, { action: "studioflow.workspace-section.created", entityType: "workspace-section", entityId: created.id, actor, metadata: { projectId, isDefault: true, bySystem: true } });
   return created.id;
 }
 
@@ -95,13 +98,13 @@ async function nextCardOrder(tx: TxClient, sectionId: string) {
 /**
  * Writes one card inside the caller's transaction. Also used by the answer and visit commands, so what the client said
  * or what was seen on site lands in the project's Workspace in the same transaction. Without `iterationId`, the
- * phase's latest round labels it. Without `sectionId`, it goes to the project's first section.
+ * phase's latest round labels it. Without `sectionId`, it goes to the project's fixed default section.
  */
-export async function insertWorkspaceCard(tx: TxClient, input: { projectId: string; phaseId: string | null; iterationId?: string | null; sectionId?: string; body: string; origin: WorkspaceCardOrigin; pinned?: boolean; actor: AuditActor; at: Date }) {
+export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, input: { projectId: string; phaseId: string | null; iterationId?: string | null; sectionId?: string; body: string; origin: WorkspaceCardOrigin; pinned?: boolean; actor: AuditActor; at: Date }) {
   const iterationId = input.iterationId !== undefined
     ? input.iterationId
     : input.phaseId ? (await tx.sfRevision.findFirst({ where: { phase_id: input.phaseId }, orderBy: { major: "desc" }, select: { id: true } }))?.id ?? null : null;
-  const sectionId = input.sectionId ?? await firstSection(tx, input.projectId, input.actor.userId ?? "system", input.at);
+  const sectionId = input.sectionId ?? await defaultSection(tx, ports, input.projectId, input.actor.userId ?? "system", input.actor, input.at);
   const sortOrder = await nextCardOrder(tx, sectionId);
   return tx.sfWorkspaceCard.create({
     data: {
@@ -204,7 +207,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         await lockProject(tx, input.projectId);
         const last = await tx.sfWorkspaceSection.aggregate({ where: { project_id: input.projectId }, _max: { sort_order: true } });
         const section = await tx.sfWorkspaceSection.create({ data: { id: randomUUID(), project_id: input.projectId, title, sort_order: (last._max.sort_order ?? -1) + 1, created_by_id: actorId, created_at: nowOf(ports) } });
-        await audit(tx, input.actor, "workspace-section", "created", section.id, { projectId: input.projectId });
+        await audit(tx, input.actor, "workspace-section", "created", section.id, { projectId: input.projectId, isDefault: false });
         return { sectionId: section.id };
       });
     },
@@ -217,7 +220,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         if (section.title === title) return { sectionId: section.id, version: section.version };
         const updated = await tx.sfWorkspaceSection.updateMany({ where: { id: section.id, version: input.version }, data: { title, version: { increment: 1 } } });
         if (updated.count === 0) throw staleSection();
-        await audit(tx, input.actor, "workspace-section", "renamed", section.id, { projectId: input.projectId });
+        await audit(tx, input.actor, "workspace-section", "renamed", section.id, { projectId: input.projectId, isDefault: section.system_key === WORKSPACE_DEFAULT_SECTION_KEY });
         return { sectionId: section.id, version: section.version + 1 };
       });
     },
@@ -239,10 +242,11 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         await lockProject(tx, input.projectId);
         const section = await loadSection(tx, input.projectId, input.sectionId);
         if (section.version !== input.version) throw staleSection();
+        if (section.system_key === WORKSPACE_DEFAULT_SECTION_KEY) throw conflict("WORKSPACE_SECTION_DEFAULT", "The default section can be renamed or moved, not deleted.");
         await lockSection(tx, section.id);
         if (await tx.sfWorkspaceCard.count({ where: { section_id: section.id } }) > 0) throw conflict("WORKSPACE_SECTION_NOT_EMPTY", "Move or delete this section's cards first.");
         await tx.sfWorkspaceSection.delete({ where: { id: section.id } });
-        await audit(tx, input.actor, "workspace-section", "deleted", section.id, { projectId: input.projectId });
+        await audit(tx, input.actor, "workspace-section", "deleted", section.id, { projectId: input.projectId, isDefault: false });
         return { sectionId: section.id };
       });
     },
@@ -258,7 +262,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       await validatePhaseLabel(tx, input.projectId, phaseId);
       await writableScope(tx, input, phaseId);
       if (input.sectionId) await loadSection(tx, input.projectId, input.sectionId);
-      const card = await insertWorkspaceCard(tx, { projectId: input.projectId, phaseId, sectionId: input.sectionId, body, origin: input.origin ?? "NOTE", actor: input.actor, at: nowOf(ports) });
+      const card = await insertWorkspaceCard(tx, ports, { projectId: input.projectId, phaseId, sectionId: input.sectionId, body, origin: input.origin ?? "NOTE", actor: input.actor, at: nowOf(ports) });
       await audit(tx, input.actor, "workspace-card", "created", card.id, { projectId: input.projectId, phaseId });
       return { cardId: card.id };
     });
@@ -418,7 +422,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         const rows = await tx.sfWorkspaceCard.findMany({ where: { section_id: section.id }, select: { id: true } });
         orderIds(input.orderedIds, rows.map((row) => row.id));
         for (const [sortOrder, id] of input.orderedIds.entries()) await tx.sfWorkspaceCard.update({ where: { id }, data: { sort_order: sortOrder } });
-        await audit(tx, input.actor, "workspace-section", "cards-reordered", section.id, { projectId: input.projectId, count: input.orderedIds.length });
+        await audit(tx, input.actor, "workspace-section", "cards-reordered", section.id, { projectId: input.projectId, count: input.orderedIds.length, isDefault: section.system_key === WORKSPACE_DEFAULT_SECTION_KEY });
         return { sectionId: section.id };
       });
     },
@@ -482,7 +486,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       ]);
       const views = await Promise.all(cardRows.map((row) => cardView(row as CardReadRow)));
       return sectionRows.map((section) => ({
-        id: section.id, title: section.title, sortOrder: section.sort_order, version: section.version,
+        id: section.id, title: section.title, sortOrder: section.sort_order, version: section.version, isDefault: section.system_key === WORKSPACE_DEFAULT_SECTION_KEY,
         cards: views.filter((card) => card.sectionId === section.id),
       }));
     },
@@ -500,7 +504,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   type NoteInput = CommandContext & { projectId: string; phaseId: string };
   const phaseNotes = {
     /**
-     * Posts a message labelled with the phase (and its latest round) into the project's first section. `withImages` lets
+     * Posts a message labelled with the phase (and its latest round) into the project's default section. `withImages` lets
      * a message start empty when its images follow one by one (`addPhaseNoteImage`); otherwise it needs text.
      */
     async postPhaseNote(input: NoteInput & { body: string | null; clientFeedback?: boolean; withImages?: boolean }) {
@@ -508,7 +512,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       if (!body && !input.withImages) throw invalid("PHASE_NOTE_EMPTY", "Write something or add an image.");
       return runTransaction(async (tx) => {
         const phase = await writablePhase(tx, input);
-        const card = await insertWorkspaceCard(tx, { projectId: phase.project_id, phaseId: phase.id, body, origin: input.clientFeedback ? "CLIENT_ANSWER" : "NOTE", actor: input.actor, at: nowOf(ports) });
+        const card = await insertWorkspaceCard(tx, ports, { projectId: phase.project_id, phaseId: phase.id, body, origin: input.clientFeedback ? "CLIENT_ANSWER" : "NOTE", actor: input.actor, at: nowOf(ports) });
         await audit(tx, input.actor, "workspace-card", "created", card.id, { projectId: phase.project_id, phaseId: phase.id });
         return { noteId: card.id };
       });
