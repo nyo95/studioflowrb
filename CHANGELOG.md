@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.541 | 2026-10-13 | feat(studioflow): Workspace board without frames, with tools, selection and an overview map (Lead)
+
+- **Owner 2026-10-13:** "lanjut ke tampilan papan barunya" — the board UI of the accepted concept, phase 1 (WO-SF-WORKSPACE-04, after the R8.540 backend).
+- One board: frames are gone from the screen; every element is drawn at its own board place and unplaced ones stack under the lowest placed one (`geometry.ts` rewritten: `layoutElements`, `boardExtent`, `snapMove`; frame layout, frame hit-testing and fit-zoom removed with their tests).
+- Elements by kind: a **text** reads plain, as a **heading** (large, no card) or as a **sticky note** (warm note colour); style changes from the element menu (`setTextStyle`). An **image** is drawn edge to edge at its own proportions and resizes with the width handle; a **file** shows its type, name, size and an Open link that downloads with its real name.
+- Selection and moving: click selects (labels, star and menu stay visible), Shift + click adds, press and drag moves the whole selection (a single element snaps to neighbours with guide lines; several snap to the grid), the click that ends a move never opens the text or an image; click a text to write. With several selected a bar offers Mark as client feedback and Delete; Delete/Backspace removes the selection after one confirmation; Escape clears.
+- Writing and adding: bottom tool bar Select (V) · Text (T) · Sticky (S) · Photo or file; with Text or Sticky (or a double-click) a new text opens where the board was clicked and becomes an element when left with text in it (Escape cancels). Paste or drop images and files anywhere (each its own element at the pointer); plain text pasted on the board becomes a text element there. "Quick note" keeps the old quick capture.
+- Moving around: drag empty board, middle-click or Space + drag; the wheel moves, Ctrl/Cmd + wheel enlarges (100–200 %); an overview map bottom-right shows every element and the visible area and jumps where it is clicked. The phone reads the elements top to bottom by board position.
+- Action layer: `createSection`, `renameSection`, `deleteSection`, `reorderSections`, `moveCard`, `reorderCards`, `removeCardImage` and the section part of `placeItems` removed; `createCard` no longer takes a section. The service functions stay until their purge (BACKLOG `[CLEANUP]`).
+- **Migrations/dependencies:** none. **Checks:** typecheck 0; eslint 0 errors on StudioFlow; geometry tests 4/4; boundaries OK; production build OK. **Not done:** browser walk — the board page needs a signed-in session in the browser pane; owner walk pending.
+
 ## R8.540 | 2026-10-13 | feat(studioflow): Workspace board elements — text, image and file stand on their own (Lead)
 
 - **Owner 2026-10-13:** after three Executor runs on WO-SF-WORKSPACE-04 ended without a change, the owner told the Lead to implement the backend slice directly ("kamu kerjain aja sendiri langsung").

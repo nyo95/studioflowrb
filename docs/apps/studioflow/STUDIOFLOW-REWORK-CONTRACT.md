@@ -343,8 +343,16 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   frame sits at the origin) and turned each card image into an image element
   with the image's id beside its card (an image-only card was replaced by its
   first image). Archived-asset purge removes image and file elements with
-  their objects and keeps text. Section commands still exist until the Lead's
-  board UI removes frames.
+  their objects and keeps text. Since R8.541 the screen has no frames: the
+  board draws every element at its own place (unplaced ones stack under the
+  lowest placed one), and the action layer no longer offers section create,
+  rename, delete, reorder or card move/reorder (the service functions remain
+  until their purge, BACKLOG `[CLEANUP]`). Board use: click selects, Shift
+  adds, press-and-drag moves the whole selection (snapping to neighbours when
+  one moves), click a text again to write; Text / Sticky tools or a
+  double-click write at a spot; plain text pasted on the board becomes a text
+  element; Delete removes the selection after a confirmation; the overview
+  map jumps anywhere; zoom stays 100–200 %.
 - **Where it lives** (Lead UI R8.532, owner board-first 2026-10-13): one
   canvas on the project Phases page, under the phase strip and the selected
   phase's workflow card. There is no separate Workspace tab or route and no

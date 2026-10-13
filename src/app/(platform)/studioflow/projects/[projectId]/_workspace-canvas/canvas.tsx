@@ -1,14 +1,15 @@
 "use client";
 
-import { Minus, Plus, SquarePlus, X } from "lucide-react";
+import { Minus, MousePointer2, Plus, StickyNote, Type, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
-import { Button, EmptyState, IconButton, InlineEdit, InlineError, Notice, RowActionMenu, Text, useConfirm, useFileIntake, type RowActionItem } from "@/platform/ui_engine";
+import { Button, EmptyState, IconButton, InlineError, Notice, RichTextEditor, Text, useConfirm, useFileIntake } from "@/platform/ui_engine";
 
 import type { WorkspaceCommandInput } from "../../../actions";
+import { NOTE_MAX } from "../../../_components/phase-note-composer";
 import { CardComposer, WORKSPACE_FILE_ACCEPT, WorkspaceCard, runWorkspaceCommand, uploadBoardFiles, type LabelChoices, type PhaseOption, type RunCommand, type WorkspaceCardView } from "./card";
-import { CARD_TOP, DEFAULT_CARD_W, DEFAULT_FRAME, FRAME_HEAD, FRAME_PAD, ESTIMATED_CARD_H, MIN_CARD_W, MIN_FRAME, frameAt, layoutBoard, nextFramePlace, snapMove, snapToGrid, type CardSlot, type Rect } from "./geometry";
+import { DEFAULT_CARD_W, ESTIMATED_CARD_H, MIN_CARD_W, boardExtent, layoutElements, snapMove, snapToGrid, type CardSlot, type Rect } from "./geometry";
 
 export type WorkspaceSectionView = {
   id: string;
@@ -21,28 +22,29 @@ export type WorkspaceSectionView = {
 
 type Filter = "all" | "general" | "phase" | "starred" | "feedback";
 type View = { x: number; y: number; zoom: number };
-type Overrides = { frames: Record<string, Rect>; cards: Record<string, CardSlot & { sectionId: string }> };
+type Tool = "select" | "text" | "sticky";
+type Draft = CardSlot & { textStyle: "PLAIN" | "STICKY" };
 type Drag =
-  | { kind: "card"; id: string; from: string; to: string; x: number; y: number; w: number; h: number; guideX: number | null; guideY: number | null }
-  | { kind: "frame"; id: string; x: number; y: number; guideX: number | null; guideY: number | null }
-  | { kind: "card-width"; id: string; w: number }
-  | { kind: "frame-size"; id: string; w: number; h: number }
+  | { kind: "move"; ids: string[]; dx: number; dy: number; guideX: number | null; guideY: number | null }
+  | { kind: "width"; id: string; w: number }
   | { kind: "pan" };
 
-const EMPTY: Overrides = { frames: {}, cards: {} };
 const DEFAULT_VIEW: View = { x: 24, y: 16, zoom: 1 };
-/** Blocks never shrink below the size their text is written at (owner, 2026-10-13); they can only be enlarged. */
+/** Elements never shrink below the size their text is written at (owner, 2026-10-13); they can only be enlarged. */
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 2;
+const MINIMAP_W = 168;
 const clampZoom = (zoom: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
 const isFeedback = (card: WorkspaceCardView) => card.origin === "CLIENT_ANSWER";
+const isEditable = (target: EventTarget | null) => target instanceof HTMLElement && !!target.closest("input, textarea, select, [contenteditable=true]");
 
 /**
- * The project Workspace as a free canvas (owner-accepted R8.529 prototype; WO-SF-WORKSPACE-03 geometry).
- * Frames are the Workspace sections; cards sit anywhere inside them and size their height to their content.
- * Middle-click (or Space + left) drags the canvas, the wheel zooms, a card's grip drags it (also into another frame),
- * a frame's header drags the frame, the corners resize. Everything snaps to the grid and to neighbouring edges.
- * Layout is last-write-wins and never makes someone's text edit stale. Below 768 px the frames read top to bottom.
+ * The project Workspace as one board of standalone elements (WO-SF-WORKSPACE-04, owner-accepted concept 2026-10-13):
+ * text (plain, heading, sticky note), images and files sit anywhere on it. Click an element to select it (Shift adds
+ * more), press and drag to move everything selected, click a text again to write in it. Click empty board with the
+ * Text or Sticky tool, or double-click it, to write there; paste or drop images and files anywhere. Drag empty board
+ * (or middle-click, or Space + drag) to move around; zoom only enlarges, and the overview map jumps anywhere.
+ * Layout is last-write-wins and never makes someone's text edit stale. Below 768 px the elements read top to bottom.
  */
 export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, drawingList }: {
   projectId: string;
@@ -59,23 +61,28 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   const router = useRouter();
   const confirm = useConfirm();
   const viewportRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Optimistic geometry and removals, dropped whenever the server sends the board again.
+  // Optimistic places and removals, dropped whenever the server sends the board again.
   const [received, setReceived] = useState(sections);
-  const [overrides, setOverrides] = useState<Overrides>(EMPTY);
+  const [overrides, setOverrides] = useState<Record<string, CardSlot>>({});
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-  if (received !== sections) { setReceived(sections); setOverrides(EMPTY); setHidden(new Set()); }
+  if (received !== sections) { setReceived(sections); setOverrides({}); setHidden(new Set()); }
 
   const [heights, setHeights] = useState<ReadonlyMap<string, number>>(new Map());
   const [view, setView] = useState<View>(DEFAULT_VIEW);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [selection, setSelection] = useState<ReadonlySet<string>>(new Set());
+  const [tool, setTool] = useState<Tool>("select");
+  const [draft, setDraft] = useState<Draft | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [round, setRound] = useState<string | null>(null);
-  const [composer, setComposer] = useState<{ sectionId?: string; place?: CardSlot } | null>(null);
+  const [composer, setComposer] = useState(false);
   const [lens, setLens] = useState<"workspace" | "drawings">("workspace");
   const [error, setError] = useState<string | null>(null);
   const [narrow, setNarrow] = useState(false);
   const spaceDown = useRef(false);
+  const ignoreClick = useRef(false);
   const composerRef = useRef<HTMLDivElement>(null);
 
   // Quick capture opens ready to type: the editor loads on demand, so focus it once it is there.
@@ -95,6 +102,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   const labelChoices: LabelChoices = useMemo(() => ({ allowNone: canEditGeneral, phases: phases.filter((phase) => writable.has(phase.id)) }), [canEditGeneral, phases, writable]);
   const canCreate = canEditGeneral || labelChoices.phases.length > 0;
   const limited = !readOnlyReason && !canEditGeneral && labelChoices.phases.length > 0;
+  const newBlockPhase = selectedPhase && labelChoices.phases.some((phase) => phase.id === selectedPhase.id) ? selectedPhase.id : labelChoices.allowNone ? null : labelChoices.phases[0]?.id ?? null;
 
   // ── View (pan and zoom are personal: this browser only) ─────────────
   const viewKey = `studioflow.workspace.view.${projectId}`;
@@ -115,29 +123,15 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     try { window.localStorage.setItem(viewKey, JSON.stringify(view)); } catch { /* kept for this visit only */ }
   }, [view, viewKey]);
 
-  // ── Board model: server data + optimistic overrides, laid out ───────
-  const board = useMemo(() => {
-    const live = sections.map((section) => ({ ...section, cards: [] as WorkspaceCardView[] }));
-    const byId = new Map(live.map((section) => [section.id, section]));
-    for (const section of sections) {
-      for (const card of section.cards) {
-        if (hidden.has(card.id)) continue;
-        const moved = overrides.cards[card.id];
-        const target = byId.get(moved?.sectionId ?? section.id) ?? byId.get(section.id)!;
-        target.cards.push(moved ? { ...card, canvas: { x: moved.x, y: moved.y, w: moved.w } } : card);
-      }
-    }
-    for (const section of live) if (overrides.frames[section.id]) section.canvas = overrides.frames[section.id]!;
-    return live;
-  }, [sections, overrides, hidden]);
-  const layout = useMemo(() => layoutBoard(board, heights), [board, heights]);
-  const cardIndex = useMemo(() => {
-    const index = new Map<string, { card: WorkspaceCardView; sectionId: string }>();
-    for (const section of board) for (const card of section.cards) index.set(card.id, { card, sectionId: section.id });
-    return index;
-  }, [board]);
+  // ── Board model: server data + optimistic places, laid out ──────────
+  const elements = useMemo(() => sections.flatMap((section) => section.cards)
+    .filter((card) => !hidden.has(card.id))
+    .map((card) => (overrides[card.id] ? { ...card, canvas: overrides[card.id]! } : card)), [sections, overrides, hidden]);
+  const byId = useMemo(() => new Map(elements.map((card) => [card.id, card])), [elements]);
+  const layout = useMemo(() => layoutElements(elements, heights), [elements, heights]);
+  const heightOf = useCallback((id: string) => heights.get(id) ?? ESTIMATED_CARD_H, [heights]);
 
-  // ── Measuring card heights (they follow their content) ──────────────
+  // ── Measuring element heights (they follow their content) ───────────
   const observer = useRef<ResizeObserver | null>(null);
   useEffect(() => {
     observer.current = new ResizeObserver((entries) => {
@@ -168,42 +162,20 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   }, [router]);
   const act = async (input: WorkspaceCommandInput) => {
     const result = await run(input);
-    if (!result.ok) { setError(result.message); setOverrides(EMPTY); setHidden(new Set()); }
+    if (!result.ok) { setError(result.message); setOverrides({}); setHidden(new Set()); }
     return result.ok;
   };
 
-  /** Saves geometry. Unplaced neighbours are saved where they are drawn, so placing one item never moves another. */
-  const place = (payload: { sections?: (Rect & { id: string })[]; cards?: (CardSlot & { id: string; sectionId?: string })[] }) => {
-    const sectionsOut = new Map((payload.sections ?? []).map((item) => [item.id, item]));
-    const cardsOut = new Map((payload.cards ?? []).map((item) => [item.id, item]));
-    if (sectionsOut.size > 0) {
-      for (const section of board) {
-        if (section.canvas || sectionsOut.has(section.id)) continue;
-        const frame = layout.frames.get(section.id)!;
-        sectionsOut.set(section.id, { id: section.id, x: frame.x, y: frame.y, w: DEFAULT_FRAME.w, h: DEFAULT_FRAME.h });
-      }
+  /** Saves places. Unplaced elements are saved where they are drawn, so placing one element never moves another. */
+  const place = (items: (CardSlot & { id: string })[]) => {
+    const out = new Map(items.map((item) => [item.id, item]));
+    for (const card of elements) {
+      if (card.canvas || out.has(card.id)) continue;
+      out.set(card.id, { id: card.id, ...layout.get(card.id)! });
     }
-    const touched = new Set([...cardsOut.values()].flatMap((item) => [item.sectionId ?? cardIndex.get(item.id)?.sectionId].filter(Boolean) as string[]));
-    for (const id of cardsOut.keys()) { const from = cardIndex.get(id)?.sectionId; if (from) touched.add(from); }
-    for (const section of board) {
-      if (!touched.has(section.id)) continue;
-      for (const card of section.cards) {
-        if (card.canvas || cardsOut.has(card.id)) continue;
-        cardsOut.set(card.id, { id: card.id, ...layout.cards.get(card.id)! });
-      }
-    }
-    setOverrides((current) => {
-      const next: Overrides = { frames: { ...current.frames }, cards: { ...current.cards } };
-      for (const item of sectionsOut.values()) next.frames[item.id] = { x: item.x, y: item.y, w: item.w, h: item.h };
-      for (const item of cardsOut.values()) next.cards[item.id] = { x: item.x, y: item.y, w: item.w, sectionId: item.sectionId ?? cardIndex.get(item.id)?.sectionId ?? "" };
-      return next;
-    });
-    void act({
-      command: "placeItems",
-      projectId,
-      sections: sectionsOut.size ? [...sectionsOut.values()] : undefined,
-      cards: cardsOut.size ? [...cardsOut.values()].map((item) => ({ id: item.id, x: Math.max(0, item.x), y: Math.max(0, item.y), w: Math.max(MIN_CARD_W, item.w), ...(item.sectionId && item.sectionId !== cardIndex.get(item.id)?.sectionId ? { sectionId: item.sectionId } : {}) })) : undefined,
-    });
+    const cards = [...out.values()].map((item) => ({ id: item.id, x: Math.max(0, Math.round(item.x)), y: Math.max(0, Math.round(item.y)), w: Math.max(MIN_CARD_W, Math.round(item.w)) }));
+    setOverrides((current) => ({ ...current, ...Object.fromEntries(cards.map((item) => [item.id, { x: item.x, y: item.y, w: item.w }])) }));
+    void act({ command: "placeItems", projectId, cards });
   };
 
   // ── Pointer gestures ────────────────────────────────────────────────
@@ -213,7 +185,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     return { x: (clientX - rect.left - current.x) / current.zoom, y: (clientY - rect.top - current.y) / current.zoom };
   };
 
-  /** Follows the pointer until it is released; `move` returns the live state, `end` commits it. */
+  /** Follows the pointer until it is released. */
   const follow = (event: ReactPointerEvent, move: (e: PointerEvent) => void, end: () => void) => {
     event.preventDefault();
     event.stopPropagation();
@@ -230,98 +202,94 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     follow(event, (e) => setView({ ...start.view, x: start.view.x + e.clientX - start.x, y: start.view.y + e.clientY - start.y }), () => setDrag(null));
   };
 
-  const onViewportPointerDown = (event: ReactPointerEvent) => {
-    if (event.button === 1 || (event.button === 0 && spaceDown.current)) startPan(event);
-  };
-
-  const startCardDrag = (card: WorkspaceCardView, sectionId: string) => (event: ReactPointerEvent) => {
+  /** Selects an element and, when the pointer moves, moves it with everything else selected. */
+  const pressElement = (card: WorkspaceCardView) => (event: ReactPointerEvent) => {
     if (event.button === 1) { startPan(event); return; }
     if (event.button !== 0) return;
-    const frame = layout.frames.get(sectionId)!;
-    const slot = layout.cards.get(card.id)!;
-    const h = heights.get(card.id) ?? ESTIMATED_CARD_H;
-    const point = toWorld(event.clientX, event.clientY);
-    const offset = { x: point.x - (frame.x + slot.x), y: point.y - (frame.y + slot.y) };
-    let live: Extract<Drag, { kind: "card" }> = { kind: "card", id: card.id, from: sectionId, to: sectionId, x: frame.x + slot.x, y: frame.y + slot.y, w: slot.w, h, guideX: null, guideY: null };
-    setDrag(live);
-    follow(event, (e) => {
-      const p = toWorld(e.clientX, e.clientY);
-      const to = frameAt(layout.frames, p.x, p.y) ?? sectionId;
-      const target = layout.frames.get(to)!;
-      const others = board.find((section) => section.id === to)!.cards.filter((other) => other.id !== card.id).map((other) => {
-        const s = layout.cards.get(other.id)!;
-        return { x: target.x + s.x, y: target.y + s.y, w: s.w, h: heights.get(other.id) ?? ESTIMATED_CARD_H };
-      });
-      const snapped = snapMove({ w: slot.w, h }, p.x - offset.x, p.y - offset.y, others, { x: target.x + FRAME_PAD, y: target.y + CARD_TOP });
-      live = { ...live, to, x: snapped.x, y: snapped.y, guideX: snapped.guideX, guideY: snapped.guideY };
+    viewportRef.current?.focus({ preventScroll: true });
+    if (event.shiftKey) {
+      setSelection((current) => { const next = new Set(current); if (next.has(card.id)) next.delete(card.id); else next.add(card.id); return next; });
+      return;
+    }
+    const group = selection.has(card.id) ? [...selection] : [card.id];
+    if (!selection.has(card.id)) setSelection(new Set([card.id]));
+    // Controls inside an element only select it; an image itself can be pressed and dragged.
+    if ((event.target as HTMLElement).closest("a, input, [role=menuitem], [role=checkbox], button:not([aria-label^='Open image'])")) return;
+    const ids = group.filter((id) => { const item = byId.get(id); return item && canWriteCard(item); });
+    if (!ids.includes(card.id)) return;
+    const origin = new Map(ids.map((id) => [id, layout.get(id)!]));
+    const lead = origin.get(card.id)!;
+    const others: Rect[] = elements.filter((other) => !origin.has(other.id)).map((other) => ({ ...layout.get(other.id)!, h: heightOf(other.id) }));
+    const start = { x: event.clientX, y: event.clientY };
+    let live: Extract<Drag, { kind: "move" }> | null = null;
+    // Not `follow`: a press without movement must still reach the element as a click (to start writing).
+    const onMove = (e: PointerEvent) => {
+      if (!live && Math.abs(e.clientX - start.x) + Math.abs(e.clientY - start.y) < 4) return;
+      const zoom = viewRef.current.zoom;
+      const rawX = lead.x + (e.clientX - start.x) / zoom;
+      const rawY = lead.y + (e.clientY - start.y) / zoom;
+      const snapped = ids.length === 1 ? snapMove({ w: lead.w, h: heightOf(card.id) }, rawX, rawY, others) : { x: Math.max(0, snapToGrid(rawX)), y: Math.max(0, snapToGrid(rawY)), guideX: null, guideY: null };
+      live = { kind: "move", ids, dx: snapped.x - lead.x, dy: snapped.y - lead.y, guideX: snapped.guideX, guideY: snapped.guideY };
       setDrag(live);
-    }, () => {
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onUp);
+      if (!live) return;
+      const moved = live;
       setDrag(null);
-      const target = layout.frames.get(live.to)!;
-      const x = Math.max(0, snapToGrid(live.x - target.x));
-      const y = Math.max(CARD_TOP, snapToGrid(live.y - target.y));
-      if (live.to === sectionId && x === slot.x && y === slot.y) return;
-      place({ cards: [{ id: card.id, x, y, w: slot.w, sectionId: live.to }] });
-    });
+      ignoreClick.current = true;
+      window.setTimeout(() => { ignoreClick.current = false; }, 0);
+      if (moved.dx === 0 && moved.dy === 0) return;
+      place(moved.ids.map((id) => { const slot = origin.get(id)!; return { id, x: Math.max(0, slot.x + moved.dx), y: Math.max(0, slot.y + moved.dy), w: slot.w }; }));
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
-  const startCardWidth = (card: WorkspaceCardView) => (event: ReactPointerEvent) => {
+  const startWidth = (card: WorkspaceCardView) => (event: ReactPointerEvent) => {
     if (event.button !== 0) return;
-    const slot = layout.cards.get(card.id)!;
+    const slot = layout.get(card.id)!;
     const startX = event.clientX;
     let w = slot.w;
-    setDrag({ kind: "card-width", id: card.id, w });
-    follow(event, (e) => { w = Math.max(MIN_CARD_W, snapToGrid(slot.w + (e.clientX - startX) / viewRef.current.zoom)); setDrag({ kind: "card-width", id: card.id, w }); }, () => {
+    setDrag({ kind: "width", id: card.id, w });
+    follow(event, (e) => { w = Math.max(MIN_CARD_W, snapToGrid(slot.w + (e.clientX - startX) / viewRef.current.zoom)); setDrag({ kind: "width", id: card.id, w }); }, () => {
       setDrag(null);
-      if (w !== slot.w) place({ cards: [{ id: card.id, x: slot.x, y: slot.y, w }] });
+      if (w !== slot.w) place([{ id: card.id, x: slot.x, y: slot.y, w }]);
     });
   };
 
-  const startFrameDrag = (section: WorkspaceSectionView) => (event: ReactPointerEvent) => {
-    if (event.button === 1) { startPan(event); return; }
-    if (event.button !== 0 || !canEditGeneral) return;
-    if ((event.target as HTMLElement).closest("button, input, [contenteditable], [role=textbox]")) return;
-    const frame = layout.frames.get(section.id)!;
-    const point = toWorld(event.clientX, event.clientY);
-    const offset = { x: point.x - frame.x, y: point.y - frame.y };
-    const others = [...layout.frames].filter(([id]) => id !== section.id).map(([, rect]) => rect);
-    let live: Extract<Drag, { kind: "frame" }> = { kind: "frame", id: section.id, x: frame.x, y: frame.y, guideX: null, guideY: null };
-    setDrag(live);
-    follow(event, (e) => {
-      const p = toWorld(e.clientX, e.clientY);
-      const snapped = snapMove(frame, p.x - offset.x, p.y - offset.y, others);
-      live = { ...live, x: snapped.x, y: snapped.y, guideX: snapped.guideX, guideY: snapped.guideY };
-      setDrag(live);
-    }, () => {
-      setDrag(null);
-      if (live.x === frame.x && live.y === frame.y) return;
-      const stored = section.canvas ?? { ...DEFAULT_FRAME, x: frame.x, y: frame.y };
-      place({ sections: [{ id: section.id, x: live.x, y: live.y, w: stored.w, h: stored.h }] });
-    });
+  const spotAt = (clientX: number, clientY: number, w = DEFAULT_CARD_W): CardSlot => {
+    const point = toWorld(clientX, clientY);
+    return { x: Math.max(0, snapToGrid(point.x)), y: Math.max(0, snapToGrid(point.y)), w };
   };
 
-  const startFrameSize = (section: WorkspaceSectionView) => (event: ReactPointerEvent) => {
-    if (event.button !== 0 || !canEditGeneral) return;
-    const frame = layout.frames.get(section.id)!;
-    const start = { x: event.clientX, y: event.clientY };
-    let size = { w: frame.w, h: frame.h };
-    setDrag({ kind: "frame-size", id: section.id, ...size });
-    follow(event, (e) => {
-      const zoom = viewRef.current.zoom;
-      size = { w: Math.max(MIN_FRAME.w, snapToGrid(frame.w + (e.clientX - start.x) / zoom)), h: Math.max(MIN_FRAME.h, snapToGrid(frame.h + (e.clientY - start.y) / zoom)) };
-      setDrag({ kind: "frame-size", id: section.id, ...size });
-    }, () => {
-      setDrag(null);
-      if (size.w !== frame.w || size.h !== frame.h) place({ sections: [{ id: section.id, x: frame.x, y: frame.y, ...size }] });
-    });
+  const onBoardPointerDown = (event: ReactPointerEvent) => {
+    if ((event.target as HTMLElement).closest("article, [data-board-ui]")) return;
+    if (event.button === 1 || (event.button === 0 && spaceDown.current)) { startPan(event); return; }
+    if (event.button !== 0) return;
+    viewportRef.current?.focus({ preventScroll: true });
+    if (tool !== "select" && canCreate) {
+      event.preventDefault();
+      setDraft({ ...spotAt(event.clientX, event.clientY), textStyle: tool === "sticky" ? "STICKY" : "PLAIN" });
+      setTool("select");
+      return;
+    }
+    setSelection(new Set());
+    startPan(event);
   };
 
-  // Wheel zooms around the pointer; the browser's middle-click autoscroll is switched off on the canvas.
+  const onBoardDoubleClick = (event: ReactMouseEvent) => {
+    if (!canCreate || (event.target as HTMLElement).closest("article, [data-board-ui]")) return;
+    setDraft({ ...spotAt(event.clientX, event.clientY), textStyle: "PLAIN" });
+  };
+
+  // Wheel moves around (Shift + wheel sideways); Ctrl/Cmd + wheel, or a trackpad pinch, enlarges.
   useEffect(() => {
     const element = viewportRef.current;
     if (!element) return;
-    // The wheel moves around (Shift + wheel sideways); Ctrl/Cmd + wheel, or a trackpad pinch, enlarges.
     const onWheel = (event: WheelEvent) => {
+      if ((event.target as HTMLElement).closest("[data-board-ui]")) return;
       event.preventDefault();
       const rect = element.getBoundingClientRect();
       if (!event.ctrlKey && !event.metaKey) {
@@ -340,7 +308,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     element.addEventListener("wheel", onWheel, { passive: false });
     element.addEventListener("mousedown", noAutoscroll);
     element.addEventListener("auxclick", noAutoscroll);
-    const keyDown = (event: KeyboardEvent) => { if (event.code === "Space" && !(event.target as HTMLElement).closest("input, textarea, [contenteditable]")) spaceDown.current = true; };
+    const keyDown = (event: KeyboardEvent) => { if (event.code === "Space" && !isEditable(event.target)) spaceDown.current = true; };
     const keyUp = (event: KeyboardEvent) => { if (event.code === "Space") spaceDown.current = false; };
     window.addEventListener("keydown", keyDown);
     window.addEventListener("keyup", keyUp);
@@ -353,40 +321,37 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     };
   }, [lens, narrow]);
 
-  // The page does not scroll on a desktop (owner, 2026-10-13): the canvas fills the room left under the cards above
+  // The page does not scroll on a desktop (owner, 2026-10-13): the board fills the room left under the cards above
   // it, down to the page's bottom padding, and follows when that room changes (window size, an Undo bar appearing).
   const [fitHeight, setFitHeight] = useState<number | null>(null);
+  const [boardWidth, setBoardWidth] = useState(1000);
   useEffect(() => {
     const element = viewportRef.current;
     if (!element) return;
-    // Looked up on every measure: while the page streams in, the canvas can sit outside its final scrolling area.
+    // Looked up on every measure: while the page streams in, the board can sit outside its final scrolling area.
     const scrollArea = () => {
       let scroller: HTMLElement | null = element.parentElement;
       while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
       return scroller ?? document.documentElement;
     };
-    // Whatever sits above the canvas (a phase bar loading in, an Undo bar) changes the page content's height, so the
-    // page content is watched as a whole; it is (re)found on each measure for the same streaming reason.
     let watched: Element | null = null;
-    const measure = () => {
+    const measureRoom = () => {
       const area = scrollArea();
       const content = area.firstElementChild ?? area;
-      if (content !== watched) { if (watched) observer.unobserve(watched); observer.observe(content); watched = content; }
+      if (content !== watched) { if (watched) resize.unobserve(watched); resize.observe(content); watched = content; }
       const top = element.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop;
-      // The room the page keeps under the canvas (its bottom padding), measured rather than assumed.
       const below = Math.max(0, area.scrollHeight - (top + element.offsetHeight));
       const next = Math.max(280, Math.floor(area.clientHeight - top - below));
       setFitHeight((current) => (current === next ? current : next));
+      setBoardWidth((current) => (current === element.clientWidth ? current : element.clientWidth));
     };
-    const observer = new ResizeObserver(() => measure());
-    observer.observe(document.documentElement);
-    window.addEventListener("resize", measure);
-    // A page opened in a background tab is only put in place when the tab is shown: measure when the canvas
-    // actually appears, and once more after the streamed page has settled.
-    const appear = new IntersectionObserver(measure);
+    const resize = new ResizeObserver(() => measureRoom());
+    resize.observe(document.documentElement);
+    window.addEventListener("resize", measureRoom);
+    const appear = new IntersectionObserver(measureRoom);
     appear.observe(element);
-    const settle = [window.setTimeout(measure, 0), window.setTimeout(measure, 400)];
-    return () => { observer.disconnect(); appear.disconnect(); settle.forEach((id) => window.clearTimeout(id)); window.removeEventListener("resize", measure); };
+    const settle = [window.setTimeout(measureRoom, 0), window.setTimeout(measureRoom, 400)];
+    return () => { resize.disconnect(); appear.disconnect(); settle.forEach((id) => window.clearTimeout(id)); window.removeEventListener("resize", measureRoom); };
   }, [lens, narrow]);
 
   const zoomBy = (factor: number) => setView((current) => {
@@ -396,40 +361,104 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     return { zoom, x: ox - ((ox - current.x) / current.zoom) * zoom, y: oy - ((oy - current.y) / current.zoom) * zoom };
   });
 
-  // ── Writing at a spot: images pasted or dropped on the canvas, double-click to write ─────
+  // ── Paste, drop and upload: each file is its own element ────────────
   const lastPointer = useRef<{ x: number; y: number } | null>(null);
-  /** The frame under a canvas point (or the default frame) and the block's place inside it. */
-  const spotAt = (clientX: number, clientY: number) => {
-    const point = toWorld(clientX, clientY);
-    const sectionId = frameAt(layout.frames, point.x, point.y) ?? board.find((section) => section.isDefault)?.id ?? board[0]?.id;
-    const frame = sectionId ? layout.frames.get(sectionId) : undefined;
-    if (!sectionId || !frame) return { sectionId: undefined, place: undefined };
-    return { sectionId, place: { x: Math.max(0, snapToGrid(point.x - frame.x)), y: Math.max(CARD_TOP, snapToGrid(point.y - frame.y)), w: DEFAULT_CARD_W } };
-  };
-  const newBlockPhase = selectedPhase && labelChoices.phases.some((phase) => phase.id === selectedPhase.id) ? selectedPhase.id : labelChoices.allowNone ? null : labelChoices.phases[0]?.id ?? null;
-  const dropImages = async (files: File[]) => {
-    if (files.length === 0) return;
+  const pointerSpot = (w = DEFAULT_CARD_W) => {
     const rect = viewportRef.current?.getBoundingClientRect();
-    const at = lastPointer.current ?? (rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: 0, y: 0 });
-    const spot = spotAt(at.x, at.y);
-    const { problems } = await uploadBoardFiles({ projectId, sectionId: spot.sectionId, phaseId: newBlockPhase, place: spot.place, files });
+    const at = lastPointer.current ?? (rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 3 } : { x: 0, y: 0 });
+    return spotAt(at.x, at.y, w);
+  };
+  const addFiles = async (files: File[], spot: CardSlot) => {
+    if (files.length === 0) return;
+    const { problems } = await uploadBoardFiles({ projectId, phaseId: newBlockPhase, place: spot, files });
     if (problems.length > 0) setError(problems.join(" "));
     router.refresh();
   };
-  const intake = useFileIntake({ accept: `image/png,image/jpeg,image/webp,${WORKSPACE_FILE_ACCEPT}`, multiple: true, pasteFromPage: true, disabled: !canCreate || narrow || lens !== "workspace", onFiles: (files) => void dropImages(files) });
-  const writeAt = (event: ReactMouseEvent) => {
-    if (!canCreate || (event.target as HTMLElement).closest("article, button, header, input, [contenteditable]")) return;
-    const spot = spotAt(event.clientX, event.clientY);
-    setComposer({ sectionId: spot.sectionId, place: spot.place });
+  const intake = useFileIntake({ accept: `image/png,image/jpeg,image/webp,${WORKSPACE_FILE_ACCEPT}`, multiple: true, pasteFromPage: true, disabled: !canCreate || narrow || lens !== "workspace", onFiles: (files) => void addFiles(files, pointerSpot(240)) });
+  const pickFiles = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = [...(event.target.files ?? [])];
+    event.target.value = "";
+    const rect = viewportRef.current?.getBoundingClientRect();
+    void addFiles(files, rect ? spotAt(rect.left + rect.width / 2 - 120, rect.top + rect.height / 3, 240) : { x: 32, y: 32, w: 240 });
   };
+
+  /** Creates a text element; the board refreshes with it in place. */
+  const createText = async (body: string, slot: CardSlot, textStyle: "PLAIN" | "STICKY" | "HEADING") => {
+    const text = body.trim();
+    if (!text) return;
+    await act({ command: "createCard", projectId, phaseId: newBlockPhase, body: text.slice(0, NOTE_MAX), textStyle, x: slot.x, y: slot.y, w: slot.w });
+  };
+
+  // Plain text pasted on the board (not into a text) becomes a text element where the pointer is.
+  const pasteRef = useRef<(event: ClipboardEvent) => void>(() => undefined);
+  useEffect(() => {
+    pasteRef.current = (event: ClipboardEvent) => {
+      if (!canCreate || narrow || lens !== "workspace" || isEditable(event.target)) return;
+      const data = event.clipboardData;
+      if (!data || data.files.length > 0) return;
+      const rect = viewportRef.current?.getBoundingClientRect();
+      const at = lastPointer.current;
+      if (!rect || !at || at.x < rect.left || at.x > rect.right || at.y < rect.top || at.y > rect.bottom) return;
+      const text = data.getData("text/plain");
+      if (!text.trim()) return;
+      event.preventDefault();
+      void createText(text, spotAt(at.x, at.y), "PLAIN");
+    };
+  });
+  useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => pasteRef.current(event);
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, []);
+
+  // ── Removing ────────────────────────────────────────────────────────
+  const removeCards = async (cards: WorkspaceCardView[]) => {
+    const targets = cards.filter(canWriteCard);
+    if (targets.length === 0) return;
+    const one = targets.length === 1;
+    const ok = await confirm.confirm({
+      title: one ? "Delete this element?" : `Delete ${targets.length} elements?`,
+      description: "This cannot be undone.",
+      confirmLabel: one ? "Delete" : `Delete ${targets.length}`,
+      tone: "danger",
+    });
+    if (!ok) return;
+    setHidden((current) => new Set([...current, ...targets.map((card) => card.id)]));
+    setSelection(new Set());
+    for (const card of targets) await act({ command: "deleteCard", projectId, cardId: card.id, version: card.version });
+  };
+  const markFeedback = async (cards: WorkspaceCardView[]) => {
+    for (const card of cards.filter((item) => canWriteCard(item) && !isFeedback(item))) await act({ command: "setClientAnswer", projectId, cardId: card.id, clientAnswer: true, version: card.version });
+  };
+
+  // ── Keyboard: tools, Escape, Delete (never while writing) ───────────
+  const keyRef = useRef<(event: KeyboardEvent) => void>(() => undefined);
+  useEffect(() => {
+    keyRef.current = (event: KeyboardEvent) => {
+      if (narrow || lens !== "workspace" || isEditable(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
+      if (confirm.dialog && document.querySelector("[role=alertdialog], [role=dialog]")) return;
+      const key = event.key.toLowerCase();
+      if (key === "escape") { setSelection(new Set()); setTool("select"); setDraft(null); return; }
+      if ((key === "delete" || key === "backspace") && selection.size > 0) { event.preventDefault(); void removeCards([...selection].map((id) => byId.get(id)!).filter(Boolean)); return; }
+      if (!canCreate) return;
+      if (key === "v") setTool("select");
+      else if (key === "t") setTool("text");
+      else if (key === "s") setTool("sticky");
+    };
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => keyRef.current(event);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   // ── Filters ─────────────────────────────────────────────────────────
   const phaseRounds = useMemo(() => {
     if (!selectedPhase) return [];
     const labels = new Set<string>();
-    for (const section of board) for (const card of section.cards) if (card.phaseId === selectedPhase.id && card.iterationLabel) labels.add(card.iterationLabel);
+    for (const card of elements) if (card.phaseId === selectedPhase.id && card.iterationLabel) labels.add(card.iterationLabel);
     return [...labels];
-  }, [board, selectedPhase]);
+  }, [elements, selectedPhase]);
   // A round only filters while the phase filter is on and the round still exists.
   const activeRound = filter === "phase" && round && phaseRounds.includes(round) ? round : null;
   const matches = (card: WorkspaceCardView) => {
@@ -440,40 +469,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     return true;
   };
 
-  // ── Frame and card menus ────────────────────────────────────────────
-  const addFrame = async () => {
-    const slot = nextFramePlace(layout.frames);
-    if (await act({ command: "createSection", projectId, title: "New topic", ...slot })) setError(null);
-  };
-  const removeFrame = async (section: WorkspaceSectionView) => {
-    const ok = await confirm.confirm({ title: `Delete “${section.title}”?`, description: "Only an empty frame can be deleted.", confirmLabel: "Delete frame", tone: "danger" });
-    if (ok) await act({ command: "deleteSection", projectId, sectionId: section.id, version: section.version });
-  };
-  const removeCard = async (card: WorkspaceCardView) => {
-    const ok = await confirm.confirm({ title: "Delete this card?", description: card.images.length ? "The card and its images are removed. This cannot be undone." : "The card is removed. This cannot be undone.", confirmLabel: "Delete card", tone: "danger" });
-    if (!ok) return;
-    setHidden((current) => new Set(current).add(card.id));
-    await act({ command: "deleteCard", projectId, cardId: card.id, version: card.version });
-  };
-  const cardMoves = (card: WorkspaceCardView, sectionId: string): RowActionItem[] => board
-    .filter((section) => section.id !== sectionId)
-    .map((section, index) => ({ label: `Move to “${section.title}”`, separatorBefore: index === 0, onSelect: () => void act({ command: "moveCard", projectId, cardId: card.id, sectionId: section.id, position: section.cards.length, version: card.version }) }));
-  const frameMenu = (section: WorkspaceSectionView): RowActionItem[] => [
-    { label: "Add card here", onSelect: () => setComposer({ sectionId: section.id }) },
-    ...(section.isDefault ? [] : [{ label: "Delete frame", danger: true, separatorBefore: true, disabled: section.cards.length > 0, onSelect: () => void removeFrame(section) }]),
-  ];
-
-  const frameTitle = (section: WorkspaceSectionView) => canEditGeneral ? (
-    <InlineEdit
-      label="Frame title"
-      value={section.title}
-      onCommit={async (title) => { const result = await run({ command: "renameSection", projectId, sectionId: section.id, title, version: section.version }); if (!result.ok) throw new Error(result.message); }}
-      errorLabel={(failure) => (failure instanceof Error ? failure.message : "The title could not be saved.")}
-      display={(value) => <span className="truncate text-base font-semibold text-ink">{value}</span>}
-    />
-  ) : <span className="truncate text-base font-semibold text-ink">{section.title}</span>;
-
-  const card = (item: WorkspaceCardView, sectionId: string, style: CSSProperties | undefined, canvas: boolean) => {
+  const element = (item: WorkspaceCardView, style: CSSProperties | undefined, board: boolean) => {
     const canWrite = canWriteCard(item);
     return (
       <WorkspaceCard
@@ -484,13 +480,15 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
         labelChoices={canWrite ? labelChoices : { allowNone: false, phases: [] }}
         canUseIdeas={canUseIdeas}
         dimmed={!matches(item)}
+        selected={board && selection.has(item.id)}
         style={style}
-        measureRef={canvas ? measure(item.id) : undefined}
-        menuExtra={canWrite ? cardMoves(item, sectionId) : []}
+        measureRef={board ? measure(item.id) : undefined}
+        menuExtra={[]}
         run={run}
-        onDelete={(target) => void removeCard(target)}
-        onGripDown={canvas && canWrite ? startCardDrag(item, sectionId) : undefined}
-        onWidthDown={canvas && canWrite ? startCardWidth(item) : undefined}
+        onDelete={(target) => void removeCards([target])}
+        onPress={board ? pressElement(item) : undefined}
+        ignoreClick={() => ignoreClick.current}
+        onWidthDown={board && canWrite ? startWidth(item) : undefined}
       />
     );
   };
@@ -505,7 +503,6 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   ];
   const segmented = "flex gap-0.5 overflow-x-auto rounded-pill bg-surface-muted p-[3px]";
   const segment = (active: boolean) => `h-7 shrink-0 whitespace-nowrap rounded-pill px-3 text-xs font-medium transition-colors ${active ? "bg-surface text-ink shadow-raise" : "text-ink-secondary hover:text-ink"}`;
-  const defaultSectionId = board.find((section) => section.isDefault)?.id;
 
   const toolbar = (
     <div className="flex flex-wrap items-center gap-2 border-b border-line-subtle px-3 py-2.5">
@@ -517,7 +514,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
       ) : <h2 className="m-0 mr-1 text-base font-semibold text-ink">Workspace</h2>}
       {lens === "workspace" ? (
         <>
-          <div className={segmented} role="group" aria-label="Show cards">
+          <div className={segmented} role="group" aria-label="Show elements">
             {filters.map((item) => <button key={item.key} type="button" aria-pressed={filter === item.key} className={segment(filter === item.key)} onClick={() => setFilter(item.key)}>{item.label}</button>)}
           </div>
           {filter === "phase" && phaseRounds.length > 1 ? (
@@ -527,28 +524,19 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
             </div>
           ) : null}
           <span className="flex-1" />
-          {!narrow ? (
-            <div className="flex items-center gap-0.5">
-              <IconButton size="sm" variant="ghost" label="Zoom out" icon={<Minus aria-hidden="true" />} disabled={view.zoom <= MIN_ZOOM} onClick={() => zoomBy(0.9)} />
-              <button type="button" className="h-8 min-w-12 rounded-action px-1 text-xs tabular-nums text-ink-secondary hover:bg-surface-muted" title="Back to 100%" onClick={() => setView(DEFAULT_VIEW)}>{Math.round(view.zoom * 100)}%</button>
-              <IconButton size="sm" variant="ghost" label="Zoom in" icon={<Plus aria-hidden="true" />} disabled={view.zoom >= MAX_ZOOM} onClick={() => zoomBy(1.1)} />
-            </div>
-          ) : null}
-          {canEditGeneral ? <Button size="sm" leadingIcon={<SquarePlus className="h-3.5 w-3.5" />} onClick={() => void addFrame()}>New frame</Button> : null}
-          {canCreate ? <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setComposer({ sectionId: defaultSectionId })}>Add card</Button> : null}
+          {canCreate ? <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setComposer(true)}>Quick note</Button> : null}
         </>
       ) : null}
     </div>
   );
 
-  const composerSection = composer ? board.find((section) => section.id === composer.sectionId) ?? null : null;
   const composerPanel = composer && canCreate ? (
-    <div ref={composerRef} className={narrow ? "border-b border-line-subtle p-3" : "absolute right-3 top-3 z-30 w-[min(380px,calc(100%-24px))] rounded-card bg-surface p-3 shadow-over"} onPointerDown={(event) => event.stopPropagation()}>
+    <div ref={composerRef} data-board-ui="" className={narrow ? "border-b border-line-subtle p-3" : "absolute right-3 top-3 z-30 w-[min(380px,calc(100%-24px))] rounded-card bg-surface p-3 shadow-over"}>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <Text size="sm" weight="semibold">Add to {composerSection?.title ?? "Workspace"}</Text>
-        <IconButton size="sm" variant="ghost" label="Close" icon={<X aria-hidden="true" />} onClick={() => setComposer(null)} />
+        <Text size="sm" weight="semibold">Quick note</Text>
+        <IconButton size="sm" variant="ghost" label="Close" icon={<X aria-hidden="true" />} onClick={() => setComposer(false)} />
       </div>
-      <CardComposer key={`${composer.sectionId ?? "default"}:${selectedPhase?.id ?? ""}:${composer.place ? `${composer.place.x},${composer.place.y}` : ""}`} projectId={projectId} sectionId={composer.sectionId} place={composer.place} labelChoices={labelChoices} defaultPhaseId={selectedPhase?.id ?? null} run={run} autoFocus />
+      <CardComposer key={selectedPhase?.id ?? ""} projectId={projectId} labelChoices={labelChoices} defaultPhaseId={selectedPhase?.id ?? null} run={run} autoFocus />
     </div>
   ) : null;
 
@@ -557,12 +545,16 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
       archived: "This project is archived, so its Workspace is read-only.",
       inactive: "The Workspace can be changed once the project is active.",
       permission: "You can read this Workspace. Only the project's designer or drafter can change it.",
-      limited: "You can write cards for your own phases only; the other cards are read-only for you.",
+      limited: "You can write for your own phases only; the other elements are read-only for you.",
     }[readOnlyReason ?? "limited"]}</Notice></div>
   ) : null;
 
-  // ── Phone: the frames read top to bottom ───────────────────────────
+  // ── Phone: the elements read top to bottom ─────────────────────────
   if (narrow || lens === "drawings") {
+    const ordered = [...elements].sort((a, b) => {
+      const sa = layout.get(a.id)!, sb = layout.get(b.id)!;
+      return sa.y - sb.y || sa.x - sb.x;
+    });
     return (
       <section className="overflow-hidden rounded-card bg-surface shadow-plane" aria-label="Project workspace">
         {toolbar}
@@ -572,17 +564,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
             {composerPanel}
             {error ? <div role="alert" className="px-3 pt-3"><InlineError>{error}</InlineError></div> : null}
             <div className="grid gap-3 p-3">
-              {board.length === 0 ? <EmptyState title="Start the project's Workspace" description="Write the first card; it goes into the Workspace frame." /> : null}
-              {board.map((section) => (
-                <section key={section.id} aria-label={section.title} className="grid gap-2 rounded-card bg-surface-muted/50 p-2 shadow-[0_0_0_1px_var(--ui-border-default)]">
-                  <header className="flex min-h-9 items-center gap-2 px-1">
-                    <div className="min-w-0 flex-1">{frameTitle(section)}</div>
-                    {section.isDefault ? <span className="rounded-pill bg-surface px-2 text-[10px] font-semibold text-ink-secondary">Default</span> : null}
-                    {canCreate ? <RowActionMenu label={`${section.title} actions`} items={frameMenu(section)} /> : null}
-                  </header>
-                  {section.cards.length === 0 ? <Text size="sm" tone="tertiary" className="px-1 pb-2">No cards yet.</Text> : section.cards.map((item) => card(item, section.id, undefined, false))}
-                </section>
-              ))}
+              {ordered.length === 0 ? <EmptyState title="Start the project's Workspace" description="Write the first note, or add photos and files." /> : ordered.map((item) => element(item, undefined, false))}
             </div>
           </>
         )}
@@ -591,10 +573,30 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     );
   }
 
-  // ── Desktop: the free canvas ────────────────────────────────────────
-  const dragFrame = drag?.kind === "frame" ? drag : null;
-  const dragCard = drag?.kind === "card" ? drag : null;
-  const guides = dragFrame ?? dragCard;
+  // ── Desktop: the board ──────────────────────────────────────────────
+  const moving = drag?.kind === "move" ? drag : null;
+  const movingIds = new Set(moving?.ids ?? []);
+  const extent = boardExtent(layout, heights);
+  const scale = MINIMAP_W / extent.w;
+  const boardHeight = fitHeight ?? 560;
+  const visible = { x: -view.x / view.zoom, y: -view.y / view.zoom, w: boardWidth / view.zoom, h: boardHeight / view.zoom };
+  const jumpTo = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    const rect = event.currentTarget.getBoundingClientRect();
+    const wx = (event.clientX - rect.left) / scale, wy = (event.clientY - rect.top) / scale;
+    setView((current) => ({ ...current, x: boardWidth / 2 - wx * current.zoom, y: boardHeight / 2 - wy * current.zoom }));
+  };
+  const selected = [...selection].map((id) => byId.get(id)).filter((card): card is WorkspaceCardView => !!card);
+  const hints: Record<Tool, string> = {
+    select: "Drag empty board to move around · Shift + click to select several · Paste or drop images and files anywhere",
+    text: "Click the board to write there",
+    sticky: "Click the board to place a sticky note",
+  };
+  const tools: { key: Tool; label: string; shortcut: string; icon: ReactNode }[] = [
+    { key: "select", label: "Select", shortcut: "V", icon: <MousePointer2 aria-hidden="true" className="h-4 w-4" /> },
+    { key: "text", label: "Text", shortcut: "T", icon: <Type aria-hidden="true" className="h-4 w-4" /> },
+    { key: "sticky", label: "Sticky", shortcut: "S", icon: <StickyNote aria-hidden="true" className="h-4 w-4" /> },
+  ];
 
   return (
     <section className="overflow-hidden rounded-card bg-surface shadow-plane" aria-label="Project workspace">
@@ -603,61 +605,99 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
       {error ? <div role="alert" className="px-3 pt-3"><InlineError>{error}</InlineError></div> : null}
       <div
         ref={viewportRef}
+        tabIndex={-1}
         {...intake.target}
-        onPointerDown={onViewportPointerDown}
+        onPointerDown={onBoardPointerDown}
         onPointerMove={(event) => { lastPointer.current = { x: event.clientX, y: event.clientY }; }}
         onDragOverCapture={(event) => { lastPointer.current = { x: event.clientX, y: event.clientY }; }}
-        onDoubleClick={writeAt}
+        onDoubleClick={onBoardDoubleClick}
         style={{ height: fitHeight ?? 560 }}
-        className={`relative touch-none overflow-hidden bg-canvas ${drag?.kind === "pan" ? "cursor-grabbing" : ""} ${intake.active ? "outline-2 -outline-offset-4 outline-dashed outline-line-focus" : ""}`}
-        aria-label="Workspace canvas"
+        className={`relative touch-none overflow-hidden bg-canvas outline-none ${drag?.kind === "pan" ? "cursor-grabbing" : tool !== "select" ? "cursor-crosshair" : ""} ${intake.active ? "outline-2 -outline-offset-4 outline-dashed outline-line-focus" : ""}`}
+        aria-label="Workspace board"
       >
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background-image:radial-gradient(var(--ui-border-default)_1px,transparent_1px)]" style={{ backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
         <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
-          {board.map((section) => {
-            const laid = layout.frames.get(section.id)!;
-            const frame = dragFrame?.id === section.id ? { ...laid, x: dragFrame.x, y: dragFrame.y } : drag?.kind === "frame-size" && drag.id === section.id ? { ...laid, w: drag.w, h: drag.h } : laid;
-            const target = dragCard && dragCard.to === section.id && dragCard.to !== dragCard.from;
-            return (
-              <section
-                key={section.id}
-                aria-label={section.title}
-                className={`group/frame absolute rounded-card bg-[color-mix(in_srgb,var(--ui-surface-muted)_55%,transparent)] transition-shadow ${section.isDefault ? "shadow-[0_0_0_1.5px_var(--ui-border-strong)]" : "shadow-[0_0_0_1px_var(--ui-border-default)]"} ${target ? "shadow-[0_0_0_2px_var(--ui-border-focus)]" : ""}`}
-                style={{ left: frame.x, top: frame.y, width: frame.w, height: frame.h }}
-              >
-                <header onPointerDown={startFrameDrag(section)} className={`flex items-center gap-2 pl-3.5 pr-1.5 ${canEditGeneral ? "cursor-grab active:cursor-grabbing" : ""}`} style={{ height: FRAME_HEAD }}>
-                  <div className="min-w-0 max-w-[70%]">{frameTitle(section)}</div>
-                  {section.isDefault ? <span className="rounded-pill bg-surface px-2 py-0.5 text-[10px] font-semibold text-ink-secondary">Default</span> : null}
-                  <span className="flex-1" />
-                  {canCreate ? <IconButton size="sm" variant="ghost" label={`Add card to ${section.title}`} icon={<Plus aria-hidden="true" />} onClick={() => setComposer({ sectionId: section.id })} /> : null}
-                  {canCreate ? <RowActionMenu label={`${section.title} actions`} items={frameMenu(section)} /> : null}
-                </header>
-                {section.cards.map((item) => {
-                  if (dragCard?.id === item.id) return null;
-                  const slot = layout.cards.get(item.id)!;
-                  const w = drag?.kind === "card-width" && drag.id === item.id ? drag.w : slot.w;
-                  return card(item, section.id, { position: "absolute", left: slot.x, top: slot.y, width: w }, true);
-                })}
-                {canEditGeneral ? <span aria-hidden="true" onPointerDown={startFrameSize(section)} className="absolute bottom-1 right-1 h-3 w-3 cursor-nwse-resize opacity-0 transition-opacity group-hover/frame:opacity-100 [background:linear-gradient(135deg,transparent_50%,var(--ui-border-strong)_50%_60%,transparent_60%_72%,var(--ui-border-strong)_72%_82%,transparent_82%)]" /> : null}
-              </section>
-            );
+          {elements.map((item) => {
+            const slot = layout.get(item.id)!;
+            const w = drag?.kind === "width" && drag.id === item.id ? drag.w : slot.w;
+            const offset = moving && movingIds.has(item.id) ? { x: moving.dx, y: moving.dy } : { x: 0, y: 0 };
+            return element(item, { position: "absolute", left: slot.x + offset.x, top: slot.y + offset.y, width: w, zIndex: selection.has(item.id) ? 5 : undefined }, true);
           })}
-          {dragCard ? (() => {
-            const entry = cardIndex.get(dragCard.id);
-            return entry ? <div className="pointer-events-none absolute" style={{ left: dragCard.x, top: dragCard.y, width: dragCard.w }}>{card(entry.card, entry.sectionId, { width: dragCard.w }, false)}</div> : null;
-          })() : null}
-          {guides?.guideX != null ? <div aria-hidden="true" className="pointer-events-none absolute -top-[5000px] h-[10000px] w-px bg-line-focus opacity-40" style={{ left: guides.guideX }} /> : null}
-          {guides?.guideY != null ? <div aria-hidden="true" className="pointer-events-none absolute -left-[5000px] h-px w-[10000px] bg-line-focus opacity-40" style={{ top: guides.guideY }} /> : null}
+          {draft ? <DraftText draft={draft} onDone={(text) => { setDraft(null); void createText(text, draft, draft.textStyle); }} onCancel={() => setDraft(null)} /> : null}
+          {moving?.guideX != null ? <div aria-hidden="true" className="pointer-events-none absolute -top-[5000px] h-[10000px] w-px bg-line-focus opacity-40" style={{ left: moving.guideX }} /> : null}
+          {moving?.guideY != null ? <div aria-hidden="true" className="pointer-events-none absolute -left-[5000px] h-px w-[10000px] bg-line-focus opacity-40" style={{ top: moving.guideY }} /> : null}
         </div>
-        {board.length === 0 ? (
-          <div className="absolute inset-0 grid place-items-center p-6">
-            <EmptyState title="Start the project's Workspace" description="Write the first card; it goes into the Workspace frame. Arrange frames and cards freely afterwards." />
+
+        {elements.length === 0 && !draft ? (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center p-6">
+            <EmptyState title="Start the project's Workspace" description="Double-click to write, or paste and drop photos and files anywhere on the board." />
           </div>
         ) : null}
+
+        {selected.length > 1 ? (
+          <div data-board-ui="" className="absolute left-1/2 top-3 z-30 flex -translate-x-1/2 items-center gap-2 rounded-control bg-action py-1.5 pl-3.5 pr-1.5 text-sm text-action-ink shadow-over">
+            <span>{selected.length} selected · drag one to move them all</span>
+            <button type="button" className="h-8 rounded-action px-2.5 text-xs font-medium hover:bg-action-hover" onClick={() => void markFeedback(selected)}>Mark as client feedback</button>
+            <button type="button" className="h-8 rounded-action px-2.5 text-xs font-medium hover:bg-action-hover" onClick={() => void removeCards(selected)}>Delete</button>
+            <IconButton size="sm" variant="ghost" label="Clear selection" icon={<X aria-hidden="true" className="text-action-ink" />} onClick={() => setSelection(new Set())} />
+          </div>
+        ) : null}
+
         {composerPanel}
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded-action bg-surface px-2.5 py-1.5 text-xs text-ink-tertiary shadow-float">Wheel or middle-click drag to move around · Ctrl + wheel to enlarge · Double-click to write · Paste or drop an image</div>
+
+        <div data-board-ui="" className="absolute bottom-3 left-3 z-20 flex items-center gap-0.5 rounded-control bg-surface p-0.5 shadow-float">
+          <IconButton size="sm" variant="ghost" label="Zoom out" icon={<Minus aria-hidden="true" />} disabled={view.zoom <= MIN_ZOOM} onClick={() => zoomBy(0.9)} />
+          <button type="button" className="h-8 min-w-12 rounded-action px-1 text-xs tabular-nums text-ink-secondary hover:bg-surface-muted" title="Back to 100%" onClick={() => setView(DEFAULT_VIEW)}>{Math.round(view.zoom * 100)}%</button>
+          <IconButton size="sm" variant="ghost" label="Zoom in" icon={<Plus aria-hidden="true" />} disabled={view.zoom >= MAX_ZOOM} onClick={() => zoomBy(1.1)} />
+        </div>
+
+        <div data-board-ui="" className="absolute bottom-3 left-1/2 z-20 flex max-w-[calc(100%-24px-2*190px)] -translate-x-1/2 flex-col items-center gap-1.5">
+          <span className="rounded-action bg-surface px-2.5 py-1 text-center text-xs text-ink-tertiary shadow-float">{hints[tool]}</span>
+          {canCreate ? (
+            <div role="toolbar" aria-label="Board tools" className="flex flex-wrap justify-center gap-0.5 rounded-control bg-surface p-1 shadow-float">
+              {tools.map((item) => (
+                <button key={item.key} type="button" aria-pressed={tool === item.key} title={`${item.label} (${item.shortcut})`} onClick={() => setTool(item.key)} className={`inline-flex h-9 items-center gap-1.5 rounded-action px-3 text-sm ${tool === item.key ? "bg-action text-action-ink" : "text-ink hover:bg-surface-muted"}`}>
+                  {item.icon}<span>{item.label}</span><kbd className={`text-[10px] ${tool === item.key ? "text-action-ink/70" : "text-ink-tertiary"}`}>{item.shortcut}</kbd>
+                </button>
+              ))}
+              <span aria-hidden="true" className="mx-1 my-1.5 w-px bg-line-subtle" />
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="inline-flex h-9 items-center gap-1.5 rounded-action px-3 text-sm text-ink hover:bg-surface-muted">
+                <Upload aria-hidden="true" className="h-4 w-4" /><span>Photo or file</span>
+              </button>
+              <input ref={fileInputRef} type="file" multiple accept={`image/png,image/jpeg,image/webp,${WORKSPACE_FILE_ACCEPT}`} onChange={pickFiles} className="sr-only" tabIndex={-1} aria-hidden="true" />
+            </div>
+          ) : null}
+        </div>
+
+        <div data-board-ui="" className="absolute bottom-3 right-3 z-20 grid gap-1">
+          <span className="text-right text-[11px] text-ink-tertiary">Overview · click to jump</span>
+          <div role="presentation" onPointerDown={jumpTo} className="relative cursor-pointer overflow-hidden rounded-control bg-surface shadow-float" style={{ width: MINIMAP_W, height: Math.max(60, Math.round(extent.h * scale)) }}>
+            {elements.map((item) => {
+              const slot = layout.get(item.id)!;
+              const tone = item.kind === "IMAGE" ? "bg-ink-tertiary/50" : isFeedback(item) ? "bg-warning-line" : item.textStyle === "STICKY" ? "bg-warning-surface" : "bg-line-strong";
+              return <span key={item.id} aria-hidden="true" className={`absolute rounded-[1px] ${tone} ${matches(item) ? "" : "opacity-30"}`} style={{ left: slot.x * scale, top: slot.y * scale, width: Math.max(2, slot.w * scale), height: Math.max(2, heightOf(item.id) * scale) }} />;
+            })}
+            <span aria-hidden="true" className="pointer-events-none absolute rounded-[2px] shadow-[inset_0_0_0_1.5px_var(--ui-border-focus)]" style={{ left: visible.x * scale, top: visible.y * scale, width: visible.w * scale, height: visible.h * scale }} />
+          </div>
+        </div>
       </div>
       {confirm.dialog}
     </section>
+  );
+}
+
+/** A new text being written where the board was clicked; it becomes an element when left with any text in it. */
+function DraftText({ draft, onDone, onCancel }: { draft: Draft; onDone: (text: string) => void; onCancel: () => void }) {
+  const [text, setText] = useState("");
+  const sticky = draft.textStyle === "STICKY";
+  return (
+    <div
+      data-board-ui=""
+      className={`absolute z-10 rounded-[10px] px-3 py-2.5 ${sticky ? "rounded-[4px] bg-warning-surface shadow-float" : "bg-surface shadow-raise"}`}
+      style={{ left: draft.x, top: draft.y, width: draft.w }}
+      onKeyDownCapture={(event) => { if (event.key === "Escape") { event.preventDefault(); onCancel(); } }}
+    >
+      <RichTextEditor bare slashMenu aria-label={sticky ? "New sticky note" : "New text"} placeholder="Write, or type / for headings, lists and checklists" maxLength={NOTE_MAX} value={text} autoFocus onChange={setText} onBlur={() => onDone(text)} />
+    </div>
   );
 }

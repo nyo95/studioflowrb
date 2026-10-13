@@ -1,6 +1,6 @@
 "use client";
 
-import { GripVertical, Send, Star } from "lucide-react";
+import { FileText, Send, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type Ref } from "react";
 
@@ -46,14 +46,13 @@ export const WORKSPACE_FILE_ACCEPT = ".pdf,.dwg,.dxf,.skp,.xlsx,.xls,.docx,.doc,
  * Drops each file on the board as its own element: images as image elements, other files as file elements. Later
  * ones cascade a little below the first so none hides another. Returns what did not get through.
  */
-export async function uploadBoardFiles(input: { projectId: string; sectionId?: string; phaseId: string | null; place?: { x: number; y: number; w: number }; files: readonly File[] }): Promise<{ problems: string[] }> {
+export async function uploadBoardFiles(input: { projectId: string; phaseId: string | null; place?: { x: number; y: number; w: number }; files: readonly File[] }): Promise<{ problems: string[] }> {
   const problems: string[] = [];
   for (const [index, file] of input.files.entries()) {
     try {
       const isImage = IMAGE_TYPES.includes(file.type);
       const form = new FormData();
       form.set("projectId", input.projectId);
-      if (input.sectionId) form.set("sectionId", input.sectionId);
       if (input.phaseId) form.set("phaseId", input.phaseId);
       if (input.place) {
         form.set("x", String(input.place.x + index * 24));
@@ -90,6 +89,11 @@ export async function uploadCardImages(projectId: string, cardId: string, files:
   return { problems, failed };
 }
 
+function fileExtension(name: string): string | null {
+  const match = /\.([A-Za-z0-9]{1,4})$/.exec(name);
+  return match ? match[1].toUpperCase() : null;
+}
+
 function formatBytes(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
@@ -105,14 +109,21 @@ export async function runWorkspaceCommand(input: WorkspaceCommandInput): Promise
   }
 }
 
+const TEXT_STYLES: { value: WorkspaceCardView["textStyle"]; label: string }[] = [
+  { value: "PLAIN", label: "Text" },
+  { value: "HEADING", label: "Heading" },
+  { value: "STICKY", label: "Sticky note" },
+];
+
 /**
- * One Workspace block on the canvas (owner, option A 2026-10-13): it reads as plain content, like a Notion block, and
- * its tools (grip, labels, star, menu) appear on hover or focus. Click it to write straight into it; the text saves
- * itself shortly after typing stops and when the block is left. An image pasted or dropped while writing is added at
- * once. A checklist ticks in place. If someone else changed the text first, both texts are shown and the person
- * chooses, so nothing is overwritten silently; a move or a star by someone else is absorbed.
+ * One element on the Workspace board (WO-SF-WORKSPACE-04): a text (plain, heading or sticky note), one image, or one
+ * file. It reads as plain content; its labels, star and menu appear on hover, focus or selection. Press and drag it to
+ * move it (with everything selected); click a text to write straight into it — the text saves itself shortly after
+ * typing stops and when it is left. An image pasted while writing lands beside the text as its own element. A
+ * checklist ticks in place. If someone else changed the text first, both texts are shown and the person chooses, so
+ * nothing is overwritten silently; a move or a star by someone else is absorbed.
  */
-export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseIdeas, dimmed, style, measureRef, menuExtra, run, onDelete, onGripDown, onWidthDown }: {
+export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseIdeas, dimmed, selected = false, style, measureRef, menuExtra, run, onDelete, onPress, ignoreClick, onWidthDown }: {
   card: WorkspaceCardView;
   projectId: string;
   canWrite: boolean;
@@ -121,11 +132,15 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
   dimmed: boolean;
   style?: CSSProperties;
   measureRef?: Ref<HTMLElement>;
+  /** Shown as part of the board's selection. */
+  selected?: boolean;
   menuExtra: readonly RowActionItem[];
   run: RunCommand;
   onDelete: (card: WorkspaceCardView) => void;
-  /** Starts a drag of the block (canvas only); absent where it cannot move. */
-  onGripDown?: (event: ReactPointerEvent) => void;
+  /** Selects the element and may start moving it (board only); absent where it cannot move. */
+  onPress?: (event: ReactPointerEvent) => void;
+  /** True right after a move, so the click that ends it does not also open the text. */
+  ignoreClick?: () => boolean;
   onWidthDown?: (event: ReactPointerEvent) => void;
 }) {
   const router = useRouter();
@@ -214,10 +229,17 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
 
   const feedback = card.origin === "CLIENT_ANSWER";
   const canLabel = canWrite && (labelChoices.allowNone || labelChoices.phases.length > 0);
+  const styleItems: RowActionItem[] = isText ? TEXT_STYLES.map((option, index) => ({
+    label: option.value === card.textStyle ? `${option.label} (current)` : `Make ${option.label.toLowerCase()}`,
+    disabled: option.value === card.textStyle,
+    separatorBefore: index === 0,
+    onSelect: () => void command({ command: "setTextStyle", projectId, cardId: card.id, textStyle: option.value, version: card.version }),
+  })) : [];
   const menu: RowActionItem[] = canWrite ? [
     { label: "Edit", onSelect: startEdit, disabled: !isText },
     { label: feedback ? "Not client feedback" : "Mark as client feedback", onSelect: () => void command({ command: "setClientAnswer", projectId, cardId: card.id, clientAnswer: !feedback, version: card.version }) },
     ...(canLabel ? [{ label: card.phaseId ? "Change phase label" : "Add phase label", onSelect: () => setLabelOpen(true) }] : []),
+    ...styleItems,
     ...menuExtra,
     { label: "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(card) },
   ] : [];
@@ -225,33 +247,44 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
   const byline = [feedback && !card.authorName ? "Client" : card.authorName, card.editedAt ? "edited" : null].filter(Boolean).join(" · ");
   const tools = editing || labelOpen || problems.length > 0;
 
+  const heading = isText && card.textStyle === "HEADING";
+  const sticky = isText && card.textStyle === "STICKY";
+  const image = card.kind === "IMAGE";
+  const ring = selected ? "shadow-[0_0_0_2px_var(--ui-border-focus)]" : "";
+  const surface = feedback
+    ? `bg-[color-mix(in_srgb,var(--ui-warning-bg)_70%,var(--ui-surface))] ${ring || "shadow-[0_0_0_1px_var(--ui-warning-border)]"}`
+    : sticky ? `rounded-[4px] bg-warning-surface ${ring || "shadow-float"}`
+    : heading || image ? `bg-transparent ${ring}`
+    : editing ? `bg-surface ${ring || "shadow-raise"}`
+    : `bg-surface ${ring || "shadow-[0_0_0_1px_transparent] hover:shadow-plane"}`;
+  const textClass = heading ? "text-2xl font-semibold leading-tight tracking-[-0.01em]" : "text-sm";
+
   return (
     <article
       ref={measureRef as Ref<HTMLElement>}
       style={style}
-      aria-label={`Block · ${label}${byline ? ` · ${byline}` : ""}`}
+      aria-label={`${image ? "Image" : card.kind === "FILE" ? "File" : heading ? "Heading" : sticky ? "Sticky note" : "Text"} · ${label}${byline ? ` · ${byline}` : ""}`}
       title={byline || undefined}
+      onPointerDown={!editing ? onPress : undefined}
+      // The click that ends a move must not also open the text or an image.
+      onClickCapture={(event) => { if (ignoreClick?.()) { event.stopPropagation(); event.preventDefault(); } }}
       {...(editing ? intake.target : {})}
       className={[
-        "group/card relative grid gap-1.5 rounded-[10px] px-3 py-2.5 transition-[opacity,box-shadow,background-color] duration-150",
-        feedback ? "bg-[color-mix(in_srgb,var(--ui-warning-bg)_70%,var(--ui-surface))] shadow-[0_0_0_1px_var(--ui-warning-border)]" : editing ? "bg-surface shadow-raise" : "bg-surface shadow-[0_0_0_1px_transparent] hover:shadow-plane",
+        "group/card relative grid gap-1.5 rounded-[10px] transition-[opacity,box-shadow,background-color] duration-150",
+        image ? "p-0" : heading ? "px-1.5 py-1" : "px-3 py-2.5",
+        surface,
+        onPress && !editing ? "touch-none" : "",
         intake.active ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : "",
         dimmed ? "pointer-events-none opacity-25" : "",
       ].join(" ")}
     >
-      {onGripDown && !editing ? (
-        <button type="button" aria-label="Drag to move" onPointerDown={onGripDown} className="absolute -left-5 top-2 grid h-6 w-5 cursor-grab touch-none place-items-center rounded text-ink-tertiary opacity-0 transition-opacity group-hover/card:opacity-100 focus-visible:opacity-100 active:cursor-grabbing">
-          <GripVertical aria-hidden="true" className="h-3.5 w-3.5" />
-        </button>
-      ) : null}
-
-      {/* Labels float above the block on hover, so plain content is all the block shows at rest. */}
-      <div className={`pointer-events-none absolute -top-3 left-2 flex max-w-[calc(100%-4rem)] items-center gap-1 transition-opacity ${tools ? "opacity-100" : "opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100"}`}>
+      {/* Labels float above the element on hover, so plain content is all it shows at rest. */}
+      <div className={`pointer-events-none absolute -top-3 left-2 z-10 flex max-w-[calc(100%-4rem)] items-center gap-1 transition-opacity ${tools || selected ? "opacity-100" : "opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100"}`}>
         <span className="truncate rounded-pill bg-surface px-2 py-0.5 text-[11px] text-ink-secondary shadow-float">{label}</span>
         {feedback ? <span className="rounded-pill bg-warning-surface px-2 py-0.5 text-[11px] text-warning shadow-float">Client feedback</span> : null}
         {card.origin === "SITE_VISIT" ? <span className="rounded-pill bg-surface px-2 py-0.5 text-[11px] text-ink-secondary shadow-float">Site visit</span> : null}
       </div>
-      <div className={`absolute -top-3 right-2 flex items-center rounded-pill bg-surface shadow-float transition-opacity ${tools ? "opacity-100" : card.pinned ? "opacity-100" : "opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100"}`}>
+      <div className={`absolute -top-3 right-2 z-10 flex items-center rounded-pill bg-surface shadow-float transition-opacity ${tools || selected ? "opacity-100" : card.pinned ? "opacity-100" : "opacity-0 group-hover/card:opacity-100 group-focus-within/card:opacity-100"}`}>
         <button
           type="button"
           aria-label={card.pinned ? "Unstar" : "Star"}
@@ -262,14 +295,14 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
         >
           <Star aria-hidden="true" className={`h-3.5 w-3.5 ${card.pinned ? "fill-current" : ""}`} />
         </button>
-        {menu.length > 0 && !editing ? <span className={card.pinned ? "hidden group-hover/card:inline-flex group-focus-within/card:inline-flex" : "inline-flex"}><RowActionMenu label="Block actions" items={menu} /></span> : null}
+        {menu.length > 0 && !editing ? <span className={card.pinned && !selected ? "hidden group-hover/card:inline-flex group-focus-within/card:inline-flex" : "inline-flex"}><RowActionMenu label="Element actions" items={menu} /></span> : null}
       </div>
 
       {editing ? (
         <div className="grid gap-2">
           {changedMeanwhile || status === "conflict" ? (
             <div className="grid gap-2 rounded-control border border-warning-line bg-warning-surface p-2">
-              <Text size="sm" weight="semibold">Someone else changed this block. Their text:</Text>
+              <Text size="sm" weight="semibold">Someone else changed this text. Their text:</Text>
               {card.body ? <FormattedText text={card.body} className="text-sm" /> : <Text size="sm" tone="tertiary">(no text)</Text>}
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="secondary" onClick={() => { setDraft(card.body); adopt(card.body, card.version); setStatus("idle"); setProblems([]); }}>Use theirs</Button>
@@ -277,25 +310,34 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
               </div>
             </div>
           ) : null}
-          <RichTextEditor bare slashMenu aria-label="Block text" placeholder="Write, or type / for headings, lists and checklists" maxLength={NOTE_MAX} value={draft} autoFocus onChange={onType} onBlur={() => void leave()} />
-          <Text size="sm" tone="tertiary" className="text-xs">{status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "Paste or drop an image to place it beside this block"}{busy ? " · adding image…" : ""}</Text>
+          <RichTextEditor bare slashMenu aria-label="Text" className={heading ? "text-2xl font-semibold" : undefined} placeholder="Write, or type / for headings, lists and checklists" maxLength={NOTE_MAX} value={draft} autoFocus onChange={onType} onBlur={() => void leave()} />
+          <Text size="sm" tone="tertiary" className="text-xs">{status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "Paste an image to place it beside this text"}{busy ? " · adding image…" : ""}</Text>
         </div>
       ) : (
         <div
-          className={canWrite ? "cursor-text" : undefined}
-          onClick={(event) => { if (!(event.target as HTMLElement).closest("a, button, input, img, [role=button]")) startEdit(); }}
+          className={canWrite && isText ? "cursor-text" : undefined}
+          onClick={(event) => {
+            if (ignoreClick?.() || event.shiftKey) return;
+            if (!(event.target as HTMLElement).closest("a, button, input, img, [role=button]")) startEdit();
+          }}
         >
-          {card.body ? <FormattedText text={card.body} className="text-sm" onToggleCheck={canWrite ? toggleCheck : undefined} /> : null}
-          {card.images.length > 0 ? <ImageGallery images={card.images} size="fill" className={card.body ? "mt-2" : undefined} viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} phaseId={card.phaseId} canUseIdeas={canUseIdeas} />} /> : null}
+          {card.body ? <FormattedText text={card.body} className={textClass} onToggleCheck={canWrite ? toggleCheck : undefined} /> : null}
+          {card.images.length > 0 ? <ImageGallery images={card.images} size="fill" className={image ? "[&_button]:rounded-[10px] [&_button]:border-0" : card.body ? "mt-2" : undefined} viewerActions={(item) => <NoteImageActions image={item} projectId={projectId} phaseId={card.phaseId} canUseIdeas={canUseIdeas} />} /> : null}
           {card.file ? (
-            card.file.url ? (
-              <a href={card.file.url} download={card.file.name} className="flex items-center gap-2 text-sm text-ink-primary underline-offset-2 hover:underline">
-                <span className="truncate">{card.file.name}</span>
-                <span className="shrink-0 text-xs text-ink-tertiary">{formatBytes(card.file.bytes)}</span>
-              </a>
-            ) : <Text size="sm" tone="tertiary">{card.file.name} (unavailable)</Text>
+            <div className="flex items-center gap-3">
+              <span aria-hidden="true" className="grid h-11 w-9 shrink-0 place-items-center rounded-[6px] bg-surface-muted text-[10px] font-bold uppercase text-ink-secondary shadow-[inset_0_0_0_1px_var(--ui-border-default)]">
+                {fileExtension(card.file.name) ?? <FileText className="h-4 w-4" />}
+              </span>
+              <span className="grid min-w-0 flex-1">
+                <span className="truncate text-sm font-semibold text-ink">{card.file.name}</span>
+                <span className="text-xs text-ink-tertiary">{formatBytes(card.file.bytes)}</span>
+              </span>
+              {card.file.url ? (
+                <a href={card.file.url} download={card.file.name} className="inline-flex h-8 shrink-0 items-center rounded-action bg-action px-3 text-xs font-medium text-action-ink hover:bg-action-hover">Open</a>
+              ) : <Text size="sm" tone="tertiary">Unavailable</Text>}
+            </div>
           ) : null}
-          {!card.body && card.images.length === 0 && !card.file ? <Text size="sm" tone="tertiary">Empty block</Text> : null}
+          {!card.body && card.images.length === 0 && !card.file ? <Text size="sm" tone="tertiary">Empty text</Text> : null}
         </div>
       )}
 
@@ -334,14 +376,14 @@ function PhaseLabelPicker({ card, choices, onPick, onCancel }: { card: Workspace
 }
 
 /**
- * Quick capture: write a card into a frame. Enter sends, Shift+Enter is a new line; images paste, drop or pick in.
- * It stays open after sending so several points from one conversation go in one after another. The phase label
- * starts from the phase chosen above the board, so a card written while working on a phase belongs to it.
+ * Quick note: write a text onto the board. Enter sends, Shift+Enter is a new line; images paste, drop or pick in and
+ * land beside it as their own elements. It stays open after sending so several points from one conversation go in one
+ * after another. The phase label starts from the phase chosen above the board, so a note written while working on a
+ * phase belongs to it.
  */
-export function CardComposer({ projectId, sectionId, place, labelChoices, defaultPhaseId, run, onClose, autoFocus = false }: {
+export function CardComposer({ projectId, place, labelChoices, defaultPhaseId, run, onClose, autoFocus = false }: {
   projectId: string;
-  sectionId?: string;
-  /** Where the first block goes (a double-clicked spot); the ones after it stack under the frame's blocks. */
+  /** Where the first note goes; the ones after it stack under the board's elements. */
   place?: { x: number; y: number; w: number };
   labelChoices: LabelChoices;
   defaultPhaseId: string | null;
@@ -369,7 +411,7 @@ export function CardComposer({ projectId, sectionId, place, labelChoices, defaul
     try {
       let target = pending.current;
       if (!target || body) {
-        const created = await run({ command: "createCard", projectId, sectionId, phaseId: phaseId || null, body: body || null, clientAnswer, withImages: !target && files.length > 0, ...(spot.current ?? {}) });
+        const created = await run({ command: "createCard", projectId, phaseId: phaseId || null, body: body || null, clientAnswer, withImages: !target && files.length > 0, ...(spot.current ?? {}) });
         if (!created.ok) { setErrors([created.message]); return; }
         spot.current = undefined;
         target = (created.data as { cardId: string }).cardId;
