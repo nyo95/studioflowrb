@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.549 | 2026-10-14 | feat(bq): Save a Work Item's Cost Components as a resep (Lead)
+
+- **Owner 2026-10-14:** chose option 2 for "cari atau buat resep" — "simpan Pekerjaan sebagai resep", with as little regression or engineering as possible. The picker stays a `Combobox` (select an existing resep); creating one happens from a Pekerjaan.
+- **Service `saveItemAsAssembly`:** copies a Work Item's own Cost Components into a new assembly (name, unit, price, quantity, coefficient, category, source ref, order). The Work Item is untouched. Refused with `bq.assembly.item-has-groups` when the Work Item uses Component Groups (an assembly line has no group quantity or markup, so flattening would change the price) and with `bq.assembly.empty` when it has no lines; a blank name is refused. Needs both `bq.project.manage` and `bq.library.manage`.
+- **Screen:** "Simpan sebagai resep" in an open Pekerjaan (only when its rincian sit directly under it) opens a one-field dialog; afterwards the page data is refreshed so the new resep is in the picker at once. The resep picker's empty state now says how to get one instead of "not found".
+- **Not done on purpose:** group-held rincian, duplicate-name checks, editing a saved resep from the screen (BQ Library already edits).
+- **Migrations/dependencies:** none. **Checks:** BQ integration 29/29 (new: save, refusals); typecheck 0; eslint BQ 0. **Not done:** browser walk.
+
 ## R8.548 | 2026-10-14 | feat(bq): Structure actions move into the Struktur panel; one "+ Pekerjaan" per table (Lead)
 
 - **Owner 2026-10-14:** after a screenshot of the project screen, "kerjakan ketiganya, mulai 1024 px" on the design critique's three priorities.

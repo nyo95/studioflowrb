@@ -66,7 +66,7 @@ export function AssemblyPickerDialog({
               onValueChange={setSelectedId}
               placeholder="Pilih assembly…"
               searchPlaceholder="Cari assembly…"
-              emptyLabel="Assembly tidak ditemukan"
+              emptyLabel="Belum ada resep — simpan dari Pekerjaan yang sudah berisi rincian"
             />
           </Field>
           <Field label="Quantity per Work Item">

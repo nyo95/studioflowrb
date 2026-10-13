@@ -71,7 +71,7 @@ export function NewWorkItemDialog({
               onValueChange={setAssemblyId}
               placeholder="Cari resep…"
               searchPlaceholder="Cari resep…"
-              emptyLabel="Resep tidak ditemukan"
+              emptyLabel="Belum ada resep — simpan dari Pekerjaan yang sudah berisi rincian"
             />
           </Field>
         ) : null}

@@ -239,6 +239,30 @@ describe("BQ R6.1 invariants", () => {
     assert.equal((await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: named.id } })).name, "Kitchen set");
   });
 
+  it("saves a Work Item's own Cost Components as an assembly, and refuses one that uses Component Groups", async () => {
+    const { item } = await projectTree();
+    await service.addLineItem({ grants: GRANTS, actor: ACTOR, itemId: item.id, sourceType: "CUSTOM", titleSnapshot: "Plywood", purchaseUnitSnapshot: "SHEET", hargaSnapshot: "100", kategori: "ALAT", qty: "2" });
+    await service.addLineItem({ grants: GRANTS, actor: ACTOR, itemId: item.id, sourceType: "CUSTOM", titleSnapshot: "Install", purchaseUnitSnapshot: "HOUR", hargaSnapshot: "50", kategori: "UPAH", qty: "1", koefisien: "1.5" });
+
+    const assembly = await service.saveItemAsAssembly({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "  Lantai standar  " });
+    const stored = await testDb.prisma.bqAssemblyTemplate.findUniqueOrThrow({ where: { id: assembly.id }, include: { lines: { orderBy: { sort_order: "asc" } } } });
+    assert.equal(stored.name, "Lantai standar");
+    assert.deepEqual(stored.lines.map((line) => [line.title_snapshot, line.qty.toString(), line.harga_snapshot.toString(), line.koefisien.toString()]), [
+      ["Plywood", "2", "100", "1"],
+      ["Install", "1", "50", "1.5"],
+    ]);
+    assert.equal((await testDb.prisma.bqLineItem.count({ where: { item_id: item.id } })), 2, "the Work Item keeps its own lines");
+
+    await assert.rejects(() => service.saveItemAsAssembly({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: " " }), (error: unknown) => error instanceof AppError && error.code === "bq.assembly.name-required");
+
+    const grouped = await projectTree();
+    await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: grouped.item.id, name: "Body", qtyPerL1: "2" });
+    await assert.rejects(() => service.saveItemAsAssembly({ grants: GRANTS, actor: ACTOR, itemId: grouped.item.id, name: "Nope" }), (error: unknown) => error instanceof AppError && error.code === "bq.assembly.item-has-groups");
+
+    const bare = await projectTree();
+    await assert.rejects(() => service.saveItemAsAssembly({ grants: GRANTS, actor: ACTOR, itemId: bare.item.id, name: "Empty" }), (error: unknown) => error instanceof AppError && error.code === "bq.assembly.empty");
+  });
+
   it("keeps the requester's deletion reason when the approver rejects the request", async () => {
     const { project } = await projectTree();
     await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });

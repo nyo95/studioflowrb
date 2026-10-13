@@ -36,6 +36,53 @@ async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: {
   return line;
 }
 
+/**
+ * Saves a Work Item's own Cost Components as a new assembly (a copy; the Work Item is untouched). Kept deliberately
+ * plain: a Work Item that uses Component Groups is refused, because an assembly line carries no group quantity or
+ * markup, so flattening would change what the assembly prices.
+ */
+async function saveItemAsAssembly(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; itemId: string; name: string }) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const name = input.name.trim();
+  if (!name) throw new AppError("VALIDATION", "bq.assembly.name-required", "Give the assembly a name");
+  const item = await db.bqItem.findUnique({
+    where: { id: input.itemId },
+    include: { sub_objects: { select: { id: true } }, line_items: { orderBy: { sort_order: "asc" } } },
+  });
+  if (!item) throw new AppError("NOT_FOUND", "bq.item.not-found", "Work Item not found");
+  if (item.sub_objects.length > 0) {
+    throw new AppError("CONFLICT", "bq.assembly.item-has-groups", "This Work Item uses Component Groups. An assembly can only be saved from a Work Item whose Cost Components sit directly under it.");
+  }
+  if (item.line_items.length === 0) {
+    throw new AppError("VALIDATION", "bq.assembly.empty", "An assembly must contain at least one Cost Component");
+  }
+  const assembly = await runTransaction(async (tx) => {
+    const created = await tx.bqAssemblyTemplate.create({ data: { name, created_by: input.actor.userId ?? "system" } });
+    await tx.bqAssemblyLine.createMany({
+      data: item.line_items.map((line, index) => ({
+        assembly_template_id: created.id,
+        source_type: line.source_type,
+        source_ref_id: line.source_ref_id,
+        title_snapshot: line.title_snapshot,
+        purchase_unit_snapshot: line.purchase_unit_snapshot,
+        base_unit_snapshot: line.base_unit_snapshot,
+        purchase_to_base_factor_snapshot: line.purchase_to_base_factor_snapshot,
+        harga_snapshot: line.harga_snapshot,
+        currency_snapshot: line.currency_snapshot,
+        kategori: line.kategori,
+        qty: line.qty,
+        koefisien: line.koefisien,
+        sort_order: index,
+        notes: line.notes,
+      })),
+    });
+    return created;
+  });
+  await auditWriter({ appId: "bq", action: "bq.assembly.created", entityType: "BqAssemblyTemplate", entityId: assembly.id, actor: input.actor, changes: { fromItemId: item.id, lines: item.line_items.length } });
+  return assembly;
+}
+
 async function updateAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string; name?: string; description?: string | null }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
   const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId } });
@@ -114,6 +161,7 @@ async function applyAssemblyTemplate(input: { grants: PermissionGrants; actor: {
 
   return {
     createAssemblyTemplate,
+    saveItemAsAssembly,
     updateAssemblyTemplate,
     deleteAssemblyTemplate,
     addAssemblyCustomLine,

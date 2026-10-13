@@ -281,6 +281,22 @@ export async function deleteSubObjectAction(
   });
 }
 
+const SaveItemAsAssemblySchema = z.object({ projectId: Id, itemId: Id, name: z.string().trim().min(1).max(160) });
+
+/** Copies a Work Item's own Cost Components into a new assembly; the Work Item stays as it is. */
+export async function saveItemAsAssemblyAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const parsed = SaveItemAsAssemblySchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    await bqService.saveItemAsAssembly({ grants, actor, itemId: parsed.data.itemId, name: parsed.data.name });
+    return reload(parsed.data.projectId);
+  });
+}
+
 const ApplyAssemblySchema = z.object({ projectId: Id, itemId: Id, assemblyId: Id, qtyPerL1: z.string().trim().optional() });
 
 /** Copies an Assembly Template into project-owned L2/L3 rows. No live link is retained. */

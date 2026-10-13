@@ -2,6 +2,7 @@
 
 import { Archive, ArchiveRestore, ChevronDown, ChevronRight, FileText, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import {
@@ -62,12 +63,14 @@ import {
   updateSectionAction,
   updateSubsectionAction,
   revertLineItemPriceAction,
+  saveItemAsAssemblyAction,
   unlockProjectAction,
   updateQuotationAction,
 } from "./actions";
 import { AddSectionDialog } from "./add-section-dialog";
 import { AssemblyPickerDialog } from "./assembly-picker-dialog";
 import { NewWorkItemDialog } from "./new-work-item-dialog";
+import { SaveAsAssemblyDialog } from "./save-as-assembly-dialog";
 import { ImportDialog } from "./source-picker-dialog";
 import { QuotationDialog } from "./quotation-dialog";
 
@@ -284,6 +287,9 @@ export function ProjectEditor({
   /** A Pekerjaan to apply a resep to as a Kelompok rincian. */
   const [assemblyItemId, setAssemblyItemId] = useState<string | null>(null);
   const [newItemTarget, setNewItemTarget] = useState<NewItemTarget | null>(null);
+  /** The Pekerjaan whose rincian are being saved as a resep. */
+  const [saveAssemblyItem, setSaveAssemblyItem] = useState<BqItemDetail | null>(null);
+  const router = useRouter();
   const [lockOpen, setLockOpen] = useState(false);
   /** Set when the server refused to lock because rows still have a price of Rp0: the count to confirm. */
   const [zeroPriceRows, setZeroPriceRows] = useState<number | null>(null);
@@ -434,6 +440,7 @@ export function ProjectEditor({
             commitNum={commitNum}
             onImport={setImportTarget}
             onApplyAssembly={setAssemblyItemId}
+            onSaveAssembly={setSaveAssemblyItem}
             columns={totalColumns}
           />
           {editable ? (
@@ -476,6 +483,7 @@ export function ProjectEditor({
                 commitNum={commitNum}
                 onImport={setImportTarget}
                 onApplyAssembly={setAssemblyItemId}
+                onSaveAssembly={setSaveAssemblyItem}
                 columns={totalColumns}
               />
               {editable ? (
@@ -617,6 +625,26 @@ export function ProjectEditor({
         />
       ) : null}
 
+      {saveAssemblyItem ? (
+        <SaveAsAssemblyDialog
+          key={saveAssemblyItem.id}
+          initialName={saveAssemblyItem.name}
+          lineCount={saveAssemblyItem.lineItems.length}
+          pending={pending}
+          error={error}
+          onClose={() => setSaveAssemblyItem(null)}
+          onSave={(name) => {
+            void run(saveItemAsAssemblyAction, { itemId: saveAssemblyItem.id, name })
+              .then(() => {
+                setSaveAssemblyItem(null);
+                // The resep list comes from the page, so fetch it again for the picker.
+                router.refresh();
+              })
+              .catch(() => undefined);
+          }}
+        />
+      ) : null}
+
       {newItemTarget ? (
         <NewWorkItemDialog
           assemblies={assemblies}
@@ -650,6 +678,7 @@ function ItemTable({
   commitNum,
   onImport,
   onApplyAssembly,
+  onSaveAssembly,
   columns,
 }: {
   items: readonly BqItemDetail[];
@@ -663,6 +692,7 @@ function ItemTable({
   commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
+  onSaveAssembly?: (item: BqItemDetail) => void;
   columns: number;
 }) {
   if (items.length === 0) {
@@ -704,6 +734,7 @@ function ItemTable({
               commitNum={commitNum}
               onImport={onImport}
               onApplyAssembly={onApplyAssembly}
+              onSaveAssembly={onSaveAssembly}
               columns={columns + (editable ? 1 : 0)}
             />
           );
@@ -727,6 +758,7 @@ function ItemRows({
   commitNum,
   onImport,
   onApplyAssembly,
+  onSaveAssembly,
   columns,
 }: {
   item: BqItemDetail;
@@ -742,6 +774,7 @@ function ItemRows({
   commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
+  onSaveAssembly?: (item: BqItemDetail) => void;
   columns: number;
 }) {
   return (
@@ -906,6 +939,16 @@ function ItemRows({
                       onClick={() => onApplyAssembly(item.id)}
                     >
                       Terapkan resep
+                    </Button>
+                  ) : null}
+                  {onSaveAssembly && item.lineItems.length > 0 && item.subObjects.length === 0 ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={pending}
+                      onClick={() => onSaveAssembly(item)}
+                    >
+                      Simpan sebagai resep
                     </Button>
                   ) : null}
                   </> : null}
