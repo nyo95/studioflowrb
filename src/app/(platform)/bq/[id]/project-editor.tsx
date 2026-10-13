@@ -627,7 +627,7 @@ function ItemTable({
           <TableHead align="end" className="w-[90px]">Jumlah</TableHead>
           <TableHead className="w-[80px]">Satuan</TableHead>
           <TableHead align="end" className="w-[90px]">Koef.</TableHead>
-          <TableHead align="end" className="w-[90px]">Tambahan %</TableHead>
+          <TableHead align="end" className="w-[90px]">Markup</TableHead>
           <TableHead align="end" className="w-[150px]">Harga satuan</TableHead>
           <TableHead align="end" className="w-[140px]">Total</TableHead>
           {editable ? <TableHead align="end" className="w-[80px]" aria-label="Aksi" /> : null}
@@ -732,9 +732,9 @@ function ItemRows({
         </TableCell>
         <TableCell align="end">
           {hasChildren ? (
-            <InlineEdit label="Tambahan persen" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "markupL1Pct")} />
+            <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "markupL1Pct")} />
           ) : (
-            <Tooltip content="Tambahan % hanya berlaku untuk Pekerjaan yang punya rincian biaya.">
+            <Tooltip content="Markup tidak berlaku untuk Pekerjaan tanpa breakdown — nilainya otomatis 0.">
               <span className="inline-block"><Text tone="tertiary" size="sm">—</Text></span>
             </Tooltip>
           )}
@@ -910,7 +910,7 @@ function SubObjectRows({
               {/* A Kelompok is not a plain folder: its multiplier and extra % change the Pekerjaan's price, so both
                   stay in view here, never behind a menu. */}
               <Text tone="tertiary" size="sm" className="block">
-                Kelompok rincian · jumlah per Pekerjaan dan tambahan % ikut menghitung harga
+                Kelompok rincian · jumlah per Pekerjaan dan markup ikut menghitung harga
               </Text>
             </div>
           </div>
@@ -923,9 +923,9 @@ function SubObjectRows({
           <Text tone="tertiary" size="sm">—</Text>
         </TableCell>
         <TableCell align="end">
-          <Tooltip content="Tambahan % kelompok ini — hanya berlaku untuk rincian biaya di dalamnya.">
+          <Tooltip content="Markup kelompok ini (%) — hanya berlaku untuk rincian biaya di dalamnya.">
             <span className="inline-block">
-              <InlineEdit label="Tambahan persen" align="end" inputMode="decimal" value={subObject.markupL2Pct} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "markupL2Pct")} />
+              <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={subObject.markupL2Pct} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "markupL2Pct")} />
             </span>
           </Tooltip>
         </TableCell>
