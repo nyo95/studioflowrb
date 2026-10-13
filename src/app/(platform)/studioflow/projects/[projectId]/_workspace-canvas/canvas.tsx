@@ -2,13 +2,13 @@
 
 import { Maximize, Minus, Plus, SquarePlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
-import { Button, EmptyState, IconButton, InlineEdit, InlineError, Notice, RowActionMenu, Text, useConfirm, type RowActionItem } from "@/platform/ui_engine";
+import { Button, EmptyState, IconButton, InlineEdit, InlineError, Notice, RowActionMenu, Text, useConfirm, useFileIntake, type RowActionItem } from "@/platform/ui_engine";
 
 import type { WorkspaceCommandInput } from "../../../actions";
-import { CardComposer, WorkspaceCard, runWorkspaceCommand, type LabelChoices, type PhaseOption, type RunCommand, type WorkspaceCardView } from "./card";
-import { CARD_TOP, DEFAULT_FRAME, FRAME_HEAD, FRAME_PAD, ESTIMATED_CARD_H, MIN_CARD_W, MIN_FRAME, fitZoom, frameAt, layoutBoard, nextFramePlace, snapMove, snapToGrid, type CardSlot, type Rect } from "./geometry";
+import { CardComposer, WorkspaceCard, runWorkspaceCommand, uploadCardImages, type LabelChoices, type PhaseOption, type RunCommand, type WorkspaceCardView } from "./card";
+import { CARD_TOP, DEFAULT_CARD_W, DEFAULT_FRAME, FRAME_HEAD, FRAME_PAD, ESTIMATED_CARD_H, MIN_CARD_W, MIN_FRAME, fitZoom, frameAt, layoutBoard, nextFramePlace, snapMove, snapToGrid, type CardSlot, type Rect } from "./geometry";
 
 export type WorkspaceSectionView = {
   id: string;
@@ -67,7 +67,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   const [drag, setDrag] = useState<Drag | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
   const [round, setRound] = useState<string | null>(null);
-  const [composer, setComposer] = useState<{ sectionId?: string } | null>(null);
+  const [composer, setComposer] = useState<{ sectionId?: string; place?: CardSlot } | null>(null);
   const [lens, setLens] = useState<"workspace" | "drawings">("workspace");
   const [error, setError] = useState<string | null>(null);
   const [narrow, setNarrow] = useState(false);
@@ -348,20 +348,29 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   useEffect(() => {
     const element = viewportRef.current;
     if (!element) return;
-    let scroller: HTMLElement | null = element.parentElement;
-    while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
-    const frame = scroller ?? document.documentElement;
+    // Looked up on every measure: while the page streams in, the canvas can sit outside its final scrolling area.
+    const scrollArea = () => {
+      let scroller: HTMLElement | null = element.parentElement;
+      while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
+      return scroller ?? document.documentElement;
+    };
     const measure = () => {
-      const top = element.getBoundingClientRect().top - frame.getBoundingClientRect().top + frame.scrollTop;
-      const next = Math.max(420, Math.floor(frame.clientHeight - top - 24));
+      const area = scrollArea();
+      const top = element.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop;
+      const next = Math.max(280, Math.floor(area.clientHeight - top - 24));
       setFitHeight((current) => (current === next ? current : next));
     };
     const observer = new ResizeObserver(measure);
-    observer.observe(frame);
+    observer.observe(document.documentElement);
     const above = element.closest("section")?.previousElementSibling;
     if (above) observer.observe(above);
     window.addEventListener("resize", measure);
-    return () => { observer.disconnect(); window.removeEventListener("resize", measure); };
+    // A page opened in a background tab is only put in place when the tab is shown: measure when the canvas
+    // actually appears, and once more after the streamed page has settled.
+    const appear = new IntersectionObserver(measure);
+    appear.observe(element);
+    const settle = [window.setTimeout(measure, 0), window.setTimeout(measure, 400)];
+    return () => { observer.disconnect(); appear.disconnect(); settle.forEach((id) => window.clearTimeout(id)); window.removeEventListener("resize", measure); };
   }, [lens, narrow]);
 
   const zoomBy = (factor: number) => setView((current) => {
@@ -370,6 +379,35 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     const zoom = Math.max(0.4, Math.min(1.6, current.zoom * factor));
     return { zoom, x: ox - ((ox - current.x) / current.zoom) * zoom, y: oy - ((oy - current.y) / current.zoom) * zoom };
   });
+
+  // ── Writing at a spot: images pasted or dropped on the canvas, double-click to write ─────
+  const lastPointer = useRef<{ x: number; y: number } | null>(null);
+  /** The frame under a canvas point (or the default frame) and the block's place inside it. */
+  const spotAt = (clientX: number, clientY: number) => {
+    const point = toWorld(clientX, clientY);
+    const sectionId = frameAt(layout.frames, point.x, point.y) ?? board.find((section) => section.isDefault)?.id ?? board[0]?.id;
+    const frame = sectionId ? layout.frames.get(sectionId) : undefined;
+    if (!sectionId || !frame) return { sectionId: undefined, place: undefined };
+    return { sectionId, place: { x: Math.max(0, snapToGrid(point.x - frame.x)), y: Math.max(CARD_TOP, snapToGrid(point.y - frame.y)), w: DEFAULT_CARD_W } };
+  };
+  const newBlockPhase = selectedPhase && labelChoices.phases.some((phase) => phase.id === selectedPhase.id) ? selectedPhase.id : labelChoices.allowNone ? null : labelChoices.phases[0]?.id ?? null;
+  const dropImages = async (files: File[]) => {
+    if (files.length === 0) return;
+    const rect = viewportRef.current?.getBoundingClientRect();
+    const at = lastPointer.current ?? (rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: 0, y: 0 });
+    const spot = spotAt(at.x, at.y);
+    const created = await run({ command: "createCard", projectId, sectionId: spot.sectionId, phaseId: newBlockPhase, body: null, withImages: true, ...(spot.place ?? {}) });
+    if (!created.ok) { setError(created.message); return; }
+    const { problems } = await uploadCardImages(projectId, (created.data as { cardId: string }).cardId, files);
+    if (problems.length > 0) setError(problems.join(" "));
+    router.refresh();
+  };
+  const intake = useFileIntake({ accept: "image/png,image/jpeg,image/webp", multiple: true, pasteFromPage: true, disabled: !canCreate || narrow || lens !== "workspace", onFiles: (files) => void dropImages(files) });
+  const writeAt = (event: ReactMouseEvent) => {
+    if (!canCreate || (event.target as HTMLElement).closest("article, button, header, input, [contenteditable]")) return;
+    const spot = spotAt(event.clientX, event.clientY);
+    setComposer({ sectionId: spot.sectionId, place: spot.place });
+  };
 
   // ── Filters ─────────────────────────────────────────────────────────
   const phaseRounds = useMemo(() => {
@@ -497,7 +535,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
         <Text size="sm" weight="semibold">Add to {composerSection?.title ?? "Workspace"}</Text>
         <IconButton size="sm" variant="ghost" label="Close" icon={<X aria-hidden="true" />} onClick={() => setComposer(null)} />
       </div>
-      <CardComposer key={`${composer.sectionId ?? "default"}:${selectedPhase?.id ?? ""}`} projectId={projectId} sectionId={composer.sectionId} labelChoices={labelChoices} defaultPhaseId={selectedPhase?.id ?? null} run={run} autoFocus />
+      <CardComposer key={`${composer.sectionId ?? "default"}:${selectedPhase?.id ?? ""}:${composer.place ? `${composer.place.x},${composer.place.y}` : ""}`} projectId={projectId} sectionId={composer.sectionId} place={composer.place} labelChoices={labelChoices} defaultPhaseId={selectedPhase?.id ?? null} run={run} autoFocus />
     </div>
   ) : null;
 
@@ -552,9 +590,13 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
       {error ? <div role="alert" className="px-3 pt-3"><InlineError>{error}</InlineError></div> : null}
       <div
         ref={viewportRef}
+        {...intake.target}
         onPointerDown={onViewportPointerDown}
+        onPointerMove={(event) => { lastPointer.current = { x: event.clientX, y: event.clientY }; }}
+        onDragOverCapture={(event) => { lastPointer.current = { x: event.clientX, y: event.clientY }; }}
+        onDoubleClick={writeAt}
         style={{ height: fitHeight ?? 560 }}
-        className={`relative touch-none overflow-hidden bg-canvas ${drag?.kind === "pan" ? "cursor-grabbing" : ""}`}
+        className={`relative touch-none overflow-hidden bg-canvas ${drag?.kind === "pan" ? "cursor-grabbing" : ""} ${intake.active ? "outline-2 -outline-offset-4 outline-dashed outline-line-focus" : ""}`}
         aria-label="Workspace canvas"
       >
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background-image:radial-gradient(var(--ui-border-default)_1px,transparent_1px)]" style={{ backgroundSize: `${24 * view.zoom}px ${24 * view.zoom}px`, backgroundPosition: `${view.x}px ${view.y}px` }} />
@@ -600,7 +642,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
           </div>
         ) : null}
         {composerPanel}
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded-action bg-surface px-2.5 py-1.5 text-xs text-ink-tertiary shadow-float">Middle-click and drag to move around · Wheel to zoom</div>
+        <div className="pointer-events-none absolute bottom-3 left-3 rounded-action bg-surface px-2.5 py-1.5 text-xs text-ink-tertiary shadow-float">Middle-click and drag to move around · Wheel to zoom · Double-click to write · Paste or drop an image</div>
       </div>
       {confirm.dialog}
     </section>

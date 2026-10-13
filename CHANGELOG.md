@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.535 | 2026-10-13 | feat(studioflow): Workspace cards behave like blocks (Lead)
+
+- **Owner decision 2026-10-13 (option A, after a Codex design review of R8.522):** keep the free canvas and make each card behave like a Notion block, rather than switching to a vertical block document (Codex's proposal) that would undo the accepted canvas, its backend and migrate data again. No schema or service change: a card already holds text, images or a checklist, so a card is the block.
+- Blocks read as plain content at rest; the grip (left), the phase · round and Client feedback / Site visit labels (floating above) and the star and menu (floating right) appear on hover or focus. Client feedback keeps its warm tint; a starred block keeps its star visible. Author and "edited" moved into the block's tooltip.
+- Click a block to write in it (no Save): the text saves itself 0.7 s after typing stops and when the block is left, with the version it started from; a text change by someone else stops the autosave and shows "Use theirs / Keep mine". An image pasted or dropped while writing is added to that block at once; the x on an image removes it.
+- Checklists tick in place without opening the block (UI Engine `FormattedText` gains `onToggleCheck` and `toggleCheckItem`, tested).
+- "/" menu while writing: Text, Heading, Bullet list, Numbered list, Checklist (UI Engine `RichTextEditor` gains `bare`, `slashMenu` and `onBlur`; keyboard Up/Down/Enter/Escape).
+- On the canvas: paste (Ctrl/Cmd+V outside a text field) or drop an image to get an image block where the pointer is, in the frame under it (the default frame otherwise), labelled with the selected phase; double-click empty canvas to write a block at that spot (quick capture opens there, later blocks stack under).
+- R8.533 follow-up: the canvas height is measured again when the canvas actually appears (a page opened in a background tab is put in place only when shown), with the minimum lowered to 280 px so a 900 px window does not scroll; the in-app browser showed the canvas at the fallback 560 px before this fix.
+- **Migrations/dependencies:** none. **Checks:** `npm test` 1,058 passed; typecheck; eslint 0 errors; boundaries. Visual check not done (the in-app browser pane was hidden); owner walk.
+
 ## R8.534 | 2026-10-13 | fix(studioflow): Workspace frame titles in the UI Engine sans (Lead)
 
 - **Owner 2026-10-13:** the frame title ("Workspace") was in a serif that does not match the UI Engine. It was Instrument Serif, carried over from the prototype; `DESIGN.md` keeps that face without a consumer and out of operational chrome unless the owner decides otherwise. Frame titles (canvas and phone view) now use Schibsted Grotesk semibold at the section-title size, like every other card title. No other serif use remains in StudioFlow.

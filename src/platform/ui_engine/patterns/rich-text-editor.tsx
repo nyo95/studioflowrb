@@ -21,6 +21,15 @@ export type RichTextEditorProps = {
   onSubmit?: () => void;
   /** A short box that grows with its text, for a composer; the default is a note-sized box. */
   compact?: boolean;
+  /**
+   * Writing straight on the page (a block, not a form field): no frame and no toolbar. Pair it with `slashMenu`, so
+   * headings, lists and checklists stay one keystroke away.
+   */
+  bare?: boolean;
+  /** Typing "/" at the start of a line or after a space opens a menu that turns the line into a heading, list or checklist. */
+  slashMenu?: boolean;
+  /** Focus left the editor (not into its own menu). */
+  onBlur?: () => void;
 };
 
 /**

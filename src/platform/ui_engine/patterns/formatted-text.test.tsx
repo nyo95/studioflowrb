@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import { FormattedText } from "./formatted-text";
+import { FormattedText, toggleCheckItem } from "./formatted-text";
 
 const html = (text: string) => renderToStaticMarkup(<FormattedText text={text} />);
 
@@ -44,6 +44,16 @@ describe("FormattedText", () => {
   it("leaves a lone asterisk and multiplication alone", () => {
     const out = html("Size 60 * 60 cm, note *");
     assert.match(out, /Size 60 \* 60 cm, note \*/);
+  });
+
+  it("ticks check items in place when asked, and flips exactly the item it is given", () => {
+    const text = "Intro\n- [ ] first\n- [x] second\n\n- [ ] third";
+    assert.match(renderToStaticMarkup(<FormattedText text={text} onToggleCheck={() => undefined} />), /aria-label="Mark as done"/);
+    assert.match(html(text), /readonly=""/i);
+    assert.equal(toggleCheckItem(text, 0), "Intro\n- [x] first\n- [x] second\n\n- [ ] third");
+    assert.equal(toggleCheckItem(text, 1), "Intro\n- [ ] first\n- [ ] second\n\n- [ ] third");
+    assert.equal(toggleCheckItem(text, 2), "Intro\n- [ ] first\n- [x] second\n\n- [x] third");
+    assert.equal(toggleCheckItem(text, 5), text);
   });
 
   it("shows characters the rich editor escaped as typed, without the backslash", () => {
