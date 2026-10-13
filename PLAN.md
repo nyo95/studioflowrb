@@ -3,11 +3,11 @@
 Plan ID: WO-SF-WORKSPACE-04 (Workspace board: one board per project, standalone Text / Image / File elements)
 Scope: StudioFlow Workspace backend — element kinds, image and file elements, frames folded into the one board, data migration, follow-through in every reader; minimal UI wiring only
 Module(s): studioflow (core; Workspace is not an optional module)
-Target revision: R8.539 (Executor; R8.538 is the Lead's plan correction). The Lead's board UI follows as its own revision.
+Target revision: R8.540 (Executor, backend slice). R8.538/R8.539 are Lead plan corrections. The section purge and all frame-UI removal move to the Lead's board UI revision. The Lead's board UI follows as its own revision.
 Status: READY
 Priority: P1
 Owner: owner 2026-10-13 — accepted the clickable board concept (https://claude.ai/artifact/TbUL52g4MYgm1Y3G3TBvhL) and the direction below ("sudah jalan, susun rencana kerjanya"). Recorded in R8.537.
-Last updated: 2026-10-13 (Lead, R8.538 — correction after an Executor BLOCKED report that named no conflict; see "Corrections R8.538")
+Last updated: 2026-10-13 (Lead, R8.539 — split after the second Executor report; earlier: R8.538 — correction after an Executor BLOCKED report that named no conflict; see "Corrections R8.538")
 
 ## Why
 
@@ -118,13 +118,16 @@ Keep the table `sf_workspace_card` and the model `SfWorkspaceCard` (the
   for other kinds); labels, client-answer flag, star and delete for every kind.
   Deleting an image/file element queues its object through the existing
   unreferenced-cleanup path.
-- **Placement:** `placeWorkspaceItems` keeps working for elements (sections
-  part removed); the width check follows the new minimum.
-- **Sections:** the create / rename / delete / reorder / move-to-section
-  commands and the section part of placement are **PURGED** from the service,
-  the action and their tests. `readWorkspace` returns the project's elements
-  as one list (each with `kind`, `textStyle`, `canvas`, and for IMAGE/FILE a
-  signed `url`, `contentType`, `bytes`, `fileName`), not sections.
+- **Placement:** `placeWorkspaceItems` keeps working; the card width check
+  follows the new minimum.
+- **Sections stay as they are in this slice** (commands, action, tests, read
+  shape by section). After the migration every project holds only its DEFAULT
+  section; the Lead purges the section commands together with the frame UI in
+  the board UI revision. `readWorkspace` adds per element `kind`, `textStyle`,
+  and for IMAGE/FILE a signed `url`, `contentType`, `bytes`, `fileName`; the
+  per-card `images` array is removed.
+- The old two-step image path (`addWorkspaceCardImage` / `removeCardImage`,
+  `withImages`) is removed; its callers move to create-image and delete.
 - Phase Engine paths (Client answered note, site-visit note, `postPhaseNote`)
   keep creating `TEXT` elements in the default section, unplaced.
 
@@ -143,19 +146,16 @@ Keep the table `sf_workspace_card` and the model `SfWorkspaceCard` (the
 
 ### Wiring (minimal; the Lead replaces the screen next)
 
-Authorized UI edits, so the purge does not leave dead or broken screens: in
-`_workspace-canvas/` and the Phases page, remove the frame controls (add /
-rename / delete frame, frame header drag and resize, card move-to-frame menu)
-and draw the elements on the one default frame; adapt `layoutBoard` and the
-pinned-notes dialog to the new read shape. This is wiring, not design: no new
-interaction, styling or layout beyond that.
-
-`workspaceAction` mirrors the service (new create-image / create-file
-actions as `FormData` uploads, `textStyle`, removed section commands). The
-current canvas must keep compiling and remain usable: render all elements in
-the single default frame, an image element through the existing image
-component with one image, a file element as a link with its name. No layout,
-interaction or styling work beyond that.
+`workspaceAction` gains create-image (Server Action `FormData`), `textStyle`;
+the file upload uses its streamed route. The current canvas keeps its frames
+and must keep compiling and working: `WorkspaceCard` renders an IMAGE element
+as its single image (existing `ImageGallery`, `size="fill"`) and a FILE
+element as a link with its name and the `download` attribute; the canvas's
+paste/drop and the card's paste-while-writing call create-image (a non-image
+file dropped on the canvas calls the file route) instead of the old two-step
+path; the composer stops attaching images (drop it from `NoteDraftFields`
+use only if the type change forces it). Nothing else in the UI changes: no
+frame removal, no new interaction, styling or layout.
 
 ## Corrections R8.538
 
@@ -177,6 +177,15 @@ format of `docs/agent/EXECUTOR.md` (expected, actual with paths, the one
 conflict, options, recommendation); a report without the conflict cannot be
 decided.
 
+## Corrections R8.539
+
+The second Executor report again named no conflict and said the whole Work
+Order could not be completed in one run. The Lead splits it: this Work Order is
+the backend slice (schema, migration, element commands, file route, reader
+follow-through, tests, contract, the small card/canvas call-site wiring above).
+The section-command purge, frame-UI removal and the new board UI belong to the
+Lead's next revision. Migration rules are unchanged.
+
 ## Tests (disposable database)
 
 - Migration on seeded old-shape data: text-only card unchanged; text + 3 images
@@ -195,9 +204,8 @@ decided.
   element queues its object for cleanup.
 - Ideas bridge reads a migrated image element by its old image id.
 - Asset retention/cleanup covers element objects.
-- Removed section commands are gone from the action schema.
 - The existing Phase Engine and Workspace suites stay green (adjusted only
-  where a section command was purged).
+  where the old image path was removed).
 
 ## Verification
 
@@ -228,12 +236,12 @@ push.
 You are the Backend Executor on the same checkout (location: rumah, use
 `.env.rumah`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `PLAN.md`
 (WO-SF-WORKSPACE-04), the StudioFlow contract's Workspace section,
-`CHANGELOG.md` R8.519–R8.538 and `src/apps/studioflow/workspace/service.ts`.
-Implement the whole plan as one local revision commit R8.539 (confirm it is the
+`CHANGELOG.md` R8.519–R8.539 and `src/apps/studioflow/workspace/service.ts`.
+Implement the whole plan as one local revision commit R8.540 (confirm it is the
 next unused number): the migration that adds element kinds and folds frames and
 card images into standalone elements, the image and file element commands with
-their limits, the purge of section commands, every reader's follow-through, the
-contract update, minimal wiring that keeps the canvas usable, and every listed
+their limits (file upload on a streamed route), every reader's follow-through,
+the contract update, the small call-site wiring that keeps the canvas usable, and every listed
 test. Where the plan leaves an ordinary implementation choice, make it and note
 it in the changelog; where completing it would change a locked decision or
 invent product behaviour, stop with the full BLOCKED / CONFLICT report

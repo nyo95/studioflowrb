@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.539 | 2026-10-13 | docs(plan): WO-SF-WORKSPACE-04 split to a backend slice (Lead)
+
+- The Executor's second report on WO-SF-WORKSPACE-04 named no repository conflict; it could not finish the whole Work Order in one run and offered a split. The Work Order is now the backend slice only (schema, migration folding frames and card images into elements, image/file element commands with a streamed file route, reader follow-through, tests, contract, small card/canvas call-site wiring). Section commands stay for now; their purge and all frame-UI removal move to the Lead's board UI revision. Migration rules unchanged. Executor target R8.540.
+- **Migrations/dependencies:** none. **Checks:** docs only.
+
 ## R8.538 | 2026-10-13 | docs(plan): WO-SF-WORKSPACE-04 correction after Executor BLOCKED (Lead)
 
 - The Executor stopped on WO-SF-WORKSPACE-04 at R8.537 without naming the conflict and without changing files. Lead inspection: the plan required `Content-Disposition` on signed file links, which the platform storage port and private asset route do not offer. Corrected to the existing deliverables pattern (same-origin signed link + anchor `download` attribute); 25 MB files reuse the streamed deliverable `PUT` route pattern; removal of frame UI and the in-migration drop of `sf_workspace_card_image` are stated as authorized. Any further block must use the full report format.
