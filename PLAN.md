@@ -1,203 +1,164 @@
 # Active Plan
 
-Plan ID: WO-SF-WORKSPACE-01 (Workspace backend: one project Workspace of sections and cards replaces phase Notes)
-Scope: StudioFlow phase Notes evolve into one Workspace per project with ordered sections and cards; phase and round are labels on a card; backend plus minimal functional UI wiring
-Module(s): studioflow (core; Workspace is not an optional module), ideas (caller update through the StudioFlow public bridge only)
-Target revision: R8.519
-Status: IMPLEMENTED (backend R8.519; Lead board UI R8.523) — AWAITING BROWSER ACCEPTANCE
+Plan ID: WO-SF-WORKSPACE-02 (Workspace default section: a fixed system section every project's loose cards land in)
+Scope: StudioFlow Workspace backend only — a system-owned default section per project, its migration, and every write that today falls back to "the first section"
+Module(s): studioflow (core; Workspace is not an optional module)
+Target revision: R8.525 (Executor). The Lead's board-first UI follows as its own revision.
+Status: READY
 Priority: P1
-Owner: owner Workspace plan 2026-10-12 (sequence: Executor backend first, Lead UI next); owner decisions 2026-10-12 recorded in R8.518; Presentation extraction accepted in R8.517
-Last updated: 2026-10-12 (Lead, R8.518)
+Owner: owner decisions 2026-10-13 (board-first correction of R8.523, recorded in R8.524)
+Last updated: 2026-10-13 (Lead, R8.524)
 
-M3 is complete: Ideas (R8.512, PASS R8.513) and Presentation (R8.514, correction
-R8.516, PASS R8.517) are separate modules. This slice is the first of two:
-the Executor delivers the Workspace backend with minimal wiring as one commit;
-the Lead then accepts it and builds the final UI (UI Engine `WorkspaceShell`
-and generic reorder, full board, autosave/conflict UX, Phase details drawer,
-Workspace/Drawing List lenses, responsive and accessibility acceptance) as the
-next revision. Never combine the two.
+## Why
 
-## Outcome
+The owner rejected the R8.523 screen because it made two places to work (a
+phase Notes feed and a separate Workspace tab). The correction is
+**board-first**: one project Workspace board shown in full on the Phases page.
+Its global "+ Add card" and the Phase Engine's client-answer and site-visit
+cards must land in a **default section with a fixed system identity**, not in
+"whatever section is first" (R8.519 `firstSection`), because the team may
+reorder or add sections at any time. That identity is a data rule, so it is
+backend work before the Lead rebuilds the UI.
 
-Every project has one Workspace: ordered **sections** (free topics the team
-names, such as "Client feedback", "Materials", "Site") holding ordered
-**cards**. A card carries the formatted text, images, pin, client/visit
-origin, author and the **phase and round labels** a phase note carries today;
-the labels say where a card came from and let a phase page show "this phase's
-cards", but they never decide where a card lives. All existing notes become
-cards with their ids, text, images, storage keys, authors, times, pins, phase
-and round labels intact, and the old note tables cease to exist (one source of
-truth). Every Phase Engine behavior is unchanged.
+## Owner decisions (2026-10-13, board-first)
 
-## Owner decisions (2026-10-12, R8.518)
+Recorded here so the Lead UI revision that follows has one source; only items
+B1–B4 are this Executor slice.
 
-1. **One Workspace per project; phase is only a label.** Sections belong to the
-   project, not to a phase, so the team is not forced into a per-phase filing
-   structure. A card's phase label is set automatically from where it was
-   written (the phase page, a client answer, a site visit) and can be changed
-   or cleared; the round label follows the Phase Engine as today.
-2. **Existing notes go into one "Notes" section per project**, oldest first,
-   each keeping its phase and round label (Lead analysis in R8.518: one
-   section per phase was rejected because it rebuilds the per-phase filing the
-   owner chose to drop; one mixed section is safe because the phase label and
-   a phase filter keep every note findable). New projects get a "Notes"
-   section when their first card is created.
-3. **A section can be deleted only when it is empty**
-   (`WORKSPACE_SECTION_NOT_EMPTY`); a project's last section can never be
-   deleted while the project has cards.
+- B1. Every project has at most one **default section** with a fixed system
+  identity. Loose cards (no section chosen), "Client answered" cards and
+  site-visit cards always go there, wherever it sits in the order.
+- B2. Its initial name is **"Workspace"**; it may be renamed and moved, but
+  **never deleted**.
+- B3. Each existing project's R8.519 "Notes" section becomes its default
+  section and is renamed "Workspace" (no project ends up with two general
+  sections).
+- B4. No new section is ever created as default by a person; only the system
+  creates it, lazily, when a project needs it and has none.
+- UI (Lead, next revision, not this slice): the Workspace tab and route are
+  removed; one full board sits on the Phases page after the phase strip and
+  workflow bar; choosing a phase changes only the workflow controls and the
+  phase/round context of new cards, the board stays on "All"; toolbar All ·
+  General · selected phase · Starred · Client feedback, round selector only
+  under a phase filter; sections are columns with internal horizontal scroll
+  on desktop and stacked on narrow screens; "+ Add card" per section plus one
+  global button (default section); "Starred" with a star icon; "Client
+  feedback" is the card label, "Client answered" stays the workflow command;
+  Requirements, Files and round history move to a Phase details drawer whose
+  button shows counts ("Requirements 0/3 · Files 0"); Workspace / Drawing List
+  is a lens switch on the Phases page (Drawing List = the existing CD list on a
+  drafter phase). Bringing ideas in from Ideas is a later, separate slice.
 
 ## Locked decisions
 
 ### Schema (one forward-only migration, `studioflow` schema)
 
-- `SfWorkspaceSection` (`sf_workspace_section`): `id`, `project_id` (FK →
-  `sf_project`, cascade), `title` (1–80 chars), `sort_order`, `created_by_id`,
-  `created_at`, `updated_at`, `version` int default 1. Index
-  `(project_id, sort_order)`.
-- `SfWorkspaceCard` (`sf_workspace_card`): the renamed `sf_phase_note` table
-  (`ALTER TABLE … RENAME`, ids kept) with: `section_id` (FK →
-  `sf_workspace_section`, restrict), `sort_order` int, `is_pinned` (renamed
-  from `is_starred`), `origin` enum `sf_workspace_card_origin`
-  (`NOTE` | `CLIENT_ANSWER` | `SITE_VISIT`) replacing `is_client_feedback`
-  (true → `CLIENT_ANSWER`; false and the note's round has a `visit_date` and
-  the note was written by the visit command → `SITE_VISIT`; otherwise `NOTE`),
-  `version` int default 1, `updated_at`, and a new `project_id` (FK →
-  `sf_project`, cascade; backfilled from the phase). `phase_id` becomes
-  nullable with FK → `sf_phase` **SetNull** (the phase label; a card outlives a
-  label), and `iteration_id` stays FK → `sf_revision` SetNull (the round
-  label). Invariants enforced in the service: a card's section and phase
-  belong to the card's project; when `iteration_id` is set, `phase_id` equals
-  that round's phase. Keep `body`, `author_id`, `author_name`, `created_at`,
-  `edited_at`. Indexes `(section_id, sort_order)`, `(project_id, created_at)`,
-  `(phase_id, created_at)`, `(iteration_id)`.
-- `SfWorkspaceCardImage` (`sf_workspace_card_image`): the renamed
-  `sf_phase_note_image` (ids, `storage_key` unique, `content_type`, `bytes`,
-  `sort_order`, uploader snapshot, `created_at` kept) with `note_id` renamed
-  `card_id`, cascade from the card.
-- Migration steps: create the section table and enum; insert one "Notes"
-  section per project that has notes; rename tables, columns and constraints;
-  backfill `section_id`, `sort_order` (by `created_at`, `id`), `origin`,
-  `version`, `updated_at`, `project_id`; then set `section_id` and
-  `project_id` NOT NULL. Card `sort_order` inside the one "Notes" section
-  follows `created_at`, `id` across all phases of the project. For `SITE_VISIT`
-  use the exact rule: the note's `iteration_id` points to a round with a
-  non-null `visit_date` and the note's `created_at` is within the same second
-  as that round's `created_at` (the visit command writes both in one
-  transaction); every other non-client note is `NOTE`. Guards: refuse when a
-  note row has a `phase_id` that does not exist. No row copy, no object copy,
-  no table left behind; existing storage keys stay valid and are not renamed.
-- Migration-isolation: StudioFlow-internal only; no cross-module FK.
+- `SfWorkspaceSection` gains `system_key String?` (`system_key` column, text,
+  nullable) and `@@unique([project_id, system_key])`. The only value written
+  is `"DEFAULT"`; ordinary sections stay `NULL` (PostgreSQL treats NULLs as
+  distinct, so any number of ordinary sections is allowed). Export the value
+  as `WORKSPACE_DEFAULT_SECTION_KEY = "DEFAULT"` and the initial title as
+  `DEFAULT_WORKSPACE_SECTION = "Workspace"` (replacing `"Notes"`).
+- Backfill, per project that has at least one section: choose the section
+  whose title is exactly `Notes`, earliest `created_at` then `id`; if none,
+  the first by `sort_order`, `created_at`, `id`. Set its `system_key =
+  'DEFAULT'`, and rename it to `Workspace` only when its title is still
+  exactly `Notes` (a section the owner already renamed keeps its name).
+  Increment its `version`. Projects without sections get nothing now (B4).
+- Guard: after the backfill, refuse (raise) if any project has more than one
+  `DEFAULT`, or has sections but no `DEFAULT`.
+- No other table changes. DB names stay (`is_pinned`, `origin =
+  CLIENT_ANSWER`); "Starred" and "Client feedback" are UI labels only.
 
-### Services and actions
+### Service (`src/apps/studioflow/workspace/service.ts`)
 
-- Replace `phases/notes.ts` with a `workspace` service inside StudioFlow
-  (`src/apps/studioflow/workspace/`), composed where the notes service is
-  today. Read = project read. Write on a card labelled with a phase = as notes
-  today (`phaseWork` + project access `transition` on that phase + writable,
-  ACTIVE project); write on a card with no phase label and every section
-  command = `phaseWork` + project access `document` + writable, ACTIVE
-  project. Changing a card's phase label needs the write right for both the
-  old and the new label.
-- Commands: create/rename/reorder/delete section; create card (in a section,
-  appended, optional phase label), update card text, set/clear phase label
-  (clearing a phase label also clears the round label), pin/unpin, move card
-  (to another section and/or position), reorder cards within a section,
-  delete card; add/remove card
-  images (same limits, sniffing, key prefix and cleanup ledger as note images
-  today). Reads: the project Workspace (sections in order with their cards and
-  signed image URLs, optional filter by phase label) and the existing
-  per-phase chronological feed projection (cards labelled with that phase) so
-  the current notes UI keeps working.
-- **Concurrency:** every card and section update/move/delete carries the
-  `version` the client read; a mismatch returns `CONFLICT`
-  `WORKSPACE_CARD_STALE` / `WORKSPACE_SECTION_STALE` and changes nothing; each
-  successful write increments `version`. Reorders lock the parent rows in the
-  transaction (`SELECT … FOR UPDATE` on the section or phase) and validate the
-  full id list like Presentation's `orderIds`.
-- **Phase Engine integration (atomic, same transaction as today):** "client
-  answered" with text creates a `CLIENT_ANSWER` card and "add site visit" with
-  a note creates a `SITE_VISIT` card, both labelled with the phase and round
-  and appended to the project's first section (creating "Notes" when none
-  exists). The
-  empty-round checks (`emptyNeverSent`, `emptyAutoStart`) count the round's
-  cards (and through them their images) instead of notes. Hard reset keeps
-  every card and clears only its round link (unchanged SetNull meaning). Undo,
-  skip, auto-advance, CD Mall → CD Final, explicit completion and every
-  permission and audit of the Phase Engine are unchanged.
-- **Audit:** `studioflow.workspace-section.*` and `studioflow.workspace-card.*`
-  with ids, phase/project ids, counts and moves; never card text or image
-  content. Historical `studioflow.phase-note.*` events are not rewritten.
-- **Media and retention:** archive retention and asset cleanup read
-  `sfWorkspaceCardImage` instead of `sfPhaseNoteImage` with identical
-  semantics (`iterationImages` count name may stay for compatibility of the
-  summary). The cleanup reference check includes card images.
-- **Public bridge:** rename `readPhaseNoteImageSource` to
-  `readWorkspaceImageSource` (same input/output contract, `imageId` is a card
-  image id) and update the Ideas callers and the composition Moodboard
-  coordinator in this revision; no compatibility alias.
-- **Minimal UI wiring:** the existing phase notes UI keeps working on the new
-  service (post, edit, pin, client-answer flag display, images, Ideas/
-  Moodboard/Schedule image actions). Add only plain controls needed to
-  exercise the new commands (section list with add/rename/delete, move card
-  to section, up/down reorder). No drag-and-drop, no new dependency, no visual
-  design; the Lead replaces this UI next revision.
+- Replace `firstSection` with `defaultSection(tx, projectId, createdById,
+  at)`: lock the project row, return the `DEFAULT` section; when the project
+  has none, create one titled `Workspace` with `system_key = 'DEFAULT'` at the
+  front of the order (`sort_order` = current minimum − 1, or 0 when the project
+  has no section), relying on the unique constraint as the last line against
+  races.
+- Every fallback that used `firstSection` uses `defaultSection`:
+  `insertWorkspaceCard` without `sectionId` (so `createWorkspaceCard` without a
+  section, `postPhaseNote`, the Phase Engine's client-answer card and the
+  site-visit card). The Phase Engine's own rules, events, permissions and
+  audit are unchanged; only the section a card lands in changes.
+- `deleteWorkspaceSection` refuses the default section with `CONFLICT`
+  `WORKSPACE_SECTION_DEFAULT` ("The default section can be renamed or moved,
+  not deleted.") before any other check that could mutate. Rename and reorder
+  work on it as on any section. `createWorkspaceSection` never sets
+  `system_key`. The "delete only when empty" rule and every version check are
+  unchanged.
+- `readWorkspace` returns `isDefault: boolean` per section. The optional
+  `phaseId` filter is kept.
+- Audit metadata for `workspace-section.*` gains `isDefault` where the
+  section is the default one; when `defaultSection` creates one, audit
+  `studioflow.workspace-section.created` with `{ projectId, isDefault: true,
+  bySystem: true }`.
+
+### Wiring
+
+- `workspaceAction` and its schema are unchanged except that the existing
+  board can show the refusal message; do not touch the R8.523 screens beyond
+  passing `isDefault` through `workspace/page.tsx` if the type requires it.
+  The Lead replaces the UI next revision.
+- Update `STUDIOFLOW-REWORK-CONTRACT.md` §6.1 (default section rule) and the
+  R8.519/R8.523 browser-backlog item (default section named "Workspace",
+  cannot be deleted).
 
 ## Tests (disposable database)
 
-- Populated migration fixture: notes with text only, images only, pinned,
-  client answers, visit notes, notes without a round (after hard reset),
-  across two phases of one project and a second project; compare ids, text, authors, times, round links, image
-  ids/keys/order before and after; assert sections created, origins as the
-  rule says, one "Notes" section per project with cards ordered across
-  phases, phase and round labels kept, old tables gone, `prisma migrate diff` shows no drift for these
-  tables.
-- Section and card commands, ordering, move between sections, phase-label
-  set/clear (clearing also clears the round label), cross-project section or
-  phase refusal, the phase filter, stale-version conflicts, permission/PIC/archived/completed refusals, image limits and
-  rollback, cleanup ledger.
-- Phase Engine: the whole existing phase suite stays green; plus client answer
-  and site visit create the right card atomically (failure rolls back both),
-  empty-round checks use cards, hard reset keeps cards and clears round links,
-  undo restores as before.
-- Ideas: note-image → Ideas, → Schedule, → Moodboard through
-  `readWorkspaceImageSource`. Retention purges card images.
+- Populated migration fixture: (a) a project with the R8.519 "Notes" section
+  plus a later ordinary section placed before it; (b) a project whose "Notes"
+  was renamed by the owner; (c) a project with only ordinary sections and no
+  "Notes"; (d) a project with no sections. After migrate: (a) the old Notes is
+  DEFAULT and titled Workspace, the other section untouched; (b) DEFAULT keeps
+  the owner's title; (c) the first section by order is DEFAULT; (d) no
+  section; every card, image and order unchanged; the guard fails a seeded
+  double-default.
+- Service: a card created without a section goes to the default section even
+  when another section is first; client answered with text and a site visit
+  with a note put their cards in the default section (atomic as before); a
+  project with no section gets one "Workspace" DEFAULT section created at the
+  front on its first loose card, and two concurrent first cards create exactly
+  one; deleting the default section is refused with
+  `WORKSPACE_SECTION_DEFAULT` even when empty; renaming and reordering it work;
+  `createWorkspaceSection` never creates a default; `readWorkspace` reports
+  `isDefault`.
+- The whole existing Phase Engine and Workspace suites stay green.
 
 ## Verification
 
 `npm test`, typecheck, eslint, `check:boundaries`, `check:legacy-runtime`,
-production build, full migration chain on a fresh disposable rebuild database
-and incremental deploy on the standard disposable test database, staged and
-unstaged whitespace. Append the browser items (notes feed parity, section and
-card commands, client answer and visit cards, 375 px) to
-`docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`; browser acceptance belongs to the
-Lead's next revision.
+production build, `prisma migrate diff` (no drift), the full migration chain on
+a fresh disposable rebuild database and incremental deploy on the standard
+disposable test database, staged and unstaged whitespace. Apply the migration
+to the kantor dev database only after the tests pass and the target is verified
+as `studioflow_rebuild` on localhost:5433. Browser acceptance belongs to the
+Lead's UI revision.
 
 ## Non-goals
 
-No final Workspace UI, no `WorkspaceShell`, no drag-and-drop library, no
-Drawing List or Requirements changes, no Phase Engine meaning change, no new
-module, no cross-module FK or internal import, no new permission, no push or
-release.
+No UI redesign, no route or navigation change, no Phase details drawer, no
+lens switch, no Ideas integration, no renaming of `is_pinned` or `origin`, no
+Phase Engine meaning change, no new permission, no new dependency, no push.
 
 ## Executor Prompt
 
 You are the Backend Executor on the same checkout (location: kantor). Read
-`AGENTS.md`, `docs/agent/EXECUTOR.md`, `PLAN.md` (WO-SF-WORKSPACE-01), the
-StudioFlow contract sections on phases, rounds and notes, and
-`docs/apps/platform/MODULES-M2-COUPLING-REPORT.md` (phase-note image source).
-Implement exactly the locked Workspace backend as one local revision commit
-R8.519 (confirm it is the next unused number in `CHANGELOG.md`): the one
-forward-only migration that turns phase notes into one project Workspace of
-sections, cards and card images (phase and round as card labels) without a
-second source of truth; the StudioFlow workspace
-service, actions, access, version-based concurrency, audit, media and
-retention; atomic client-answer and site-visit cards; empty-round checks on
-cards; hard reset keeping cards; the `readWorkspaceImageSource` rename with
-its callers; minimal functional UI wiring; and every test in the plan,
-including the whole Phase Engine suite and the populated migration fixture.
-Stop with BLOCKED / CONFLICT if a locked decision cannot be met as written.
-Database commands only against verified disposable rebuild-only databases.
-Run every gate in Verification, append the browser items, update
-`CHANGELOG.md`, commit locally without pushing, and reply with only a
+`AGENTS.md`, `docs/agent/EXECUTOR.md`, `PLAN.md` (WO-SF-WORKSPACE-02), the
+StudioFlow contract §6.1 (Project Workspace), `CHANGELOG.md` R8.519 and R8.523,
+and `src/apps/studioflow/workspace/service.ts`. Implement exactly the locked
+default-section backend as one local revision commit R8.525 (confirm it is the
+next unused number in `CHANGELOG.md`): the `system_key` column with its unique
+constraint, the forward-only migration with the Notes→Workspace backfill and
+guard, `defaultSection` replacing `firstSection` for every loose,
+client-answer and site-visit card, the refusal to delete the default section,
+`isDefault` on reads and audit, the contract and browser-backlog updates, and
+every test in the plan including the populated migration fixture. Stop with
+BLOCKED / CONFLICT if a locked decision cannot be met as written. Database
+commands only against verified disposable rebuild-only databases, then the
+kantor dev database after the gates pass. Run every gate in Verification,
+update `CHANGELOG.md`, commit locally without pushing, and reply with only a
 Planner/Reviewer prompt: commit, checks with results, limitations, dirty
 files, and a request for verdict.

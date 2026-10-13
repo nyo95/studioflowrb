@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.524 | 2026-10-13 | docs(plan): board-first Workspace correction, default section work order (Lead)
+
+- **Owner decision 2026-10-13:** R8.523 is rejected as UX because it kept two places to work (phase Notes and a Workspace tab). Correction is **board-first**: one full project Workspace board on the Phases page; the Workspace tab and route go; Starred (star) and Client feedback as card terms, Client answered stays the workflow command; Requirements, Files and round history in a Phase details drawer with counts; Workspace / Drawing List as a lens switch; Ideas intake is a later slice.
+- Owner confirmed the Lead defaults: the R8.519 "Notes" section becomes each project's **default section**, renamed "Workspace"; it can be renamed and moved but never deleted; loose, client-answer and site-visit cards always land there; drawer button shows counts; Ideas later.
+- `PLAN.md` now holds READY `WO-SF-WORKSPACE-02` (Executor, target R8.525): `system_key` on sections with a per-project unique default, forward-only backfill and guard, `defaultSection` replacing `firstSection`, refusal to delete the default, `isDefault` on reads and audit, tests. The Lead's board-first UI follows as its own revision.
+- **Migrations/dependencies:** none. **Checks:** documentation only.
+
 ## R8.523 | 2026-10-13 | feat(studioflow): Workspace board screen (Lead)
 
 - **WO-SF-WORKSPACE-01 Lead UI slice**, replacing the R8.519 plain tab. Sections sit side by side as columns (stacked below 768 px; the board scrolls inside itself, never the page). Cards show the phase · round label, Client answer / Site visit origin, pin, formatted text, images (with Save to Ideas / Use in schedule / Add to moodboard in the viewer) and author · time · edited.
