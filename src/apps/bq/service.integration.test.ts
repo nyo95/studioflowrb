@@ -49,6 +49,194 @@ async function projectTree() {
 }
 
 describe("BQ R6.1 invariants", () => {
+  async function moveFixture() {
+    const { project, section, item } = await projectTree();
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, qty: "2.345678", markupL1Pct: "12.5" });
+    const lines = [];
+    for (const qty of ["0.5", "0.333333", "1.234567", "2"]) {
+      lines.push(await service.addLineItem({ grants: GRANTS, actor: ACTOR, itemId: item.id, sourceType: "MASTERDATA", sourceRefId: "price-source", titleSnapshot: `Line ${qty}`, purchaseUnitSnapshot: "PCS", hargaSnapshot: "33.333", kategori: "MATERIAL", qty, koefisien: "1.111111" }));
+    }
+    const read = createBqPublicRead(testDb.prisma);
+    const readItem = async () => (await read.getProjectDetail(project.id))!.sections[0]!.items.find((row) => row.id === item.id)!;
+    return { project, section, item, lines, readItem };
+  }
+
+  it("previews and groups fractional direct lines neutrally without changing any price/snapshot", async () => {
+    const { item, lines, readItem } = await moveFixture();
+    const lineItemIds = [lines[2]!.id, lines[0]!.id, lines[1]!.id];
+    const before = await readItem();
+    const auditCount = await testDb.prisma.auditEvent.count();
+    const preview = await service.previewLineItemMove({ grants: [BQ_PERMISSIONS.projectRead], itemId: item.id, lineItemIds, target: { newGroup: {} } });
+    assert.equal(preview.changes, false);
+    assert.deepEqual(preview.before, { rate: before.rate, total: before.total });
+    assert.deepEqual(preview.after, preview.before);
+    assert.equal(await testDb.prisma.auditEvent.count(), auditCount);
+    assert.equal(await testDb.prisma.bqSubObject.count({ where: { item_id: item.id } }), 0);
+    const group = await service.groupLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds, name: "  Neutral  " });
+    assert.equal(group.name, "Neutral");
+    assert.equal(group.qty_per_l1.toString(), "1");
+    assert.equal(group.markup_l2_pct.toString(), "0");
+    const after = await readItem();
+    assert.deepEqual({ rate: after.rate, total: after.total }, preview.after);
+    assert.deepEqual(after.subObjects[0]!.lineItems.map((line) => line.id), lines.slice(0, 3).map((line) => line.id));
+    assert.deepEqual((await testDb.prisma.bqLineItem.findMany({ where: { item_id: item.id } })).map((line) => line.sort_order), [0]);
+    for (const old of lines) {
+      const stored = await testDb.prisma.bqLineItem.findUniqueOrThrow({ where: { id: old.id } });
+      assert.deepEqual({ ...stored, item_id: old.item_id, sub_object_id: old.sub_object_id, sort_order: old.sort_order, updated_at: old.updated_at }, old);
+    }
+    const audit = await testDb.prisma.auditEvent.findMany({ where: { action: "bq.line-items.grouped" } });
+    assert.equal(audit.length, 1);
+    assert.deepEqual(audit[0]!.metadata, { count: 3, itemId: item.id, sourceParentIds: [item.id], targetParentId: group.id });
+  });
+
+  it("previews non-neutral new groups exactly as stored, including database decimal scales", async () => {
+    const { item, lines, readItem } = await moveFixture();
+    const existing = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Existing", qtyPerL1: "1" });
+    const lineItemIds = [lines[0]!.id, lines[1]!.id];
+    const values = { qtyPerL1: "1.2345678", markupL2Pct: "12.34567" };
+    const preview = await service.previewLineItemMove({ grants: GRANTS, itemId: item.id, lineItemIds, target: { newGroup: values } });
+    assert.equal(preview.changes, true);
+    const group = await service.groupLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds, name: "New", ...values });
+    assert.equal(group.sort_order, existing.sort_order + 1);
+    assert.equal(group.qty_per_l1.toString(), "1.234568");
+    assert.equal(group.markup_l2_pct.toString(), "12.3457");
+    const after = await readItem();
+    assert.deepEqual({ rate: after.rate, total: after.total }, preview.after);
+  });
+
+  it("moves direct to group, group to group and back, appends in source order and retains empty groups", async () => {
+    const { item, lines, readItem } = await moveFixture();
+    const first = await service.groupLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds: [lines[1]!.id], name: "First" });
+    const target = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Target", qtyPerL1: "2", markupL2Pct: "10" });
+    const existing = await service.addLineItem({ grants: GRANTS, actor: ACTOR, subObjectId: target.id, sourceType: "CUSTOM", titleSnapshot: "Already target", purchaseUnitSnapshot: "PCS", hargaSnapshot: "10", kategori: "MATERIAL", qty: "1" });
+    const lineItemIds = [lines[1]!.id, lines[2]!.id, lines[0]!.id, existing.id];
+    const preview = await service.previewLineItemMove({ grants: GRANTS, itemId: item.id, lineItemIds, target: { subObjectId: target.id } });
+    assert.equal(preview.changes, true);
+    await service.moveLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds, target: { subObjectId: target.id } });
+    let after = await readItem();
+    assert.deepEqual({ rate: after.rate, total: after.total }, preview.after);
+    assert.deepEqual(after.subObjects.find((group) => group.id === target.id)!.lineItems.map((line) => line.id), [existing.id, lines[0]!.id, lines[2]!.id, lines[1]!.id]);
+    assert.equal(after.subObjects.find((group) => group.id === first.id)!.lineItems.length, 0);
+    const previewBack = await service.previewLineItemMove({ grants: GRANTS, itemId: item.id, lineItemIds: [lines[2]!.id, lines[0]!.id], target: { direct: true } });
+    await service.moveLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds: [lines[2]!.id, lines[0]!.id], target: { direct: true } });
+    after = await readItem();
+    assert.deepEqual({ rate: after.rate, total: after.total }, previewBack.after);
+    assert.deepEqual(after.lineItems.map((line) => line.id), [lines[3]!.id, lines[0]!.id, lines[2]!.id]);
+    for (const where of [{ item_id: item.id }, { sub_object_id: target.id }]) {
+      const stored = await testDb.prisma.bqLineItem.findMany({ where, orderBy: { sort_order: "asc" } });
+      assert.deepEqual(stored.map((line) => line.sort_order), stored.map((_, i) => i));
+    }
+    const audits = await testDb.prisma.auditEvent.findMany({ where: { action: "bq.line-items.moved" }, orderBy: { occurred_at: "asc" } });
+    assert.equal(audits.length, 2);
+    assert.deepEqual(audits[0]!.metadata, { count: 3, itemId: item.id, sourceParentIds: [item.id, first.id], targetParentId: target.id });
+  });
+
+  it("does not write/audit a same-parent move and preview never opens a write transaction", async () => {
+    const { item, lines } = await moveFixture();
+    const group = await service.groupLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds: [lines[0]!.id], name: "Target" });
+    const original = await testDb.prisma.bqLineItem.findMany({ orderBy: { id: "asc" } });
+    const auditCount = await testDb.prisma.auditEvent.count();
+    const readOnly = createBqService(testDb.prisma, {
+      runTransaction: async () => { throw new Error("Preview opened a transaction"); },
+      auditWriter: { async write() { throw new Error("Preview wrote audit"); } },
+    });
+    for (const [lineItemIds, target] of [
+      [[lines[1]!.id], { direct: true }], [[lines[0]!.id], { subObjectId: group.id }],
+    ] as const) {
+      const preview = await readOnly.previewLineItemMove({ grants: [BQ_PERMISSIONS.projectManage], itemId: item.id, lineItemIds: [...lineItemIds], target });
+      assert.equal(preview.changes, false);
+      await service.moveLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds: [...lineItemIds], target });
+    }
+    await readOnly.previewLineItemMove({ grants: [BQ_PERMISSIONS.projectRead], itemId: item.id, lineItemIds: [lines[0]!.id], target: { newGroup: {} } });
+    assert.deepEqual(await testDb.prisma.bqLineItem.findMany({ orderBy: { id: "asc" } }), original);
+    assert.equal(await testDb.prisma.auditEvent.count(), auditCount);
+  });
+
+  it("rejects foreign/missing lines or targets, duplicate/empty selections and invalid group inputs without writes", async () => {
+    const { item, lines } = await moveFixture();
+    const foreign = await moveFixture();
+    const foreignGroup = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: foreign.item.id, name: "Foreign", qtyPerL1: "1" });
+    const original = await testDb.prisma.bqLineItem.findMany({ orderBy: { id: "asc" } });
+    const groupsBefore = await testDb.prisma.bqSubObject.count();
+    const auditBefore = await testDb.prisma.auditEvent.count();
+    for (const lineItemIds of [["missing"], [foreign.lines[0]!.id], [lines[0]!.id, foreign.lines[1]!.id]]) {
+      const input = { grants: GRANTS, itemId: item.id, lineItemIds };
+      for (const operation of [
+        () => service.moveLineItems({ ...input, actor: ACTOR, target: { direct: true } }),
+        () => service.groupLineItems({ ...input, actor: ACTOR, name: "Invalid" }),
+        () => service.previewLineItemMove({ ...input, target: { newGroup: {} } }),
+      ]) await assert.rejects(operation, (error: unknown) => error instanceof AppError && error.code === "bq.line-item.move-stale");
+    }
+    for (const subObjectId of [foreignGroup.id, "missing-group"]) {
+      const input = { grants: GRANTS, itemId: item.id, lineItemIds: [lines[0]!.id], target: { subObjectId } };
+      await assert.rejects(() => service.moveLineItems({ ...input, actor: ACTOR }), (error: unknown) => error instanceof AppError && error.code === "bq.line-item.move-stale");
+      await assert.rejects(() => service.previewLineItemMove(input), (error: unknown) => error instanceof AppError && error.code === "bq.line-item.move-stale");
+    }
+    for (const lineItemIds of [[], [lines[0]!.id, lines[0]!.id]]) {
+      const input = { grants: GRANTS, itemId: item.id, lineItemIds };
+      for (const operation of [
+        () => service.moveLineItems({ ...input, actor: ACTOR, target: { direct: true } }),
+        () => service.groupLineItems({ ...input, actor: ACTOR, name: "Invalid" }),
+        () => service.previewLineItemMove({ ...input, target: { direct: true } }),
+      ]) await assert.rejects(operation, (error: unknown) => error instanceof AppError && error.kind === "VALIDATION");
+    }
+    for (const values of [{ name: " " }, { qtyPerL1: "0" }, { qtyPerL1: "-1" }, { qtyPerL1: "bad" }, { markupL2Pct: "1000" }, { markupL2Pct: "-1" }]) {
+      await assert.rejects(() => service.groupLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds: [lines[0]!.id], name: "Invalid", ...values }),
+        (error: unknown) => error instanceof AppError && error.kind === "VALIDATION");
+    }
+    await assert.rejects(() => service.moveLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds: [lines[0]!.id], target: { direct: true, subObjectId: foreignGroup.id } as never }),
+      (error: unknown) => error instanceof AppError && error.kind === "VALIDATION");
+    assert.deepEqual(await testDb.prisma.bqLineItem.findMany({ orderBy: { id: "asc" } }), original);
+    assert.equal(await testDb.prisma.bqSubObject.count(), groupsBefore);
+    assert.equal(await testDb.prisma.auditEvent.count(), auditBefore);
+  });
+
+  it("refuses mutations without manage permission and on LOCKED/ARCHIVED while allowing read previews", async () => {
+    const { project, item, lines } = await moveFixture();
+    const input = { itemId: item.id, lineItemIds: [lines[0]!.id] };
+    for (const operation of [
+      () => service.moveLineItems({ ...input, grants: [BQ_PERMISSIONS.projectRead], actor: ACTOR, target: { direct: true } }),
+      () => service.groupLineItems({ ...input, grants: [BQ_PERMISSIONS.projectRead], actor: ACTOR, name: "Blocked" }),
+      () => service.previewLineItemMove({ ...input, grants: [], target: { direct: true } }),
+    ]) await assert.rejects(operation, (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN");
+    const original = await testDb.prisma.bqLineItem.findMany({ orderBy: { id: "asc" } });
+    await service.lockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+    for (const status of ["locked", "archived"]) {
+      if (status === "archived") {
+        await service.unlockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+        await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+      }
+      for (const operation of [
+        () => service.moveLineItems({ ...input, grants: GRANTS, actor: ACTOR, target: { direct: true } }),
+        () => service.groupLineItems({ ...input, grants: GRANTS, actor: ACTOR, name: "Blocked" }),
+      ]) await assert.rejects(operation, (error: unknown) => error instanceof AppError && error.code === `bq.project.${status}`);
+      assert.equal((await service.previewLineItemMove({ ...input, grants: [BQ_PERMISSIONS.projectRead], target: { newGroup: {} } })).changes, false);
+    }
+    assert.deepEqual(await testDb.prisma.bqLineItem.findMany({ orderBy: { id: "asc" } }), original);
+  });
+
+  it("rolls back line moves, source renumbering and new groups if the audit write fails", async () => {
+    const { item, lines } = await moveFixture();
+    const target = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Target", qtyPerL1: "2" });
+    const original = await testDb.prisma.bqLineItem.findMany({ orderBy: { id: "asc" } });
+    const groups = await testDb.prisma.bqSubObject.findMany({ orderBy: { id: "asc" } });
+    const auditCount = await testDb.prisma.auditEvent.count();
+    const failure = new Error("Audit unavailable");
+    const failing = createBqService(testDb.prisma, {
+      runTransaction: <T>(work: (tx: PrismaClient) => Promise<T>) => testDb.prisma.$transaction((tx) => work(tx as unknown as PrismaClient)),
+      auditWriter: { async write() { throw failure; } },
+    });
+    for (const operation of [
+      () => failing.moveLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds: [lines[0]!.id, lines[1]!.id], target: { subObjectId: target.id } }),
+      () => failing.groupLineItems({ grants: GRANTS, actor: ACTOR, itemId: item.id, lineItemIds: [lines[0]!.id], name: "Rollback" }),
+    ]) {
+      await assert.rejects(operation, (error: unknown) => error === failure);
+      assert.deepEqual(await testDb.prisma.bqLineItem.findMany({ orderBy: { id: "asc" } }), original);
+      assert.deepEqual(await testDb.prisma.bqSubObject.findMany({ orderBy: { id: "asc" } }), groups);
+      assert.equal(await testDb.prisma.auditEvent.count(), auditCount);
+    }
+  });
+
   for (const parentKind of ["section", "subsection"] as const) {
     it(`reorders ${parentKind} items without changing money and skips unchanged rows`, async () => {
       const { project, section, item } = await projectTree();

@@ -129,6 +129,85 @@ export async function updateSubsectionAction(
   });
 }
 
+const LineItemMoveTargetSchema = z.union([
+  z.strictObject({ direct: z.literal(true) }),
+  z.strictObject({ subObjectId: Id }),
+]);
+const NewGroupValuesSchema = z.strictObject({ qtyPerL1: z.string().trim().optional(), markupL2Pct: z.string().trim().optional() });
+const PreviewLineItemMoveSchema = z.strictObject({
+  projectId: Id,
+  itemId: Id,
+  lineItemIds: z.array(Id).min(1),
+  target: z.union([LineItemMoveTargetSchema, z.strictObject({ newGroup: NewGroupValuesSchema })]),
+});
+const MoveLineItemsSchema = PreviewLineItemMoveSchema.extend({ target: LineItemMoveTargetSchema });
+const GroupLineItemsSchema = z.strictObject({
+  projectId: Id, itemId: Id, lineItemIds: z.array(Id).min(1), name: z.string().trim().min(1).max(160),
+  qtyPerL1: z.string().trim().optional(), markupL2Pct: z.string().trim().optional(),
+});
+
+function moveFormValues(formData: FormData) {
+  const fields = formData.getAll("lineItemIds");
+  let lineItemIds: unknown = fields;
+  if (fields.length === 1 && typeof fields[0] === "string" && fields[0].trim().startsWith("[")) {
+    lineItemIds = parseMoveJson(fields[0]);
+  }
+  return { projectId: formData.get("projectId"), itemId: formData.get("itemId"), lineItemIds };
+}
+
+function parseMoveJson(value: FormDataEntryValue | null): unknown {
+  if (typeof value !== "string") throw new AppError("VALIDATION", "bq.line-item.move-invalid", "Invalid move request");
+  try { return JSON.parse(value); }
+  catch { throw new AppError("VALIDATION", "bq.line-item.move-invalid", "Invalid move request"); }
+}
+
+type LineItemMovePreview = { changes: boolean; beforeRate: string; afterRate: string; beforeTotal: string; afterTotal: string };
+
+export async function previewLineItemMoveAction(
+  _prev: ActionResult<LineItemMovePreview> | null,
+  formData: FormData,
+): Promise<ActionResult<LineItemMovePreview>> {
+  return runSafeAction(async () => {
+    const { grants } = await authorize();
+    const parsed = PreviewLineItemMoveSchema.safeParse({ ...moveFormValues(formData), target: parseMoveJson(formData.get("target")) });
+    if (!parsed.success) throw validationError(parsed.error);
+    const { itemId, lineItemIds, target } = parsed.data;
+    const preview = await bqService.previewLineItemMove({ grants, itemId, lineItemIds, target });
+    return { changes: preview.changes, beforeRate: preview.before.rate, afterRate: preview.after.rate, beforeTotal: preview.before.total, afterTotal: preview.after.total };
+  });
+}
+
+export async function moveLineItemsAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const parsed = MoveLineItemsSchema.safeParse({ ...moveFormValues(formData), target: parseMoveJson(formData.get("target")) });
+    if (!parsed.success) throw validationError(parsed.error);
+    const { projectId, ...value } = parsed.data;
+    await bqService.moveLineItems({ grants, actor, ...value });
+    return reload(projectId);
+  });
+}
+
+export async function groupLineItemsAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const parsed = GroupLineItemsSchema.safeParse({
+      ...moveFormValues(formData), name: formData.get("name"),
+      qtyPerL1: formData.get("qtyPerL1") || undefined, markupL2Pct: formData.get("markupL2Pct") || undefined,
+    });
+    if (!parsed.success) throw validationError(parsed.error);
+    const { projectId, ...value } = parsed.data;
+    await bqService.groupLineItems({ grants, actor, ...value });
+    return reload(projectId);
+  });
+}
+
 const ReorderItemsSchema = z.object({
   projectId: Id,
   sectionId: Id.optional(),
