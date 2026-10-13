@@ -5,7 +5,8 @@ Amended: owner, 2026-10-10 (D5 web console, D7 dropped, D10 updates; R8.501),
 and 2026-10-11 (D5 terminology: Platform Owner and Developer; R8.503; core-app
 bundle and Developer-controlled module permission ceiling; R8.504; isolated
 Developer web console delivered in R8.506; locked Platform Owner authority and
-task-based custom-role matrix in R8.507).
+task-based custom-role matrix in R8.507), and 2026-10-13 (owner keeps the Developer
+web console exactly as delivered in R8.506; no removal and no new hardening; R8.521).
 Scope: how StudioFlowRB becomes a platform of separately versioned, separately
 switchable modules, so a customer runs only what it has, and a new capability can
 be used on its own first and injected later.
@@ -157,7 +158,7 @@ in WO-DEVELOPER-02.
 | M2 | Discovery report: every coupling of Ideas and Presentation, the exact public functions StudioFlow must expose, the migration that moves their tables, cost | Executor report, Lead locks |
 | M3 | Ideas Board extracted to its own module and schema; Presentation next | Executor |
 | M4 | ~~Signed entitlement~~ dropped (D7, 2026-10-10) | — |
-| S1 | Developer web console: authenticator sign-in, modules On/Off (WO-DEVELOPER-01) | Executor backend, Lead UI |
+| S1 | Developer web console: authenticator sign-in, modules On/Off (WO-DEVELOPER-01) — done R8.506, kept as is (owner 2026-10-13) | Executor backend, Lead UI |
 | S2 | Updates from GitHub releases with backup and automatic roll-back (WO-DEVELOPER-02, D10) | Lead plans after the office-server facts |
 | M5 | Customer build profiles that leave out code, release tags, Windows service installer | Lead plans, later |
 

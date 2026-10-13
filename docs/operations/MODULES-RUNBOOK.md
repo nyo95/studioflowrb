@@ -1,9 +1,9 @@
 # Turning modules on and off from the server
 
 Use this runbook to switch an optional module (for example Ideas Board or
-Presentation) on or off directly on a StudioFlow server. This remains the
-maintenance path while the Developer web console is being built and is also a
-fallback when that console is unavailable.
+Presentation) on or off directly on a StudioFlow server. The usual way is the Developer web console
+(`/system`); this server command is the fallback when the console is
+unavailable (for example before the authenticator is enrolled).
 
 Switching a module off hides it from everyone and makes its permissions
 temporarily inactive. **Its data and Role grants are kept** and return exactly

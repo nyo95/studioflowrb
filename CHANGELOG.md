@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.521 | 2026-10-13 | docs(platform): owner keeps the Developer web console as delivered (Lead)
+
+- **Owner decision 2026-10-13:** after the R8.520 review flagged the R8.506 Developer web console (authenticator sign-in, recovery codes, lockout, `/system`) as more than the 2026-10-10 scope reset asked for, the owner chose to keep it exactly as delivered: no removal, no further hardening. Recorded in `MODULES-DECISION.md` (header and phase S1). The modules runbook now names the console as the usual path and the server command as the fallback.
+- **Migrations/dependencies:** none. **Checks:** documentation only.
+
 ## R8.520 | 2026-10-13 | fix(studioflow): a two-step phase continues by its own step names (Lead)
 
 - **Audit 2026-10-12 (P2), verified:** `isCdMall` treats any phase whose definition lists two or more iteration kinds as a two-step phase. That is the contract's rule (§5.2, "the first of two iteration kinds"), so the workflow itself is kept, but the screen and messages were hard-coded to the studio's names: a custom "Concept Study → Final Concept" phase showed "Continue to CD Final" and refused with "CD Mall must be revised or continued to CD Final".
