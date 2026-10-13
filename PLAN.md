@@ -1,98 +1,153 @@
 # Active Plan
 
-Plan ID: PROTO-SF-WORKSPACE-CANVAS (clickable prototype: a Notion-like Workspace that feels as free as Miro)
-Scope: a throwaway, self-contained prototype for the owner to try; no product code, no backend, no database
-Module(s): none (prototype only; the eventual product work belongs to studioflow core)
-Target revision: R8.527 (Codex, prototype commit). The Lead reviews it with the owner, then locks the product plan.
-Status: DELIVERED (R8.527, Lead fixes R8.528) — AWAITING OWNER VERDICT
+Plan ID: WO-SF-WORKSPACE-03 (Workspace canvas backend: frames and cards keep their place on the board)
+Scope: StudioFlow Workspace backend — geometry for sections (frames) and cards, one batch "place" command, reads, tests; minimal type pass-through only
+Module(s): studioflow (core; Workspace is not an optional module)
+Target revision: R8.531 (Executor). The Lead's canvas UI follows as its own revision.
+Status: READY
 Priority: P1
-Owner: owner 2026-10-13 — rejected the board-first columns and the four Lead layout sketches ("kurang oke, lebih mirip Notion tapi feels-nya fleksibel seperti Miro"); asked that Codex build the prototype. Recorded in R8.526.
-Last updated: 2026-10-13 (Lead, R8.526)
+Owner: owner 2026-10-13 — accepted the canvas prototype as built in R8.529 ("sudah oke"), including 10 px snapping and the stacked document on a phone. Recorded in R8.530.
+Last updated: 2026-10-13 (Lead, R8.530)
 
-## What the owner wants to feel
+## Why
 
-- **Notion:** a page you type into directly. Blocks: heading/topic, text,
-  bullet and checklist, image, a "client feedback" block. Type "/" to pick a
-  block type; Enter makes the next block; paste an image to drop it in.
-- **Miro:** the same blocks are not stuck in one column. They can be dragged
-  anywhere on a large surface, placed side by side, resized, grouped inside a
-  named **frame** (a topic such as "Client feedback", "Material", "Site"), and
-  the surface can be panned and zoomed. Nothing forces a rigid grid.
-- **Position:** the owner also found the R8.523 placement wrong. The prototype
-  must show where the Workspace lives on the project page, not just the
-  surface. Lead suggestion to test (the owner may reject it): the Workspace is
-  the main body of the project page, with the phase workflow reduced to a
-  compact bar above it (phase strip, current round, "Client answered" /
-  "Send to client"), and Requirements, Files and round history behind a
-  "Phase details" button with counts.
+The accepted direction is the R8.529 prototype (`prototypes/workspace-canvas/`):
+the project Workspace is a free canvas — sections are **frames** placed
+anywhere, cards are placed anywhere inside them, cards size their height to
+their content, everything snaps to an 8 px grid, the canvas pans with the
+middle mouse button. Today the database only knows an order (`sort_order`), so
+a card's place on the canvas would be lost on reload. This slice stores
+positions and sizes. It changes no meaning of sections or cards.
 
-## What must carry over from the locked product rules
+## Owner decisions carried into the product (2026-10-13)
 
-Show these in the prototype so the owner can judge them in context:
-- one Workspace per project; every block can carry a **phase label** and a
-  **round label** (e.g. "Design 3D · D2") shown as small chips;
-- writing while a phase is selected labels new blocks with that phase and its
-  current round;
-- "Client answered" with text drops a **Client feedback** block into the
-  default frame named **"Workspace"**, which can be renamed and moved but not
-  deleted;
-- **Starred** (star icon) and **Client feedback** are the block terms;
-- filters (All · General · a phase · Starred · Client feedback) **dim** the
-  non-matching blocks rather than moving them, so positions never jump;
-- a narrow screen (375 px) cannot be a free canvas: show what it becomes
-  (suggestion: the frames read top to bottom as a document).
+- Frames = the existing Workspace sections (R8.519); the default section
+  (R8.525, `system_key = DEFAULT`, "Workspace") is the default frame. Frame
+  delete rules stay: only an empty frame can be deleted, the default never.
+- A card always belongs to a frame (`section_id` stays required). In the UI,
+  dropping a card on empty canvas keeps it in its frame (Lead UI rule).
+- A card's **height is never stored**: it follows its content. Its width and
+  position are stored. Images stay part of a card (the existing card image
+  gallery); there is no separate image card.
+- Heading / bullet / checklist from the `/` menu are formatting inside the
+  card body (the existing rich-text dialect), not a stored card type. Client
+  feedback stays `origin = CLIENT_ANSWER`; Starred stays `is_pinned`.
+- Pan and zoom are a personal view, kept in the browser only; never stored.
+- On a phone, frames and cards read top to bottom in their stored order.
 
-## Deliverable
+## Locked decisions
 
-- One self-contained folder `prototypes/workspace-canvas/` with `index.html`
-  (plus local `.js`/`.css` if needed). Plain HTML, CSS and JavaScript; it opens
-  by double-clicking the file in a browser. No npm package, no CDN, no build
-  step, no import from `src/`. It is not linked from the app and not part of
-  the Next build (confirm `next build` and the boundary checks ignore it).
-- Sample content only, made up but realistic for an interior studio project
-  (no real client data copied from the database): five phases with Design 3D
-  active at D2, a few client-feedback blocks over D1 and D2, a Material frame
-  with an image placeholder and a checklist, a Site frame, one starred block,
-  one unlabelled ("General") block.
-- Interactions that must really work: type into blocks, "/" block menu, Enter
-  for a new block, drag blocks freely and into or out of frames, resize a
-  block and a frame, create and rename a frame (the "Workspace" frame refuses
-  delete), pan and zoom, star a block, set or clear a phase label, the filters
-  dimming, switch the selected phase in the workflow bar, "Client answered"
-  adding a feedback block to the Workspace frame, and the 375 px view. State
-  may live in memory or `localStorage`; nothing is sent anywhere.
-- A short `prototypes/workspace-canvas/README.md`: how to open it, what is
-  real and what is faked, and three open questions for the owner.
+### Schema (one forward-only migration, `studioflow` schema)
 
-## Non-goals
+- `SfWorkspaceSection` gains `canvas_x Int?`, `canvas_y Int?`,
+  `canvas_w Int?`, `canvas_h Int?` (columns of the same names).
+- `SfWorkspaceCard` gains `canvas_x Int?`, `canvas_y Int?`, `canvas_w Int?`.
+  No height column.
+- All nullable, no backfill. **Null means "not placed yet"**: the UI lays an
+  unplaced frame out to the right of the placed ones in `sort_order`, and
+  stacks unplaced cards under the frame's lowest card in `sort_order`, with
+  default widths (frame 384, card 256). This is how existing data, new cards
+  from Client answered or a site visit, and cards created without a position
+  appear, so the Phase Engine paths need no geometry.
+- Check constraints: every stored value is `0 ≤ value ≤ 100000`; when set,
+  `canvas_w ≥ 180` for cards and `canvas_w ≥ 260`, `canvas_h ≥ 120` for frames;
+  for each row, x and y are both null or both set.
 
-No change under `src/`, `prisma/`, routes or navigation; no migration; no new
-dependency in `package.json`; no product decision beyond what is listed; no
-push. The R8.523 Workspace screen and R8.525 backend stay as they are until the
-owner accepts a direction.
+### Service (`src/apps/studioflow/workspace/service.ts`)
+
+- New `placeWorkspaceItems(input: ProjectInput & { sections?: Array<{ id,
+  x, y, w, h }>, cards?: Array<{ id, x, y, w, sectionId? }> })` — one
+  transaction, up to 200 sections and 500 cards per call:
+  - Every id must belong to the project (`NOT_FOUND` otherwise); a card's
+    `sectionId`, when given, must be a section of the same project.
+  - Gates: each card follows its own write rule (phase-labelled → that phase's
+    `transition`; unlabelled → `document`), and section geometry needs
+    `document`; `phaseWork`; writable, ACTIVE project. One refused item
+    refuses the whole call.
+  - Geometry is **layout, last write wins**: no version is checked and
+    `version` is **not** incremented, so moving or resizing never makes
+    someone's text edit stale. A card whose `sectionId` changes is a
+    membership change: lock both sections, set `section_id`, and record
+    `studioflow.workspace-card.moved` (from/to section). Pure geometry writes
+    are **not** audited (too frequent, no meaning).
+  - After writing, recompute `sort_order` of every touched section's cards by
+    `(canvas_y nulls last, canvas_x, created_at, id)` and of the project's
+    sections by `(canvas_x nulls last, canvas_y, sort_order, id)` when any
+    section moved, so the phone order follows the canvas. Unplaced (null)
+    items keep their relative order after the placed ones.
+  - Returns nothing but `{ ok: true }`.
+- `createWorkspaceSection` and `createWorkspaceCard` accept optional
+  `x, y, w` (and `h` for a section); without them the row stays unplaced.
+- `moveWorkspaceCard` (to another section, by position) keeps working for the
+  menu path and clears the moved card's `canvas_x/canvas_y` so it lands
+  stacked in its new frame; `reorderWorkspaceCards` and
+  `reorderWorkspaceSections` keep working unchanged.
+- Reads: `readWorkspace` returns per section `canvas: { x, y, w, h } | null`
+  and per card `canvas: { x, y, w } | null`.
+
+### Wiring
+
+- `workspaceAction` gains `placeItems` (schema mirrors the service limits:
+  integers, ranges, array sizes) and the optional geometry on `createSection`
+  and `createCard`. Pass the new read fields through `workspace/page.tsx` if the
+  types require it; no other UI change — the Lead replaces the screen next.
+- Contract §6.1: frames and cards have optional stored geometry, layout is last
+  write wins and never bumps `version`, card height follows content, unplaced =
+  null with the stacking rule, phone order follows the canvas.
+
+## Tests (disposable database)
+
+- Migration: existing sections and cards read back with `canvas: null`,
+  nothing else changed (ids, order, versions, default section).
+- `placeItems`: frames and cards placed and read back; `version` unchanged
+  after a place; a stale text edit is **not** caused by a concurrent move
+  (edit with the version read before a move still succeeds); a card moved to
+  another frame changes `section_id`, writes the `moved` audit, and both
+  frames' `sort_order` follow `(y, x)`; sections reorder by x when moved;
+  unplaced items stay after placed ones in order.
+- Refusals: a card or section of another project; a `sectionId` of another
+  project; out-of-range or too-small widths; x without y; a drafter placing a
+  card labelled with a designer phase (whole call refused, nothing written); a
+  viewer; an archived or completed project; arrays over the limits.
+- Create with geometry stores it; create without leaves null; Client answered
+  and a site visit still create unplaced cards in the default frame.
+- `moveWorkspaceCard` clears the card's position.
+- The whole existing Phase Engine and Workspace suites stay green.
 
 ## Verification
 
-Open `index.html` in a browser at desktop width and at 375 px and walk every
-interaction listed above; `npm run build` and `npm run check:boundaries` still
-pass (proving the folder is outside the app); staged and unstaged whitespace.
+`npm test`, typecheck, eslint, `check:boundaries`, `check:legacy-runtime`,
+production build, `prisma migrate diff` (no new drift), the full migration chain
+on a fresh disposable rebuild database and incremental deploy on the standard
+disposable test database, staged and unstaged whitespace. Apply the migration
+to the kantor dev database (`studioflow_rebuild` on localhost:5433, verified)
+after the gates pass. Browser acceptance belongs to the Lead's canvas UI
+revision.
+
+## Non-goals
+
+No canvas UI, no route or navigation change, no storing of card height, pan or
+zoom, no card type column, no loose cards outside frames, no change to the
+default-section or delete-when-empty rules, no Phase Engine meaning change, no
+new permission, no new dependency, no push.
 
 ## Executor Prompt
 
-You are Codex on the same checkout (location: kantor), assigned by the owner to
-build a prototype. Read `AGENTS.md`, `PLAN.md` (PROTO-SF-WORKSPACE-CANVAS) and
-`CHANGELOG.md` R8.519–R8.526 for context. Build exactly the deliverable in the
-plan as one local revision commit R8.527 (confirm the next unused number in
-`CHANGELOG.md`): a self-contained clickable prototype in
-`prototypes/workspace-canvas/` that feels like Notion (type directly, "/"
-blocks, Enter, paste image) and moves like Miro (free drag, side-by-side,
-resize, frames as topics, pan and zoom), placed inside a mock project page with
-a compact phase workflow bar and a "Phase details" button, carrying the locked
-rules (phase and round chips, default "Workspace" frame that cannot be
-deleted, Starred, Client feedback, dimming filters, 375 px fallback). Plain
-HTML/CSS/JS, no dependency, no change under `src/` or `prisma/`, sample data
-only. Verify every interaction at desktop and 375 px, run `npm run build` and
-`npm run check:boundaries`, add the README with three open questions, update
-`CHANGELOG.md`, commit locally without pushing, and reply with only a
-Planner/Reviewer prompt: commit, how to open it, what works and what is faked,
-checks, dirty files, and a request for review.
+You are the Backend Executor on the same checkout (location: kantor). Read
+`AGENTS.md`, `docs/agent/EXECUTOR.md`, `PLAN.md` (WO-SF-WORKSPACE-03), the
+StudioFlow contract §6.1, `CHANGELOG.md` R8.519–R8.530, the accepted prototype
+in `prototypes/workspace-canvas/` (behaviour reference only), and
+`src/apps/studioflow/workspace/service.ts`. Implement exactly the locked canvas
+geometry backend as one local revision commit R8.531 (confirm it is the next
+unused number in `CHANGELOG.md`): the forward-only migration adding nullable
+`canvas_*` columns with their checks, `placeWorkspaceItems` (batch, last write
+wins, no version bump, membership change audited, sort order following the
+canvas), optional geometry on create, `moveWorkspaceCard` clearing position,
+geometry on reads, the `placeItems` action, the contract update, and every test
+in the plan. Do not build the canvas UI, change routes or navigation, or change
+the Phase Engine's meaning. Stop with BLOCKED / CONFLICT if a locked decision
+cannot be met as written. Database commands only against verified disposable
+rebuild-only databases, then the kantor dev database after the gates pass. Run
+every gate in Verification, update `CHANGELOG.md`, commit locally without
+pushing, and reply with only a Planner/Reviewer prompt: commit, checks with
+results, limitations, dirty files, and a request for verdict.

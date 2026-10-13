@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.530 | 2026-10-13 | docs(plan): canvas accepted, Workspace geometry work order (Lead)
+
+- **Owner decision 2026-10-13:** the R8.529 canvas prototype is accepted as the Workspace direction ("sudah oke"), including 10 px snapping and the stacked document on a phone.
+- Lead product rules recorded with it: frames are the existing sections (default frame = default section; delete only when empty, never the default); a card always belongs to a frame; card height follows content and is never stored; images stay part of a card; heading, bullet and checklist are body formatting, not a card type; Starred = pin, Client feedback = `CLIENT_ANSWER`; pan and zoom stay in the browser.
+- `PLAN.md` now holds READY `WO-SF-WORKSPACE-03` (Executor, target R8.531): nullable `canvas_*` geometry on sections and cards (null = not placed yet, stacked by order), a batch `placeItems` command that is last-write-wins without bumping `version`, audits only frame membership changes and keeps `sort_order` following the canvas for the phone, optional geometry on create, `moveWorkspaceCard` clearing position, geometry on reads, tests. The Lead's canvas UI follows as its own revision.
+- **Migrations/dependencies:** none. **Checks:** documentation only.
+
 ## R8.529 | 2026-10-13 | feat(prototype): Workspace canvas in the StudioFlow theme, middle-click pan, auto-height cards, snapping (Lead)
 
 - **Owner 2026-10-13:** the canvas direction is right ("kurang lebih seperti itu"); asked for the UI Engine look, panning with the middle mouse button, cards that size themselves to their content, and snapping so the canvas stays tidy.
