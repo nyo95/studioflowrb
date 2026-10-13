@@ -402,12 +402,17 @@ export async function phaseNoteAction(input: PhaseNoteCommandInput): Promise<Act
 // Minimal transport for the Workspace backend; every write that changes a card or section names the version it read.
 
 const Version = z.number().int().min(1);
+const CanvasCoordinate = z.number().int().min(0).max(100_000);
+const CardCanvasWidth = z.number().int().min(180).max(100_000);
+const SectionCanvasWidth = z.number().int().min(260).max(100_000);
+const SectionCanvasHeight = z.number().int().min(120).max(100_000);
 const WorkspaceCommand = z.discriminatedUnion("command", [
-  z.strictObject({ command: z.literal("createSection"), projectId: Id, title: z.string().max(200) }),
+  z.strictObject({ command: z.literal("createSection"), projectId: Id, title: z.string().max(200), x: CanvasCoordinate.optional(), y: CanvasCoordinate.optional(), w: SectionCanvasWidth.optional(), h: SectionCanvasHeight.optional() }),
   z.strictObject({ command: z.literal("renameSection"), projectId: Id, sectionId: Id, title: z.string().max(200), version: Version }),
   z.strictObject({ command: z.literal("deleteSection"), projectId: Id, sectionId: Id, version: Version }),
   z.strictObject({ command: z.literal("reorderSections"), projectId: Id, orderedIds: z.array(Id).min(1).max(200) }),
-  z.strictObject({ command: z.literal("createCard"), projectId: Id, sectionId: Id.optional(), phaseId: Id.nullable().optional(), body: NoteBody, clientAnswer: z.boolean().optional(), withImages: z.boolean().optional() }),
+  z.strictObject({ command: z.literal("createCard"), projectId: Id, sectionId: Id.optional(), phaseId: Id.nullable().optional(), body: NoteBody, clientAnswer: z.boolean().optional(), withImages: z.boolean().optional(), x: CanvasCoordinate.optional(), y: CanvasCoordinate.optional(), w: CardCanvasWidth.optional() }),
+  z.strictObject({ command: z.literal("placeItems"), projectId: Id, sections: z.array(z.strictObject({ id: Id, x: CanvasCoordinate, y: CanvasCoordinate, w: SectionCanvasWidth, h: SectionCanvasHeight })).max(200).optional(), cards: z.array(z.strictObject({ id: Id, x: CanvasCoordinate, y: CanvasCoordinate, w: CardCanvasWidth, sectionId: Id.optional() })).max(500).optional() }),
   z.strictObject({ command: z.literal("updateCard"), projectId: Id, cardId: Id, body: NoteBody, version: Version }),
   z.strictObject({ command: z.literal("pinCard"), projectId: Id, cardId: Id, pinned: z.boolean(), version: Version }),
   z.strictObject({ command: z.literal("setClientAnswer"), projectId: Id, cardId: Id, clientAnswer: z.boolean(), version: Version }),
@@ -427,11 +432,12 @@ export async function workspaceAction(input: WorkspaceCommandInput): Promise<Act
     const workspace = studioFlow.workspace;
     let result: unknown;
     switch (data.command) {
-      case "createSection": result = await workspace.createWorkspaceSection({ ...base, title: data.title }); break;
+      case "createSection": result = await workspace.createWorkspaceSection({ ...base, title: data.title, x: data.x, y: data.y, w: data.w, h: data.h }); break;
       case "renameSection": result = await workspace.renameWorkspaceSection({ ...base, sectionId: data.sectionId, title: data.title, version: data.version }); break;
       case "deleteSection": result = await workspace.deleteWorkspaceSection({ ...base, sectionId: data.sectionId, version: data.version }); break;
       case "reorderSections": result = await workspace.reorderWorkspaceSections({ ...base, orderedIds: data.orderedIds }); break;
-      case "createCard": result = await workspace.createWorkspaceCard({ ...base, sectionId: data.sectionId, phaseId: data.phaseId ?? null, body: data.body, clientAnswer: data.clientAnswer, withImages: data.withImages }); break;
+      case "createCard": result = await workspace.createWorkspaceCard({ ...base, sectionId: data.sectionId, phaseId: data.phaseId ?? null, body: data.body, clientAnswer: data.clientAnswer, withImages: data.withImages, x: data.x, y: data.y, w: data.w }); break;
+      case "placeItems": result = await workspace.placeWorkspaceItems({ ...base, sections: data.sections, cards: data.cards }); break;
       case "updateCard": result = await workspace.updateWorkspaceCardText({ ...base, cardId: data.cardId, body: data.body, version: data.version }); break;
       case "pinCard": result = await workspace.setWorkspaceCardFlags({ ...base, cardId: data.cardId, pinned: data.pinned, version: data.version }); break;
       case "setClientAnswer": result = await workspace.setWorkspaceCardFlags({ ...base, cardId: data.cardId, clientAnswer: data.clientAnswer, version: data.version }); break;

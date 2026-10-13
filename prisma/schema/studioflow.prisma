@@ -264,6 +264,11 @@ model SfWorkspaceSection {
   updated_at    DateTime @updatedAt
   /// Optimistic concurrency: every change increments it; a write naming an older version is refused.
   version       Int      @default(1)
+  /// Optional canvas geometry. Null position means this frame has not been placed yet.
+  canvas_x      Int?
+  canvas_y      Int?
+  canvas_w      Int?
+  canvas_h      Int?
 
   project SfProject         @relation(fields: [project_id], references: [id], onDelete: Cascade)
   cards   SfWorkspaceCard[]
@@ -297,6 +302,10 @@ model SfWorkspaceCard {
   updated_at   DateTime              @updatedAt
   /// Optimistic concurrency: every change increments it; a write naming an older version is refused.
   version      Int                   @default(1)
+  /// Optional canvas geometry. Height follows the card's content and is never stored.
+  canvas_x     Int?
+  canvas_y     Int?
+  canvas_w     Int?
 
   project   SfProject              @relation(fields: [project_id], references: [id], onDelete: Cascade)
   section   SfWorkspaceSection     @relation(fields: [section_id], references: [id], onDelete: Restrict)

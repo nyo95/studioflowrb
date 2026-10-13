@@ -39,6 +39,10 @@ export const WORKSPACE_SECTION_TITLE_MAX = 80;
 export const WORKSPACE_DEFAULT_SECTION_KEY = "DEFAULT";
 /** Initial display name only; the fixed system identity survives a later rename or reorder. */
 export const DEFAULT_WORKSPACE_SECTION = "Workspace";
+export const WORKSPACE_CANVAS_MAX = 100_000;
+export const WORKSPACE_CARD_MIN_WIDTH = 180;
+export const WORKSPACE_SECTION_MIN_WIDTH = 260;
+export const WORKSPACE_SECTION_MIN_HEIGHT = 120;
 
 export type NoteImageUpload = { body: Uint8Array; contentType: string };
 export type WorkspaceCardOrigin = "NOTE" | "CLIENT_ANSWER" | "SITE_VISIT";
@@ -100,7 +104,7 @@ async function nextCardOrder(tx: TxClient, sectionId: string) {
  * or what was seen on site lands in the project's Workspace in the same transaction. Without `iterationId`, the
  * phase's latest round labels it. Without `sectionId`, it goes to the project's fixed default section.
  */
-export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, input: { projectId: string; phaseId: string | null; iterationId?: string | null; sectionId?: string; body: string; origin: WorkspaceCardOrigin; pinned?: boolean; actor: AuditActor; at: Date }) {
+export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, input: { projectId: string; phaseId: string | null; iterationId?: string | null; sectionId?: string; body: string; origin: WorkspaceCardOrigin; pinned?: boolean; actor: AuditActor; at: Date; x?: number; y?: number; w?: number }) {
   const iterationId = input.iterationId !== undefined
     ? input.iterationId
     : input.phaseId ? (await tx.sfRevision.findFirst({ where: { phase_id: input.phaseId }, orderBy: { major: "desc" }, select: { id: true } }))?.id ?? null : null;
@@ -110,6 +114,7 @@ export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, 
     data: {
       id: randomUUID(), project_id: input.projectId, section_id: sectionId, sort_order: sortOrder, phase_id: input.phaseId, iteration_id: iterationId,
       body: input.body, origin: input.origin, is_pinned: input.pinned ?? false, author_id: input.actor.userId ?? null, author_name: input.actor.label, created_at: input.at,
+      canvas_x: input.x, canvas_y: input.y, canvas_w: input.w,
     },
     select: { id: true },
   });
@@ -117,6 +122,36 @@ export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, 
 
 type CardRow = { id: string; project_id: string; section_id: string; phase_id: string | null; iteration_id: string | null; body: string; is_pinned: boolean; origin: WorkspaceCardOrigin; version: number; _count: { images: number } };
 type ProjectInput = CommandContext & { projectId: string };
+type CardGeometry = { x: number; y: number; w: number };
+type SectionGeometry = CardGeometry & { h: number };
+
+function canvasInteger(value: number, minimum: number, label: string): number {
+  if (!Number.isInteger(value) || value < minimum || value > WORKSPACE_CANVAS_MAX) {
+    throw invalid("WORKSPACE_CANVAS_INVALID", `${label} must be a whole number from ${minimum} to ${WORKSPACE_CANVAS_MAX}.`);
+  }
+  return value;
+}
+
+function cardGeometry(input: Partial<CardGeometry>): CardGeometry | undefined {
+  if (input.x === undefined && input.y === undefined && input.w === undefined) return undefined;
+  if (input.x === undefined || input.y === undefined || input.w === undefined) throw invalid("WORKSPACE_CANVAS_INVALID", "Card position and width must be provided together.");
+  return {
+    x: canvasInteger(input.x, 0, "Card x"),
+    y: canvasInteger(input.y, 0, "Card y"),
+    w: canvasInteger(input.w, WORKSPACE_CARD_MIN_WIDTH, "Card width"),
+  };
+}
+
+function sectionGeometry(input: Partial<SectionGeometry>): SectionGeometry | undefined {
+  if (input.x === undefined && input.y === undefined && input.w === undefined && input.h === undefined) return undefined;
+  if (input.x === undefined || input.y === undefined || input.w === undefined || input.h === undefined) throw invalid("WORKSPACE_CANVAS_INVALID", "Frame position and size must be provided together.");
+  return {
+    x: canvasInteger(input.x, 0, "Frame x"),
+    y: canvasInteger(input.y, 0, "Frame y"),
+    w: canvasInteger(input.w, WORKSPACE_SECTION_MIN_WIDTH, "Frame width"),
+    h: canvasInteger(input.h, WORKSPACE_SECTION_MIN_HEIGHT, "Frame height"),
+  };
+}
 
 export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction } = ports;
@@ -200,13 +235,14 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   // ── Sections ──────────────────────────────────────────────────────────
 
   const sections = {
-    async createWorkspaceSection(input: ProjectInput & { title: string }) {
+    async createWorkspaceSection(input: ProjectInput & { title: string; x?: number; y?: number; w?: number; h?: number }) {
       const title = requiredText(input.title, "WORKSPACE_SECTION_TITLE_REQUIRED", "Section title", WORKSPACE_SECTION_TITLE_MAX);
+      const canvas = sectionGeometry(input);
       return runTransaction(async (tx) => {
         const { actorId } = await writableProject(tx, input);
         await lockProject(tx, input.projectId);
         const last = await tx.sfWorkspaceSection.aggregate({ where: { project_id: input.projectId }, _max: { sort_order: true } });
-        const section = await tx.sfWorkspaceSection.create({ data: { id: randomUUID(), project_id: input.projectId, title, sort_order: (last._max.sort_order ?? -1) + 1, created_by_id: actorId, created_at: nowOf(ports) } });
+        const section = await tx.sfWorkspaceSection.create({ data: { id: randomUUID(), project_id: input.projectId, title, sort_order: (last._max.sort_order ?? -1) + 1, created_by_id: actorId, created_at: nowOf(ports), canvas_x: canvas?.x, canvas_y: canvas?.y, canvas_w: canvas?.w, canvas_h: canvas?.h } });
         await audit(tx, input.actor, "workspace-section", "created", section.id, { projectId: input.projectId, isDefault: false });
         return { sectionId: section.id };
       });
@@ -254,15 +290,16 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
 
   // ── Cards ─────────────────────────────────────────────────────────────
 
-  async function createCard(input: ProjectInput & { sectionId?: string; phaseId?: string | null; body: string | null; origin?: "NOTE" | "CLIENT_ANSWER"; withImages?: boolean }) {
+  async function createCard(input: ProjectInput & { sectionId?: string; phaseId?: string | null; body: string | null; origin?: "NOTE" | "CLIENT_ANSWER"; withImages?: boolean; x?: number; y?: number; w?: number }) {
     const body = optionalText(input.body, PHASE_NOTE_MAX) ?? "";
     if (!body && !input.withImages) throw invalid("PHASE_NOTE_EMPTY", "Write something or add an image.");
+    const canvas = cardGeometry(input);
     return runTransaction(async (tx) => {
       const phaseId = input.phaseId ?? null;
       await validatePhaseLabel(tx, input.projectId, phaseId);
       await writableScope(tx, input, phaseId);
       if (input.sectionId) await loadSection(tx, input.projectId, input.sectionId);
-      const card = await insertWorkspaceCard(tx, ports, { projectId: input.projectId, phaseId, sectionId: input.sectionId, body, origin: input.origin ?? "NOTE", actor: input.actor, at: nowOf(ports) });
+      const card = await insertWorkspaceCard(tx, ports, { projectId: input.projectId, phaseId, sectionId: input.sectionId, body, origin: input.origin ?? "NOTE", actor: input.actor, at: nowOf(ports), ...canvas });
       await audit(tx, input.actor, "workspace-card", "created", card.id, { projectId: input.projectId, phaseId });
       return { cardId: card.id };
     });
@@ -367,7 +404,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   }
 
   const cards = {
-    createWorkspaceCard: (input: ProjectInput & { sectionId?: string; phaseId?: string | null; body: string | null; clientAnswer?: boolean; withImages?: boolean }) =>
+    createWorkspaceCard: (input: ProjectInput & { sectionId?: string; phaseId?: string | null; body: string | null; clientAnswer?: boolean; withImages?: boolean; x?: number; y?: number; w?: number }) =>
       createCard({ ...input, origin: input.clientAnswer ? "CLIENT_ANSWER" : "NOTE" }),
     updateWorkspaceCardText: (input: ProjectInput & { cardId: string; body: string | null; version: number }) => updateCardText(input),
     setWorkspaceCardFlags: (input: ProjectInput & { cardId: string; pinned?: boolean; clientAnswer?: boolean; version: number }) => setCardFlags(input),
@@ -403,7 +440,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         const targetIds = (await tx.sfWorkspaceCard.findMany({ where: { section_id: target.id, NOT: { id: card.id } }, orderBy: [{ sort_order: "asc" }, { id: "asc" }], select: { id: true } })).map((row) => row.id);
         targetIds.splice(Math.min(input.position, targetIds.length), 0, card.id);
         for (const [sortOrder, id] of targetIds.entries()) {
-          await tx.sfWorkspaceCard.update({ where: { id }, data: id === card.id ? { section_id: target.id, sort_order: sortOrder, version: { increment: 1 } } : { sort_order: sortOrder } });
+          await tx.sfWorkspaceCard.update({ where: { id }, data: id === card.id ? { section_id: target.id, sort_order: sortOrder, canvas_x: null, canvas_y: null, version: { increment: 1 } } : { sort_order: sortOrder } });
         }
         if (card.section_id !== target.id) {
           const sourceIds = (await tx.sfWorkspaceCard.findMany({ where: { section_id: card.section_id }, orderBy: [{ sort_order: "asc" }, { id: "asc" }], select: { id: true } })).map((row) => row.id);
@@ -426,13 +463,99 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         return { sectionId: section.id };
       });
     },
+
+    /** Persists one canvas gesture batch. Geometry is last-write-wins and deliberately never changes content versions. */
+    async placeWorkspaceItems(input: ProjectInput & { sections?: Array<{ id: string } & SectionGeometry>; cards?: Array<{ id: string; sectionId?: string } & CardGeometry> }) {
+      const sectionInputs = input.sections ?? [];
+      const cardInputs = input.cards ?? [];
+      if (sectionInputs.length > 200 || cardInputs.length > 500) throw invalid("WORKSPACE_CANVAS_LIMIT", "Place at most 200 frames and 500 cards at once.");
+      for (const item of sectionInputs) sectionGeometry(item);
+      for (const item of cardInputs) cardGeometry(item);
+      // Repeated ids are intentional for buffered pointer updates: the last value in the batch wins.
+      const sectionsById = new Map(sectionInputs.map((item) => [item.id, item]));
+      const cardsById = new Map(cardInputs.map((item) => [item.id, item]));
+
+      return runTransaction(async (tx) => {
+        requireCommand(input, P.phaseWork);
+        // Serialise canvas batches for one project before reading membership, so a concurrent cross-frame move audits
+        // the real source and reorders both the real source and destination while still remaining last-write-wins.
+        await lockProject(tx, input.projectId);
+        const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true, status: true } });
+        if (!project) throw notFound("project");
+        assertProjectWritable(project);
+        if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing its notes.");
+        if (sectionsById.size > 0) await writableProject(tx, input);
+
+        const sectionRows = await tx.sfWorkspaceSection.findMany({ where: { id: { in: [...sectionsById.keys()] }, project_id: input.projectId }, select: { id: true } });
+        if (sectionRows.length !== sectionsById.size) throw notFound("workspace section");
+        const cardRows = await tx.sfWorkspaceCard.findMany({
+          where: { id: { in: [...cardsById.keys()] }, project_id: input.projectId },
+          select: { id: true, section_id: true, phase_id: true },
+        });
+        if (cardRows.length !== cardsById.size) throw cardNotFound();
+        for (const card of cardRows) await writableScope(tx, input, card.phase_id);
+
+        const targetIds = [...new Set([...cardsById.values()].flatMap((item) => item.sectionId ? [item.sectionId] : []))];
+        const targets = await tx.sfWorkspaceSection.findMany({ where: { id: { in: targetIds }, project_id: input.projectId }, select: { id: true } });
+        if (targets.length !== targetIds.length) throw notFound("workspace section");
+
+        const touchedSectionIds = new Set(sectionRows.map((section) => section.id));
+        for (const card of cardRows) {
+          touchedSectionIds.add(card.section_id);
+          const targetId = cardsById.get(card.id)?.sectionId;
+          if (targetId) touchedSectionIds.add(targetId);
+        }
+        for (const sectionId of [...touchedSectionIds].sort()) await lockSection(tx, sectionId);
+
+        for (const item of sectionsById.values()) {
+          await tx.sfWorkspaceSection.update({ where: { id: item.id }, data: { canvas_x: item.x, canvas_y: item.y, canvas_w: item.w, canvas_h: item.h } });
+        }
+        for (const card of cardRows) {
+          const item = cardsById.get(card.id)!;
+          const targetId = item.sectionId ?? card.section_id;
+          await tx.sfWorkspaceCard.update({ where: { id: card.id }, data: { section_id: targetId, canvas_x: item.x, canvas_y: item.y, canvas_w: item.w } });
+          if (targetId !== card.section_id) {
+            await audit(tx, input.actor, "workspace-card", "moved", card.id, { projectId: input.projectId, fromSectionId: card.section_id, toSectionId: targetId });
+          }
+        }
+
+        for (const sectionId of touchedSectionIds) {
+          const rows = await tx.sfWorkspaceCard.findMany({
+            where: { section_id: sectionId },
+            orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+            select: { id: true, canvas_x: true, canvas_y: true, created_at: true, sort_order: true },
+          });
+          rows.sort((a, b) => {
+            const aPlaced = a.canvas_x !== null && a.canvas_y !== null;
+            const bPlaced = b.canvas_x !== null && b.canvas_y !== null;
+            if (aPlaced !== bPlaced) return aPlaced ? -1 : 1;
+            if (!aPlaced || !bPlaced) return a.sort_order - b.sort_order || a.id.localeCompare(b.id);
+            return a.canvas_y! - b.canvas_y! || a.canvas_x! - b.canvas_x! || a.created_at.getTime() - b.created_at.getTime() || a.id.localeCompare(b.id);
+          });
+          for (const [sortOrder, row] of rows.entries()) await tx.sfWorkspaceCard.update({ where: { id: row.id }, data: { sort_order: sortOrder } });
+        }
+
+        if (sectionsById.size > 0) {
+          const rows = await tx.sfWorkspaceSection.findMany({ where: { project_id: input.projectId }, orderBy: [{ sort_order: "asc" }, { id: "asc" }], select: { id: true, canvas_x: true, canvas_y: true, sort_order: true } });
+          rows.sort((a, b) => {
+            const aPlaced = a.canvas_x !== null;
+            const bPlaced = b.canvas_x !== null;
+            if (aPlaced !== bPlaced) return aPlaced ? -1 : 1;
+            if (!aPlaced || !bPlaced) return a.sort_order - b.sort_order || a.id.localeCompare(b.id);
+            return a.canvas_x! - b.canvas_x! || a.canvas_y! - b.canvas_y! || a.sort_order - b.sort_order || a.id.localeCompare(b.id);
+          });
+          for (const [sortOrder, row] of rows.entries()) await tx.sfWorkspaceSection.update({ where: { id: row.id }, data: { sort_order: sortOrder } });
+        }
+        return { ok: true as const };
+      });
+    },
   };
 
   // ── Reads ─────────────────────────────────────────────────────────────
 
   type CardReadRow = {
     id: string; body: string; is_pinned: boolean; origin: WorkspaceCardOrigin; author_id: string | null; author_name: string | null; created_at: Date; edited_at: Date | null; version: number;
-    section_id: string; sort_order: number; phase_id: string | null; iteration_id: string | null;
+    section_id: string; sort_order: number; phase_id: string | null; iteration_id: string | null; canvas_x: number | null; canvas_y: number | null; canvas_w: number | null;
     images: ImageRow[];
     iteration: { id: string; major: number; name: string } | null;
     phase: { id: string; name_snapshot: string; prefix_snapshot: string; definition: { default_iteration_kinds: unknown } } | null;
@@ -466,6 +589,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       phaseName: row.phase?.name_snapshot ?? null,
       iterationId: row.iteration_id,
       iterationLabel: roundLabel(row),
+      canvas: row.canvas_x === null || row.canvas_y === null || row.canvas_w === null ? null : { x: row.canvas_x, y: row.canvas_y, w: row.canvas_w },
       images: await signImages(row.images),
     };
   }
@@ -487,6 +611,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       const views = await Promise.all(cardRows.map((row) => cardView(row as CardReadRow)));
       return sectionRows.map((section) => ({
         id: section.id, title: section.title, sortOrder: section.sort_order, version: section.version, isDefault: section.system_key === WORKSPACE_DEFAULT_SECTION_KEY,
+        canvas: section.canvas_x === null || section.canvas_y === null || section.canvas_w === null || section.canvas_h === null ? null : { x: section.canvas_x, y: section.canvas_y, w: section.canvas_w, h: section.canvas_h },
         cards: views.filter((card) => card.sectionId === section.id),
       }));
     },

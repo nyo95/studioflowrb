@@ -3664,8 +3664,8 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
 describe("WO-SF-WORKSPACE-01 project Workspace", () => {
   afterEach(() => storage.objects.clear());
 
-  async function setup() {
-    const { projectId } = await newProject();
+  async function setup(name = "Heloskin Cimanggu") {
+    const { projectId } = await newProject(name);
     const moodboard = await phaseOf(projectId, "moodboard");
     const cd = await phaseOf(projectId, "cd");
     return { projectId, moodboard, cd, base: { ...as(designer), projectId } };
@@ -3822,7 +3822,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     await sf.phases.sendIteration({ ...phaseBase, iterationId: iteration.id });
     const answered = await sf.phases.recordClientAnswer({ ...phaseBase, iterationId: iteration.id, note: "Warmer, please" });
     const card = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: answered.noteId! } });
-    assert.deepEqual([card.section_id, card.phase_id, card.iteration_id, card.origin], [defaultSection.id, moodboard.id, iteration.id, "CLIENT_ANSWER"], "the project's default section takes it even when another section is first");
+    assert.deepEqual([card.section_id, card.phase_id, card.iteration_id, card.origin, card.canvas_x, card.canvas_y, card.canvas_w], [defaultSection.id, moodboard.id, iteration.id, "CLIENT_ANSWER", null, null, null], "the project's default section takes an unplaced card even when another section is first");
 
     const failingAudit = createStudioFlowService(testDb.prisma, {
       runTransaction: (work) => testDb.prisma.$transaction((tx) => work(tx)), auditWriter: { write: async () => { throw new Error("audit down"); } },
@@ -3835,6 +3835,83 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     assert.equal(await testDb.prisma.sfWorkspaceCard.count(), before, "a failed visit leaves no card behind");
     const visit = await sf.phases.createSupervisionVisit({ ...base, phaseId: supervision.id, visitDate: "2026-09-20", note: "Ceiling checked" });
     const visitCard = await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { iteration_id: visit.iterationId } });
-    assert.deepEqual([visitCard.section_id, visitCard.phase_id, visitCard.origin, visitCard.body], [defaultSection.id, supervision.id, "SITE_VISIT", "Ceiling checked"]);
+    assert.deepEqual([visitCard.section_id, visitCard.phase_id, visitCard.origin, visitCard.body, visitCard.canvas_x, visitCard.canvas_y, visitCard.canvas_w], [defaultSection.id, supervision.id, "SITE_VISIT", "Ceiling checked", null, null, null]);
+  });
+
+  it("stores optional geometry, places a last-write-wins batch without bumping versions, and orders the phone document by canvas", async () => {
+    const { projectId, base } = await setup();
+    const unplaced = await sf.workspace.createWorkspaceCard({ ...base, body: "Unplaced first" });
+    const defaultFrame = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
+    const materials = await sf.workspace.createWorkspaceSection({ ...base, title: "Materials", x: 640, y: 40, w: 400, h: 240 });
+    const placed = await sf.workspace.createWorkspaceCard({ ...base, sectionId: defaultFrame.id, body: "Placed", x: 80, y: 240, w: 256 });
+    const moving = await sf.workspace.createWorkspaceCard({ ...base, sectionId: defaultFrame.id, body: "Move me", x: 240, y: 80, w: 256 });
+    const beforeVersion = (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: moving.cardId } })).version;
+    const auditsBefore = await testDb.prisma.auditEvent.count({ where: { action: "studioflow.workspace-card.moved" } });
+
+    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((section) => section.id === materials.sectionId)?.canvas, { x: 640, y: 40, w: 400, h: 240 });
+    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((section) => section.id === defaultFrame.id)?.canvas, null);
+    await sf.workspace.placeWorkspaceItems({
+      ...base,
+      sections: [
+        { id: defaultFrame.id, x: 500, y: 40, w: 384, h: 300 },
+        { id: materials.sectionId, x: 20, y: 40, w: 400, h: 300 },
+      ],
+      cards: [
+        { id: moving.cardId, x: 300, y: 300, w: 256 },
+        { id: moving.cardId, x: 40, y: 40, w: 288, sectionId: materials.sectionId },
+        { id: placed.cardId, x: 80, y: 120, w: 256 },
+      ],
+    });
+
+    const workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    assert.deepEqual(workspace.map((section) => section.id), [materials.sectionId, defaultFrame.id], "frames follow canvas x");
+    assert.deepEqual(workspace[0]!.cards.map((card) => [card.id, card.sortOrder, card.canvas]), [[moving.cardId, 0, { x: 40, y: 40, w: 288 }]]);
+    assert.deepEqual(workspace[1]!.cards.map((card) => [card.id, card.sortOrder]), [[placed.cardId, 0], [unplaced.cardId, 1]], "placed cards lead and unplaced cards retain their order after them");
+    assert.equal(workspace[0]!.cards[0]!.version, beforeVersion, "layout never bumps the card version");
+    assert.equal((await testDb.prisma.sfWorkspaceSection.findUniqueOrThrow({ where: { id: defaultFrame.id } })).version, defaultFrame.version, "layout never bumps the frame version");
+    const saved = await sf.workspace.updateWorkspaceCardText({ ...base, cardId: moving.cardId, body: "Edited after move", version: beforeVersion });
+    assert.equal(saved.version, beforeVersion + 1, "a version read before the move is still valid for text");
+    const movedAudits = await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.workspace-card.moved", entity_id: moving.cardId } });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.workspace-card.moved" } }), auditsBefore + 1);
+    assert.ok(movedAudits.some((event) => {
+      const metadata = event.metadata as { fromSectionId?: string; toSectionId?: string };
+      return metadata.fromSectionId === defaultFrame.id && metadata.toSectionId === materials.sectionId;
+    }));
+
+    await sf.workspace.moveWorkspaceCard({ ...base, cardId: placed.cardId, sectionId: materials.sectionId, position: 0, version: workspace[1]!.cards[0]!.version });
+    const movedByMenu = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: placed.cardId } });
+    assert.deepEqual([movedByMenu.canvas_x, movedByMenu.canvas_y, movedByMenu.canvas_w], [null, null, 256], "the menu move clears position but keeps width");
+  });
+
+  it("refuses invalid, foreign, unauthorized, oversized, archived, and completed canvas batches atomically", async () => {
+    const { projectId, moodboard, base } = await setup();
+    const defaultCard = await sf.workspace.createWorkspaceCard({ ...base, body: "General" });
+    const labelled = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Designer phase" });
+    const defaultFrame = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
+    const other = await setup("Other canvas project");
+    const foreignCard = await sf.workspace.createWorkspaceCard({ ...other.base, body: "Foreign" });
+    const foreignFrame = (await sf.workspace.readWorkspace({ grants: ALL, projectId: other.projectId }))[0]!;
+
+    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: foreignCard.cardId, x: 0, y: 0, w: 180 }] }), "PHASE_NOTE_NOT_FOUND");
+    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, sections: [{ id: foreignFrame.id, x: 0, y: 0, w: 260, h: 120 }] }), "WORKSPACE_SECTION_NOT_FOUND");
+    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: defaultCard.cardId, x: 0, y: 0, w: 180, sectionId: foreignFrame.id }] }), "WORKSPACE_SECTION_NOT_FOUND");
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, body: "Partial", x: 1 }), "WORKSPACE_CANVAS_INVALID");
+    await rejectsWith(sf.workspace.createWorkspaceSection({ ...base, title: "Too small", x: 0, y: 0, w: 259, h: 120 }), "WORKSPACE_CANVAS_INVALID");
+    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: defaultCard.cardId, x: 100_001, y: 0, w: 180 }] }), "WORKSPACE_CANVAS_INVALID");
+
+    const before = await testDb.prisma.sfWorkspaceCard.findMany({ where: { id: { in: [defaultCard.cardId, labelled.cardId] } }, orderBy: { id: "asc" } });
+    await rejectsWith(sf.workspace.placeWorkspaceItems({
+      ...as(drafter, DRAFTER_GRANTS), projectId,
+      cards: [{ id: defaultCard.cardId, x: 10, y: 10, w: 180 }, { id: labelled.cardId, x: 20, y: 20, w: 180 }],
+    }), "PERMISSION_DENIED");
+    assert.deepEqual(await testDb.prisma.sfWorkspaceCard.findMany({ where: { id: { in: [defaultCard.cardId, labelled.cardId] } }, orderBy: { id: "asc" } }), before, "one refused item rolls the whole batch back");
+    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...as(designer, [P.access, P.projectRead]), projectId, cards: [{ id: defaultCard.cardId, x: 0, y: 0, w: 180 }] }), "PERMISSION_DENIED");
+    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: Array.from({ length: 501 }, () => ({ id: defaultCard.cardId, x: 0, y: 0, w: 180 })) }), "WORKSPACE_CANVAS_LIMIT");
+    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, sections: Array.from({ length: 201 }, () => ({ id: defaultFrame.id, x: 0, y: 0, w: 260, h: 120 })) }), "WORKSPACE_CANVAS_LIMIT");
+
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: clock } });
+    await assert.rejects(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: defaultCard.cardId, x: 0, y: 0, w: 180 }] }));
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: null, status: "COMPLETED" } });
+    await assert.rejects(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: defaultCard.cardId, x: 0, y: 0, w: 180 }] }));
   });
 });

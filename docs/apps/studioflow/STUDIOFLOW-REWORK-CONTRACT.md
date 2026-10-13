@@ -310,6 +310,16 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   menu equivalent for each drag, a phase filter and a pinned filter (both turn
   reordering off), inline section rename, and card edit that shows both texts
   when someone else saved first.
+- **Canvas geometry** (WO-SF-WORKSPACE-03, owner 2026-10-13): sections are
+  frames with optional stored x/y/width/height; cards have optional stored
+  x/y/width and always size their height from their content. Null geometry
+  means not placed yet: frames lay out after placed frames in stored order and
+  cards stack below the frame's placed cards in stored order, using default
+  widths of 384 and 256 respectively. Canvas placement is last-write-wins,
+  never increments a card or section `version`, and pure geometry is not
+  audited; moving a card between frames remains an audited membership change.
+  Stored order follows canvas position for the phone's top-to-bottom document.
+  Pan and zoom remain personal browser state and are never persisted.
 - **Requirements** (§6.2): the standard checklist.
 
 `sf_activity` (legacy feedback rows) is closed history: no command writes it.
