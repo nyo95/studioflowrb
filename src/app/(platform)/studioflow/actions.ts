@@ -403,7 +403,8 @@ export async function phaseNoteAction(input: PhaseNoteCommandInput): Promise<Act
 
 const Version = z.number().int().min(1);
 const CanvasCoordinate = z.number().int().min(0).max(100_000);
-const CardCanvasWidth = z.number().int().min(180).max(100_000);
+const CardCanvasWidth = z.number().int().min(120).max(100_000);
+const TextStyle = z.enum(["PLAIN", "HEADING", "STICKY"]);
 const SectionCanvasWidth = z.number().int().min(260).max(100_000);
 const SectionCanvasHeight = z.number().int().min(120).max(100_000);
 const WorkspaceCommand = z.discriminatedUnion("command", [
@@ -411,9 +412,10 @@ const WorkspaceCommand = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("renameSection"), projectId: Id, sectionId: Id, title: z.string().max(200), version: Version }),
   z.strictObject({ command: z.literal("deleteSection"), projectId: Id, sectionId: Id, version: Version }),
   z.strictObject({ command: z.literal("reorderSections"), projectId: Id, orderedIds: z.array(Id).min(1).max(200) }),
-  z.strictObject({ command: z.literal("createCard"), projectId: Id, sectionId: Id.optional(), phaseId: Id.nullable().optional(), body: NoteBody, clientAnswer: z.boolean().optional(), withImages: z.boolean().optional(), x: CanvasCoordinate.optional(), y: CanvasCoordinate.optional(), w: CardCanvasWidth.optional() }),
+  z.strictObject({ command: z.literal("createCard"), projectId: Id, sectionId: Id.optional(), phaseId: Id.nullable().optional(), body: NoteBody, clientAnswer: z.boolean().optional(), withImages: z.boolean().optional(), textStyle: TextStyle.optional(), x: CanvasCoordinate.optional(), y: CanvasCoordinate.optional(), w: CardCanvasWidth.optional() }),
   z.strictObject({ command: z.literal("placeItems"), projectId: Id, sections: z.array(z.strictObject({ id: Id, x: CanvasCoordinate, y: CanvasCoordinate, w: SectionCanvasWidth, h: SectionCanvasHeight })).max(200).optional(), cards: z.array(z.strictObject({ id: Id, x: CanvasCoordinate, y: CanvasCoordinate, w: CardCanvasWidth, sectionId: Id.optional() })).max(500).optional() }),
   z.strictObject({ command: z.literal("updateCard"), projectId: Id, cardId: Id, body: NoteBody, version: Version }),
+  z.strictObject({ command: z.literal("setTextStyle"), projectId: Id, cardId: Id, textStyle: TextStyle, version: Version }),
   z.strictObject({ command: z.literal("pinCard"), projectId: Id, cardId: Id, pinned: z.boolean(), version: Version }),
   z.strictObject({ command: z.literal("setClientAnswer"), projectId: Id, cardId: Id, clientAnswer: z.boolean(), version: Version }),
   z.strictObject({ command: z.literal("setCardPhase"), projectId: Id, cardId: Id, phaseId: Id.nullable(), version: Version }),
@@ -436,9 +438,10 @@ export async function workspaceAction(input: WorkspaceCommandInput): Promise<Act
       case "renameSection": result = await workspace.renameWorkspaceSection({ ...base, sectionId: data.sectionId, title: data.title, version: data.version }); break;
       case "deleteSection": result = await workspace.deleteWorkspaceSection({ ...base, sectionId: data.sectionId, version: data.version }); break;
       case "reorderSections": result = await workspace.reorderWorkspaceSections({ ...base, orderedIds: data.orderedIds }); break;
-      case "createCard": result = await workspace.createWorkspaceCard({ ...base, sectionId: data.sectionId, phaseId: data.phaseId ?? null, body: data.body, clientAnswer: data.clientAnswer, withImages: data.withImages, x: data.x, y: data.y, w: data.w }); break;
+      case "createCard": result = await workspace.createWorkspaceCard({ ...base, sectionId: data.sectionId, phaseId: data.phaseId ?? null, body: data.body, clientAnswer: data.clientAnswer, withImages: data.withImages, textStyle: data.textStyle, x: data.x, y: data.y, w: data.w }); break;
       case "placeItems": result = await workspace.placeWorkspaceItems({ ...base, sections: data.sections, cards: data.cards }); break;
       case "updateCard": result = await workspace.updateWorkspaceCardText({ ...base, cardId: data.cardId, body: data.body, version: data.version }); break;
+      case "setTextStyle": result = await workspace.setWorkspaceTextStyle({ ...base, cardId: data.cardId, textStyle: data.textStyle, version: data.version }); break;
       case "pinCard": result = await workspace.setWorkspaceCardFlags({ ...base, cardId: data.cardId, pinned: data.pinned, version: data.version }); break;
       case "setClientAnswer": result = await workspace.setWorkspaceCardFlags({ ...base, cardId: data.cardId, clientAnswer: data.clientAnswer, version: data.version }); break;
       case "setCardPhase": result = await workspace.setWorkspaceCardPhase({ ...base, cardId: data.cardId, phaseId: data.phaseId, version: data.version }); break;
@@ -463,6 +466,45 @@ export async function addWorkspaceCardImageAction(formData: FormData): Promise<A
     const result = await studioFlow.workspace.addWorkspaceCardImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
     refresh(data.projectId);
     return { imageId: result.imageId };
+  });
+}
+
+const FormNumber = z.preprocess((value) => (value === null || value === "" ? undefined : Number(value)), z.number().int().optional());
+const NewElementForm = z.strictObject({
+  projectId: Id,
+  sectionId: z.preprocess((value) => value || undefined, Id.optional()),
+  phaseId: z.preprocess((value) => value || null, Id.nullable()),
+  clientAnswer: z.preprocess((value) => value === "true", z.boolean()),
+  x: FormNumber, y: FormNumber, w: FormNumber,
+});
+function newElementFields(formData: FormData) {
+  const field = (name: string) => formData.get(name);
+  return parse(NewElementForm, { projectId: field("projectId"), sectionId: field("sectionId"), phaseId: field("phaseId"), clientAnswer: field("clientAnswer"), x: field("x"), y: field("y"), w: field("w") });
+}
+
+/** One image element on the Workspace board (pasted or dropped), in one request. */
+export async function createWorkspaceImageAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = newElementFields(formData);
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new AppError("VALIDATION", "NOTE_IMAGE_REQUIRED", "Choose an image.");
+    const result = await studioFlow.workspace.createWorkspaceImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+/** One file element on the Workspace board (25 MB at most, within the Server Action body limit). */
+export async function createWorkspaceFileAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = newElementFields(formData);
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new AppError("VALIDATION", "WORKSPACE_FILE_REQUIRED", "Choose a file.");
+    const result = await studioFlow.workspace.createWorkspaceFile({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), name: file.name } });
+    refresh(data.projectId);
+    return result;
   });
 }
 

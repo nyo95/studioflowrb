@@ -76,6 +76,9 @@ export async function ProjectWorkspace({ projectId, selectedPhaseId, people, arc
           createdAt: card.createdAt,
           editedAt: card.editedAt,
           images: card.images,
+          kind: card.kind,
+          textStyle: card.textStyle,
+          file: card.file,
           canvas: card.canvas,
         })),
       }))}

@@ -322,6 +322,29 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   Pan and zoom remain personal browser state and are never persisted.
   A card's stored x/y are relative to its frame's top-left corner (so moving a
   frame is one stored change); frame x/y are canvas coordinates.
+- **One board of standalone elements** (WO-SF-WORKSPACE-04, owner
+  2026-10-13, R8.540): every card is an **element** of one kind — `TEXT`
+  (body in the rich-text dialect; style `PLAIN`, `HEADING` or `STICKY`;
+  headings, lists and checklists stay body formatting), `IMAGE` (exactly one
+  PNG/JPEG/WebP ≤ 3 MB) or `FILE` (exactly one PDF, DWG, DXF, SKP, XLSX, XLS,
+  DOCX, DOC, PPTX, ZIP, TXT or CSV ≤ 25 MB; the type comes from the name's
+  extension and must match the bytes where the format has a signature, never
+  from the client's claim). Image and file elements keep their object on the
+  row (`storage_key`, type, size, file name, uploader snapshot; a database
+  check by kind); `SfWorkspaceCardImage` is gone. Height is never stored:
+  text follows its content, an image its own proportions at the stored width;
+  the minimum width is 120. Reads give an image element as a one-image list
+  and a file element as a signed link plus its name (the UI downloads it with
+  the anchor `download` attribute; PDF opens inline). An image added to an
+  element (pasted while writing, sent with a note) lands beside it as its own
+  element with the same labels; an empty note becomes its first image. The
+  R8.540 migration folded every frame into the project's DEFAULT section at
+  the place it was drawn (frame titles became `HEADING` elements, the DEFAULT
+  frame sits at the origin) and turned each card image into an image element
+  with the image's id beside its card (an image-only card was replaced by its
+  first image). Archived-asset purge removes image and file elements with
+  their objects and keeps text. Section commands still exist until the Lead's
+  board UI removes frames.
 - **Where it lives** (Lead UI R8.532, owner board-first 2026-10-13): one
   canvas on the project Phases page, under the phase strip and the selected
   phase's workflow card. There is no separate Workspace tab or route and no

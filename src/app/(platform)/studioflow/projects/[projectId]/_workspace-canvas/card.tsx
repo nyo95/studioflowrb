@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as R
 
 import { Button, Checkbox, FormattedText, ImageGallery, InlineError, RichTextEditor, RowActionMenu, Select, Text, shrinkImageFile, toggleCheckItem, useFileIntake, type RowActionItem } from "@/platform/ui_engine";
 
-import { addWorkspaceCardImageAction, workspaceAction, type WorkspaceCommandInput } from "../../../actions";
+import { addWorkspaceCardImageAction, createWorkspaceFileAction, createWorkspaceImageAction, workspaceAction, type WorkspaceCommandInput } from "../../../actions";
 import { NOTE_MAX, NoteDraftFields, useNoteDraft, type NoteImage } from "../../../_components/phase-note-composer";
 import { NoteImageActions } from "../round-labels";
 
@@ -22,7 +22,11 @@ export type WorkspaceCardView = {
   authorName: string | null;
   createdAt: Date;
   editedAt: Date | null;
+  /** An image element carries its one image here; text and file elements have none. */
   images: readonly NoteImage[];
+  kind: "TEXT" | "IMAGE" | "FILE";
+  textStyle: "PLAIN" | "HEADING" | "STICKY";
+  file: { url: string | null; name: string; contentType: string; bytes: number } | null;
   canvas: { x: number; y: number; w: number } | null;
 };
 
@@ -34,8 +38,39 @@ export type CommandOutcome = { ok: true; data: unknown } | { ok: false; message:
 export type RunCommand = (input: WorkspaceCommandInput) => Promise<CommandOutcome>;
 
 const NOTE_IMAGE_BYTES = 3 * 1024 * 1024;
+const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+/** Files the board takes as file elements (server: domain/files.ts), besides images. */
+export const WORKSPACE_FILE_ACCEPT = ".pdf,.dwg,.dxf,.skp,.xlsx,.xls,.docx,.doc,.pptx,.zip,.txt,.csv";
 
-/** Uploads images onto one card, one request at a time so the order holds; returns what did not get through. */
+/**
+ * Drops each file on the board as its own element: images as image elements, other files as file elements. Later
+ * ones cascade a little below the first so none hides another. Returns what did not get through.
+ */
+export async function uploadBoardFiles(input: { projectId: string; sectionId?: string; phaseId: string | null; place?: { x: number; y: number; w: number }; files: readonly File[] }): Promise<{ problems: string[] }> {
+  const problems: string[] = [];
+  for (const [index, file] of input.files.entries()) {
+    try {
+      const isImage = IMAGE_TYPES.includes(file.type);
+      const form = new FormData();
+      form.set("projectId", input.projectId);
+      if (input.sectionId) form.set("sectionId", input.sectionId);
+      if (input.phaseId) form.set("phaseId", input.phaseId);
+      if (input.place) {
+        form.set("x", String(input.place.x + index * 24));
+        form.set("y", String(input.place.y + index * 24));
+        form.set("w", String(isImage ? input.place.w : Math.max(input.place.w, 256)));
+      }
+      form.set("file", isImage ? await shrinkImageFile(file, { maxBytes: NOTE_IMAGE_BYTES }) : file);
+      const result = isImage ? await createWorkspaceImageAction(form) : await createWorkspaceFileAction(form);
+      if (!result.ok) problems.push(result.error.safeMessage);
+    } catch {
+      problems.push(`${file.name || "A file"} could not be added.`);
+    }
+  }
+  return { problems };
+}
+
+/** Adds images that belong with one element (each lands beside it as its own element); returns what did not get through. */
 export async function uploadCardImages(projectId: string, cardId: string, files: readonly File[]): Promise<{ problems: string[]; failed: File[] }> {
   const problems: string[] = [];
   const failed: File[] = [];
@@ -53,6 +88,10 @@ export async function uploadCardImages(projectId: string, cardId: string, files:
     }
   }
   return { problems, failed };
+}
+
+function formatBytes(bytes: number): string {
+  return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 export async function runWorkspaceCommand(input: WorkspaceCommandInput): Promise<CommandOutcome> {
@@ -109,8 +148,9 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
 
   const adopt = (body: string, version: number) => { base.current = { body, version }; setBaseBody(body); };
 
+  const isText = card.kind === "TEXT";
   const startEdit = () => {
-    if (!canWrite || editing) return;
+    if (!canWrite || editing || !isText) return;
     setDraft(card.body); adopt(card.body, card.version); setProblems([]); setStatus("idle");
     // After a menu closes and hands focus back to its button, so the editor keeps the caret.
     window.setTimeout(() => setEditing(true), 0);
@@ -175,7 +215,7 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
   const feedback = card.origin === "CLIENT_ANSWER";
   const canLabel = canWrite && (labelChoices.allowNone || labelChoices.phases.length > 0);
   const menu: RowActionItem[] = canWrite ? [
-    { label: "Edit", onSelect: startEdit },
+    { label: "Edit", onSelect: startEdit, disabled: !isText },
     { label: feedback ? "Not client feedback" : "Mark as client feedback", onSelect: () => void command({ command: "setClientAnswer", projectId, cardId: card.id, clientAnswer: !feedback, version: card.version }) },
     ...(canLabel ? [{ label: card.phaseId ? "Change phase label" : "Add phase label", onSelect: () => setLabelOpen(true) }] : []),
     ...menuExtra,
@@ -238,10 +278,7 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
             </div>
           ) : null}
           <RichTextEditor bare slashMenu aria-label="Block text" placeholder="Write, or type / for headings, lists and checklists" maxLength={NOTE_MAX} value={draft} autoFocus onChange={onType} onBlur={() => void leave()} />
-          {card.images.length > 0 ? (
-            <ImageGallery images={card.images} size="fill" onRemove={(image) => void command({ command: "removeCardImage", projectId, imageId: image.id })} />
-          ) : null}
-          <Text size="sm" tone="tertiary" className="text-xs">{status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "Paste or drop an image to add it"}{busy ? " · adding image…" : ""}</Text>
+          <Text size="sm" tone="tertiary" className="text-xs">{status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "Paste or drop an image to place it beside this block"}{busy ? " · adding image…" : ""}</Text>
         </div>
       ) : (
         <div
@@ -250,7 +287,15 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
         >
           {card.body ? <FormattedText text={card.body} className="text-sm" onToggleCheck={canWrite ? toggleCheck : undefined} /> : null}
           {card.images.length > 0 ? <ImageGallery images={card.images} size="fill" className={card.body ? "mt-2" : undefined} viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} phaseId={card.phaseId} canUseIdeas={canUseIdeas} />} /> : null}
-          {!card.body && card.images.length === 0 ? <Text size="sm" tone="tertiary">Empty block</Text> : null}
+          {card.file ? (
+            card.file.url ? (
+              <a href={card.file.url} download={card.file.name} className="flex items-center gap-2 text-sm text-ink-primary underline-offset-2 hover:underline">
+                <span className="truncate">{card.file.name}</span>
+                <span className="shrink-0 text-xs text-ink-tertiary">{formatBytes(card.file.bytes)}</span>
+              </a>
+            ) : <Text size="sm" tone="tertiary">{card.file.name} (unavailable)</Text>
+          ) : null}
+          {!card.body && card.images.length === 0 && !card.file ? <Text size="sm" tone="tertiary">Empty block</Text> : null}
         </div>
       )}
 

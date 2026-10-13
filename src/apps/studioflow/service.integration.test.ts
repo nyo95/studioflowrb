@@ -86,7 +86,7 @@ async function reset() {
     "sf_schedule_option", "sf_schedule_entry", "sf_schedule_template_item", "sf_schedule_template_category", "sf_schedule_prefix",
     "sf_mom_image", "sf_mom_item", "sf_mom_document",
     "sf_checklist_item", "sf_checklist_template",
-    "sf_deliverable", "sf_workspace_card_image", "sf_workspace_card", "sf_workspace_section", "sf_asset_cleanup_failure",
+    "sf_deliverable", "sf_workspace_card", "sf_workspace_section", "sf_asset_cleanup_failure",
     "sf_activity", "sf_revision", "sf_phase",
     "sf_phase_definition", "sf_phase_template",
     "sf_external_schedule_placement", "sf_project", "sf_client", "sf_settings", "sf_holiday",
@@ -523,8 +523,9 @@ describe("WO-BE-02 archived asset retention", () => {
     for (const key of Object.values(keys)) await storage.put({ key, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
     await db.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, name: "Private file", storage_key: keys.deliverable } });
     const section = await db.sfWorkspaceSection.create({ data: { project_id: projectId, title: "Notes", sort_order: 0, created_by_id: designer.id } });
-    const note = await db.sfWorkspaceCard.create({ data: { project_id: projectId, section_id: section.id, sort_order: 0, phase_id: phase.id, iteration_id: (await openIteration(phase.id)).id } });
-    await db.sfWorkspaceCardImage.create({ data: { card_id: note.id, storage_key: keys.iteration, content_type: "image/png", bytes: 1, sort_order: 1, uploaded_by_id: designer.id, uploaded_by_name: "Designer" } });
+    const iterationId = (await openIteration(phase.id)).id;
+    await db.sfWorkspaceCard.create({ data: { project_id: projectId, section_id: section.id, sort_order: 0, phase_id: phase.id, iteration_id: iterationId, body: "Keep this note text" } });
+    await db.sfWorkspaceCard.create({ data: { project_id: projectId, section_id: section.id, sort_order: 1, phase_id: phase.id, iteration_id: iterationId, kind: "IMAGE", storage_key: keys.iteration, content_type: "image/png", bytes: 1, uploaded_by_id: designer.id, uploaded_by_name: "Designer" } });
     const { documentId } = await sf.mom.createDocument({ ...as(designer), projectId, topic: "Retain this text" });
     const item = await db.sfMomItem.findFirstOrThrow({ where: { document_id: documentId } });
     await db.sfMomImage.create({ data: { item_id: item.id, slot: 0, storage_key: keys.mom, content_type: "image/png", bytes: 1 } });
@@ -559,7 +560,8 @@ describe("WO-BE-02 archived asset retention", () => {
     }
     assert.ok(storage.objects.has("client-logo")); assert.ok(storage.objects.has("template-photo"));
     assert.equal(await db.sfDeliverable.count({ where: { project_id: expired.projectId } }), 0);
-    assert.equal(await db.sfWorkspaceCardImage.count({ where: { card: { project_id: expired.projectId } } }), 0);
+    assert.equal(await db.sfWorkspaceCard.count({ where: { project_id: expired.projectId, storage_key: { not: null } } }), 0);
+    assert.equal(await db.sfWorkspaceCard.count({ where: { project_id: expired.projectId, body: "Keep this note text" } }), 1);
     assert.equal(await db.sfMomImage.count({ where: { item: { document_id: expired.documentId } } }), 0);
     assert.equal((await db.sfScheduleOption.findFirstOrThrow({ where: { entry_id: expired.entryId } })).image_key, null);
     const revision = await db.sfMomRevision.findUniqueOrThrow({ where: { id: expired.revision.id } });
@@ -3239,7 +3241,8 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
     return { projectId, phase, iteration, base, noteId };
   }
   const jpeg = () => ({ body: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]), contentType: "image/jpeg" });
-  const imageKeys = async (noteId: string) => (await testDb.prisma.sfWorkspaceCardImage.findMany({ where: { card_id: noteId }, orderBy: { sort_order: "asc" } })).map((row) => row.storage_key);
+  /** The project's image elements, oldest first (WO-SF-WORKSPACE-04: each image is its own element). */
+  const imageElements = (projectId: string) => testDb.prisma.sfWorkspaceCard.findMany({ where: { project_id: projectId, kind: "IMAGE" }, orderBy: [{ created_at: "asc" }, { id: "asc" }] });
 
   it("posts, edits, stars and marks a message without any phase event, and audits each change", async () => {
     const { projectId, iteration, base } = await setup();
@@ -3257,69 +3260,72 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
     assert.deepEqual(actions, ["studioflow.workspace-card.created", "studioflow.workspace-card.edited", "studioflow.workspace-card.flags-changed"]);
   });
 
-  it("adds images in order under the project's private prefix and writes the audit", async () => {
-    const { projectId, base, noteId } = await setup();
+  it("turns an empty note into its first image and lays later images beside it as their own elements", async () => {
+    const { projectId, iteration, base, noteId } = await setup();
     const first = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
     const second = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: jpeg() });
-    const rows = await testDb.prisma.sfWorkspaceCardImage.findMany({ where: { card_id: noteId }, orderBy: { sort_order: "asc" } });
-    assert.deepEqual(rows.map((row) => [row.id, row.sort_order, row.content_type, row.uploaded_by_id, row.uploaded_by_name]), [
-      [first.imageId, 1, "image/png", designer.id, "Dina Designer"], [second.imageId, 2, "image/jpeg", designer.id, "Dina Designer"],
+    assert.equal(first.imageId, noteId, "the empty note became the image");
+    assert.notEqual(second.imageId, noteId);
+    // Both were written at the same test clock instant: put the converted note first.
+    const rows = (await imageElements(projectId)).sort((x, y) => Number(x.id !== noteId) - Number(y.id !== noteId));
+    assert.deepEqual(rows.map((row) => [row.id, row.kind, row.body, row.content_type, row.phase_id, row.iteration_id, row.uploaded_by_id, row.uploaded_by_name]), [
+      [noteId, "IMAGE", "", "image/png", base.phaseId, iteration.id, designer.id, "Dina Designer"],
+      [second.imageId, "IMAGE", "", "image/jpeg", base.phaseId, iteration.id, designer.id, "Dina Designer"],
     ]);
     for (const row of rows) {
-      assert.ok(row.storage_key.startsWith(`studioflow/notes/${projectId}/`));
-      assert.ok(storage.objects.has(row.storage_key));
+      assert.ok(row.storage_key!.startsWith(`studioflow/notes/${projectId}/`));
+      assert.ok(storage.objects.has(row.storage_key!));
     }
     assert.equal((await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.workspace-card.image-added" } })).length, 2);
   });
 
-  it("refuses a bad type, a fake image, an oversize file and a 13th image, leaving no stored object behind", async () => {
-    const { base, noteId } = await setup();
+  it("refuses a bad type, a fake image and an oversize file, leaving no stored object behind", async () => {
+    const { projectId, base, noteId } = await setup();
     await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: { body: new Uint8Array([0x25, 0x50, 0x44, 0x46, 1, 2, 3, 4, 5]), contentType: "application/pdf" } }), "NOTE_IMAGE_TYPE");
     await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: { body: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), contentType: "image/png" } }), "NOTE_IMAGE_TYPE");
     await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: { body: new Uint8Array(0), contentType: "image/png" } }), "NOTE_IMAGE_SIZE");
     const big = new Uint8Array(3 * 1024 * 1024 + 1); big.set(PNG);
     await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: { body: big, contentType: "image/png" } }), "NOTE_IMAGE_SIZE");
     assert.equal(storage.objects.size, 0);
-    for (let i = 0; i < 12; i++) await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
-    await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() }), "NOTE_IMAGE_LIMIT");
-    assert.equal(storage.objects.size, 12);
-    assert.equal(await testDb.prisma.sfWorkspaceCardImage.count({ where: { card_id: noteId } }), 12);
+    assert.equal((await imageElements(projectId)).length, 0);
   });
 
-  it("holds the limit under concurrent adds and discards the object of a failed write", async () => {
-    const { base, noteId } = await setup();
-    for (let i = 0; i < 10; i++) await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
-    const results = await Promise.allSettled(Array.from({ length: 4 }, () => sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() })));
-    assert.equal(results.filter((result) => result.status === "fulfilled").length, 2);
-    assert.equal(await testDb.prisma.sfWorkspaceCardImage.count({ where: { card_id: noteId } }), 12);
-    assert.equal(storage.objects.size, 12, "a refused add leaves no object behind");
+  it("turns an empty note into an image only once under concurrent adds", async () => {
+    const { projectId, base, noteId } = await setup();
+    const results = await Promise.all(Array.from({ length: 4 }, () => sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() })));
+    assert.equal(results.filter((result) => result.imageId === noteId).length, 1);
+    const rows = await imageElements(projectId);
+    assert.equal(rows.length, 4);
+    assert.equal(storage.objects.size, 4);
+    assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { project_id: projectId, kind: "TEXT" } }), 0, "no empty note is left behind");
   });
 
-  it("removes an image and releases its object, keeps one something else references, and drops a message left empty", async () => {
-    const { base, noteId } = await setup();
+  it("removes an image element and releases its object, keeping one something else references", async () => {
+    const { projectId, base, noteId } = await setup();
     const a = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
     const b = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
-    const [keyA, keyB] = await imageKeys(noteId);
-    assert.equal((await sf.phases.removePhaseNoteImage({ ...base, imageId: a.imageId })).noteRemoved, false);
+    const rows = await imageElements(projectId);
+    const keyA = rows.find((row) => row.id === a.imageId)!.storage_key;
+    const keyB = rows.find((row) => row.id === b.imageId)!.storage_key;
+    assert.equal((await sf.phases.removePhaseNoteImage({ ...base, imageId: a.imageId })).noteRemoved, true);
     assert.equal(storage.objects.has(keyA!), false);
+    assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { id: noteId } }), 0);
     // Another row points at the same object: it must survive the removal.
     const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: base.projectId, section: "MATERIAL", category: "Floor", category_key: "floor", prefix: "FL", increment: 1, sort_order: 0 } });
     await testDb.prisma.sfScheduleOption.create({ data: { entry_id: entry.id, label: "A", product_name: "Floor", search_key: "floor", image_key: keyB! } });
-    // The message had no text: removing its last image removes the message too.
-    assert.equal((await sf.phases.removePhaseNoteImage({ ...base, imageId: b.imageId })).noteRemoved, true);
+    await sf.phases.removePhaseNoteImage({ ...base, imageId: b.imageId });
     assert.ok(storage.objects.has(keyB!));
-    assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { id: noteId } }), 0);
     await rejectsWith(sf.phases.removePhaseNoteImage({ ...base, imageId: b.imageId }), "NOTE_IMAGE_NOT_FOUND");
   });
 
-  it("deletes a message with its images and releases their objects", async () => {
-    const { base, noteId } = await setup();
+  it("deletes an image element and releases its object; the image beside it stays", async () => {
+    const { projectId, base, noteId } = await setup();
     await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
     await sf.phases.addPhaseNoteImage({ ...base, noteId, file: jpeg() });
     assert.equal(storage.objects.size, 2);
     await sf.phases.deletePhaseNote({ ...base, noteId });
-    assert.equal(storage.objects.size, 0);
-    assert.equal(await testDb.prisma.sfWorkspaceCardImage.count({ where: { card_id: noteId } }), 0);
+    assert.equal(storage.objects.size, 1);
+    assert.equal((await imageElements(projectId)).length, 1);
     await rejectsWith(sf.phases.deletePhaseNote({ ...base, noteId }), "PHASE_NOTE_NOT_FOUND");
   });
 
@@ -3365,11 +3371,12 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
     await sf.phases.setPhaseNoteFlags({ ...base, noteId, starred: true });
     const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
     const shape = (images: ReadonlyArray<{ id: string; url: string | null; contentType: string; bytes: number }>) => images.map((image) => [image.id, image.contentType, image.bytes, image.url?.startsWith("https://storage.invalid/")]);
-    assert.deepEqual(shape(detail.notes[0]!.images), [[one.imageId, "image/png", PNG.byteLength, true], [two.imageId, "image/jpeg", 8, true]]);
+    const byType = (rows: unknown[][]) => rows.sort((x, y) => String(x[1]).localeCompare(String(y[1])));
+    assert.deepEqual(byType(detail.notes.flatMap((note) => shape(note.images))), [[two.imageId, "image/jpeg", 8, true], [one.imageId, "image/png", PNG.byteLength, true]]);
     const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((c) => c.id === projectId)!;
     assert.equal(card.phases.find((p) => p.id === phase.id)!.starred_notes, 1);
     const starred = await sf.phases.listStarredPhaseNotes({ grants: ALL, projectId });
-    assert.deepEqual(starred.find((item) => item.phaseId === phase.id)!.notes.map((note) => [note.id, note.imageCount]), [[noteId, 2]]);
+    assert.deepEqual(starred.find((item) => item.phaseId === phase.id)!.notes.map((note) => [note.id, note.imageCount]), [[noteId, 1]]);
     const leaked = JSON.stringify([detail, card, starred]);
     for (const key of storage.objects.keys()) assert.equal(leaked.includes(key), false, "a storage key leaked into a read");
     assert.equal(leaked.includes("storage_key"), false);
@@ -3537,7 +3544,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     const base = { ...as(designer), projectId, phaseId: phase.id };
     const { noteId } = await sf.phases.postPhaseNote({ ...base, body: null, withImages: true });
     await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
-    const image = await testDb.prisma.sfWorkspaceCardImage.findFirstOrThrow({ where: { card_id: noteId } });
+    const image = (await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { id: noteId, kind: "IMAGE" }, select: { id: true, storage_key: true } })) as { id: string; storage_key: string };
 
     const saved = await ideas.saveNoteImageToIdeas({ ...base, imageId: image.id });
     const card = await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: saved.cardId } });
@@ -3582,7 +3589,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     const base = { ...as(designer), projectId, phaseId: phase.id };
     const { noteId } = await sf.phases.postPhaseNote({ ...base, body: null, withImages: true });
     await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
-    const image = await testDb.prisma.sfWorkspaceCardImage.findFirstOrThrow({ where: { card_id: noteId } });
+    const image = (await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { id: noteId, kind: "IMAGE" }, select: { id: true, storage_key: true } })) as { id: string; storage_key: string };
     const second = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await ideas.readNoteImageSource({ ...base, imageId: image.id }) });
     assert.deepEqual([second.created, second.boardId], [false, board.id]);
     const slides = await testDb.prisma.sfPresentationSlide.findMany({ where: { board_id: board.id }, orderBy: { sort_order: "asc" } });
@@ -3913,5 +3920,93 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     await assert.rejects(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: defaultCard.cardId, x: 0, y: 0, w: 180 }] }));
     await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: null, status: "COMPLETED" } });
     await assert.rejects(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: defaultCard.cardId, x: 0, y: 0, w: 180 }] }));
+  });
+});
+
+describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
+  afterEach(() => storage.objects.clear());
+
+  const PDF = () => new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37, 1, 2, 3]);
+
+  async function setup(name = "Board project") {
+    const { projectId } = await newProject(name);
+    const moodboard = await phaseOf(projectId, "moodboard");
+    await openIteration(moodboard.id);
+    return { projectId, moodboard, base: { ...as(designer), projectId } };
+  }
+
+  it("creates an image element in one step, reads it as its own one image, and keeps text-only commands off it", async () => {
+    const { projectId, moodboard, base } = await setup();
+    const { cardId } = await sf.workspace.createWorkspaceImage({ ...base, phaseId: moodboard.id, clientAnswer: true, x: 40, y: 80, w: 120, file: png() });
+    const row = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
+    assert.deepEqual([row.kind, row.body, row.origin, row.phase_id, row.canvas_x, row.canvas_y, row.canvas_w, row.content_type, row.uploaded_by_name], ["IMAGE", "", "CLIENT_ANSWER", moodboard.id, 40, 80, 120, "image/png", "Dina Designer"]);
+    assert.ok(row.storage_key!.startsWith(`studioflow/notes/${projectId}/`) && storage.objects.has(row.storage_key!));
+    const view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards.find((card) => card.id === cardId)!;
+    assert.deepEqual([view.kind, view.file, view.images.map((image) => [image.id, image.contentType, image.url?.startsWith("https://storage.invalid/")])], ["IMAGE", null, [[cardId, "image/png", true]]]);
+    await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...base, cardId, body: "Caption", version: row.version }), "WORKSPACE_ELEMENT_NOT_TEXT");
+    await rejectsWith(sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "HEADING", version: row.version }), "WORKSPACE_ELEMENT_NOT_TEXT");
+    await rejectsWith(sf.workspace.createWorkspaceImage({ ...base, file: { body: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), contentType: "image/png" } }), "NOTE_IMAGE_TYPE");
+    await sf.workspace.deleteWorkspaceCard({ ...base, cardId, version: row.version });
+    assert.equal(storage.objects.size, 0, "deleting the element releases its object");
+  });
+
+  it("creates file elements from an allow-list checked against the bytes, and refuses everything else with nothing stored", async () => {
+    const { projectId, moodboard, base } = await setup();
+    const { cardId } = await sf.workspace.createWorkspaceFile({ ...base, x: 0, y: 0, w: 256, file: { body: PDF(), name: "DED Dapur R2.pdf" } });
+    const row = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
+    assert.deepEqual([row.kind, row.file_name, row.content_type, row.bytes, row.body], ["FILE", "DED Dapur R2.pdf", "application/pdf", PDF().byteLength, ""]);
+    assert.ok(row.storage_key!.startsWith(`studioflow/workspace-files/${projectId}/`) && row.storage_key!.endsWith(".pdf"));
+    const view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards.find((card) => card.id === cardId)!;
+    assert.deepEqual([view.kind, view.images, view.file?.name, view.file?.contentType, view.file?.url?.startsWith("https://storage.invalid/")], ["FILE", [], "DED Dapur R2.pdf", "application/pdf", true]);
+    assert.equal(JSON.stringify(view).includes(row.storage_key!), false, "the storage key never leaks into a read");
+
+    await sf.workspace.createWorkspaceFile({ ...base, file: { body: new TextEncoder().encode("a,b\n1,2\n"), name: "quantities.csv" } });
+    await sf.workspace.createWorkspaceFile({ ...base, file: { body: new Uint8Array([0x50, 0x4b, 0x03, 0x04, 9, 9]), name: "Schedule.XLSX" } });
+    const stored = storage.objects.size;
+    await rejectsWith(sf.workspace.createWorkspaceFile({ ...base, file: { body: PNG, name: "plan.pdf" } }), "WORKSPACE_FILE_TYPE");
+    await rejectsWith(sf.workspace.createWorkspaceFile({ ...base, file: { body: PDF(), name: "setup.exe" } }), "WORKSPACE_FILE_TYPE");
+    await rejectsWith(sf.workspace.createWorkspaceFile({ ...base, file: { body: PDF(), name: "no-extension" } }), "WORKSPACE_FILE_TYPE");
+    await rejectsWith(sf.workspace.createWorkspaceFile({ ...base, file: { body: new Uint8Array([0x61, 0, 0x62]), name: "notes.txt" } }), "WORKSPACE_FILE_TYPE");
+    await rejectsWith(sf.workspace.createWorkspaceFile({ ...base, file: { body: new Uint8Array(0), name: "empty.pdf" } }), "WORKSPACE_FILE_SIZE");
+    const big = new Uint8Array(25 * 1024 * 1024 + 1); big.set(PDF());
+    await rejectsWith(sf.workspace.createWorkspaceFile({ ...base, file: { body: big, name: "huge.pdf" } }), "WORKSPACE_FILE_SIZE");
+
+    const viewer = await seedUser("Vera Board Viewer", [P.access, P.projectRead]);
+    await rejectsWith(sf.workspace.createWorkspaceFile({ ...as(viewer, [P.access, P.projectRead]), projectId, file: { body: PDF(), name: "a.pdf" } }), "PERMISSION_DENIED");
+    // The drafter has no seat on the Moodboard phase, so cannot label a file with it.
+    await rejectsWith(sf.workspace.createWorkspaceFile({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: moodboard.id, file: { body: PDF(), name: "a.pdf" } }), "PERMISSION_DENIED");
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Paused" });
+    await rejectsWith(sf.workspace.createWorkspaceFile({ ...base, file: { body: PDF(), name: "a.pdf" } }), "PROJECT_ARCHIVED");
+    await rejectsWith(sf.workspace.createWorkspaceImage({ ...base, file: png() }), "PROJECT_ARCHIVED");
+    assert.equal(storage.objects.size, stored, "a refused upload stores nothing");
+  });
+
+  it("keeps a text element's style and lets it be as narrow as an image", async () => {
+    const { projectId, base } = await setup();
+    const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, body: "Dapur dan ruang makan", textStyle: "HEADING", x: 0, y: 0, w: 120 });
+    let view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards[0]!;
+    assert.deepEqual([view.kind, view.textStyle, view.canvas?.w], ["TEXT", "HEADING", 120]);
+    const changed = await sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "STICKY", version: view.version });
+    assert.equal(changed.version, view.version + 1);
+    view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards[0]!;
+    assert.equal(view.textStyle, "STICKY");
+    await rejectsWith(sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "HEADING", version: view.version - 1 }), "WORKSPACE_CARD_STALE");
+    await rejectsWith(sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "LOUD", version: view.version }), "WORKSPACE_TEXT_STYLE_INVALID");
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, body: "Too narrow", x: 0, y: 0, w: 119 }), "WORKSPACE_CANVAS_INVALID");
+  });
+
+  it("lays an image pasted into a placed text element beside it, with the text's labels", async () => {
+    const { projectId, moodboard, base } = await setup();
+    const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, clientAnswer: true, body: "Backsplash too busy", x: 100, y: 200, w: 300 });
+    const first = await sf.workspace.addWorkspaceCardImage({ ...base, cardId, file: png() });
+    const second = await sf.workspace.addWorkspaceCardImage({ ...base, cardId, file: png() });
+    const rows = await testDb.prisma.sfWorkspaceCard.findMany({ where: { id: { in: [first.imageId, second.imageId] } }, orderBy: { canvas_y: "asc" } });
+    assert.deepEqual(rows.map((row) => [row.id, row.kind, row.canvas_x, row.canvas_y, row.canvas_w, row.phase_id, row.origin]), [
+      [first.imageId, "IMAGE", 416, 200, 240, moodboard.id, "CLIENT_ANSWER"],
+      [second.imageId, "IMAGE", 416, 224, 240, moodboard.id, "CLIENT_ANSWER"],
+    ]);
+    const text = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
+    assert.deepEqual([text.kind, text.body], ["TEXT", "Backsplash too busy"], "the text stays text");
+    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards.length, 3);
   });
 });

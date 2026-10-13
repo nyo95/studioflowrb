@@ -33,7 +33,7 @@ it("sweep defaults off outside production, unrefs both timers, and catches run e
 });
 
 it("StudioFlow cleanup protects its five live key owners and deduplicates removal candidates", async () => {
-  const owners = ["sfDeliverable", "sfMomImage", "sfWorkspaceCardImage", "sfScheduleOption", "sfScheduleTemplateItem", "sfClient"];
+  const owners = ["sfDeliverable", "sfMomImage", "sfWorkspaceCard", "sfScheduleOption", "sfScheduleTemplateItem", "sfClient"];
   for (const owner of owners) {
     const db = Object.fromEntries(owners.map((name) => [name, { count: async () => name === owner ? 1 : 0 }])) as unknown as Db;
     const storage = new FakeObjectStorage();

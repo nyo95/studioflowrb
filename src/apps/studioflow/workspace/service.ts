@@ -4,7 +4,8 @@ import type { AuditActor } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { createPrivateObjectKey } from "@platform/core/storage";
 
-import { NOTE_IMAGE_BYTES, NOTE_IMAGE_LIMIT, STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
+import { WORKSPACE_FILE_BYTES, WORKSPACE_FILE_NAME_MAX, WORKSPACE_FILE_TYPES, fileExtension, sniffWorkspaceFile } from "../domain/files";
+import { NOTE_IMAGE_BYTES, STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import { iterationKinds } from "../domain/iteration-kinds";
 import { iterationShortName } from "../domain/phase";
 import {
@@ -29,8 +30,9 @@ import {
 import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
 
 /**
- * Project Workspace (WO-SF-WORKSPACE-01, owner 2026-10-12): one Workspace per project, ordered sections holding ordered
- * cards. A card's phase and round are labels — where it came from — never where it lives. Former phase notes are cards.
+ * Project Workspace (WO-SF-WORKSPACE-01, owner 2026-10-12): one Workspace per project. Since WO-SF-WORKSPACE-04 it is
+ * one board of standalone elements — text, one image, or one file each — held by the project's DEFAULT section. An
+ * element's phase and round are labels — where it came from — never where it lives. Former phase notes are elements.
  */
 
 /** One card's text; the old per-iteration notes had the same limit. */
@@ -40,19 +42,24 @@ export const WORKSPACE_DEFAULT_SECTION_KEY = "DEFAULT";
 /** Initial display name only; the fixed system identity survives a later rename or reorder. */
 export const DEFAULT_WORKSPACE_SECTION = "Workspace";
 export const WORKSPACE_CANVAS_MAX = 100_000;
-export const WORKSPACE_CARD_MIN_WIDTH = 180;
+export const WORKSPACE_CARD_MIN_WIDTH = 120;
 export const WORKSPACE_SECTION_MIN_WIDTH = 260;
 export const WORKSPACE_SECTION_MIN_HEIGHT = 120;
 
 export type NoteImageUpload = { body: Uint8Array; contentType: string };
+export type WorkspaceFileUpload = { body: Uint8Array; name: string };
 export type WorkspaceCardOrigin = "NOTE" | "CLIENT_ANSWER" | "SITE_VISIT";
+export type WorkspaceElementKind = "TEXT" | "IMAGE" | "FILE";
+export type WorkspaceTextStyle = "PLAIN" | "HEADING" | "STICKY";
+export const WORKSPACE_TEXT_STYLES: readonly WorkspaceTextStyle[] = ["PLAIN", "HEADING", "STICKY"];
+/** Where an image added beside an element lands: to its right, each later one a little lower. */
+const BESIDE_GAP = 16;
+const BESIDE_STEP = 24;
+const BESIDE_WIDTH = 240;
+
+type StoredAsset = { storage_key: string; content_type: string; bytes: number; file_name?: string | null; uploaded_by_id: string | null; uploaded_by_name: string };
 
 const IMAGE_SIGNED_URL_SECONDS = 15 * 60;
-
-export const NOTE_IMAGES_SELECT = {
-  orderBy: [{ sort_order: "asc" as const }, { created_at: "asc" as const }, { id: "asc" as const }],
-  select: { id: true, storage_key: true, content_type: true, bytes: true },
-};
 
 function cardNotFound(): AppError {
   return new AppError("NOT_FOUND", "PHASE_NOTE_NOT_FOUND", "This note no longer exists.");
@@ -60,6 +67,10 @@ function cardNotFound(): AppError {
 
 function staleCard(): AppError {
   return conflict("WORKSPACE_CARD_STALE", "Someone changed this card in the meantime. Reload to see the latest version.");
+}
+
+function notText(): AppError {
+  return invalid("WORKSPACE_ELEMENT_NOT_TEXT", "Only a text element has text to change.");
 }
 
 function staleSection(): AppError {
@@ -104,7 +115,7 @@ async function nextCardOrder(tx: TxClient, sectionId: string) {
  * or what was seen on site lands in the project's Workspace in the same transaction. Without `iterationId`, the
  * phase's latest round labels it. Without `sectionId`, it goes to the project's fixed default section.
  */
-export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, input: { projectId: string; phaseId: string | null; iterationId?: string | null; sectionId?: string; body: string; origin: WorkspaceCardOrigin; pinned?: boolean; actor: AuditActor; at: Date; x?: number; y?: number; w?: number }) {
+export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, input: { projectId: string; phaseId: string | null; iterationId?: string | null; sectionId?: string; body: string; origin: WorkspaceCardOrigin; pinned?: boolean; actor: AuditActor; at: Date; x?: number; y?: number; w?: number; kind?: WorkspaceElementKind; textStyle?: WorkspaceTextStyle; asset?: StoredAsset }) {
   const iterationId = input.iterationId !== undefined
     ? input.iterationId
     : input.phaseId ? (await tx.sfRevision.findFirst({ where: { phase_id: input.phaseId }, orderBy: { major: "desc" }, select: { id: true } }))?.id ?? null : null;
@@ -115,12 +126,17 @@ export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, 
       id: randomUUID(), project_id: input.projectId, section_id: sectionId, sort_order: sortOrder, phase_id: input.phaseId, iteration_id: iterationId,
       body: input.body, origin: input.origin, is_pinned: input.pinned ?? false, author_id: input.actor.userId ?? null, author_name: input.actor.label, created_at: input.at,
       canvas_x: input.x, canvas_y: input.y, canvas_w: input.w,
+      kind: input.kind ?? "TEXT", text_style: input.textStyle ?? "PLAIN", ...(input.asset ?? {}),
     },
     select: { id: true },
   });
 }
 
-type CardRow = { id: string; project_id: string; section_id: string; phase_id: string | null; iteration_id: string | null; body: string; is_pinned: boolean; origin: WorkspaceCardOrigin; version: number; _count: { images: number } };
+type CardRow = {
+  id: string; project_id: string; section_id: string; phase_id: string | null; iteration_id: string | null; body: string; is_pinned: boolean; origin: WorkspaceCardOrigin; version: number;
+  kind: WorkspaceElementKind; storage_key: string | null; canvas_x: number | null; canvas_y: number | null; canvas_w: number | null;
+};
+const CARD_ROW_SELECT = { id: true, project_id: true, section_id: true, phase_id: true, iteration_id: true, body: true, is_pinned: true, origin: true, version: true, kind: true, storage_key: true, canvas_x: true, canvas_y: true, canvas_w: true } as const;
 type ProjectInput = CommandContext & { projectId: string };
 type CardGeometry = { x: number; y: number; w: number };
 type SectionGeometry = CardGeometry & { h: number };
@@ -187,7 +203,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   async function loadCard(tx: TxClient, input: ProjectInput & { cardId: string }, phaseId?: string): Promise<CardRow> {
     const card = await tx.sfWorkspaceCard.findFirst({
       where: { id: input.cardId, project_id: input.projectId, ...(phaseId ? { phase_id: phaseId } : {}) },
-      select: { id: true, project_id: true, section_id: true, phase_id: true, iteration_id: true, body: true, is_pinned: true, origin: true, version: true, _count: { select: { images: true } } },
+      select: CARD_ROW_SELECT,
     });
     if (!card) throw cardNotFound();
     return card;
@@ -211,18 +227,23 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     await writeAudit(ports, tx, { action: `studioflow.${entity}.${action}`, entityType: entity, entityId, actor, metadata });
   }
 
-  type ImageRow = { id: string; storage_key: string; content_type: string; bytes: number };
-  /** Public view of a card's images: short-lived signed links, never the storage key. */
-  async function signImages(rows: readonly ImageRow[]) {
-    return Promise.all(rows.map(async (row) => {
-      let url: string | null = null;
-      try {
-        url = await ports.storage.createSignedReadUrl(row.storage_key, IMAGE_SIGNED_URL_SECONDS);
-      } catch {
-        // A storage hiccup hides one thumbnail; it must not fail the whole page.
-      }
-      return { id: row.id, url, contentType: row.content_type, bytes: row.bytes };
-    }));
+  type AssetRow = { id: string; kind: WorkspaceElementKind; storage_key: string | null; content_type: string | null; bytes: number | null; file_name: string | null };
+  /** A short-lived signed link, never the storage key. A storage hiccup hides one object; it must not fail the page. */
+  async function signedUrl(key: string) {
+    try {
+      return await ports.storage.createSignedReadUrl(key, IMAGE_SIGNED_URL_SECONDS);
+    } catch {
+      return null;
+    }
+  }
+  /** An image element reads as a one-image list (so every image view keeps one shape); text and files have none. */
+  async function elementImages(row: AssetRow) {
+    if (row.kind !== "IMAGE" || !row.storage_key) return [];
+    return [{ id: row.id, url: await signedUrl(row.storage_key), contentType: row.content_type ?? "", bytes: row.bytes ?? 0 }];
+  }
+  async function elementFile(row: AssetRow) {
+    if (row.kind !== "FILE" || !row.storage_key) return null;
+    return { url: await signedUrl(row.storage_key), name: row.file_name ?? "File", contentType: row.content_type ?? "", bytes: row.bytes ?? 0 };
   }
 
   /** A label must belong to the card's project; a round label implies its own phase. */
@@ -290,16 +311,27 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
 
   // ── Cards ─────────────────────────────────────────────────────────────
 
-  async function createCard(input: ProjectInput & { sectionId?: string; phaseId?: string | null; body: string | null; origin?: "NOTE" | "CLIENT_ANSWER"; withImages?: boolean; x?: number; y?: number; w?: number }) {
+  function textStyleOf(value: string | undefined): WorkspaceTextStyle | undefined {
+    if (value === undefined) return undefined;
+    if (!WORKSPACE_TEXT_STYLES.includes(value as WorkspaceTextStyle)) throw invalid("WORKSPACE_TEXT_STYLE_INVALID", "Choose plain, heading or sticky.");
+    return value as WorkspaceTextStyle;
+  }
+
+  /**
+   * A text element. `withImages` lets a note start empty while its images follow (`addPhaseNoteImage`): the first image
+   * then turns the empty note into that image element, so no empty text is left behind.
+   */
+  async function createCard(input: ProjectInput & { sectionId?: string; phaseId?: string | null; body: string | null; origin?: "NOTE" | "CLIENT_ANSWER"; withImages?: boolean; textStyle?: string; x?: number; y?: number; w?: number }) {
     const body = optionalText(input.body, PHASE_NOTE_MAX) ?? "";
     if (!body && !input.withImages) throw invalid("PHASE_NOTE_EMPTY", "Write something or add an image.");
     const canvas = cardGeometry(input);
+    const textStyle = textStyleOf(input.textStyle);
     return runTransaction(async (tx) => {
       const phaseId = input.phaseId ?? null;
       await validatePhaseLabel(tx, input.projectId, phaseId);
       await writableScope(tx, input, phaseId);
       if (input.sectionId) await loadSection(tx, input.projectId, input.sectionId);
-      const card = await insertWorkspaceCard(tx, ports, { projectId: input.projectId, phaseId, sectionId: input.sectionId, body, origin: input.origin ?? "NOTE", actor: input.actor, at: nowOf(ports), ...canvas });
+      const card = await insertWorkspaceCard(tx, ports, { projectId: input.projectId, phaseId, sectionId: input.sectionId, body, origin: input.origin ?? "NOTE", textStyle, actor: input.actor, at: nowOf(ports), ...canvas });
       await audit(tx, input.actor, "workspace-card", "created", card.id, { projectId: input.projectId, phaseId });
       return { cardId: card.id };
     });
@@ -309,11 +341,26 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     const body = optionalText(input.body, PHASE_NOTE_MAX) ?? "";
     return runTransaction(async (tx) => {
       const card = await writableCard(tx, input, phaseId);
+      if (card.kind !== "TEXT") throw notText();
       if (card.body === body) return { cardId: card.id, version: card.version };
-      if (!body && card._count.images === 0) throw invalid("PHASE_NOTE_EMPTY", "A note needs text or an image. Delete it instead.");
+      if (!body) throw invalid("PHASE_NOTE_EMPTY", "A note needs text. Delete it instead.");
       const updated = await tx.sfWorkspaceCard.updateMany({ where: { id: card.id, version: card.version }, data: { body, edited_at: nowOf(ports), version: { increment: 1 } } });
       if (updated.count === 0) throw staleCard();
       await audit(tx, input.actor, "workspace-card", "edited", card.id, { projectId: input.projectId, phaseId: card.phase_id });
+      return { cardId: card.id, version: card.version + 1 };
+    });
+  }
+
+  async function setTextStyle(input: ProjectInput & { cardId: string; textStyle: string; version?: number }) {
+    const textStyle = textStyleOf(input.textStyle)!;
+    return runTransaction(async (tx) => {
+      const card = await writableCard(tx, input);
+      if (card.kind !== "TEXT") throw notText();
+      const current = await tx.sfWorkspaceCard.findUniqueOrThrow({ where: { id: card.id }, select: { text_style: true } });
+      if (current.text_style === textStyle) return { cardId: card.id, version: card.version };
+      const updated = await tx.sfWorkspaceCard.updateMany({ where: { id: card.id, version: card.version }, data: { text_style: textStyle, version: { increment: 1 } } });
+      if (updated.count === 0) throw staleCard();
+      await audit(tx, input.actor, "workspace-card", "style-changed", card.id, { projectId: input.projectId, textStyle });
       return { cardId: card.id, version: card.version + 1 };
     });
   }
@@ -337,80 +384,153 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   async function deleteCard(input: ProjectInput & { cardId: string; version?: number }, phaseId?: string) {
     const result = await runTransaction(async (tx) => {
       const card = await writableCard(tx, input, phaseId);
-      const keys = (await tx.sfWorkspaceCardImage.findMany({ where: { card_id: card.id }, select: { storage_key: true } })).map((image) => image.storage_key);
+      const keys = card.storage_key ? [card.storage_key] : [];
       const deleted = await tx.sfWorkspaceCard.deleteMany({ where: { id: card.id, version: card.version } });
       if (deleted.count === 0) throw staleCard();
-      await audit(tx, input.actor, "workspace-card", "deleted", card.id, { projectId: input.projectId, phaseId: card.phase_id, images: keys.length });
+      await audit(tx, input.actor, "workspace-card", "deleted", card.id, { projectId: input.projectId, phaseId: card.phase_id, kind: card.kind });
       return { cardId: card.id, keys: await enqueueUnreferencedCleanup(tx, keys) };
     });
     await discardObjects(db, ports.storage, result.keys);
     return { cardId: result.cardId };
   }
 
-  /** Appends one image. The object is written before the row and discarded if the transaction fails. */
-  async function addCardImage(input: ProjectInput & { cardId: string; file: NoteImageUpload }, phaseId?: string) {
-    requireCommand(input, P.phaseWork);
-    const extension = STUDIOFLOW_IMAGE_TYPES[input.file.contentType];
+  function checkedImage(file: NoteImageUpload) {
+    const extension = STUDIOFLOW_IMAGE_TYPES[file.contentType];
     if (!extension) throw invalid("NOTE_IMAGE_TYPE", "Use a PNG, JPEG, or WebP image.");
-    const bytes = input.file.body.byteLength;
+    const bytes = file.body.byteLength;
     if (bytes === 0 || bytes > NOTE_IMAGE_BYTES) throw invalid("NOTE_IMAGE_SIZE", "Each image must be smaller than 3 MB.");
-    if (!sniffImage(input.file.body, input.file.contentType)) throw invalid("NOTE_IMAGE_TYPE", "This file is not a valid image.");
-    // Scope, access and limit are checked before touching storage, then again inside the write transaction.
-    await runTransaction(async (tx) => {
-      const card = await writableCard(tx, input, phaseId);
-      if (card._count.images >= NOTE_IMAGE_LIMIT) throw invalid("NOTE_IMAGE_LIMIT", `A note holds at most ${NOTE_IMAGE_LIMIT} images.`);
-    });
-    const key = createPrivateObjectKey(`studioflow/notes/${input.projectId}`, extension);
-    await ports.storage.put({ key, contentType: input.file.contentType, bytes, body: input.file.body });
+    if (!sniffImage(file.body, file.contentType)) throw invalid("NOTE_IMAGE_TYPE", "This file is not a valid image.");
+    return { extension, bytes };
+  }
+
+  function checkedFile(file: WorkspaceFileUpload) {
+    const name = requiredText(file.name, "WORKSPACE_FILE_NAME_REQUIRED", "File name", WORKSPACE_FILE_NAME_MAX);
+    const extension = fileExtension(name);
+    const rule = extension ? WORKSPACE_FILE_TYPES[extension] : undefined;
+    if (!extension || !rule) throw invalid("WORKSPACE_FILE_TYPE", "Use a PDF, DWG, DXF, SKP, Excel, Word, PowerPoint, ZIP, TXT or CSV file.");
+    const bytes = file.body.byteLength;
+    if (bytes === 0 || bytes > WORKSPACE_FILE_BYTES) throw invalid("WORKSPACE_FILE_SIZE", "Each file must be smaller than 25 MB.");
+    if (!sniffWorkspaceFile(file.body, extension)) throw invalid("WORKSPACE_FILE_TYPE", "This file does not match its type.");
+    return { name, extension, bytes, contentType: rule.contentType };
+  }
+
+  /** Writes the object first, then the rows; the object is discarded when the transaction fails. */
+  async function storeThen<T>(key: string, upload: { contentType: string; bytes: number; body: Uint8Array }, write: () => Promise<T>): Promise<T> {
+    await ports.storage.put({ key, contentType: upload.contentType, bytes: upload.bytes, body: upload.body });
     try {
-      return await runTransaction(async (tx) => {
-        const card = await writableCard(tx, input, phaseId);
-        // Serialise concurrent adds to one card so the limit and the order cannot race.
-        await tx.$queryRaw`SELECT id FROM studioflow.sf_workspace_card WHERE id = ${card.id} FOR UPDATE`;
-        const last = await tx.sfWorkspaceCardImage.aggregate({ where: { card_id: card.id }, _count: { _all: true }, _max: { sort_order: true } });
-        if (last._count._all >= NOTE_IMAGE_LIMIT) throw invalid("NOTE_IMAGE_LIMIT", `A note holds at most ${NOTE_IMAGE_LIMIT} images.`);
-        const image = await tx.sfWorkspaceCardImage.create({
-          data: { card_id: card.id, storage_key: key, content_type: input.file.contentType, bytes, sort_order: (last._max.sort_order ?? 0) + 1, uploaded_by_id: input.actor.userId!, uploaded_by_name: input.actor.label },
-          select: { id: true },
-        });
-        await tx.sfWorkspaceCard.update({ where: { id: card.id }, data: { version: { increment: 1 } } });
-        await audit(tx, input.actor, "workspace-card", "image-added", card.id, { projectId: input.projectId, imageId: image.id, bytes });
-        return { cardId: card.id, imageId: image.id };
-      });
+      return await write();
     } catch (error) {
       await discardObjects(db, ports.storage, [key]);
       throw error;
     }
   }
 
-  /** Removes one image; a card left with no text and no image is removed with it. */
+  type NewElementInput = ProjectInput & { sectionId?: string; phaseId?: string | null; clientAnswer?: boolean; x?: number; y?: number; w?: number };
+
+  /** One image element, in one step: the image is its content. */
+  async function createImage(input: NewElementInput & { file: NoteImageUpload }) {
+    requireCommand(input, P.phaseWork);
+    const { extension, bytes } = checkedImage(input.file);
+    const canvas = cardGeometry(input);
+    const phaseId = input.phaseId ?? null;
+    // Scope and access are checked before touching storage, then again inside the write transaction.
+    await runTransaction(async (tx) => { await validatePhaseLabel(tx, input.projectId, phaseId); await writableScope(tx, input, phaseId); });
+    const key = createPrivateObjectKey(`studioflow/notes/${input.projectId}`, extension);
+    return storeThen(key, { contentType: input.file.contentType, bytes, body: input.file.body }, () => runTransaction(async (tx) => {
+      await writableScope(tx, input, phaseId);
+      if (input.sectionId) await loadSection(tx, input.projectId, input.sectionId);
+      const element = await insertWorkspaceCard(tx, ports, {
+        projectId: input.projectId, phaseId, sectionId: input.sectionId, body: "", origin: input.clientAnswer ? "CLIENT_ANSWER" : "NOTE", actor: input.actor, at: nowOf(ports), ...canvas,
+        kind: "IMAGE", asset: { storage_key: key, content_type: input.file.contentType, bytes, uploaded_by_id: input.actor.userId ?? null, uploaded_by_name: input.actor.label },
+      });
+      await audit(tx, input.actor, "workspace-card", "created", element.id, { projectId: input.projectId, phaseId, kind: "IMAGE", bytes });
+      return { cardId: element.id };
+    }));
+  }
+
+  /** One file element (PDF, drawings, office files, archives, text), in one step. */
+  async function createFile(input: NewElementInput & { file: WorkspaceFileUpload }) {
+    requireCommand(input, P.phaseWork);
+    const file = checkedFile(input.file);
+    const canvas = cardGeometry(input);
+    const phaseId = input.phaseId ?? null;
+    await runTransaction(async (tx) => { await validatePhaseLabel(tx, input.projectId, phaseId); await writableScope(tx, input, phaseId); });
+    const key = createPrivateObjectKey(`studioflow/workspace-files/${input.projectId}`, file.extension);
+    return storeThen(key, { contentType: file.contentType, bytes: file.bytes, body: input.file.body }, () => runTransaction(async (tx) => {
+      await writableScope(tx, input, phaseId);
+      if (input.sectionId) await loadSection(tx, input.projectId, input.sectionId);
+      const element = await insertWorkspaceCard(tx, ports, {
+        projectId: input.projectId, phaseId, sectionId: input.sectionId, body: "", origin: input.clientAnswer ? "CLIENT_ANSWER" : "NOTE", actor: input.actor, at: nowOf(ports), ...canvas,
+        kind: "FILE", asset: { storage_key: key, content_type: file.contentType, bytes: file.bytes, file_name: file.name, uploaded_by_id: input.actor.userId ?? null, uploaded_by_name: input.actor.label },
+      });
+      await audit(tx, input.actor, "workspace-card", "created", element.id, { projectId: input.projectId, phaseId, kind: "FILE", bytes: file.bytes });
+      return { cardId: element.id };
+    }));
+  }
+
+  /**
+   * Adds an image that belongs with an element (pasted while writing it, or sent with a note). An empty text note
+   * becomes the image itself; otherwise a new image element with the same labels lands beside it.
+   */
+  async function addCardImage(input: ProjectInput & { cardId: string; file: NoteImageUpload }, phaseId?: string) {
+    requireCommand(input, P.phaseWork);
+    const { extension, bytes } = checkedImage(input.file);
+    await runTransaction(async (tx) => { await writableCard(tx, input, phaseId); });
+    const key = createPrivateObjectKey(`studioflow/notes/${input.projectId}`, extension);
+    const asset: StoredAsset = { storage_key: key, content_type: input.file.contentType, bytes, uploaded_by_id: input.actor.userId ?? null, uploaded_by_name: input.actor.label };
+    return storeThen(key, { contentType: input.file.contentType, bytes, body: input.file.body }, () => runTransaction(async (tx) => {
+      await writableCard(tx, input, phaseId);
+      // Serialise adds to one element so an empty note turns into an image only once.
+      await tx.$queryRaw`SELECT id FROM studioflow.sf_workspace_card WHERE id = ${input.cardId} FOR UPDATE`;
+      const anchor = await loadCard(tx, input, phaseId);
+      if (anchor.kind === "TEXT" && anchor.body === "") {
+        await tx.sfWorkspaceCard.update({ where: { id: anchor.id }, data: { kind: "IMAGE", ...asset, version: { increment: 1 } } });
+        await audit(tx, input.actor, "workspace-card", "image-added", anchor.id, { projectId: input.projectId, imageId: anchor.id, bytes });
+        return { cardId: anchor.id, imageId: anchor.id };
+      }
+      let place: { x: number; y: number; w: number } | undefined;
+      if (anchor.canvas_x !== null && anchor.canvas_y !== null) {
+        const x = Math.min(WORKSPACE_CANVAS_MAX, anchor.canvas_x + (anchor.canvas_w ?? 256) + BESIDE_GAP);
+        const beside = await tx.sfWorkspaceCard.count({ where: { section_id: anchor.section_id, canvas_x: x, canvas_y: { gte: anchor.canvas_y, lt: anchor.canvas_y + BESIDE_STEP * 100 } } });
+        place = { x, y: Math.min(WORKSPACE_CANVAS_MAX, anchor.canvas_y + beside * BESIDE_STEP), w: BESIDE_WIDTH };
+      }
+      const element = await insertWorkspaceCard(tx, ports, {
+        projectId: anchor.project_id, phaseId: anchor.phase_id, iterationId: anchor.iteration_id, sectionId: anchor.section_id, body: "", origin: anchor.origin,
+        actor: input.actor, at: nowOf(ports), ...place, kind: "IMAGE", asset,
+      });
+      await audit(tx, input.actor, "workspace-card", "image-added", anchor.id, { projectId: input.projectId, imageId: element.id, bytes });
+      return { cardId: anchor.id, imageId: element.id };
+    }));
+  }
+
+  /** Removes one image element (an image is its own element now). */
   async function removeCardImage(input: ProjectInput & { imageId: string }, phaseId?: string) {
     const result = await runTransaction(async (tx) => {
-      const image = await tx.sfWorkspaceCardImage.findFirst({
-        where: { id: input.imageId, card: { project_id: input.projectId, ...(phaseId ? { phase_id: phaseId } : {}) } },
-        select: { id: true, card_id: true, storage_key: true, card: { select: { body: true, phase_id: true } } },
+      const image = await tx.sfWorkspaceCard.findFirst({
+        where: { id: input.imageId, kind: "IMAGE", project_id: input.projectId, ...(phaseId ? { phase_id: phaseId } : {}) },
+        select: { id: true, storage_key: true, phase_id: true },
       });
       if (!image) throw new AppError("NOT_FOUND", "NOTE_IMAGE_NOT_FOUND", "This image no longer exists.");
-      await writableScope(tx, input, image.card.phase_id);
-      await tx.sfWorkspaceCardImage.delete({ where: { id: image.id } });
-      const emptied = !image.card.body && (await tx.sfWorkspaceCardImage.count({ where: { card_id: image.card_id } })) === 0;
-      if (emptied) await tx.sfWorkspaceCard.delete({ where: { id: image.card_id } });
-      else await tx.sfWorkspaceCard.update({ where: { id: image.card_id }, data: { version: { increment: 1 } } });
-      await audit(tx, input.actor, "workspace-card", emptied ? "deleted" : "image-removed", image.card_id, { projectId: input.projectId, imageId: image.id });
-      return { cardId: image.card_id, imageId: image.id, cardRemoved: emptied, keys: await enqueueUnreferencedCleanup(tx, [image.storage_key]) };
+      await writableScope(tx, input, image.phase_id);
+      await tx.sfWorkspaceCard.delete({ where: { id: image.id } });
+      await audit(tx, input.actor, "workspace-card", "deleted", image.id, { projectId: input.projectId, kind: "IMAGE" });
+      return { imageId: image.id, keys: await enqueueUnreferencedCleanup(tx, image.storage_key ? [image.storage_key] : []) };
     });
     await discardObjects(db, ports.storage, result.keys);
-    return { cardId: result.cardId, imageId: result.imageId, cardRemoved: result.cardRemoved };
+    return { cardId: result.imageId, imageId: result.imageId, cardRemoved: true };
   }
 
   const cards = {
-    createWorkspaceCard: (input: ProjectInput & { sectionId?: string; phaseId?: string | null; body: string | null; clientAnswer?: boolean; withImages?: boolean; x?: number; y?: number; w?: number }) =>
+    createWorkspaceCard: (input: ProjectInput & { sectionId?: string; phaseId?: string | null; body: string | null; clientAnswer?: boolean; withImages?: boolean; textStyle?: string; x?: number; y?: number; w?: number }) =>
       createCard({ ...input, origin: input.clientAnswer ? "CLIENT_ANSWER" : "NOTE" }),
     updateWorkspaceCardText: (input: ProjectInput & { cardId: string; body: string | null; version: number }) => updateCardText(input),
     setWorkspaceCardFlags: (input: ProjectInput & { cardId: string; pinned?: boolean; clientAnswer?: boolean; version: number }) => setCardFlags(input),
     deleteWorkspaceCard: (input: ProjectInput & { cardId: string; version: number }) => deleteCard(input),
+    setWorkspaceTextStyle: (input: ProjectInput & { cardId: string; textStyle: string; version: number }) => setTextStyle(input),
     addWorkspaceCardImage: (input: ProjectInput & { cardId: string; file: NoteImageUpload }) => addCardImage(input),
     removeWorkspaceCardImage: (input: ProjectInput & { imageId: string }) => removeCardImage(input),
+    createWorkspaceImage: (input: NewElementInput & { file: NoteImageUpload }) => createImage(input),
+    createWorkspaceFile: (input: NewElementInput & { file: WorkspaceFileUpload }) => createFile(input),
 
     /** Sets or clears a card's phase label. Clearing it, or moving to another phase, also clears the round label. */
     async setWorkspaceCardPhase(input: ProjectInput & { cardId: string; phaseId: string | null; version: number }) {
@@ -556,12 +676,11 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   type CardReadRow = {
     id: string; body: string; is_pinned: boolean; origin: WorkspaceCardOrigin; author_id: string | null; author_name: string | null; created_at: Date; edited_at: Date | null; version: number;
     section_id: string; sort_order: number; phase_id: string | null; iteration_id: string | null; canvas_x: number | null; canvas_y: number | null; canvas_w: number | null;
-    images: ImageRow[];
+    kind: WorkspaceElementKind; text_style: WorkspaceTextStyle; storage_key: string | null; content_type: string | null; bytes: number | null; file_name: string | null;
     iteration: { id: string; major: number; name: string } | null;
     phase: { id: string; name_snapshot: string; prefix_snapshot: string; definition: { default_iteration_kinds: unknown } } | null;
   };
   const CARD_INCLUDE = {
-    images: NOTE_IMAGES_SELECT,
     iteration: { select: { id: true, major: true, name: true } },
     phase: { select: { id: true, name_snapshot: true, prefix_snapshot: true, definition: { select: { default_iteration_kinds: true } } } },
   } as const;
@@ -590,7 +709,10 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       iterationId: row.iteration_id,
       iterationLabel: roundLabel(row),
       canvas: row.canvas_x === null || row.canvas_y === null || row.canvas_w === null ? null : { x: row.canvas_x, y: row.canvas_y, w: row.canvas_w },
-      images: await signImages(row.images),
+      kind: row.kind,
+      textStyle: row.text_style,
+      images: await elementImages(row),
+      file: await elementFile(row),
     };
   }
 
@@ -670,7 +792,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         select: {
           id: true, name_snapshot: true, prefix_snapshot: true,
           definition: { select: { default_iteration_kinds: true } },
-          workspace_cards: { where: { is_pinned: true }, orderBy: [{ created_at: "asc" }, { id: "asc" }], select: { id: true, body: true, created_at: true, author_name: true, _count: { select: { images: true } }, iteration: { select: { major: true, name: true } } } },
+          workspace_cards: { where: { is_pinned: true }, orderBy: [{ created_at: "asc" }, { id: "asc" }], select: { id: true, body: true, kind: true, file_name: true, created_at: true, author_name: true, iteration: { select: { major: true, name: true } } } },
         },
       });
       return phases.map((phase) => {
@@ -679,7 +801,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
           phaseId: phase.id,
           phaseName: phase.name_snapshot,
           notes: phase.workspace_cards.map((card) => ({
-            id: card.id, body: card.body, createdAt: card.created_at, authorName: card.author_name, imageCount: card._count.images,
+            id: card.id, body: card.kind === "FILE" ? card.file_name ?? "" : card.body, createdAt: card.created_at, authorName: card.author_name, imageCount: card.kind === "IMAGE" ? 1 : 0,
             iterationLabel: card.iteration ? iterationShortName(card.iteration.name, phase.prefix_snapshot, card.iteration, kinds.includes(card.iteration.name)) : null,
           })),
         };
@@ -692,7 +814,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     const rows = await db.sfWorkspaceCard.findMany({
       where: { phase_id: phaseId },
       orderBy: [{ created_at: "asc" }, { id: "asc" }],
-      include: { images: NOTE_IMAGES_SELECT, iteration: { select: { id: true, major: true, name: true } } },
+      include: { iteration: { select: { id: true, major: true, name: true } } },
     });
     return Promise.all(rows.map(async (row) => ({
       id: row.id,
@@ -707,7 +829,9 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       editedAt: row.edited_at,
       iterationId: row.iteration_id,
       iterationLabel: row.iteration ? iterationShortName(row.iteration.name, prefix, row.iteration, kinds.includes(row.iteration.name)) : null,
-      images: await signImages(row.images),
+      kind: row.kind,
+      images: await elementImages(row),
+      file: await elementFile(row),
     })));
   }
 

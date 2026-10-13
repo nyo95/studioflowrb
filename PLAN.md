@@ -4,7 +4,7 @@ Plan ID: WO-SF-WORKSPACE-04 (Workspace board: one board per project, standalone 
 Scope: StudioFlow Workspace backend — element kinds, image and file elements, frames folded into the one board, data migration, follow-through in every reader; minimal UI wiring only
 Module(s): studioflow (core; Workspace is not an optional module)
 Target revision: R8.540 (Executor, backend slice). R8.538/R8.539 are Lead plan corrections. The section purge and all frame-UI removal move to the Lead's board UI revision. The Lead's board UI follows as its own revision.
-Status: READY
+Status: IMPLEMENTED (backend slice R8.540 by the Lead on owner instruction) — NEXT: Lead board UI (purge sections and frame UI, new board per the accepted concept)
 Priority: P1
 Owner: owner 2026-10-13 — accepted the clickable board concept (https://claude.ai/artifact/TbUL52g4MYgm1Y3G3TBvhL) and the direction below ("sudah jalan, susun rencana kerjanya"). Recorded in R8.537.
 Last updated: 2026-10-13 (Lead, R8.539 — split after the second Executor report; earlier: R8.538 — correction after an Executor BLOCKED report that named no conflict; see "Corrections R8.538")

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, 
 import { Button, EmptyState, IconButton, InlineEdit, InlineError, Notice, RowActionMenu, Text, useConfirm, useFileIntake, type RowActionItem } from "@/platform/ui_engine";
 
 import type { WorkspaceCommandInput } from "../../../actions";
-import { CardComposer, WorkspaceCard, runWorkspaceCommand, uploadCardImages, type LabelChoices, type PhaseOption, type RunCommand, type WorkspaceCardView } from "./card";
+import { CardComposer, WORKSPACE_FILE_ACCEPT, WorkspaceCard, runWorkspaceCommand, uploadBoardFiles, type LabelChoices, type PhaseOption, type RunCommand, type WorkspaceCardView } from "./card";
 import { CARD_TOP, DEFAULT_CARD_W, DEFAULT_FRAME, FRAME_HEAD, FRAME_PAD, ESTIMATED_CARD_H, MIN_CARD_W, MIN_FRAME, frameAt, layoutBoard, nextFramePlace, snapMove, snapToGrid, type CardSlot, type Rect } from "./geometry";
 
 export type WorkspaceSectionView = {
@@ -412,13 +412,11 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     const rect = viewportRef.current?.getBoundingClientRect();
     const at = lastPointer.current ?? (rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : { x: 0, y: 0 });
     const spot = spotAt(at.x, at.y);
-    const created = await run({ command: "createCard", projectId, sectionId: spot.sectionId, phaseId: newBlockPhase, body: null, withImages: true, ...(spot.place ?? {}) });
-    if (!created.ok) { setError(created.message); return; }
-    const { problems } = await uploadCardImages(projectId, (created.data as { cardId: string }).cardId, files);
+    const { problems } = await uploadBoardFiles({ projectId, sectionId: spot.sectionId, phaseId: newBlockPhase, place: spot.place, files });
     if (problems.length > 0) setError(problems.join(" "));
     router.refresh();
   };
-  const intake = useFileIntake({ accept: "image/png,image/jpeg,image/webp", multiple: true, pasteFromPage: true, disabled: !canCreate || narrow || lens !== "workspace", onFiles: (files) => void dropImages(files) });
+  const intake = useFileIntake({ accept: `image/png,image/jpeg,image/webp,${WORKSPACE_FILE_ACCEPT}`, multiple: true, pasteFromPage: true, disabled: !canCreate || narrow || lens !== "workspace", onFiles: (files) => void dropImages(files) });
   const writeAt = (event: ReactMouseEvent) => {
     if (!canCreate || (event.target as HTMLElement).closest("article, button, header, input, [contenteditable]")) return;
     const spot = spotAt(event.clientX, event.clientY);

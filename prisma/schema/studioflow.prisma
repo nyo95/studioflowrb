@@ -250,6 +250,26 @@ enum SfWorkspaceCardOrigin {
   @@schema("studioflow")
 }
 
+/// What a Workspace element is (WO-SF-WORKSPACE-04): text (with its own formatting), exactly one image, or exactly one file.
+enum SfWorkspaceElementKind {
+  TEXT
+  IMAGE
+  FILE
+
+  @@map("sf_workspace_element_kind")
+  @@schema("studioflow")
+}
+
+/// How a text element reads on the board. Headings, lists and checklists inside the text stay body formatting.
+enum SfWorkspaceTextStyle {
+  PLAIN
+  HEADING
+  STICKY
+
+  @@map("sf_workspace_text_style")
+  @@schema("studioflow")
+}
+
 /// A free topic in a project's Workspace (owner, 2026-10-12: one Workspace per project; phases are only card labels).
 /// A section can be deleted only when empty.
 model SfWorkspaceSection {
@@ -279,8 +299,9 @@ model SfWorkspaceSection {
   @@schema("studioflow")
 }
 
-/// One card in a project's Workspace (formerly a phase note, WO-SF-NOTEFEED-01; ids kept by WO-SF-WORKSPACE-01).
-/// The phase and round are labels: they say where the card came from and never decide where it lives.
+/// One element on a project's Workspace board (formerly a phase note, WO-SF-NOTEFEED-01; ids kept by WO-SF-WORKSPACE-01;
+/// standalone text / image / file elements since WO-SF-WORKSPACE-04, where card images became image elements keeping
+/// their ids). The phase and round are labels: they say where the element came from and never decide where it lives.
 model SfWorkspaceCard {
   id           String                @id @default(uuid())
   project_id   String
@@ -290,7 +311,9 @@ model SfWorkspaceCard {
   phase_id     String?
   /// Round label. Hard-resetting a phase's rounds leaves its cards unlabelled, never deleted. When set, `phase_id` is that round's phase.
   iteration_id String?
-  /// The rich-text dialect `FormattedText` shows. Empty when the card is only images.
+  kind         SfWorkspaceElementKind @default(TEXT)
+  text_style   SfWorkspaceTextStyle   @default(PLAIN)
+  /// The rich-text dialect `FormattedText` shows. Always empty on an image or file element.
   body         String                @default("")
   is_pinned    Boolean               @default(false)
   origin       SfWorkspaceCardOrigin @default(NOTE)
@@ -302,42 +325,30 @@ model SfWorkspaceCard {
   updated_at   DateTime              @updatedAt
   /// Optimistic concurrency: every change increments it; a write naming an older version is refused.
   version      Int                   @default(1)
-  /// Optional canvas geometry. Height follows the card's content and is never stored.
+  /// Optional canvas geometry. Height is never stored: text follows its content, an image its own proportions.
   canvas_x     Int?
   canvas_y     Int?
   canvas_w     Int?
+  /// The one stored object of an image or file element; null on text (database check by kind).
+  storage_key      String? @unique
+  content_type     String?
+  bytes            Int?
+  /// A file element's original name, shown and used as the download name.
+  file_name        String?
+  uploaded_by_id   String?
+  /// Snapshot, so the name survives the person being renamed or removed.
+  uploaded_by_name String?
 
   project   SfProject              @relation(fields: [project_id], references: [id], onDelete: Cascade)
   section   SfWorkspaceSection     @relation(fields: [section_id], references: [id], onDelete: Restrict)
   phase     SfPhase?               @relation(fields: [phase_id], references: [id], onDelete: SetNull)
   iteration SfRevision?            @relation(fields: [iteration_id], references: [id], onDelete: SetNull)
-  images    SfWorkspaceCardImage[]
 
   @@index([section_id, sort_order])
   @@index([project_id, created_at])
   @@index([phase_id, created_at])
   @@index([iteration_id])
   @@map("sf_workspace_card")
-  @@schema("studioflow")
-}
-
-/// Screenshots and photos on one Workspace card.
-model SfWorkspaceCardImage {
-  id               String   @id @default(uuid())
-  card_id          String
-  storage_key      String   @unique
-  content_type     String
-  bytes            Int
-  sort_order       Int
-  uploaded_by_id   String
-  /// Snapshot, so the name survives the person being renamed or removed.
-  uploaded_by_name String
-  created_at       DateTime @default(now())
-
-  card SfWorkspaceCard @relation(fields: [card_id], references: [id], onDelete: Cascade)
-
-  @@index([card_id, sort_order])
-  @@map("sf_workspace_card_image")
   @@schema("studioflow")
 }
 
