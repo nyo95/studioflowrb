@@ -27,6 +27,7 @@ import {
   Tooltip,
 } from "@/platform/ui_engine";
 import { createMoney, formatMoney } from "@platform/utilities/money";
+import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
 import type { ActionResult } from "@platform/core/actions";
 import type {
   BqAssemblyTemplateRead,
@@ -36,7 +37,7 @@ import type {
   BqSectionDetail,
   BqSubObjectDetail,
 } from "@/apps/bq/public";
-import { BQ_PRICE_MODE_LABEL, BQ_PRICE_MODES, isMarkerPriceMode } from "@/apps/bq/lib/quotation";
+import { BQ_PRICE_MODES, isMarkerPriceMode } from "@/apps/bq/lib/quotation";
 import type { UnitRead } from "@/apps/masterdata/public";
 
 import { resolveCalcExpression } from "@/apps/bq/lib/calc-expression";
@@ -65,6 +66,7 @@ import {
   updateQuotationAction,
 } from "./actions";
 import { AssemblyPickerDialog } from "./assembly-picker-dialog";
+import { NewWorkItemDialog } from "./new-work-item-dialog";
 import { ImportDialog } from "./source-picker-dialog";
 import { QuotationDialog } from "./quotation-dialog";
 
@@ -77,10 +79,8 @@ const KATEGORI_LABEL: Record<string, string> = {
   ALAT: "Alat",
 };
 
-type AssemblyTarget =
-  | { via: "item"; itemId: string }
-  | { via: "section"; sectionId: string }
-  | { via: "subsection"; subsectionId: string };
+/** Where a new Pekerjaan will land; `where` is the Bagian/Subbagian name shown in its dialog. */
+type NewItemTarget = { sectionId?: string; subsectionId?: string; where: string };
 
 type Mutation = (prev: null, formData: FormData) => Promise<ActionResult<BqProjectDetail>>;
 
@@ -93,26 +93,46 @@ function money(amount: string | null, currency = "IDR") {
 /** Counts every terminal cost line (L1-only Work Items and L3 Cost
  *  Components) so the header can show "X dari Y sudah ada harga" instead of
  *  only revealing incompleteness once the Grand Total goes blank. */
-function countPriceCompleteness(sections: BqProjectDetail["sections"]) {
-  let total = 0;
-  let priced = 0;
+type ReadinessKey = "empty" | "zero" | "tbc" | "byOwner";
+/** The first row of a kind: the row to scroll to, and the Pekerjaan / Kelompok to open so the row is visible. */
+type ReadinessJump = { rowId: string; open: string[] };
+type Readiness = {
+  total: number;
+  priced: number;
+  counts: Record<ReadinessKey, number>;
+  first: Partial<Record<ReadinessKey, ReadinessJump>>;
+};
 
-  const countLine = (line: BqLineItemDetail) => {
-    total += 1;
-    if (line.hargaSnapshot !== null) priced += 1;
+const isZeroPrice = (value: string) => compareDecimals(toDecimalString(value), toDecimalString("0")) === 0;
+
+function summarizeReadiness(sections: BqProjectDetail["sections"]): Readiness {
+  const result: Readiness = { total: 0, priced: 0, counts: { empty: 0, zero: 0, tbc: 0, byOwner: 0 }, first: {} };
+  const note = (key: ReadinessKey, rowId: string, open: string[]) => {
+    result.counts[key] += 1;
+    result.first[key] ??= { rowId, open };
+  };
+
+  const countLine = (line: BqLineItemDetail, open: string[]) => {
+    result.total += 1;
+    if (line.hargaSnapshot === null) { note("empty", `bq-row-${line.id}`, open); return; }
+    result.priced += 1;
+    if (isZeroPrice(line.hargaSnapshot)) note("zero", `bq-row-${line.id}`, open);
   };
 
   const countItem = (item: BqItemDetail) => {
     // TBC and By Owner rows are unpriced on purpose, so they are not "missing" a price.
-    if (isMarkerPriceMode(item.priceMode)) return;
+    if (item.priceMode === "TBC") { note("tbc", `bq-row-${item.id}`, []); return; }
+    if (item.priceMode === "BY_OWNER") { note("byOwner", `bq-row-${item.id}`, []); return; }
     const hasChildren = item.subObjects.length > 0 || item.lineItems.length > 0;
     if (!hasChildren) {
-      total += 1;
-      if (item.hargaSnapshot !== null) priced += 1;
+      result.total += 1;
+      if (item.hargaSnapshot === null) { note("empty", `bq-row-${item.id}`, []); return; }
+      result.priced += 1;
+      if (isZeroPrice(item.hargaSnapshot)) note("zero", `bq-row-${item.id}`, []);
       return;
     }
-    item.lineItems.forEach(countLine);
-    item.subObjects.forEach((subObject) => subObject.lineItems.forEach(countLine));
+    item.lineItems.forEach((line) => countLine(line, [item.id]));
+    item.subObjects.forEach((subObject) => subObject.lineItems.forEach((line) => countLine(line, [item.id, subObject.id])));
   };
 
   for (const section of sections) {
@@ -120,7 +140,52 @@ function countPriceCompleteness(sections: BqProjectDetail["sections"]) {
     section.subsections.forEach((subsection) => subsection.items.forEach(countItem));
   }
 
-  return { total, priced };
+  return result;
+}
+
+/** Editor wording for a marker row; the quotation keeps `BQ_PRICE_MODE_LABEL` ("By Owner") for the client. */
+const PRICE_STATUS_LABEL: Record<"PRICED" | "TBC" | "BY_OWNER", string> = {
+  PRICED: "Berharga",
+  TBC: "TBC",
+  BY_OWNER: "Disediakan owner",
+};
+
+const READINESS_COPY: Record<ReadinessKey, { label: string; hint: string; blocksLock: boolean }> = {
+  empty: { label: "Harga kosong", hint: "Belum diisi — harus diisi atau ditandai TBC / Disediakan owner sebelum dikunci.", blocksLock: true },
+  zero: { label: "Harga Rp0", hint: "Dihitung sebagai Rp0 — boleh dikunci dengan konfirmasi.", blocksLock: false },
+  tbc: { label: "TBC", hint: "Baris penanda: tidak masuk total.", blocksLock: false },
+  byOwner: { label: "Disediakan owner", hint: "Baris penanda: tidak masuk total.", blocksLock: false },
+};
+
+/** One strip that answers "can I lock this, and what is still open?"; each chip jumps to the first such row. */
+function ReadinessBar({ readiness, onJump }: { readiness: Readiness; onJump: (jump: ReadinessJump) => void }) {
+  const keys = (Object.keys(READINESS_COPY) as ReadinessKey[]).filter((key) => readiness.counts[key] > 0);
+  const blocked = readiness.counts.empty > 0;
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-card border border-line bg-surface px-4 py-3" role="status" aria-label="Kesiapan untuk dikunci">
+      <Text size="sm" weight="medium" className={blocked ? "text-warning" : "text-success"}>
+        {blocked ? "Belum siap dikunci" : keys.length > 0 ? "Siap dikunci, dengan catatan" : "Siap dikunci"}
+      </Text>
+      {keys.map((key) => {
+        const jump = readiness.first[key];
+        return (
+          <button
+            key={key}
+            type="button"
+            title={READINESS_COPY[key].hint}
+            onClick={() => jump && onJump(jump)}
+            className="inline-flex items-center gap-1.5 rounded-control px-1.5 py-0.5 text-sm text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+          >
+            <Badge tone={key === "empty" ? "warning" : key === "zero" ? "warning" : "neutral"}>{readiness.counts[key]}</Badge>
+            {READINESS_COPY[key].label}
+          </button>
+        );
+      })}
+      {readiness.total > 0 ? (
+        <Text tone="tertiary" size="sm" className="ml-auto">{readiness.priced} dari {readiness.total} rincian sudah ada harga</Text>
+      ) : null}
+    </div>
+  );
 }
 
 /** Structural Work Item count per Section, for the outline rail's quick scan.
@@ -134,21 +199,32 @@ function SectionOutline({ sections }: { sections: readonly BqSectionDetail[] }) 
   if (sections.length === 0) return null;
   return (
     <nav
-      aria-label="Navigasi Section"
-      className="sticky top-0 hidden w-[196px] shrink-0 flex-col gap-0.5 self-start py-1 xl:flex"
+      aria-label="Struktur dokumen"
+      className="sticky top-0 hidden w-[220px] shrink-0 flex-col gap-0.5 self-start py-1 xl:flex"
     >
-      <Text tone="tertiary" size="sm" meta className="px-2.5 pb-1">Outline</Text>
+      <Text tone="tertiary" size="sm" meta className="px-2.5 pb-1">Struktur</Text>
       {sections.map((section) => {
         const count = workItemCount(section);
         return (
-          <a
-            key={section.id}
-            href={`#bq-section-${section.id}`}
-            className="flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-sm text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
-          >
-            <span className="truncate">{section.name}</span>
-            {count > 0 ? <span className="shrink-0 text-xs tabular-nums text-ink-tertiary">{count}</span> : null}
-          </a>
+          <div key={section.id} className="grid gap-0.5">
+            <a
+              href={`#bq-section-${section.id}`}
+              className="flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+            >
+              <span className="truncate">{section.name}</span>
+              {count > 0 ? <span className="shrink-0 text-xs tabular-nums text-ink-tertiary">{count}</span> : null}
+            </a>
+            {section.subsections.map((subsection) => (
+              <a
+                key={subsection.id}
+                href={`#bq-subsection-${subsection.id}`}
+                className="flex items-center justify-between gap-2 rounded-control py-1 pl-6 pr-2.5 text-sm text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+              >
+                <span className="truncate">{subsection.name}</span>
+                {subsection.items.length > 0 ? <span className="shrink-0 text-xs tabular-nums">{subsection.items.length}</span> : null}
+              </a>
+            ))}
+          </div>
         );
       })}
     </nav>
@@ -171,7 +247,9 @@ export function ProjectEditor({
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [importTarget, setImportTarget] = useState<{ itemId?: string; subObjectId?: string } | null>(null);
-  const [assemblyTarget, setAssemblyTarget] = useState<AssemblyTarget | null>(null);
+  /** A Pekerjaan to apply a resep to as a Kelompok rincian. */
+  const [assemblyItemId, setAssemblyItemId] = useState<string | null>(null);
+  const [newItemTarget, setNewItemTarget] = useState<NewItemTarget | null>(null);
   const [lockOpen, setLockOpen] = useState(false);
   /** Set when the server refused to lock because rows still have a price of Rp0: the count to confirm. */
   const [zeroPriceRows, setZeroPriceRows] = useState<number | null>(null);
@@ -225,7 +303,15 @@ export function ProjectEditor({
   };
 
   const totalColumns = 8;
-  const { total: pricingTotal, priced: pricingPriced } = countPriceCompleteness(project.sections);
+  const readiness = summarizeReadiness(project.sections);
+
+  /** Opens the Pekerjaan / Kelompok that holds the row, then scrolls to it once it is on screen. */
+  const jumpTo = (jump: { rowId: string; open: string[] }) => {
+    if (jump.open.length > 0) {
+      setExpanded((current) => new Set([...current, ...jump.open]));
+    }
+    window.setTimeout(() => document.getElementById(jump.rowId)?.scrollIntoView({ block: "center", behavior: "smooth" }), 60);
+  };
 
   return (
     <div className="grid gap-4">
@@ -233,31 +319,35 @@ export function ProjectEditor({
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3">
         <Text tone="secondary" size="sm">
-          {project.sections.length} section
+          {project.sections.length} bagian
           {canManage && project.status === "ACTIVE" ? " · dapat diedit" : null}
         </Text>
         <div className="flex flex-wrap items-center gap-2">
           {canManage && project.status !== "ARCHIVED" ? (
-            <Button variant="ghost" onClick={() => setQuotationOpen(true)} disabled={pending}>Quotation details</Button>
+            <Button variant="ghost" onClick={() => setQuotationOpen(true)} disabled={pending}>Detail quotation</Button>
           ) : null}
           <Link href={`/bq/print/${project.id}/quotation`} prefetch={false} className={buttonClasses("secondary", "md")}>
             <FileText aria-hidden="true" className="size-4" />
             Quotation
           </Link>
           {canManage && project.status === "ACTIVE" ? <>
-            <Button variant="secondary" leadingIcon={<Lock aria-hidden="true" />} onClick={() => setLockOpen(true)} disabled={pending}>Lock project</Button>
-            <Button variant="ghost" leadingIcon={<Archive aria-hidden="true" />} onClick={() => setLifecycleConfirm("archive")} disabled={pending}>Archive</Button>
+            <Button variant="secondary" leadingIcon={<Lock aria-hidden="true" />} onClick={() => setLockOpen(true)} disabled={pending}>Kunci project</Button>
+            <Button variant="ghost" leadingIcon={<Archive aria-hidden="true" />} onClick={() => setLifecycleConfirm("archive")} disabled={pending}>Arsipkan</Button>
           </> : null}
           {canManage && project.status === "LOCKED" ? (
-            <Button variant="secondary" leadingIcon={<LockOpen aria-hidden="true" />} onClick={() => void run(unlockProjectAction, {}).catch(() => undefined)} disabled={pending}>Unlock</Button>
+            <Button variant="secondary" leadingIcon={<LockOpen aria-hidden="true" />} onClick={() => void run(unlockProjectAction, {}).catch(() => undefined)} disabled={pending}>Buka kunci</Button>
           ) : null}
           {canManage && project.status === "ARCHIVED" ? <>
-            <Button variant="secondary" leadingIcon={<ArchiveRestore aria-hidden="true" />} onClick={() => setLifecycleConfirm("restore")} disabled={pending}>Restore</Button>
-            <Button variant="ghost" leadingIcon={<Trash2 aria-hidden="true" />} onClick={() => setLifecycleConfirm("delete")} disabled={pending}>Request deletion</Button>
+            <Button variant="secondary" leadingIcon={<ArchiveRestore aria-hidden="true" />} onClick={() => setLifecycleConfirm("restore")} disabled={pending}>Pulihkan</Button>
+            <Button variant="ghost" leadingIcon={<Trash2 aria-hidden="true" />} onClick={() => setLifecycleConfirm("delete")} disabled={pending}>Ajukan penghapusan</Button>
           </> : null}
-          {project.status !== "ACTIVE" ? <Badge tone={project.status === "ARCHIVED" ? "warning" : "neutral"}>{project.status === "ARCHIVED" ? "Archived — read only" : "Locked — read only"}</Badge> : null}
+          {project.status !== "ACTIVE" ? <Badge tone={project.status === "ARCHIVED" ? "warning" : "neutral"}>{project.status === "ARCHIVED" ? "Diarsipkan — hanya baca" : "Terkunci — hanya baca"}</Badge> : null}
         </div>
       </div>
+
+      {project.status === "ACTIVE" && readiness.total + readiness.counts.tbc + readiness.counts.byOwner > 0 ? (
+        <ReadinessBar readiness={readiness} onJump={jumpTo} />
+      ) : null}
 
       <div className="flex items-start gap-5">
         <SectionOutline sections={project.sections} />
@@ -265,8 +355,8 @@ export function ProjectEditor({
           {project.sections.length === 0 ? (
             <SectionCard>
               <EmptyState
-                title="Belum ada section"
-                description={editable ? "Tambahkan section untuk mulai menyusun BQ." : "Project ini belum memiliki section."}
+                title="Belum ada bagian"
+                description={editable ? "Tambahkan bagian untuk mulai menyusun BQ." : "Project ini belum memiliki bagian."}
               />
             </SectionCard>
           ) : null}
@@ -277,7 +367,7 @@ export function ProjectEditor({
             {editable ? (
               <InlineEdit
                 value={section.name}
-                label="Section name"
+                label="Nama bagian"
                 className="text-base font-semibold text-ink"
                 onCommit={(name) => run(updateSectionAction, { id: section.id, name })}
               />
@@ -297,17 +387,17 @@ export function ProjectEditor({
             commit={commit}
             commitNum={commitNum}
             onImport={setImportTarget}
-            onApplyAssembly={(itemId) => setAssemblyTarget({ via: "item", itemId })}
+            onApplyAssembly={setAssemblyItemId}
             columns={totalColumns}
           />
 
           {section.subsections.map((subsection) => (
-            <div key={subsection.id} className="grid gap-2 rounded-control border border-line-subtle p-3">
+            <div key={subsection.id} id={`bq-subsection-${subsection.id}`} className="grid gap-2 rounded-control border border-line-subtle p-3">
               <div className="flex items-center">
                 {editable ? (
                   <InlineEdit
                     value={subsection.name}
-                    label="Subsection name"
+                    label="Nama subbagian"
                     className="text-sm font-semibold text-ink-secondary"
                     onCommit={(name) => run(updateSubsectionAction, { id: subsection.id, name })}
                   />
@@ -326,24 +416,19 @@ export function ProjectEditor({
                 commit={commit}
                 commitNum={commitNum}
                 onImport={setImportTarget}
-                onApplyAssembly={(itemId) => setAssemblyTarget({ via: "item", itemId })}
+                onApplyAssembly={setAssemblyItemId}
                 columns={totalColumns}
               />
               {editable ? (
                 <div className="flex gap-1.5 pt-1">
-                  <AddRow
-                    label="+ Work Item"
-                    placeholder="Nama Work Item"
-                    disabled={pending}
-                    onAdd={(name) => run(addItemAction, { subsectionId: subsection.id, name })}
-                  />
                   <Button
                     size="sm"
                     variant="ghost"
+                    leadingIcon={<Plus aria-hidden="true" />}
                     disabled={pending}
-                    onClick={() => setAssemblyTarget({ via: "subsection", subsectionId: subsection.id })}
+                    onClick={() => setNewItemTarget({ subsectionId: subsection.id, where: `${section.name} › ${subsection.name}` })}
                   >
-                    Terapkan Assembly
+                    Pekerjaan
                   </Button>
                 </div>
               ) : null}
@@ -351,26 +436,21 @@ export function ProjectEditor({
           ))}
           {editable ? (
             <div className="flex flex-wrap gap-1.5 border-t border-line-subtle pt-3">
-              <AddRow
-                label="+ Subsection"
-                placeholder="Nama subsection"
-                disabled={pending}
-                onAdd={(name) => run(addSubsectionAction, { sectionId: section.id, name })}
-              />
-              <AddRow
-                label="+ Work Item"
-                placeholder="Nama Work Item"
-                disabled={pending}
-                onAdd={(name) => run(addItemAction, { sectionId: section.id, name })}
-              />
               <Button
                 size="sm"
                 variant="ghost"
+                leadingIcon={<Plus aria-hidden="true" />}
                 disabled={pending}
-                onClick={() => setAssemblyTarget({ via: "section", sectionId: section.id })}
+                onClick={() => setNewItemTarget({ sectionId: section.id, where: section.name })}
               >
-                Terapkan Assembly
+                Pekerjaan
               </Button>
+              <AddRow
+                label="+ Subbagian"
+                placeholder="Nama subbagian"
+                disabled={pending}
+                onAdd={(name) => run(addSubsectionAction, { sectionId: section.id, name })}
+              />
             </div>
           ) : null}
         </SectionCard>
@@ -379,20 +459,20 @@ export function ProjectEditor({
       </div>
 
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface/95 px-4 py-3 shadow-plane backdrop-blur-sm">
-        {pricingTotal > 0 ? (
+        {readiness.total > 0 ? (
           <Text
             tone="tertiary"
             size="sm"
-            className={pricingPriced === pricingTotal ? undefined : "text-warning"}
+            className={readiness.priced === readiness.total ? undefined : "text-warning"}
           >
-            {pricingPriced} dari {pricingTotal} Cost Component sudah ada harga
+            {readiness.priced} dari {readiness.total} rincian sudah ada harga
           </Text>
         ) : <span />}
         <div className="flex items-baseline gap-2">
-          <Text tone="secondary" size="sm">Grand total</Text>
+          <Text tone="secondary" size="sm">Total keseluruhan</Text>
           <span className="text-xl font-semibold tabular-nums text-ink">
             {project.grandTotal === null
-              ? <span className="text-sm font-normal text-ink-tertiary">Belum lengkap — ada item tanpa harga</span>
+              ? <span className="text-sm font-normal text-ink-tertiary">Belum lengkap — ada harga yang kosong</span>
               : formatMoney(createMoney(project.grandTotal, "IDR"))}
           </span>
         </div>
@@ -429,12 +509,11 @@ export function ProjectEditor({
       <ConfirmDialog
         open={lockOpen}
         onOpenChange={setLockOpen}
-        title="Lock this project?"
-        description="A locked project becomes read-only. Nothing in its structure or numbers can change afterwards."
-        confirmLabel="Lock project"
-        tone="danger"
+        title="Kunci project ini?"
+        description={`Project terkunci tidak bisa diubah (struktur maupun angkanya) sampai kuncinya dibuka kembali.${readiness.counts.empty > 0 ? ` Masih ada ${readiness.counts.empty} harga kosong; isi atau tandai TBC / Disediakan owner dulu.` : ""}`}
+        confirmLabel="Kunci project"
+        tone="primary"
         pending={pending}
-        requireTypedConfirmation="LOCK"
         onConfirm={() => {
           void run(lockProjectAction, {})
             .catch((caught: { code?: string; count?: number }) => {
@@ -451,9 +530,9 @@ export function ProjectEditor({
       <ConfirmDialog
         open={zeroPriceRows !== null}
         onOpenChange={(open) => { if (!open) setZeroPriceRows(null); }}
-        title="Lock with unpriced rows?"
-        description={`${zeroPriceRows ?? 0} row${zeroPriceRows === 1 ? " has" : "s have"} a price of Rp0. If that is intended (for example a price by request), lock anyway. Otherwise cancel and fill the prices in first.`}
-        confirmLabel="Lock anyway"
+        title="Kunci dengan harga Rp0?"
+        description={`${zeroPriceRows ?? 0} baris berharga Rp0. Jika memang disengaja, kunci saja. Jika belum, batalkan dan isi harganya dulu.`}
+        confirmLabel="Tetap kunci"
         tone="danger"
         pending={pending}
         onConfirm={() => {
@@ -464,9 +543,9 @@ export function ProjectEditor({
       <ConfirmDialog
         open={lifecycleConfirm !== null}
         onOpenChange={(open) => { if (!open) setLifecycleConfirm(null); }}
-        title={lifecycleConfirm === "archive" ? "Archive this project?" : lifecycleConfirm === "restore" ? "Restore this project?" : "Request permanent deletion?"}
-        description={lifecycleConfirm === "archive" ? "The project stays readable but cannot be edited until restored." : lifecycleConfirm === "restore" ? "The project returns to ACTIVE and can be edited again." : "An authorized approver must review the request before this archived project is permanently removed."}
-        confirmLabel={lifecycleConfirm === "archive" ? "Archive project" : lifecycleConfirm === "restore" ? "Restore project" : "Submit request"}
+        title={lifecycleConfirm === "archive" ? "Arsipkan project ini?" : lifecycleConfirm === "restore" ? "Pulihkan project ini?" : "Ajukan penghapusan permanen?"}
+        description={lifecycleConfirm === "archive" ? "Project tetap bisa dibaca tetapi tidak bisa diubah sampai dipulihkan." : lifecycleConfirm === "restore" ? "Project kembali aktif dan bisa diubah lagi." : "Permintaan harus ditinjau oleh approver sebelum project terarsip ini dihapus permanen."}
+        confirmLabel={lifecycleConfirm === "archive" ? "Arsipkan" : lifecycleConfirm === "restore" ? "Pulihkan" : "Kirim permintaan"}
         tone={lifecycleConfirm === "restore" ? "primary" : "danger"}
         pending={pending}
         onConfirm={() => {
@@ -475,20 +554,32 @@ export function ProjectEditor({
         }}
       />
 
-      {assemblyTarget ? (
+      {assemblyItemId ? (
         <AssemblyPickerDialog
-          key={assemblyTarget.via === "item" ? assemblyTarget.itemId : assemblyTarget.via === "section" ? assemblyTarget.sectionId : assemblyTarget.subsectionId}
+          key={assemblyItemId}
           assemblies={assemblies}
           pending={pending}
-          onClose={() => setAssemblyTarget(null)}
+          onClose={() => setAssemblyItemId(null)}
           onApply={(assemblyId, qtyPerL1) => {
-            const action = assemblyTarget.via === "item" ? applyAssemblyAction : addItemAndApplyAssemblyAction;
-            const fields = assemblyTarget.via === "item"
-              ? { itemId: assemblyTarget.itemId, assemblyId, qtyPerL1 }
-              : assemblyTarget.via === "section"
-                ? { sectionId: assemblyTarget.sectionId, assemblyId, qtyPerL1 }
-                : { subsectionId: assemblyTarget.subsectionId, assemblyId, qtyPerL1 };
-            void run(action, fields).catch(() => undefined).finally(() => setAssemblyTarget(null));
+            void run(applyAssemblyAction, { itemId: assemblyItemId, assemblyId, qtyPerL1 }).catch(() => undefined).finally(() => setAssemblyItemId(null));
+          }}
+        />
+      ) : null}
+
+      {newItemTarget ? (
+        <NewWorkItemDialog
+          assemblies={assemblies}
+          units={units}
+          where={newItemTarget.where}
+          pending={pending}
+          error={error}
+          onClose={() => setNewItemTarget(null)}
+          onSubmit={({ name, qty, unit, assemblyId }) => {
+            const where = newItemTarget.sectionId ? { sectionId: newItemTarget.sectionId } : { subsectionId: newItemTarget.subsectionId };
+            const request = assemblyId
+              ? run(addItemAndApplyAssemblyAction, { ...where, assemblyId, name, qty, unit })
+              : run(addItemAction, { ...where, name, qty, unit });
+            void request.then(() => setNewItemTarget(null)).catch(() => undefined);
           }}
         />
       ) : null}
@@ -524,22 +615,22 @@ function ItemTable({
   columns: number;
 }) {
   if (items.length === 0) {
-    return <Text tone="tertiary" size="sm">No Work Items yet.</Text>;
+    return <Text tone="tertiary" size="sm">Belum ada Pekerjaan.</Text>;
   }
 
   return (
     <DataTable minWidth="960px" density="compact">
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[36px]" aria-label="Expand" />
+          <TableHead className="w-[36px]" aria-label="Buka atau tutup" />
           <TableHead>Uraian</TableHead>
-          <TableHead align="end" className="w-[90px]">Qty</TableHead>
-          <TableHead className="w-[80px]">Unit</TableHead>
+          <TableHead align="end" className="w-[90px]">Jumlah</TableHead>
+          <TableHead className="w-[80px]">Satuan</TableHead>
           <TableHead align="end" className="w-[90px]">Koef.</TableHead>
-          <TableHead align="end" className="w-[90px]">Markup</TableHead>
-          <TableHead align="end" className="w-[130px]">Rate</TableHead>
+          <TableHead align="end" className="w-[90px]">Tambahan %</TableHead>
+          <TableHead align="end" className="w-[150px]">Harga satuan</TableHead>
           <TableHead align="end" className="w-[140px]">Total</TableHead>
-          {editable ? <TableHead align="end" className="w-[80px]" aria-label="Actions" /> : null}
+          {editable ? <TableHead align="end" className="w-[80px]" aria-label="Aksi" /> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -604,23 +695,30 @@ function ItemRows({
 }) {
   return (
     <>
-      <TableRow>
+      <TableRow id={`bq-row-${item.id}`}>
         <TableCell>
           <IconButton
             size="sm"
             variant="ghost"
-            label={open ? `Collapse ${item.name}` : `Expand ${item.name}`}
+            label={open ? `Tutup ${item.name}` : `Buka ${item.name}`}
             icon={open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
             onClick={() => toggle(item.id)}
           />
         </TableCell>
         <TableCell wrap className="font-medium">
-          <InlineEdit label="Work Item name" value={item.name} disabled={!editable} onCommit={commit(updateItemAction, item.id, "name")} />
+          <InlineEdit label="Nama Pekerjaan" value={item.name} disabled={!editable} onCommit={commit(updateItemAction, item.id, "name")} />
+          <Text tone="tertiary" size="sm" className="mt-0.5 block font-normal">
+            {isMarkerPriceMode(item.priceMode)
+              ? "Baris penanda — tidak masuk total"
+              : hasChildren
+                ? `Harga dari rincian (${item.lineItems.length + item.subObjects.reduce((sum, group) => sum + group.lineItems.length, 0)} baris)`
+                : "Harga langsung"}
+          </Text>
         </TableCell>
         <TableCell align="end">
-          <InlineEdit label="Quantity" align="end" inputMode="decimal" value={item.qty} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "qty")} />
+          <InlineEdit label="Jumlah" align="end" inputMode="decimal" value={item.qty} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "qty")} />
         </TableCell>
-        <TableCell>{editable ? <Select aria-label="Work Item unit" value={item.unit} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "unit")(event.target.value).catch(() => undefined)}>{units.some((unit) => unit.code === item.unit) ? null : <option value={item.unit} disabled>{item.unit} (inactive snapshot)</option>}{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code}</option>)}</Select> : item.unit}</TableCell>
+        <TableCell>{editable ? <Select aria-label="Satuan Pekerjaan" value={item.unit} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "unit")(event.target.value).catch(() => undefined)}>{units.some((unit) => unit.code === item.unit) ? null : <option value={item.unit} disabled>{item.unit} (inactive snapshot)</option>}{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code}</option>)}</Select> : item.unit}</TableCell>
         {/* Koef. and Markup are two fixed columns rather than one cell that
             switches meaning: an L1 with children takes its cost from them, so
             its own coefficient is dormant (shown "—"); a childless L1 has no
@@ -634,40 +732,44 @@ function ItemRows({
         </TableCell>
         <TableCell align="end">
           {hasChildren ? (
-            <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "markupL1Pct")} />
+            <InlineEdit label="Tambahan persen" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "markupL1Pct")} />
           ) : (
-            <Tooltip content="Markup tidak berlaku untuk Work Item tanpa breakdown — nilainya otomatis 0.">
+            <Tooltip content="Tambahan % hanya berlaku untuk Pekerjaan yang punya rincian biaya.">
               <span className="inline-block"><Text tone="tertiary" size="sm">—</Text></span>
             </Tooltip>
           )}
         </TableCell>
         <TableCell align="end">
           {isMarkerPriceMode(item.priceMode) ? (
-            <Tooltip content="Not priced and not counted in the grand total. Change it in the row's details.">
-              <span className="inline-block"><Badge tone="neutral">{BQ_PRICE_MODE_LABEL[item.priceMode]}</Badge></span>
+            <Tooltip content="Tidak diberi harga dan tidak masuk total. Ubah di baris pengaturan harga Pekerjaan ini.">
+              <span className="inline-block"><Badge tone="neutral">{PRICE_STATUS_LABEL[item.priceMode]}</Badge></span>
             </Tooltip>
           ) : hasChildren ? (
             money(item.rate)
           ) : (
             <InlineEdit
-              label="Unit price"
+              label="Harga satuan"
               align="end"
               inputMode="decimal"
-              placeholder="Belum ada harga"
+              placeholder="Belum diisi"
               value={item.hargaSnapshot ?? ""}
-              display={(value) => value ? formatMoney(createMoney(value, "IDR")) : <span className="text-ink-tertiary">Belum ada harga</span>}
+              display={(value) => !value
+                ? <span className="font-medium text-warning">Belum diisi</span>
+                : isZeroPrice(value)
+                  ? <span className="font-medium text-warning">Rp 0</span>
+                  : formatMoney(createMoney(value, "IDR"))}
               disabled={!editable}
               onCommit={commitNum(updateItemAction, item.id, "hargaSnapshot")}
             />
           )}
         </TableCell>
         <TableCell align="end" className="font-semibold">
-          {isMarkerPriceMode(item.priceMode) ? <Text tone="tertiary" size="sm">{BQ_PRICE_MODE_LABEL[item.priceMode]}</Text> : money(item.total)}
+          {isMarkerPriceMode(item.priceMode) ? <Text tone="tertiary" size="sm">{PRICE_STATUS_LABEL[item.priceMode]}</Text> : money(item.total)}
         </TableCell>
         {editable ? (
           <TableCell align="end">
             <RemoveButton
-              label={`Delete ${item.name}`}
+              label={`Hapus ${item.name}`}
               onRemove={() => run(deleteItemAction, { id: item.id })}
               disabled={pending}
             />
@@ -713,29 +815,23 @@ function ItemRows({
                 <div className="flex flex-wrap items-center gap-1.5 pl-4">
                   {editable ? (
                     <label className="mr-2 flex items-center gap-2 text-sm text-ink-secondary">
-                      Price
+                      Status harga
                       <Select
-                        aria-label={`Price mode for ${item.name}`}
+                        aria-label={`Status harga ${item.name}`}
                         value={item.priceMode}
                         disabled={pending}
                         onChange={(event) => void commit(updateItemAction, item.id, "priceMode")(event.target.value).catch(() => undefined)}
                       >
-                        {BQ_PRICE_MODES.map((mode) => <option key={mode} value={mode}>{mode === "PRICED" ? "Priced" : `${BQ_PRICE_MODE_LABEL[mode]} — not counted`}</option>)}
+                        {BQ_PRICE_MODES.map((mode) => <option key={mode} value={mode}>{mode === "PRICED" ? "Berharga" : `${PRICE_STATUS_LABEL[mode]} — tidak dihitung`}</option>)}
                       </Select>
                     </label>
                   ) : null}
                   {isMarkerPriceMode(item.priceMode) ? (
                     <Text tone="tertiary" size="sm" className="mr-2">
-                      Marked {BQ_PRICE_MODE_LABEL[item.priceMode]}: the quotation shows no price for this row and the grand total leaves it out.
+                      Ditandai {PRICE_STATUS_LABEL[item.priceMode]}: quotation tidak menampilkan harga baris ini dan total keseluruhan tidak menghitungnya.
                     </Text>
                   ) : null}
                   {editable ? <>
-                  <AddRow
-                    label="+ Component Group"
-                    placeholder="Nama Component Group"
-                    disabled={pending}
-                    onAdd={(name) => run(addSubObjectAction, { itemId: item.id, name })}
-                  />
                   <Button
                     size="sm"
                     variant="ghost"
@@ -743,8 +839,14 @@ function ItemRows({
                     disabled={pending}
                     onClick={() => onImport({ itemId: item.id })}
                   >
-                    + Tambah Cost Component
+                    + Rincian biaya
                   </Button>
+                  <AddRow
+                    label="+ Kelompok rincian"
+                    placeholder="Nama kelompok rincian"
+                    disabled={pending}
+                    onAdd={(name) => run(addSubObjectAction, { itemId: item.id, name })}
+                  />
                   {onApplyAssembly ? (
                     <Button
                       size="sm"
@@ -752,7 +854,7 @@ function ItemRows({
                       disabled={pending}
                       onClick={() => onApplyAssembly(item.id)}
                     >
-                      Assembly
+                      Terapkan resep
                     </Button>
                   ) : null}
                   </> : null}
@@ -799,24 +901,31 @@ function SubObjectRows({
             <IconButton
               size="sm"
               variant="ghost"
-              label={open ? `Collapse ${subObject.name}` : `Expand ${subObject.name}`}
+              label={open ? `Tutup ${subObject.name}` : `Buka ${subObject.name}`}
               icon={open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
               onClick={() => toggle(subObject.id)}
             />
-            <InlineEdit label="Component name" value={subObject.name} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "name")} />
+            <div className="min-w-0">
+              <InlineEdit label="Nama kelompok rincian" value={subObject.name} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "name")} />
+              {/* A Kelompok is not a plain folder: its multiplier and extra % change the Pekerjaan's price, so both
+                  stay in view here, never behind a menu. */}
+              <Text tone="tertiary" size="sm" className="block">
+                Kelompok rincian · jumlah per Pekerjaan dan tambahan % ikut menghitung harga
+              </Text>
+            </div>
           </div>
         </TableCell>
         <TableCell align="end">
-          <InlineEdit label="Quantity per Work Item" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "qtyPerL1")} />
+          <InlineEdit label="Jumlah per Pekerjaan" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "qtyPerL1")} />
         </TableCell>
-        <TableCell><Text tone="tertiary" size="sm">per Work Item</Text></TableCell>
+        <TableCell><Text tone="tertiary" size="sm">per Pekerjaan</Text></TableCell>
         <TableCell align="end">
           <Text tone="tertiary" size="sm">—</Text>
         </TableCell>
         <TableCell align="end">
-          <Tooltip content="Component Group markup (%) — applies only to Cost Components in this group.">
+          <Tooltip content="Tambahan % kelompok ini — hanya berlaku untuk rincian biaya di dalamnya.">
             <span className="inline-block">
-              <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={subObject.markupL2Pct} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "markupL2Pct")} />
+              <InlineEdit label="Tambahan persen" align="end" inputMode="decimal" value={subObject.markupL2Pct} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "markupL2Pct")} />
             </span>
           </Tooltip>
         </TableCell>
@@ -825,7 +934,7 @@ function SubObjectRows({
         {editable ? (
           <TableCell align="end">
             <RemoveButton
-              label={`Delete ${subObject.name}`}
+              label={`Hapus ${subObject.name}`}
               onRemove={() => run(deleteSubObjectAction, { id: subObject.id })}
               disabled={pending}
             />
@@ -850,7 +959,7 @@ function SubObjectRows({
                     disabled={pending}
                     onClick={() => onImport({ subObjectId: subObject.id })}
                   >
-                    + Tambah Cost Component
+                    + Rincian biaya
                   </Button>
                 </div>
               </TableCell>
@@ -880,16 +989,16 @@ function LineItemRow({
   commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
 }) {
   return (
-    <TableRow>
+    <TableRow id={`bq-row-${line.id}`}>
       <TableCell />
       <TableCell wrap>
         <div className={depth === 2 ? "pl-10" : "pl-4"}>
-          <InlineEdit label="Cost Component name" value={line.titleSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "titleSnapshot")} />
+          <InlineEdit label="Nama rincian biaya" value={line.titleSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "titleSnapshot")} />
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
             <Badge tone="neutral">{KATEGORI_LABEL[line.kategori] ?? line.kategori}</Badge>
             {line.sourceType !== "CUSTOM" ? (
               <Text tone="tertiary" size="sm">
-                {line.sourceType === "MASTERDATA" ? "Snapshot Master Data" : "Snapshot BQ Library"}
+                {line.sourceType === "MASTERDATA" ? "Salinan harga Master Data" : "Salinan harga BQ Library"}
               </Text>
             ) : null}
             {/* bq-contract K-03: the factor is context for setting a coefficient,
@@ -900,18 +1009,32 @@ function LineItemRow({
               </Text>
             ) : null}
             {line.sourcePriceSnapshot !== null && line.hargaSnapshot !== line.sourcePriceSnapshot ? (
-              <Tooltip content={`Harga asli: ${formatMoney(createMoney(line.sourcePriceSnapshot, line.currencySnapshot))}`}>
+              <>
                 <Badge tone="warning">Harga diubah</Badge>
-              </Tooltip>
+                {/* Master Data is untouched: this only sets this row's price back to the copy taken when it was added. */}
+                {editable ? (
+                  <button
+                    type="button"
+                    disabled={pending}
+                    onClick={() => void run(revertLineItemPriceAction, { id: line.id }).catch(() => undefined)}
+                    className="inline-flex items-center gap-1 rounded-control text-sm text-action underline-offset-2 hover:underline disabled:opacity-50"
+                  >
+                    <RotateCcw aria-hidden="true" className="size-3.5" />
+                    Kembalikan ke {formatMoney(createMoney(line.sourcePriceSnapshot, line.currencySnapshot))}
+                  </button>
+                ) : (
+                  <Text tone="tertiary" size="sm">Harga awal {formatMoney(createMoney(line.sourcePriceSnapshot, line.currencySnapshot))}</Text>
+                )}
+              </>
             ) : null}
           </div>
         </div>
       </TableCell>
       <TableCell align="end">
-        <InlineEdit label="Quantity" align="end" inputMode="decimal" value={line.qty} disabled={!editable} onCommit={commitNum(updateLineItemAction, line.id, "qty")} />
+        <InlineEdit label="Jumlah" align="end" inputMode="decimal" value={line.qty} disabled={!editable} onCommit={commitNum(updateLineItemAction, line.id, "qty")} />
       </TableCell>
       <TableCell>
-        <InlineEdit label="Unit" value={line.purchaseUnitSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "purchaseUnitSnapshot")} />
+        <InlineEdit label="Satuan" value={line.purchaseUnitSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "purchaseUnitSnapshot")} />
       </TableCell>
       <TableCell align="end">
         <InlineEdit label="Coefficient" align="end" inputMode="decimal" value={line.koefisien} disabled={!editable} onCommit={commitNum(updateLineItemAction, line.id, "koefisien")} />
@@ -921,12 +1044,16 @@ function LineItemRow({
       </TableCell>
       <TableCell align="end">
         <InlineEdit
-          label="Price"
+          label="Harga satuan"
           align="end"
           inputMode="decimal"
           value={line.hargaSnapshot}
           disabled={!editable}
-          display={(value) => value ? formatMoney(createMoney(value, line.currencySnapshot)) : <span className="text-ink-tertiary">Belum ada harga</span>}
+          display={(value) => !value
+            ? <span className="font-medium text-warning">Belum diisi</span>
+            : isZeroPrice(value)
+              ? <span className="font-medium text-warning">Rp 0</span>
+              : formatMoney(createMoney(value, line.currencySnapshot))}
           onCommit={commitNum(updateLineItemAction, line.id, "hargaSnapshot")}
         />
       </TableCell>
@@ -934,20 +1061,8 @@ function LineItemRow({
       {editable ? (
         <TableCell align="end">
           <div className="flex items-center justify-end gap-0.5">
-            {line.sourcePriceSnapshot !== null && line.hargaSnapshot !== line.sourcePriceSnapshot ? (
-              <Tooltip content="Kembalikan ke harga snapshot asal">
-                <IconButton
-                  size="sm"
-                  variant="ghost"
-                  label="Revert harga"
-                  icon={<RotateCcw aria-hidden="true" />}
-                  disabled={pending}
-                  onClick={() => run(revertLineItemPriceAction, { id: line.id })}
-                />
-              </Tooltip>
-            ) : null}
             <RemoveButton
-              label={`Delete ${line.titleSnapshot}`}
+              label={`Hapus ${line.titleSnapshot}`}
               onRemove={() => run(deleteLineItemAction, { id: line.id })}
               disabled={pending}
             />
@@ -1021,7 +1136,7 @@ function RemoveButton({ label, onRemove, disabled }: { label: string; onRemove: 
         open={open}
         onOpenChange={setOpen}
         title={label}
-        description="This Work Item and its breakdown will be permanently removed from the project."
+        description="Baris ini beserta isinya akan dihapus permanen dari project."
         confirmLabel="Hapus"
         tone="danger"
         pending={disabled}

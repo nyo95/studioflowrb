@@ -219,6 +219,26 @@ describe("BQ R6.1 invariants", () => {
     );
   });
 
+  it("makes a Work Item from an assembly with its lines directly under it and the chosen name, quantity and unit", async () => {
+    const { section } = await projectTree();
+    const assembly = await service.createAssemblyTemplate({ grants: GRANTS, actor: ACTOR, name: "Kitchen set" });
+    await service.addAssemblyCustomLine({ grants: GRANTS, actor: ACTOR, assemblyId: assembly.id, title: "Plywood", purchaseUnit: "SHEET", harga: "100", kategori: "ALAT", qty: "2" });
+    await service.addAssemblyCustomLine({ grants: GRANTS, actor: ACTOR, assemblyId: assembly.id, title: "Install", purchaseUnit: "HOUR", harga: "50", kategori: "ALAT", qty: "1" });
+
+    const item = await service.addItemAndApplyAssembly({ grants: GRANTS, actor: ACTOR, sectionId: section.id, assemblyId: assembly.id, name: "Dapur lantai 2", qty: "3", unit: "PCS" });
+    const stored = await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: item.id }, include: { sub_objects: true, line_items: { orderBy: { sort_order: "asc" } } } });
+    assert.equal(stored.name, "Dapur lantai 2");
+    assert.equal(stored.qty.toString(), "3");
+    assert.equal(stored.unit, "PCS");
+    assert.equal(stored.sub_objects.length, 0, "no Component Group named like the Work Item");
+    assert.deepEqual(stored.line_items.map((line) => line.title_snapshot), ["Plywood", "Install"]);
+    assert.deepEqual(stored.line_items.map((line) => line.sort_order), [0, 1]);
+
+    // Without a chosen name the assembly's own name is used.
+    const named = await service.addItemAndApplyAssembly({ grants: GRANTS, actor: ACTOR, sectionId: section.id, assemblyId: assembly.id });
+    assert.equal((await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: named.id } })).name, "Kitchen set");
+  });
+
   it("keeps the requester's deletion reason when the approver rejects the request", async () => {
     const { project } = await projectTree();
     await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });

@@ -76,12 +76,28 @@ async function deleteAssemblyLine(input: { grants: PermissionGrants; actor: { ki
   await auditWriter({ appId: "bq", action: "bq.assembly-line.deleted", entityType: "BqAssemblyLine", entityId: line.id, actor: input.actor });
 }
 
-async function applyAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; itemId: string; assemblyId: string; qtyPerL1?: string }) {
+/**
+ * `placement: "direct"` snapshots the assembly's lines straight under the Work Item (no wrapping Component Group): used
+ * when a new Work Item is made from an assembly, where a group named like the item would only repeat it. The default
+ * "group" keeps the assembly as one Component Group with its own quantity per Work Item.
+ */
+async function applyAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; itemId: string; assemblyId: string; qtyPerL1?: string; placement?: "group" | "direct" }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   await requireEditableProjectForItem(input.itemId);
   const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId }, include: { lines: { orderBy: { sort_order: "asc" } } } });
   if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
   if (!assembly.lines.length) throw new AppError("VALIDATION", "bq.assembly.empty", "An assembly must contain at least one Cost Component");
+  if (input.placement === "direct") {
+    const lineData = (line: (typeof assembly.lines)[number], sortOrder: number) => ({ item_id: input.itemId, source_type: line.source_type, source_ref_id: line.source_ref_id, source_imported_at: new Date(), title_snapshot: line.title_snapshot, purchase_unit_snapshot: line.purchase_unit_snapshot, base_unit_snapshot: line.base_unit_snapshot, purchase_to_base_factor_snapshot: line.purchase_to_base_factor_snapshot, source_price_snapshot: line.source_type === "CUSTOM" ? null : line.harga_snapshot, harga_snapshot: line.harga_snapshot, currency_snapshot: line.currency_snapshot, kategori: line.kategori, qty: line.qty, koefisien: line.koefisien, sort_order: sortOrder, notes: line.notes });
+    const created = await runTransaction(async (tx) => {
+      const last = await tx.bqLineItem.aggregate({ where: { item_id: input.itemId }, _max: { sort_order: true } });
+      const first = (last._max.sort_order ?? -1) + 1;
+      await tx.bqLineItem.createMany({ data: assembly.lines.map((line, index) => lineData(line, first + index)) });
+      return assembly.lines.length;
+    });
+    await auditWriter({ appId: "bq", action: "bq.assembly.applied", entityType: "BqItem", entityId: input.itemId, actor: input.actor, changes: { assemblyId: assembly.id, placement: "direct", lines: created } });
+    return { id: input.itemId };
+  }
   // Read+reserve the sub-object's sort_order and copy its lines atomically: two
   // near-simultaneous applies could otherwise both read the same MAX and collide,
   // and a createMany failure after the bare create would strand an empty group.

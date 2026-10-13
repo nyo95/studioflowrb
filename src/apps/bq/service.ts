@@ -30,7 +30,10 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     sectionId?: string;
     subsectionId?: string;
     assemblyId: string;
-    qtyPerL1?: string;
+    /** Defaults to the assembly's name, quantity 1 and unit "ls" when the caller does not choose them. */
+    name?: string;
+    qty?: string;
+    unit?: string;
   }) {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
     const assembly = await ctx.db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId } });
@@ -41,16 +44,18 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
       actor: input.actor,
       sectionId: input.sectionId,
       subsectionId: input.subsectionId,
-      name: assembly.name,
-      qty: "1",
-      unit: "ls",
+      name: input.name?.trim() || assembly.name,
+      qty: input.qty ?? "1",
+      unit: input.unit?.trim() || "ls",
     });
+    // The assembly's lines go straight under the new Work Item: a Component Group named like the Work Item would
+    // only repeat it, and its quantity per Work Item is always 1 here.
     await assemblies.applyAssemblyTemplate({
       grants: input.grants,
       actor: input.actor,
       itemId: item.id,
       assemblyId: input.assemblyId,
-      qtyPerL1: input.qtyPerL1,
+      placement: "direct",
     });
     return item;
   }

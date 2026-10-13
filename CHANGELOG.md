@@ -1,5 +1,19 @@
 # Changelog
 
+## R8.545 | 2026-10-14 | feat(bq): Project screen redesign slice 2 — readiness bar, price status, one door for a new Pekerjaan (Lead)
+
+- **Owner 2026-10-14:** "lanjut Slice 2 redesign layar BQ" (memo of the same day, slice 2: no schema change).
+- **Terms on the screen:** Bagian / Subbagian / Pekerjaan / Kelompok rincian / Rincian biaya / Resep; columns Jumlah, Satuan, Koef., Tambahan %, Harga satuan, Total; lock, archive and delete dialogs in Indonesian. The quotation keeps "By Owner" for the client; the editor says "Disediakan owner".
+- **Readiness bar** above the structure (ACTIVE only): counts of empty prices (block lock), Rp0 (lock with confirmation), TBC and Disediakan owner; each chip opens the Pekerjaan/Kelompok that holds the first such row and scrolls to it. Counting uses structure and string comparison only, no money arithmetic in the browser.
+- **Price status per row:** a Pekerjaan states "Harga langsung", "Harga dari rincian (N baris)" or "Baris penanda"; an empty price reads "Belum diisi" and Rp0 reads "Rp 0", both in the warning tone.
+- **Revert in view:** a changed price shows "Harga diubah" with a text action "Kembalikan ke Rp X" next to it (read-only projects show "Harga awal Rp X"), replacing the icon-only button in the actions column. Master Data is untouched (K-18). A Work Item's own direct price still has no baseline (owner decision D3, not part of this slice).
+- **Kelompok rincian:** the row says outright that its quantity per Pekerjaan and extra % take part in the price; the multiplier and extra % stay in the row.
+- **One door for a new Pekerjaan:** "+ Pekerjaan" opens a dialog with *Mulai kosong* or *Pakai resep*, name, quantity and unit (default unit from the active units, "ls" if present); the three "Terapkan Assembly" buttons at Bagian and Subbagian level are gone. "Terapkan resep" inside a Pekerjaan stays and still adds the resep as a Kelompok with its own quantity.
+- **Service:** `addItemAndApplyAssembly` takes name, quantity and unit, and snapshots the resep's lines directly under the new Pekerjaan (`applyAssemblyTemplate` placement `direct`); before it created a group named like the Pekerjaan inside it. Applying into an existing Pekerjaan is unchanged.
+- **Structure panel:** the outline rail (wide screens) now lists Subbagian under each Bagian with counts and jumps to them. Lock confirmation no longer asks to type LOCK (Unlock exists); it states open empty prices instead.
+- **Not in this slice:** saving a Pekerjaan as a resep, moving or grouping rows with an impact preview (slice 3), revert for a direct Pekerjaan price (D3), the mixed-language service error messages.
+- **Migrations/dependencies:** none. **Checks:** BQ integration 28/28 (new: resep applied directly with chosen name, quantity and unit); typecheck 0; eslint `src/app/(platform)/bq` and `src/apps/bq` 0. **Not done:** browser walk — the browser pane is not signed in and the running dev server predates `prisma generate`; BQ screens need the owner's walk (readiness chips jump, "+ Pekerjaan" both ways, revert text, lock dialog).
+
 ## R9 | 2026-10-13 | release: publish Workspace and existing image-flow fixes
 
 - **Owner authorisation:** push the committed work now; the owner's own manual browser walk is provisionally OK. Record the remaining checks in the consolidated backlog. This owner walk is separate from automated Playwright evidence and is not a Lead acceptance PASS.

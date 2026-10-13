@@ -134,6 +134,7 @@ const ItemSchema = z.object({
   sectionId: Id.optional(),
   subsectionId: Id.optional(),
   name: z.string().trim().min(1).max(160),
+  qty: z.string().trim().optional(),
   unit: z.string().trim().max(40).optional(),
 });
 
@@ -155,7 +156,7 @@ export async function addItemAction(
       sectionId: value.sectionId,
       subsectionId: value.subsectionId,
       name: value.name,
-      qty: "1",
+      qty: value.qty ? positiveDecimal(value.qty, "Quantity") : "1",
       unit: value.unit || "ls",
     });
     return reload(value.projectId);
@@ -300,10 +301,12 @@ const AddItemAndApplyAssemblySchema = z.object({
   sectionId: Id.optional(),
   subsectionId: Id.optional(),
   assemblyId: Id,
-  qtyPerL1: z.string().trim().optional(),
+  name: z.string().trim().max(160).optional(),
+  qty: z.string().trim().optional(),
+  unit: z.string().trim().max(40).optional(),
 });
 
-/** Creates an L1 at the selected footer, then applies the assembly in the same transaction. */
+/** Creates a Work Item at the selected footer with the assembly's lines under it, in the same transaction. */
 export async function addItemAndApplyAssemblyAction(
   _prev: ActionResult<BqProjectDetail> | null,
   formData: FormData,
@@ -325,7 +328,9 @@ export async function addItemAndApplyAssemblyAction(
       sectionId: value.sectionId,
       subsectionId: value.subsectionId,
       assemblyId: value.assemblyId,
-      qtyPerL1: value.qtyPerL1 ? positiveDecimal(value.qtyPerL1, "Assembly quantity") : undefined,
+      name: value.name || undefined,
+      qty: value.qty ? positiveDecimal(value.qty, "Quantity") : undefined,
+      unit: value.unit || undefined,
     });
     return reload(value.projectId);
   });
