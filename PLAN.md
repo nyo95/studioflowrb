@@ -1,153 +1,207 @@
 # Active Plan
 
-Plan ID: WO-SF-WORKSPACE-03 (Workspace canvas backend: frames and cards keep their place on the board)
-Scope: StudioFlow Workspace backend — geometry for sections (frames) and cards, one batch "place" command, reads, tests; minimal type pass-through only
+Plan ID: WO-SF-WORKSPACE-04 (Workspace board: one board per project, standalone Text / Image / File elements)
+Scope: StudioFlow Workspace backend — element kinds, image and file elements, frames folded into the one board, data migration, follow-through in every reader; minimal UI wiring only
 Module(s): studioflow (core; Workspace is not an optional module)
-Target revision: R8.531 (Executor). The Lead's canvas UI follows as its own revision.
-Status: IMPLEMENTED (backend R8.531 PASS; Lead canvas UI R8.532) — AWAITING OWNER WALK
+Target revision: R8.538 (Executor). The Lead's board UI follows as its own revision.
+Status: READY
 Priority: P1
-Owner: owner 2026-10-13 — accepted the canvas prototype as built in R8.529 ("sudah oke"), including 10 px snapping and the stacked document on a phone. Recorded in R8.530.
-Last updated: 2026-10-13 (Lead, R8.530)
+Owner: owner 2026-10-13 — accepted the clickable board concept (https://claude.ai/artifact/TbUL52g4MYgm1Y3G3TBvhL) and the direction below ("sudah jalan, susun rencana kerjanya"). Recorded in R8.537.
+Last updated: 2026-10-13 (Lead, R8.537)
 
 ## Why
 
-The accepted direction is the R8.529 prototype (`prototypes/workspace-canvas/`):
-the project Workspace is a free canvas — sections are **frames** placed
-anywhere, cards are placed anywhere inside them, cards size their height to
-their content, everything snaps to an 8 px grid, the canvas pans with the
-middle mouse button. Today the database only knows an order (`sort_order`), so
-a card's place on the canvas would be lost on reload. This slice stores
-positions and sizes. It changes no meaning of sections or cards.
+Today a Workspace nests four levels: canvas → frame (section) → card → images
+(`SfWorkspaceCardImage`, up to 12 per card). The owner found this odd for a
+designer: a pasted image becomes an empty card holding the image, an image
+cannot be sized on its own, and files have no place. The accepted direction is
+one board per project holding standalone elements. This Work Order is
+**phase 1 (backend)**; comment pins on images, feedback merged with the round
+feedback list, round lens/compare, the phone photo tray and grouping are later
+phases and are non-goals here.
 
-## Owner decisions carried into the product (2026-10-13)
+## Owner decisions (2026-10-13)
 
-- Frames = the existing Workspace sections (R8.519); the default section
-  (R8.525, `system_key = DEFAULT`, "Workspace") is the default frame. Frame
-  delete rules stay: only an empty frame can be deleted, the default never.
-- A card always belongs to a frame (`section_id` stays required). In the UI,
-  dropping a card on empty canvas keeps it in its frame (Lead UI rule).
-- A card's **height is never stored**: it follows its content. Its width and
-  position are stored. Images stay part of a card (the existing card image
-  gallery); there is no separate image card.
-- Heading / bullet / checklist from the `/` menu are formatting inside the
-  card body (the existing rich-text dialect), not a stored card type. Client
-  feedback stays `origin = CLIENT_ANSWER`; Starred stays `is_pinned`.
-- Pan and zoom are a personal view, kept in the browser only; never stored.
-- On a phone, frames and cards read top to bottom in their stored order.
+- **One board per project, no frames.** The project's DEFAULT section stays as
+  the hidden container of every element; no other section exists afterwards.
+- **Element kinds:** `TEXT` (body in the existing rich-text dialect — headings,
+  bullets, numbered lists, checklists stay formatting inside the body), `IMAGE`
+  (exactly one image), `FILE` (exactly one file, opened through a short-lived
+  signed link). A text element has a style: `PLAIN`, `HEADING`, `STICKY`.
+- **Height is never stored for any kind.** Text height follows content; an
+  image's height follows its own proportions at the stored width (the browser
+  renders `width = w, height = auto`). Width and position are stored, as today.
+- Labels (phase, round), `origin` (`NOTE` / `CLIENT_ANSWER` / `SITE_VISIT`),
+  star (`is_pinned`), author snapshot and optimistic `version` apply to every
+  element unchanged. Layout stays last-write-wins without a version bump.
+- **Old data is kept, split, never lost:** frame titles become `HEADING` text
+  elements; a card holding text and images becomes a text element plus one
+  image element per image, laid out beside it with the same labels and origin.
+- File limits (Lead default, owner may change later): at most **25 MB**; allowed
+  types PDF, DWG, DXF, SKP, XLSX, XLS, DOCX, DOC, PPTX, ZIP, TXT, CSV. Images keep
+  today's types (PNG, JPEG, WebP) and 3 MB limit after client-side shrinking.
+- Merging board client feedback with the round feedback list (`SfActivity`
+  FEEDBACK) is **decided for phase 2**; do not build it now and do not change
+  `SfActivity`.
 
 ## Locked decisions
 
 ### Schema (one forward-only migration, `studioflow` schema)
 
-- `SfWorkspaceSection` gains `canvas_x Int?`, `canvas_y Int?`,
-  `canvas_w Int?`, `canvas_h Int?` (columns of the same names).
-- `SfWorkspaceCard` gains `canvas_x Int?`, `canvas_y Int?`, `canvas_w Int?`.
-  No height column.
-- All nullable, no backfill. **Null means "not placed yet"**: the UI lays an
-  unplaced frame out to the right of the placed ones in `sort_order`, and
-  stacks unplaced cards under the frame's lowest card in `sort_order`, with
-  default widths (frame 384, card 256). This is how existing data, new cards
-  from Client answered or a site visit, and cards created without a position
-  appear, so the Phase Engine paths need no geometry.
-- Check constraints: every stored value is `0 ≤ value ≤ 100000`; when set,
-  `canvas_w ≥ 180` for cards and `canvas_w ≥ 260`, `canvas_h ≥ 120` for frames;
-  for each row, x and y are both null or both set.
+Keep the table `sf_workspace_card` and the model `SfWorkspaceCard` (the
+"element"); renaming would only churn every reader.
+
+- New enums `sf_workspace_element_kind` (`TEXT`, `IMAGE`, `FILE`) and
+  `sf_workspace_text_style` (`PLAIN`, `HEADING`, `STICKY`).
+- `SfWorkspaceCard` gains: `kind` (NOT NULL, default `TEXT`), `text_style`
+  (NOT NULL, default `PLAIN`), and nullable asset columns `storage_key`
+  (unique), `content_type`, `bytes`, `file_name`, `uploaded_by_id`,
+  `uploaded_by_name`.
+- Checks: `TEXT` ⇒ all asset columns null; `IMAGE`/`FILE` ⇒ `storage_key`,
+  `content_type`, `bytes` set and `body = ''`; `FILE` ⇒ `file_name` set.
+  Card width minimum drops from 180 to **120** (images may be small).
+- Data move, in this order, inside the migration:
+  1. **Frames.** For each project, a placed non-default section's cards that
+     have a position get absolute coordinates: `card.x + frame.x - default.x`,
+     `card.y + frame.y - default.y` (clamped to ≥ 0); the default section's own
+     position is then set to `(0, 0)` (its stored size kept or cleared — it is
+     no longer drawn). Cards of an unplaced section stay unplaced. Every card
+     moves to the DEFAULT section. Each non-default section's title becomes a
+     `HEADING` text element at the frame's absolute position (null when the
+     frame was unplaced), `origin = NOTE`, no labels, author = the section's
+     creator with a null name snapshot. Non-default sections are then deleted.
+     A project with sections but without a DEFAULT one is impossible by R8.525;
+     the migration refuses (RAISE) rather than guess.
+  2. **Images.** Every `sf_workspace_card_image` row becomes an `IMAGE`
+     element **with the image row's id** (so any id held elsewhere still
+     resolves), same project/section/labels/origin/pinned/author snapshot as
+     its card, `created_at` of the image, asset columns from the image row.
+     Placement: a card with an empty body is replaced by its first image —
+     that image element takes the card's position, width and `sort_order`
+     slot and the empty text card is deleted; the remaining images of a card
+     are laid in a row to the right of the card: `x = card.x + card.w + 16 +
+     i * (240 + 16)`, `y = card.y`, `w = 240` (i from 0 in image `sort_order`);
+     when the card is unplaced, its images stay unplaced. Overlap with other
+     elements is acceptable; the owner rearranges.
+  3. Drop `sf_workspace_card_image` once every row has moved; refuse (RAISE)
+     if any image row is left behind.
+  4. Recompute `sort_order` of each project's elements by `(canvas_y nulls
+     last, canvas_x, created_at, id)` so the phone order follows the board.
+- Integration tests prove each rule on seeded old-shape data (see Tests).
 
 ### Service (`src/apps/studioflow/workspace/service.ts`)
 
-- New `placeWorkspaceItems(input: ProjectInput & { sections?: Array<{ id,
-  x, y, w, h }>, cards?: Array<{ id, x, y, w, sectionId? }> })` — one
-  transaction, up to 200 sections and 500 cards per call:
-  - Every id must belong to the project (`NOT_FOUND` otherwise); a card's
-    `sectionId`, when given, must be a section of the same project.
-  - Gates: each card follows its own write rule (phase-labelled → that phase's
-    `transition`; unlabelled → `document`), and section geometry needs
-    `document`; `phaseWork`; writable, ACTIVE project. One refused item
-    refuses the whole call.
-  - Geometry is **layout, last write wins**: no version is checked and
-    `version` is **not** incremented, so moving or resizing never makes
-    someone's text edit stale. A card whose `sectionId` changes is a
-    membership change: lock both sections, set `section_id`, and record
-    `studioflow.workspace-card.moved` (from/to section). Pure geometry writes
-    are **not** audited (too frequent, no meaning).
-  - After writing, recompute `sort_order` of every touched section's cards by
-    `(canvas_y nulls last, canvas_x, created_at, id)` and of the project's
-    sections by `(canvas_x nulls last, canvas_y, sort_order, id)` when any
-    section moved, so the phone order follows the canvas. Unplaced (null)
-    items keep their relative order after the placed ones.
-  - Returns nothing but `{ ok: true }`.
-- `createWorkspaceSection` and `createWorkspaceCard` accept optional
-  `x, y, w` (and `h` for a section); without them the row stays unplaced.
-- `moveWorkspaceCard` (to another section, by position) keeps working for the
-  menu path and clears the moved card's `canvas_x/canvas_y` so it lands
-  stacked in its new frame; `reorderWorkspaceCards` and
-  `reorderWorkspaceSections` keep working unchanged.
-- Reads: `readWorkspace` returns per section `canvas: { x, y, w, h } | null`
-  and per card `canvas: { x, y, w } | null`.
+- **Create text:** the existing `createCard` path, plus optional `textStyle`;
+  `withImages` disappears (an empty text element is not created).
+- **Create image:** one command takes the image bytes, kind `IMAGE`, optional
+  `x, y, w`, `phaseId`, `clientAnswer`; checks scope, access, size and type
+  (sniffed, as today) before storage, stores the object, inserts the element
+  in one transaction, discards the object if the insert fails. Replaces the
+  current two-step "create empty card, then add image".
+- **Create file:** the same shape for `FILE`, with the file limits above. The
+  stored `content_type` comes from the allow-list by extension and a magic-byte
+  check where the format has one (PDF `%PDF`, ZIP-based Office/ZIP `PK`, DWG
+  `AC10`), never from the client's claim. Reads return a signed link that
+  downloads with the original file name (`Content-Disposition: attachment`),
+  except PDF which may open inline. Reuse `ports.storage` and the existing
+  private object key helper; add no dependency.
+- **Update:** text body edit and `textStyle` change for `TEXT` only (refused
+  for other kinds); labels, client-answer flag, star and delete for every kind.
+  Deleting an image/file element queues its object through the existing
+  unreferenced-cleanup path.
+- **Placement:** `placeWorkspaceItems` keeps working for elements (sections
+  part removed); the width check follows the new minimum.
+- **Sections:** the create / rename / delete / reorder / move-to-section
+  commands and the section part of placement are **PURGED** from the service,
+  the action and their tests. `readWorkspace` returns the project's elements
+  as one list (each with `kind`, `textStyle`, `canvas`, and for IMAGE/FILE a
+  signed `url`, `contentType`, `bytes`, `fileName`), not sections.
+- Phase Engine paths (Client answered note, site-visit note, `postPhaseNote`)
+  keep creating `TEXT` elements in the default section, unplaced.
 
-### Wiring
+### Follow-through (every reader of the old image table)
 
-- `workspaceAction` gains `placeItems` (schema mirrors the service limits:
-  integers, ranges, array sizes) and the optional geometry on `createSection`
-  and `createCard`. Pass the new read fields through `workspace/page.tsx` if the
-  types require it; no other UI change — the Lead replaces the screen next.
-- Contract §6.1: frames and cards have optional stored geometry, layout is last
-  write wins and never bumps `version`, card height follows content, unplaced =
-  null with the stacking rule, phone order follows the canvas.
+- `public/ideas-bridge.ts` `readWorkspaceImageSource`: reads an `IMAGE`
+  element by id (ids preserved by the migration).
+- `projects/asset-retention.ts`, `asset-cleanup.ts`, the asset sweep: include
+  image and file element objects.
+- Pinned-notes dialog read: `imageCount` becomes the element's kind (an image
+  or file element shows as such); keep the dialog working.
+- Iteration delete / undo guards in `phases/service.ts` keep counting
+  `workspace_cards` (now every element) — unchanged meaning.
+- `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md` Workspace section:
+  one board per project, element kinds, limits, height rule, migration rule.
+
+### Wiring (minimal; the Lead replaces the screen next)
+
+`workspaceAction` mirrors the service (new create-image / create-file
+actions as `FormData` uploads, `textStyle`, removed section commands). The
+current canvas must keep compiling and remain usable: render all elements in
+the single default frame, an image element through the existing image
+component with one image, a file element as a link with its name. No layout,
+interaction or styling work beyond that.
 
 ## Tests (disposable database)
 
-- Migration: existing sections and cards read back with `canvas: null`,
-  nothing else changed (ids, order, versions, default section).
-- `placeItems`: frames and cards placed and read back; `version` unchanged
-  after a place; a stale text edit is **not** caused by a concurrent move
-  (edit with the version read before a move still succeeds); a card moved to
-  another frame changes `section_id`, writes the `moved` audit, and both
-  frames' `sort_order` follow `(y, x)`; sections reorder by x when moved;
-  unplaced items stay after placed ones in order.
-- Refusals: a card or section of another project; a `sectionId` of another
-  project; out-of-range or too-small widths; x without y; a drafter placing a
-  card labelled with a designer phase (whole call refused, nothing written); a
-  viewer; an archived or completed project; arrays over the limits.
-- Create with geometry stores it; create without leaves null; Client answered
-  and a site visit still create unplaced cards in the default frame.
-- `moveWorkspaceCard` clears the card's position.
-- The whole existing Phase Engine and Workspace suites stay green.
+- Migration on seeded old-shape data: text-only card unchanged; text + 3 images
+  → text kept, 3 image elements with the image ids, same labels/origin/pinned,
+  row positions as specified; image-only card (1 and 2 images) → first image
+  takes its place and the empty text card is gone; unplaced card → images
+  unplaced; placed non-default frame → its cards in absolute coordinates in
+  DEFAULT, a heading element with its title at its position, frame deleted;
+  unplaced frame → heading and cards unplaced; image table dropped; sort order
+  follows `(y, x)`; versions and ids of surviving cards unchanged.
+- Create image / file: stored and read back with a signed link; wrong type,
+  spoofed type (bytes don't match the extension), over-size, viewer, drafter on
+  a designer-phase label, archived or completed project all refused with
+  nothing stored (object discarded on a failed insert).
+- Text style change; body edit refused on IMAGE/FILE; delete of an image/file
+  element queues its object for cleanup.
+- Ideas bridge reads a migrated image element by its old image id.
+- Asset retention/cleanup covers element objects.
+- Removed section commands are gone from the action schema.
+- The existing Phase Engine and Workspace suites stay green (adjusted only
+  where a section command was purged).
 
 ## Verification
 
 `npm test`, typecheck, eslint, `check:boundaries`, `check:legacy-runtime`,
-production build, `prisma migrate diff` (no new drift), the full migration chain
-on a fresh disposable rebuild database and incremental deploy on the standard
-disposable test database, staged and unstaged whitespace. Apply the migration
-to the kantor dev database (`studioflow_rebuild` on localhost:5433, verified)
-after the gates pass. Browser acceptance belongs to the Lead's canvas UI
-revision.
+production build, `prisma migrate diff` (no drift), the full migration chain on
+a fresh disposable rebuild database and incremental deploy on the standard test
+database (`masterdata_test`), staged and unstaged whitespace. After the gates
+pass, apply the migration to the rumah dev database (`masterdata` on
+localhost:5433, verified rebuild-only). Browser acceptance belongs to the
+Lead's board UI revision.
+
+## Reviewer Acceptance (Lead, after the commit)
+
+Old projects open with every former card, image and frame title present on one
+board in the same places; paste/drop creates image and file elements; files
+open; client feedback, star and labels survive on split elements.
 
 ## Non-goals
 
-No canvas UI, no route or navigation change, no storing of card height, pan or
-zoom, no card type column, no loose cards outside frames, no change to the
-default-section or delete-when-empty rules, no Phase Engine meaning change, no
-new permission, no new dependency, no push.
+No board UI design, toolbar, multi-select, comment pins, drawing on images,
+round lens/compare, photo tray, grouping, minimap, presentation export; no
+change to `SfActivity` or the round feedback list; no stored element height;
+no new permission; no new dependency; no change to Phase Engine meaning; no
+push.
 
 ## Executor Prompt
 
-You are the Backend Executor on the same checkout (location: kantor). Read
-`AGENTS.md`, `docs/agent/EXECUTOR.md`, `PLAN.md` (WO-SF-WORKSPACE-03), the
-StudioFlow contract §6.1, `CHANGELOG.md` R8.519–R8.530, the accepted prototype
-in `prototypes/workspace-canvas/` (behaviour reference only), and
-`src/apps/studioflow/workspace/service.ts`. Implement exactly the locked canvas
-geometry backend as one local revision commit R8.531 (confirm it is the next
-unused number in `CHANGELOG.md`): the forward-only migration adding nullable
-`canvas_*` columns with their checks, `placeWorkspaceItems` (batch, last write
-wins, no version bump, membership change audited, sort order following the
-canvas), optional geometry on create, `moveWorkspaceCard` clearing position,
-geometry on reads, the `placeItems` action, the contract update, and every test
-in the plan. Do not build the canvas UI, change routes or navigation, or change
-the Phase Engine's meaning. Stop with BLOCKED / CONFLICT if a locked decision
-cannot be met as written. Database commands only against verified disposable
-rebuild-only databases, then the kantor dev database after the gates pass. Run
-every gate in Verification, update `CHANGELOG.md`, commit locally without
-pushing, and reply with only a Planner/Reviewer prompt: commit, checks with
-results, limitations, dirty files, and a request for verdict.
+You are the Backend Executor on the same checkout (location: rumah, use
+`.env.rumah`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `PLAN.md`
+(WO-SF-WORKSPACE-04), the StudioFlow contract's Workspace section,
+`CHANGELOG.md` R8.519–R8.537 and `src/apps/studioflow/workspace/service.ts`.
+Implement the whole plan as one local revision commit R8.538 (confirm it is the
+next unused number): the migration that adds element kinds and folds frames and
+card images into standalone elements, the image and file element commands with
+their limits, the purge of section commands, every reader's follow-through, the
+contract update, minimal wiring that keeps the canvas usable, and every listed
+test. Where the plan leaves an ordinary implementation choice, make it and note
+it in the changelog; where completing it would change a locked decision or
+invent product behaviour, stop with BLOCKED / CONFLICT. Database commands only
+against verified rebuild-only databases. Run every gate in Verification, update
+`CHANGELOG.md`, commit locally without pushing, and reply with only a
+Planner/Reviewer prompt: commit, checks with results, limitations, dirty files,
+and a request for verdict.

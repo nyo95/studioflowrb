@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.537 | 2026-10-13 | docs(plan): Workspace board with standalone elements, WO-SF-WORKSPACE-04 (Lead)
+
+- **Owner 2026-10-13:** canvas → frame → card → image nesting felt odd for a designer; images should stand on their own and be resizable, files need a place, text must stay readable at any zoom. After reviewing a clickable concept (Text / Checklist / Sticky / Image / File elements, comment pins, client feedback with Done, round lens, photo tray, 100–200 % zoom with an overview map), the owner accepted the direction and decided that board client feedback will merge with the round feedback list (phase 2).
+- `PLAN.md` WO-SF-WORKSPACE-04 (READY, phase 1 backend, Executor target R8.538): one board per project (frames folded into the DEFAULT section, frame titles become heading elements), element kinds TEXT / IMAGE / FILE with text styles PLAIN / HEADING / STICKY, card images split into image elements keeping their ids, image and file create commands with limits (files 25 MB, fixed allow-list, sniffed type), section commands purged, every reader followed through.
+- **Migrations/dependencies:** none in this revision. **Checks:** docs only.
+
 ## R8.536 | 2026-10-13 | fix(studioflow): Workspace images scale with their block, zoom only enlarges (Lead)
 
 - **Owner 2026-10-13:** an image in a block stayed a small thumbnail and could not be scaled; blocks should never be zoomed out below readable text, only enlarged.
