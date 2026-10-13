@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.547 | 2026-10-14 | fix(bq): One plus sign on the add buttons of the project screen (Lead)
+
+- **Owner 2026-10-14** sent a screenshot of "+ + Subbagian". The button already draws a plus icon and the label text carried a second one; "Subbagian", "Kelompok rincian" and "Rincian biaya" no longer repeat it (the double plus also existed in the old "+ Subsection" and "+ Tambah Cost Component" labels).
+- **Migrations/dependencies:** none. **Checks:** typecheck and eslint on the BQ screen; no browser walk.
+
 ## R8.546 | 2026-10-14 | fix(bq): Keep the contract term "Markup" on the project screen (Lead)
 
 - **Owner 2026-10-14** pointed at the new column "Tambahan %" and asked whether it was outside the contract. It was: R8.545 renamed Markup on the Lead's own suggestion; the contract (K-04, §6.4) says markup and the owner never decided a rename. The column, its inline editors, tooltips and the Kelompok rincian caption read "Markup" again (the header no longer wraps to two lines). The other R8.545 terms (Bagian, Subbagian, Pekerjaan, Kelompok rincian, Rincian biaya, Resep) stay as the memo proposed them, pending the owner's confirmation.

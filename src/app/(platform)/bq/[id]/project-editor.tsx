@@ -446,7 +446,7 @@ export function ProjectEditor({
                 Pekerjaan
               </Button>
               <AddRow
-                label="+ Subbagian"
+                label="Subbagian"
                 placeholder="Nama subbagian"
                 disabled={pending}
                 onAdd={(name) => run(addSubsectionAction, { sectionId: section.id, name })}
@@ -839,10 +839,10 @@ function ItemRows({
                     disabled={pending}
                     onClick={() => onImport({ itemId: item.id })}
                   >
-                    + Rincian biaya
+                    Rincian biaya
                   </Button>
                   <AddRow
-                    label="+ Kelompok rincian"
+                    label="Kelompok rincian"
                     placeholder="Nama kelompok rincian"
                     disabled={pending}
                     onAdd={(name) => run(addSubObjectAction, { itemId: item.id, name })}
@@ -959,7 +959,7 @@ function SubObjectRows({
                     disabled={pending}
                     onClick={() => onImport({ subObjectId: subObject.id })}
                   >
-                    + Rincian biaya
+                    Rincian biaya
                   </Button>
                 </div>
               </TableCell>
