@@ -2956,6 +2956,11 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: moodboard.id } })).status, "DONE");
   });
 
+  it("refuses a third iteration kind: a phase has at most two steps (owner 2026-10-13)", async () => {
+    await assert.rejects(testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "Draft" }, { name: "Review" }, { name: "Issue" }] } }), /sf_phase_definition_iteration_kinds_max_two/);
+    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "CD Mall" }, { name: "CD Final" }] } });
+  });
+
   it("keeps the client's notes on the revised iteration, and undo of the Revision keeps them", async () => {
     const { projectId } = await newProject("Notes on revision");
     const mb = await phaseOf(projectId, "moodboard");

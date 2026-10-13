@@ -204,7 +204,10 @@ Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
   the next round opens) or **OK, done** (`DONE`;
   phase done). "Save, decide later" keeps the answer and leaves the choice.
 - **CD Mall** (the first of two iteration kinds) answers with Revision or
-  **Continue to CD Final**; only CD Final's OK closes the phase.
+  **Continue to CD Final**; only CD Final's OK closes the phase. The same rule
+  applies to any phase with two iteration kinds, named by its own steps
+  (R8.520). A phase has **at most two** iteration kinds (owner 2026-10-13;
+  database check `sf_phase_definition_iteration_kinds_max_two`, R8.522).
 - **Supervision** runs on dated site visits: New visit, then **Next visit** or
   **Done (handover)**.
 - A done phase can take **+ New round** (reopen by adding a round); history is

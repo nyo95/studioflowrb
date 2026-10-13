@@ -1,5 +1,11 @@
 # Changelog
 
+## R8.522 | 2026-10-13 | fix(studioflow): a phase has at most two steps (Lead)
+
+- **Owner decision 2026-10-13:** a phase definition holds at most two iteration kinds (first step continues to the second, as CD Mall → CD Final); a third would be skipped silently by the two-step rule. New migration `20261013120000_studioflow_iteration_kinds_max_two` refuses existing data with more than two (guard) and adds the check constraint `sf_phase_definition_iteration_kinds_max_two`. Contract §5.2 records it; regression test proves a third kind is refused.
+- Correction to the R8.520 notes: no Settings screen edits iteration kinds today (only the R8.4xx migration set CD Mall / CD Final), so the constraint guards future forms and manual edits. The live-read backlog bug is lowered to `[BUG][P3]` for the same reason; the resolved owner-decision entry is removed.
+- **Migrations/dependencies:** one migration, no dependency; applied to the disposable test database and a fresh full chain (107). **Checks:** `npm test`; typecheck; eslint; architecture boundaries (results in the commit body).
+
 ## R8.521 | 2026-10-13 | docs(platform): owner keeps the Developer web console as delivered (Lead)
 
 - **Owner decision 2026-10-13:** after the R8.520 review flagged the R8.506 Developer web console (authenticator sign-in, recovery codes, lockout, `/system`) as more than the 2026-10-10 scope reset asked for, the owner chose to keep it exactly as delivered: no removal, no further hardening. Recorded in `MODULES-DECISION.md` (header and phase S1). The modules runbook now names the console as the usual path and the server command as the fallback.
