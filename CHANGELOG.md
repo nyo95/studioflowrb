@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.529 | 2026-10-13 | feat(prototype): Workspace canvas in the StudioFlow theme, middle-click pan, auto-height cards, snapping (Lead)
+
+- **Owner 2026-10-13:** the canvas direction is right ("kurang lebih seperti itu"); asked for the UI Engine look, panning with the middle mouse button, cards that size themselves to their content, and snapping so the canvas stays tidy.
+- The prototype now uses the UI Engine tokens (light and dark), Schibsted Grotesk and Instrument Serif (copied into `prototypes/workspace-canvas/fonts/`, both open-licence), and the project page shell: top bar, rail, breadcrumb capsule, title, project pill bar, phase strip with step rings, compact workflow bar ("Phase details" with counts, Send to client, Client answered), Workspace toolbar with pill filters.
+- Middle-click drag (or Space + left-drag) pans from anywhere, also over a card; the browser's middle-click autoscroll is suppressed; left-drag on empty canvas no longer pans. Cards have no fixed height (only width is resized; images keep a size) and frames grow to hold their cards, live while typing. Positions and sizes land on an 8 px grid; a dragged card or frame locks within 10 px to another edge or a 16 px gap with a visible guide.
+- Lead check in the browser: middle-drag panned by the pointer distance while left-drag on empty canvas did not; a card dropped 7 px off a neighbour's edge landed on it with the guide shown; a card grew from 121 to 247 px as text was added and its frame followed; 375 px shows the stacked document with no horizontal page overflow; no console errors.
+- **Migrations/dependencies:** none (prototype only, no change under `src/` or `prisma/`). **Checks:** `node --check` on the script; the browser walk above.
+
 ## R8.528 | 2026-10-13 | fix(prototype): Workspace canvas review fixes (Lead)
 
 - **Reviewer verdict on R8.527: PASS with Lead corrections.** Walked the prototype over a local static server (the browser pane cannot open `file://`): free drag of a block into another frame, `/` menu turning a block into a checklist, Client answered adding a labelled feedback block to the default frame, Starred filter dimming 8 of 9 blocks, 375 px stacked document with no page-level overflow. Prototype-only scope confirmed: no change under `src/` or `prisma/`.
