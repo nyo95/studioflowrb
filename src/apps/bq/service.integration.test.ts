@@ -49,6 +49,106 @@ async function projectTree() {
 }
 
 describe("BQ R6.1 invariants", () => {
+  for (const parentKind of ["section", "subsection"] as const) {
+    it(`reorders ${parentKind} items without changing money and skips unchanged rows`, async () => {
+      const { project, section, item } = await projectTree();
+      await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "50" });
+      const subsection = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Detail" });
+      const parent = parentKind === "section" ? { sectionId: section.id } : { subsectionId: subsection.id };
+      const where = parentKind === "section" ? { section_id: section.id } : { subsection_id: subsection.id };
+      const first = await service.addItem({ grants: GRANTS, actor: ACTOR, ...parent, name: "First", qty: "2", unit: "PCS", hargaSnapshot: "100", koefisien: "1.5", markupL1Pct: "10" });
+      const last = await service.addItem({ grants: GRANTS, actor: ACTOR, ...parent, name: "Last", qty: "3", unit: "PCS", hargaSnapshot: "200" });
+      const original = await testDb.prisma.bqItem.findMany({ where, orderBy: { sort_order: "asc" } });
+      const read = createBqPublicRead(testDb.prisma);
+      const before = await read.getProjectDetail(project.id);
+      assert.notEqual(before!.grandTotal, null);
+      const orderedIds = original.map((row) => row.id);
+      [orderedIds[orderedIds.length - 2], orderedIds[orderedIds.length - 1]] = [last.id, first.id];
+      await service.reorderItems({ grants: GRANTS, actor: ACTOR, ...parent, orderedIds });
+      const stored = await testDb.prisma.bqItem.findMany({ where, orderBy: { sort_order: "asc" } });
+      assert.deepEqual(stored.map((row) => row.id), orderedIds);
+      assert.deepEqual(stored.map((row) => row.sort_order), orderedIds.map((_, i) => i));
+      for (const row of stored) {
+        const old = original.find((item) => item.id === row.id)!;
+        assert.deepEqual({ ...row, sort_order: old.sort_order, updated_at: old.updated_at }, old);
+        if (old.sort_order === row.sort_order) assert.deepEqual(row, old);
+      }
+      const after = await read.getProjectDetail(project.id);
+      const readItems = parentKind === "section" ? after!.sections[0]!.items : after!.sections[0]!.subsections[0]!.items;
+      assert.deepEqual(readItems.map((row) => row.id), orderedIds);
+      assert.equal(after!.grandTotal, before!.grandTotal);
+      assert.equal(bqSectionTotal(after!.sections[0]!), bqSectionTotal(before!.sections[0]!));
+      const audits = await testDb.prisma.auditEvent.findMany({ where: { action: "bq.items.reordered" } });
+      assert.equal(audits.length, 1);
+      assert.equal(audits[0]!.entity_id, parentKind === "section" ? section.id : subsection.id);
+      assert.equal(audits[0]!.entity_type, parentKind === "section" ? "BqSection" : "BqSubsection");
+      assert.deepEqual(audits[0]!.metadata, { count: original.length });
+      await service.reorderItems({ grants: GRANTS, actor: ACTOR, ...parent, orderedIds });
+      assert.deepEqual(await testDb.prisma.bqItem.findMany({ where, orderBy: { sort_order: "asc" } }), stored);
+      assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "bq.items.reordered" } }), 1);
+    });
+
+    it(`rejects stale ${parentKind} lists, locked/archived projects and missing manage permission`, async () => {
+      const { project, section, item } = await projectTree();
+      await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "100" });
+      const subsection = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Detail" });
+      const parent = parentKind === "section" ? { sectionId: section.id } : { subsectionId: subsection.id };
+      const where = parentKind === "section" ? { section_id: section.id } : { subsection_id: subsection.id };
+      await service.addItem({ grants: GRANTS, actor: ACTOR, ...parent, name: "Second", qty: "1", unit: "PCS", hargaSnapshot: "200" });
+      await service.addItem({ grants: GRANTS, actor: ACTOR, ...parent, name: "Third", qty: "1", unit: "PCS", hargaSnapshot: "300" });
+      const foreign = await projectTree();
+      const original = await testDb.prisma.bqItem.findMany({ where, orderBy: { sort_order: "asc" } });
+      const ids = original.map((row) => row.id);
+      const otherParentId = parentKind === "section"
+        ? (await service.addItem({ grants: GRANTS, actor: ACTOR, subsectionId: subsection.id, name: "Other parent", qty: "1", unit: "PCS", hargaSnapshot: "10" })).id
+        : item.id;
+      for (const orderedIds of [ids.slice(1), [...ids, "missing-item"], [...ids, ids[0]!], ids.map(() => ids[0]!), [foreign.item.id, ...ids.slice(1)], [otherParentId, ...ids.slice(1)]]) {
+        await assert.rejects(() => service.reorderItems({ grants: GRANTS, actor: ACTOR, ...parent, orderedIds }),
+          (error: unknown) => error instanceof AppError && error.code === "bq.item.reorder-stale" && error.message === "The list changed. Refresh and try again.");
+      }
+      await assert.rejects(() => service.reorderItems({ grants: GRANTS.filter((grant) => grant !== BQ_PERMISSIONS.projectManage), actor: ACTOR, ...parent, orderedIds: ids }),
+        (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN");
+      await service.lockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+      await assert.rejects(() => service.reorderItems({ grants: GRANTS, actor: ACTOR, ...parent, orderedIds: ids }),
+        (error: unknown) => error instanceof AppError && error.code === "bq.project.locked");
+      await service.unlockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+      await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+      await assert.rejects(() => service.reorderItems({ grants: GRANTS, actor: ACTOR, ...parent, orderedIds: ids }),
+        (error: unknown) => error instanceof AppError && error.code === "bq.project.archived");
+      assert.deepEqual(await testDb.prisma.bqItem.findMany({ where, orderBy: { sort_order: "asc" } }), original);
+      assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "bq.items.reordered" } }), 0);
+    });
+  }
+
+  it("requires exactly one reorder parent and accepts an empty parent's empty list", async () => {
+    const { section } = await projectTree();
+    const subsection = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Empty" });
+    for (const parent of [{}, { sectionId: section.id, subsectionId: subsection.id }]) {
+      await assert.rejects(() => service.reorderItems({ grants: GRANTS, actor: ACTOR, ...parent, orderedIds: [] }),
+        (error: unknown) => error instanceof AppError && error.kind === "VALIDATION");
+    }
+    await service.reorderItems({ grants: GRANTS, actor: ACTOR, subsectionId: subsection.id, orderedIds: [] });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "bq.items.reordered" } }), 0);
+  });
+
+  it("normalizes gaps in item positions and rolls back every reorder write if audit fails", async () => {
+    const { section, item } = await projectTree();
+    const last = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Last", qty: "1", unit: "PCS", sortOrder: 8 });
+    const where = { section_id: section.id };
+    const original = await testDb.prisma.bqItem.findMany({ where, orderBy: { sort_order: "asc" } });
+    const failure = new Error("Audit unavailable");
+    const failing = createBqService(testDb.prisma, {
+      runTransaction: <T>(work: (tx: PrismaClient) => Promise<T>) => testDb.prisma.$transaction((tx) => work(tx as unknown as PrismaClient)),
+      auditWriter: { async write() { throw failure; } },
+    });
+    await assert.rejects(() => failing.reorderItems({ grants: GRANTS, actor: ACTOR, sectionId: section.id, orderedIds: [last.id, item.id] }),
+      (error: unknown) => error === failure);
+    assert.deepEqual(await testDb.prisma.bqItem.findMany({ where, orderBy: { sort_order: "asc" } }), original);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "bq.items.reordered" } }), 0);
+    await service.reorderItems({ grants: GRANTS, actor: ACTOR, sectionId: section.id, orderedIds: [item.id, last.id] });
+    assert.deepEqual((await testDb.prisma.bqItem.findMany({ where, orderBy: { sort_order: "asc" } })).map((row) => row.sort_order), [0, 1]);
+  });
+
   it("enforces ACTIVE, LOCKED, and ARCHIVED transitions at the service layer", async () => {
     const { project, item } = await projectTree();
     await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "100" });

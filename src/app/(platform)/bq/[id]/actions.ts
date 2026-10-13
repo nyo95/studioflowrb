@@ -129,6 +129,43 @@ export async function updateSubsectionAction(
   });
 }
 
+const ReorderItemsSchema = z.object({
+  projectId: Id,
+  sectionId: Id.optional(),
+  subsectionId: Id.optional(),
+  orderedIds: z.array(Id),
+}).refine((value) => Boolean(value.sectionId) !== Boolean(value.subsectionId), {
+  message: "Exactly one Section or Subsection is required",
+});
+
+export async function reorderItemsAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const fields = formData.getAll("orderedIds");
+    let orderedIds: unknown = fields;
+    if (fields.length === 1 && typeof fields[0] === "string" && fields[0].trim().startsWith("[")) {
+      try {
+        orderedIds = JSON.parse(fields[0]);
+      } catch {
+        throw new AppError("VALIDATION", "bq.item.reorder-invalid", "Invalid Work Item list");
+      }
+    }
+    const parsed = ReorderItemsSchema.safeParse({
+      projectId: formData.get("projectId"),
+      sectionId: formData.get("sectionId") || undefined,
+      subsectionId: formData.get("subsectionId") || undefined,
+      orderedIds,
+    });
+    if (!parsed.success) throw validationError(parsed.error);
+    const { projectId, ...value } = parsed.data;
+    await bqService.reorderItems({ grants, actor, ...value });
+    return reload(projectId);
+  });
+}
+
 const ItemSchema = z.object({
   projectId: Id,
   sectionId: Id.optional(),

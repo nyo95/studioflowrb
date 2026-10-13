@@ -223,6 +223,56 @@ async function updateSubsection(input: {
   return item;
 }
 
+async function reorderItems(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  sectionId?: string;
+  subsectionId?: string;
+  orderedIds: string[];
+}) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  if (!input.sectionId && !input.subsectionId) {
+    throw new AppError("VALIDATION", "bq.item.no-parent", "Work Item must belong to a Section or Subsection");
+  }
+  if (input.sectionId && input.subsectionId) {
+    throw new AppError("VALIDATION", "bq.item.dual-parent", "Work Item cannot belong to both a Section and Subsection");
+  }
+  if (input.sectionId) await requireEditableProjectForSection(input.sectionId);
+  else await requireEditableProjectForSubsection(input.subsectionId!);
+
+  const children = await db.bqItem.findMany({
+    where: input.sectionId ? { section_id: input.sectionId } : { subsection_id: input.subsectionId },
+    select: { id: true, sort_order: true },
+  });
+  const positions = new Map(children.map((child) => [child.id, child.sort_order]));
+  if (input.orderedIds.length !== children.length
+    || new Set(input.orderedIds).size !== children.length
+    || input.orderedIds.some((id) => !positions.has(id))) {
+    throw new AppError("CONFLICT", "bq.item.reorder-stale", "The list changed. Refresh and try again.");
+  }
+  const changed = input.orderedIds.flatMap((id, sortOrder) =>
+    positions.get(id) === sortOrder ? [] : [{ id, sortOrder }]);
+  if (changed.length === 0) return;
+
+  // Partial unique sibling indexes require parking changed rows above both
+  // the current and final ranges before assigning their final positions.
+  const offset = children.reduce((max, child) => Math.max(max, child.sort_order + 1), children.length);
+  for (const [index, child] of changed.entries()) {
+    await db.bqItem.update({ where: { id: child.id }, data: { sort_order: offset + index } });
+  }
+  for (const child of changed) {
+    await db.bqItem.update({ where: { id: child.id }, data: { sort_order: child.sortOrder } });
+  }
+  await auditWriter({
+    appId: "bq",
+    action: "bq.items.reordered",
+    entityType: input.sectionId ? "BqSection" : "BqSubsection",
+    entityId: (input.sectionId ?? input.subsectionId)!,
+    actor: input.actor,
+    changes: { count: children.length },
+  });
+}
+
 async function updateItem(input: {
   grants: PermissionGrants;
   actor: { kind: string; userId?: string; label: string };
@@ -603,6 +653,7 @@ async function deleteLineItem(input: {
     updateSection,
     updateSubsection,
     addItem,
+    reorderItems,
     updateItem,
     deleteItem,
     addSubObject,
