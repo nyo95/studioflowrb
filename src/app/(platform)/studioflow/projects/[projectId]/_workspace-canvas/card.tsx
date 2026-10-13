@@ -1,7 +1,6 @@
 "use client";
 
 import { FileText, Send, Star } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type Ref } from "react";
 
 import { Button, Checkbox, FormattedText, ImageGallery, InlineError, RichTextEditor, RowActionMenu, Select, Text, shrinkImageFile, toggleCheckItem, useFileIntake, type RowActionItem } from "@/platform/ui_engine";
@@ -143,7 +142,6 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
   ignoreClick?: () => boolean;
   onWidthDown?: (event: ReactPointerEvent) => void;
 }) {
-  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(card.body);
   // The text and version the block last saved (or opened with). A star or a move by someone else bumps the version but
@@ -214,7 +212,6 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
       const { problems: failed } = await uploadCardImages(projectId, card.id, files);
       setBusy(false);
       setProblems(failed);
-      router.refresh();
     },
   });
 
@@ -267,7 +264,7 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
       title={byline || undefined}
       onPointerDown={!editing ? onPress : undefined}
       // The click that ends a move must not also open the text or an image.
-      onClickCapture={(event) => { if (ignoreClick?.()) { event.stopPropagation(); event.preventDefault(); } }}
+      onClickCapture={(event) => { if (event.currentTarget.contains(event.target as Node) && ignoreClick?.()) { event.stopPropagation(); event.preventDefault(); } }}
       {...(editing ? intake.target : {})}
       className={[
         "group/card relative grid gap-1.5 rounded-[10px] transition-[opacity,box-shadow,background-color] duration-150",
@@ -391,7 +388,6 @@ export function CardComposer({ projectId, place, labelChoices, defaultPhaseId, r
   onClose?: () => void;
   autoFocus?: boolean;
 }) {
-  const router = useRouter();
   const draft = useNoteDraft();
   const initialPhase = defaultPhaseId && labelChoices.phases.some((phase) => phase.id === defaultPhaseId) ? defaultPhaseId : labelChoices.allowNone ? "" : labelChoices.phases[0]?.id ?? "";
   const [phaseId, setPhaseId] = useState(initialPhase);
@@ -417,7 +413,6 @@ export function CardComposer({ projectId, place, labelChoices, defaultPhaseId, r
         target = (created.data as { cardId: string }).cardId;
       }
       const { problems, failed } = await uploadCardImages(projectId, target, files);
-      router.refresh();
       if (failed.length > 0) { pending.current = target; draft.keepOnly(failed); setErrors(problems); return; }
       pending.current = null;
       draft.clear();

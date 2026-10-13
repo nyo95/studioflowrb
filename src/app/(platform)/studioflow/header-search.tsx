@@ -43,7 +43,7 @@ export function StudioFlowHeaderSearch() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
+      if (typeof event.key !== "string" || event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
       event.preventDefault();
       inputRef.current?.focus();
       inputRef.current?.select();

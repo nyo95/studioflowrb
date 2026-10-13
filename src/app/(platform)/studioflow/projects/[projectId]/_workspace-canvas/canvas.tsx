@@ -120,7 +120,10 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   const viewRef = useRef(view);
   useEffect(() => {
     viewRef.current = view;
-    try { window.localStorage.setItem(viewKey, JSON.stringify(view)); } catch { /* kept for this visit only */ }
+    const timer = window.setTimeout(() => {
+      try { window.localStorage.setItem(viewKey, JSON.stringify(view)); } catch { /* kept for this visit only */ }
+    }, 150);
+    return () => window.clearTimeout(timer);
   }, [view, viewKey]);
 
   // ── Board model: server data + optimistic places, laid out ──────────
@@ -133,6 +136,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
 
   // ── Measuring element heights (they follow their content) ───────────
   const observer = useRef<ResizeObserver | null>(null);
+  const measuredNodes = useRef(new Map<string, HTMLElement>());
   useEffect(() => {
     observer.current = new ResizeObserver((entries) => {
       setHeights((current) => {
@@ -145,19 +149,25 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
         return next ?? current;
       });
     });
+    for (const element of measuredNodes.current.values()) observer.current.observe(element);
     return () => observer.current?.disconnect();
   }, []);
-  const measure = useCallback((id: string) => (element: HTMLElement | null) => {
-    if (!element) return;
+  // Stable refs prevent pan/zoom renders from detaching and observing every element again.
+  const measurements = useMemo(() => new Map(elements.map(({ id }) => [id, (element: HTMLElement | null) => {
+    const previous = measuredNodes.current.get(id);
+    if (previous) observer.current?.unobserve(previous);
+    if (!element) { measuredNodes.current.delete(id); return; }
     element.dataset.cardId = id;
+    measuredNodes.current.set(id, element);
     observer.current?.observe(element);
-  }, []);
+  }])), [elements]);
 
   // ── Commands ─────────────────────────────────────────────────────────
   const run: RunCommand = useCallback(async (input) => {
     setError(null);
     const result = await runWorkspaceCommand(input);
-    if (result.ok || result.stale) router.refresh();
+    // Successful actions already return the revalidated page in the same response.
+    if (!result.ok && result.stale) router.refresh();
     return result;
   }, [router]);
   const act = async (input: WorkspaceCommandInput) => {
@@ -189,8 +199,16 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   const follow = (event: ReactPointerEvent, move: (e: PointerEvent) => void, end: () => void) => {
     event.preventDefault();
     event.stopPropagation();
-    const onMove = (e: PointerEvent) => move(e);
-    const onUp = () => { window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onUp); end(); };
+    let frame: number | null = null;
+    let latestMove: PointerEvent | null = null;
+    const flush = () => { frame = null; if (latestMove) { move(latestMove); latestMove = null; } };
+    const onMove = (e: PointerEvent) => { latestMove = e; frame ??= window.requestAnimationFrame(flush); };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onUp);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      flush();
+      end();
+    };
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
@@ -204,6 +222,8 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
 
   /** Selects an element and, when the pointer moves, moves it with everything else selected. */
   const pressElement = (card: WorkspaceCardView) => (event: ReactPointerEvent) => {
+    // Dialog portals bubble through React's tree, but are outside the board's DOM.
+    if (!event.currentTarget.contains(event.target as Node)) return;
     if (event.button === 1) { startPan(event); return; }
     if (event.button !== 0) return;
     viewportRef.current?.focus({ preventScroll: true });
@@ -222,6 +242,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     const others: Rect[] = elements.filter((other) => !origin.has(other.id)).map((other) => ({ ...layout.get(other.id)!, h: heightOf(other.id) }));
     const start = { x: event.clientX, y: event.clientY };
     let live: Extract<Drag, { kind: "move" }> | null = null;
+    let frame: number | null = null;
     // Not `follow`: a press without movement must still reach the element as a click (to start writing).
     const onMove = (e: PointerEvent) => {
       if (!live && Math.abs(e.clientX - start.x) + Math.abs(e.clientY - start.y) < 4) return;
@@ -230,10 +251,11 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
       const rawY = lead.y + (e.clientY - start.y) / zoom;
       const snapped = ids.length === 1 ? snapMove({ w: lead.w, h: heightOf(card.id) }, rawX, rawY, others) : { x: Math.max(0, snapToGrid(rawX)), y: Math.max(0, snapToGrid(rawY)), guideX: null, guideY: null };
       live = { kind: "move", ids, dx: snapped.x - lead.x, dy: snapped.y - lead.y, guideX: snapped.guideX, guideY: snapped.guideY };
-      setDrag(live);
+      frame ??= window.requestAnimationFrame(() => { frame = null; setDrag(live); });
     };
     const onUp = () => {
       window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onUp);
+      if (frame !== null) window.cancelAnimationFrame(frame);
       if (!live) return;
       const moved = live;
       setDrag(null);
@@ -265,6 +287,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   };
 
   const onBoardPointerDown = (event: ReactPointerEvent) => {
+    if (!event.currentTarget.contains(event.target as Node)) return;
     if ((event.target as HTMLElement).closest("article, [data-board-ui]")) return;
     if (event.button === 1 || (event.button === 0 && spaceDown.current)) { startPan(event); return; }
     if (event.button !== 0) return;
@@ -280,6 +303,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   };
 
   const onBoardDoubleClick = (event: ReactMouseEvent) => {
+    if (!event.currentTarget.contains(event.target as Node)) return;
     if (!canCreate || (event.target as HTMLElement).closest("article, [data-board-ui]")) return;
     setDraft({ ...spotAt(event.clientX, event.clientY), textStyle: "PLAIN" });
   };
@@ -372,7 +396,6 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     if (files.length === 0) return;
     const { problems } = await uploadBoardFiles({ projectId, phaseId: newBlockPhase, place: spot, files });
     if (problems.length > 0) setError(problems.join(" "));
-    router.refresh();
   };
   const intake = useFileIntake({ accept: `image/png,image/jpeg,image/webp,${WORKSPACE_FILE_ACCEPT}`, multiple: true, pasteFromPage: true, disabled: !canCreate || narrow || lens !== "workspace", onFiles: (files) => void addFiles(files, pointerSpot(240)) });
   const pickFiles = (event: ChangeEvent<HTMLInputElement>) => {
@@ -436,7 +459,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   useEffect(() => {
     keyRef.current = (event: KeyboardEvent) => {
       if (narrow || lens !== "workspace" || isEditable(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
-      if (confirm.dialog && document.querySelector("[role=alertdialog], [role=dialog]")) return;
+      if (typeof event.key !== "string" || document.querySelector("[role=alertdialog], [role=dialog]")) return;
       const key = event.key.toLowerCase();
       if (key === "escape") { setSelection(new Set()); setTool("select"); setDraft(null); return; }
       if ((key === "delete" || key === "backspace") && selection.size > 0) { event.preventDefault(); void removeCards([...selection].map((id) => byId.get(id)!).filter(Boolean)); return; }
@@ -482,7 +505,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
         dimmed={!matches(item)}
         selected={board && selection.has(item.id)}
         style={style}
-        measureRef={board ? measure(item.id) : undefined}
+        measureRef={board ? measurements.get(item.id) : undefined}
         menuExtra={[]}
         run={run}
         onDelete={(target) => void removeCards([target])}

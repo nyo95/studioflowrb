@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
@@ -27,7 +26,6 @@ export type UseInScheduleResult = ActionResult<{ projectId: string; entryId: str
  * What happens to the image afterwards stays with the caller's `apply`; the schedule always receives a copy.
  */
 export function UseInScheduleDialog({ initialName, initialNotes, targets, apply, onClose }: { initialName: string; initialNotes: string; targets: Target[]; apply: (input: UseInScheduleInput) => Promise<UseInScheduleResult>; onClose: () => void }) {
-  const router = useRouter();
   const [projectId, setProjectId] = useState(targets.length === 1 ? targets[0].id : "");
   const [mode, setMode] = useState<"new-item" | "option">("new-item");
   const [section, setSection] = useState("MATERIAL");
@@ -89,7 +87,6 @@ export function UseInScheduleDialog({ initialName, initialNotes, targets, apply,
         });
         setPending(false);
         if (!result.ok) { setError(result.error.safeMessage); return; }
-        router.refresh();
         setDone({ projectId: result.data.projectId, code: result.data.code, label: result.data.label });
       }}>
         <Field label="Project" required description="Projects whose schedule you may change.">

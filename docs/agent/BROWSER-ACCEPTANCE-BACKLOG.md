@@ -30,6 +30,15 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.542] Workspace popup interaction and board responsiveness
+- Surface: project Workspace, image viewer, Ideas Use in schedule dialog
+- Fixture: Designer PIC, editable project with a standalone image; use a disposable rebuild fixture for persisted writes
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Open a Workspace image and Use in schedule; click/type in Product name and Category, switch new item/existing option and operate selectors without moving the background. 2. Submit to a new Schedule item, verify its image, then place another copy as an option on an existing item; source image stays intact. 3. Close/cancel the nested popup and reopen it. 4. While a popup is open, tool/delete/escape gestures must not change the board behind it. 5. Pan, zoom, drag/resize several elements, type/autosave, paste/upload an image and reload; final positions and content stay correct, with no redundant refresh or keyboard exception. 6. Repeat image-to-Schedule interaction in the stacked phone view.
+- Acceptance: popup controls remain interactive, copied images appear in Schedule, no lost edits or unauthorized writes, no background gesture while using a popup; assess sustained-drag responsiveness independently.
+- Executor diagnosis 2026-10-13: desktop native clicks and typing, enabled submit, Cancel, pan/zoom/reset verified; image-to-Schedule copying passed integration tests. No dev Schedule write with test product text. Full persisted browser flow and phone check await Reviewer.
+- Status: PENDING
+
 ### [R8.532] Workspace canvas on the Phases page
 - Surface: project Phases page (phase strip, workflow card, Phase details drawer, Workspace canvas, Drawing list lens)
 - Fixture: Designer and Drafter PICs, a viewer, a project with existing cards on two phases, a drafter phase with drawings
