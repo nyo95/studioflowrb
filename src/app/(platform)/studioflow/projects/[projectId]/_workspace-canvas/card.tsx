@@ -122,9 +122,10 @@ const TEXT_STYLES: { value: WorkspaceCardView["textStyle"]; label: string }[] = 
  * checklist ticks in place. If someone else changed the text first, both texts are shown and the person chooses, so
  * nothing is overwritten silently; a move or a star by someone else is absorbed.
  */
-export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseIdeas, dimmed, selected = false, style, measureRef, menuExtra, run, onDelete, onPress, ignoreClick, onWidthDown }: {
+export function WorkspaceCard({ card, projectId, projectName, canWrite, labelChoices, canUseIdeas, dimmed, selected = false, style, measureRef, menuExtra, run, onDelete, onPress, ignoreClick, onWidthDown }: {
   card: WorkspaceCardView;
   projectId: string;
+  projectName: string;
   canWrite: boolean;
   labelChoices: LabelChoices;
   canUseIdeas: boolean;
@@ -319,7 +320,7 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
           }}
         >
           {card.body ? <FormattedText text={card.body} className={textClass} onToggleCheck={canWrite ? toggleCheck : undefined} /> : null}
-          {card.images.length > 0 ? <ImageGallery images={card.images} size="fill" className={image ? "[&_button]:rounded-[10px] [&_button]:border-0" : card.body ? "mt-2" : undefined} viewerActions={(item) => <NoteImageActions image={item} projectId={projectId} phaseId={card.phaseId} canUseIdeas={canUseIdeas} />} /> : null}
+          {card.images.length > 0 ? <ImageGallery images={card.images} size="fill" className={image ? "[&_button]:rounded-[10px] [&_button]:border-0" : card.body ? "mt-2" : undefined} viewerActions={(item) => <NoteImageActions image={item} projectId={projectId} projectName={projectName} phaseId={card.phaseId} canUseIdeas={canUseIdeas} />} /> : null}
           {card.file ? (
             <div className="flex items-center gap-3">
               <span aria-hidden="true" className="grid h-11 w-9 shrink-0 place-items-center rounded-[6px] bg-surface-muted text-[10px] font-bold uppercase text-ink-secondary shadow-[inset_0_0_0_1px_var(--ui-border-default)]">

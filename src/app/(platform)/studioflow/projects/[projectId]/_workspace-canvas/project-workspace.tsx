@@ -15,8 +15,9 @@ type PersonItem = Awaited<ReturnType<typeof studioFlow.projects.listAssignablePe
  * every card. On a drafter phase the Drawing list is offered as a second lens of the same area.
  * The write rights mirror the service gates so the screen never offers a refused change.
  */
-export async function ProjectWorkspace({ projectId, selectedPhaseId, people, archived, status }: {
+export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId, people, archived, status }: {
   projectId: string;
+  projectName: string;
   selectedPhaseId: string | null;
   people: PersonItem[];
   archived: boolean;
@@ -50,6 +51,7 @@ export async function ProjectWorkspace({ projectId, selectedPhaseId, people, arc
   return (
     <WorkspaceCanvas
       projectId={projectId}
+      projectName={projectName}
       phases={phases}
       selectedPhase={selected ? { id: selected.id, name: selected.label } : null}
       readOnlyReason={writable ? null : archived ? "archived" : status !== "ACTIVE" ? "inactive" : "permission"}

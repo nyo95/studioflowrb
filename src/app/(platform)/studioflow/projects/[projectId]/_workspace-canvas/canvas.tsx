@@ -46,8 +46,9 @@ const isEditable = (target: EventTarget | null) => target instanceof HTMLElement
  * (or middle-click, or Space + drag) to move around; zoom only enlarges, and the overview map jumps anywhere.
  * Layout is last-write-wins and never makes someone's text edit stale. Below 768 px the elements read top to bottom.
  */
-export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, drawingList }: {
+export function WorkspaceCanvas({ projectId, projectName, sections, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, drawingList }: {
   projectId: string;
+  projectName: string;
   sections: WorkspaceSectionView[];
   phases: readonly PhaseOption[];
   selectedPhase: { id: string; name: string } | null;
@@ -499,6 +500,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
         key={item.id}
         card={item}
         projectId={projectId}
+        projectName={projectName}
         canWrite={canWrite}
         labelChoices={canWrite ? labelChoices : { allowNone: false, phases: [] }}
         canUseIdeas={canUseIdeas}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { PRESENTATION_ROUTES } from "@/apps/presentation/public/nav";
-import { Button, Dialog, Field, FormActions, InlineError, Notice, Select, buttonClasses } from "@/platform/ui_engine";
+import { Button, Dialog, Field, FormActions, InlineError, Notice, Select, Text, buttonClasses } from "@/platform/ui_engine";
 import type { ActionResult } from "@platform/core/actions";
 
 type Target = { id: string; name: string };
@@ -33,22 +33,32 @@ export function MoodboardDialog({ targets, apply, onClose }: { targets: Target[]
   }
 
   return (
-    <Dialog open onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="Add to moodboard" description="A copy goes on the project's Moodboard board (the Presentation tab). Changing or deleting the original later does not change it.">
+    <Dialog open dismissible={!pending} onOpenChange={(open) => { if (!open) onClose(); }} title="Add to moodboard" description="A copy goes on the project's Moodboard board (the Presentation tab). Changing or deleting the original later does not change it.">
       <form className="grid gap-3" onSubmit={async (event) => {
         event.preventDefault();
-        if (!projectId) return;
+        if (!project || pending) return;
         setPending(true); setError(null);
-        const result = await apply(projectId);
-        setPending(false);
-        if (!result.ok) { setError(result.error.safeMessage); return; }
-        setDone({ projectId, boardId: result.data.boardId, created: result.data.created });
+        try {
+          const result = await apply(projectId);
+          if (!result.ok) { setError(result.error.safeMessage); return; }
+          setDone({ projectId, boardId: result.data.boardId, created: result.data.created });
+        } catch {
+          setError("Could not confirm the copy. Check the moodboard before trying again.");
+        } finally {
+          setPending(false);
+        }
       }}>
-        <Field label="Project" required description="Projects whose documents you may change.">
-          <Select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+        {targets.length === 1 && projectId === targets[0].id ? (
+          <div className="grid gap-1" role="group" aria-label="Destination project">
+            <Text size="sm" tone="secondary">Project</Text>
+            <Text weight="semibold">{targets[0].name}</Text>
+          </div>
+        ) : <Field label="Project" required description="Projects whose documents you may change.">
+          <Select disabled={pending} value={projectId} onChange={(event) => setProjectId(event.target.value)}>
             <option value="">Choose a project…</option>
             {targets.map((target) => <option key={target.id} value={target.id}>{target.name}</option>)}
           </Select>
-        </Field>
+        </Field>}
         {error ? <InlineError>{error}</InlineError> : null}
         <FormActions>
           <Button type="button" onClick={onClose} disabled={pending}>Cancel</Button>

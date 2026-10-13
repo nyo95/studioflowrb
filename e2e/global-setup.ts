@@ -10,7 +10,7 @@ export default async function globalSetup(config: FullConfig) {
   const { email, password } = JSON.parse(readFileSync("e2e/.tmp/owner.json", "utf8")) as { email: string; password: string };
 
   const baseURL = config.projects[0]!.use.baseURL!;
-  const browser = await chromium.launch();
+  const browser = await chromium.launch({ ...config.projects[0]!.use.launchOptions, channel: config.projects[0]!.use.channel });
   const page = await browser.newPage();
   await page.goto(`${baseURL}/login`);
   await page.getByLabel("Email").fill(email);

@@ -2,7 +2,6 @@
 
 import { ImagePlus } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
@@ -36,7 +35,6 @@ function hostOf(url: string): string {
  * at once; title, link and note are optional. "Use in schedule" copies the card into one project's schedule.
  */
 export function IdeasBoard({ cards, targets, presentationEnabled }: { cards: IdeaCardView[]; targets: Target[]; presentationEnabled: boolean }) {
-  const router = useRouter();
   const confirm = useConfirm();
   const picker = useRef<HTMLInputElement>(null);
   const [adding, setAdding] = useState(0);
@@ -63,10 +61,9 @@ export function IdeasBoard({ cards, targets, presentationEnabled }: { cards: Ide
       setAdding((count) => count - 1);
     }
     setProblems([...found]);
-    router.refresh();
   };
   // Paste works anywhere on the page outside a text field, and a drop anywhere on the board.
-  const intake = useFileIntake({ accept: ACCEPTED, multiple: true, pasteFromPage: !editing && !using, disabled: Boolean(editing || using), onFiles: (files, refused) => void add(files, refused) });
+  const intake = useFileIntake({ accept: ACCEPTED, multiple: true, pasteFromPage: !editing && !using && !moodboarding, disabled: Boolean(editing || using || moodboarding), onFiles: (files, refused) => void add(files, refused) });
 
   const shown = useMemo(() => cards.filter((card) => view === "all" || (view === "used" ? card.usages.length > 0 : card.usages.length === 0)), [cards, view]);
   const usedCount = cards.filter((card) => card.usages.length > 0).length;
@@ -82,7 +79,8 @@ export function IdeasBoard({ cards, targets, presentationEnabled }: { cards: Ide
       try {
         const result = await replaceIdeaImageAction(await upload(file, { cardId: card.id }));
         if (!result.ok) setRowError(result.error.safeMessage);
-        router.refresh();
+      } catch {
+        setRowError("Could not confirm the replacement. Check the image before trying again.");
       } finally {
         setBusy(null);
       }
@@ -102,7 +100,8 @@ export function IdeasBoard({ cards, targets, presentationEnabled }: { cards: Ide
     try {
       const result = await ideaCardAction({ command: "delete", cardId: card.id });
       if (!result.ok) setRowError(result.error.safeMessage);
-      router.refresh();
+    } catch {
+      setRowError("Could not confirm the deletion. Check your Ideas board before trying again.");
     } finally {
       setBusy(null);
     }
@@ -181,26 +180,30 @@ export function IdeasBoard({ cards, targets, presentationEnabled }: { cards: Ide
 }
 
 function EditDialog({ card, onClose }: { card: IdeaCardView; onClose: () => void }) {
-  const router = useRouter();
   const [title, setTitle] = useState(card.title ?? "");
   const [sourceUrl, setSourceUrl] = useState(card.sourceUrl ?? "");
   const [note, setNote] = useState(card.note ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   return (
-    <Dialog open onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="Idea details" description="All optional. The link is only kept as a reference.">
+    <Dialog open dismissible={!pending} onOpenChange={(open) => { if (!open) onClose(); }} title="Idea details" description="All optional. The link is only kept as a reference.">
       <form className="grid gap-3" onSubmit={async (event) => {
         event.preventDefault();
+        if (pending) return;
         setPending(true); setError(null);
-        const result = await ideaCardAction({ command: "update", cardId: card.id, title, sourceUrl, note });
-        setPending(false);
-        if (!result.ok) { setError(result.error.safeMessage); return; }
-        router.refresh();
-        onClose();
+        try {
+          const result = await ideaCardAction({ command: "update", cardId: card.id, title, sourceUrl, note });
+          if (!result.ok) { setError(result.error.safeMessage); return; }
+          onClose();
+        } catch {
+          setError("The details could not be saved. Please try again.");
+        } finally {
+          setPending(false);
+        }
       }}>
-        <Field label="Title"><Input value={title} maxLength={160} autoFocus onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Pink translucent stone" /></Field>
-        <Field label="Link" description="Where it came from, e.g. the Pinterest page."><Input type="url" value={sourceUrl} maxLength={2000} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://" /></Field>
-        <Field label="Note"><Textarea rows={3} value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder="e.g. maybe for the cashier wall" /></Field>
+        <Field label="Title"><Input disabled={pending} value={title} maxLength={160} autoFocus onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Pink translucent stone" /></Field>
+        <Field label="Link" description="Where it came from, e.g. the Pinterest page."><Input disabled={pending} type="url" value={sourceUrl} maxLength={2000} onChange={(event) => setSourceUrl(event.target.value)} placeholder="https://" /></Field>
+        <Field label="Note"><Textarea disabled={pending} rows={3} value={note} maxLength={2000} onChange={(event) => setNote(event.target.value)} placeholder="e.g. maybe for the cashier wall" /></Field>
         {error ? <InlineError>{error}</InlineError> : null}
         <FormActions>
           <Button type="button" onClick={onClose} disabled={pending}>Cancel</Button>

@@ -77,7 +77,7 @@ export default async function ProjectOverviewPage({
 
       {/* One Workspace canvas for the whole project (board-first, owner 2026-10-13); the phase only sets context. */}
       <Suspense fallback={<SectionCard padded><SkeletonBlock className="h-[420px] w-full" /></SectionCard>}>
-        <ProjectWorkspace projectId={projectId} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />
+        <ProjectWorkspace projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />
       </Suspense>
     </div>
   );

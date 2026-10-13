@@ -18,7 +18,7 @@ export const ITERATION_STATE_TONE: Record<IterationView["state"], "neutral" | "w
  * Under a note image in the large viewer: keep a copy on the person's Ideas board, or put it in this project's schedule.
  * Both copy; the note is never changed. The Workspace uses it too, where a card may have no phase label.
  */
-export function NoteImageActions({ image, projectId, phaseId, canUseIdeas }: { image: { id: string }; projectId: string; phaseId: string | null; canUseIdeas: boolean }) {
+export function NoteImageActions({ image, projectId, projectName, phaseId, canUseIdeas }: { image: { id: string }; projectId: string; projectName: string; phaseId: string | null; canUseIdeas: boolean }) {
   const ideasEnabled = useStudioFlowModuleEnabled("ideas") && canUseIdeas;
   const presentationEnabled = useStudioFlowModuleEnabled("presentation");
   const [saved, setSaved] = useState(false);
@@ -28,14 +28,24 @@ export function NoteImageActions({ image, projectId, phaseId, canUseIdeas }: { i
   const [moodboard, setMoodboard] = useState<"idle" | "pending" | "done">("idle");
   const addToMoodboard = async () => {
     setMoodboard("pending"); setError(null);
-    const result = await addNoteImageToMoodboardAction({ projectId, phaseId, imageId: image.id });
-    if (result.ok) setMoodboard("done"); else { setMoodboard("idle"); setError(result.error.safeMessage); }
+    try {
+      const result = await addNoteImageToMoodboardAction({ projectId, phaseId, imageId: image.id });
+      if (result.ok) setMoodboard("done"); else { setMoodboard("idle"); setError(result.error.safeMessage); }
+    } catch {
+      setMoodboard("idle");
+      setError("Could not confirm the copy. Check the moodboard before trying again.");
+    }
   };
   const save = async () => {
     setPending(true); setError(null);
-    const result = await saveNoteImageToIdeasAction({ projectId, phaseId, imageId: image.id });
-    setPending(false);
-    if (result.ok) setSaved(true); else setError(result.error.safeMessage);
+    try {
+      const result = await saveNoteImageToIdeasAction({ projectId, phaseId, imageId: image.id });
+      if (result.ok) setSaved(true); else setError(result.error.safeMessage);
+    } catch {
+      setError("Could not confirm the copy. Check Ideas before trying again.");
+    } finally {
+      setPending(false);
+    }
   };
   return (
     <>
@@ -47,7 +57,7 @@ export function NoteImageActions({ image, projectId, phaseId, canUseIdeas }: { i
         <UseInScheduleDialog
           initialName=""
           initialNotes=""
-          targets={[{ id: projectId, name: "this project" }]}
+          targets={[{ id: projectId, name: projectName }]}
           apply={(input) => applyNoteImageToScheduleAction({ operationId: input.operationId, projectId, phaseId, imageId: image.id, target: input.target, option: input.option })}
           onClose={() => setUsing(false)}
         />

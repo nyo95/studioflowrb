@@ -30,6 +30,15 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.544] Existing Ideas/Workspace image flows, destinations and recovery
+- Surface: Workspace image actions, Ideas image board, shared Use in schedule and Add to moodboard dialogs, Ideas details dialog
+- Fixture: private Ideas owner and another user; editable/read-only/completed project; Ideas/Presentation independently enabled and disabled; disposable rebuild fixture for writes
+- Viewport: desktop (default) and 375 px
+- Steps: 1. From Workspace verify the real fixed project name, choose an existing Schedule item, copy the image and verify source/destination independence. 2. From Ideas with multiple targets verify the picker remains and switching projects clears the item choice. 3. Save a Workspace image to Ideas and add it to Moodboard; verify only the correct owner/project receives a copy. 4. Delay/fail Schedule, Moodboard and Ideas-details requests; pending controls/close are locked and rejection restores controls without losing form text. For uncertain non-idempotent copy completion, check the destination before retrying. 5. Repeat permitted flows with modules disabled/read-only and on phone; no capability or private card becomes reachable through UI changes.
+- Acceptance: existing privacy, public module boundaries, permissions, snapshots and independent-copy rules stay intact; destination is clear; no stuck busy state, wrong item or background intake while a dialog owns the interaction.
+- Executor evidence 2026-10-13: full automated suite 1,069/1,069; Ideas browser regression with held/aborted Schedule submit and successful retry 1/1 on Edge, including phone width/deletion. In-app Workspace dialog diagnosis verified fixed project name and working item/text controls without a dev write. These checks do not constitute Reviewer PASS.
+- Status: PENDING
+
 ### [R8.542] Workspace popup interaction and board responsiveness
 - Surface: project Workspace, image viewer, Ideas Use in schedule dialog
 - Fixture: Designer PIC, editable project with a standalone image; use a disposable rebuild fixture for persisted writes
