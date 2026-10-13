@@ -1,5 +1,13 @@
 # Changelog
 
+## R9 | 2026-10-13 | release: publish Workspace and existing image-flow fixes
+
+- **Owner authorisation:** push the committed work now; the owner's own manual browser walk is provisionally OK. Record the remaining checks in the consolidated backlog. This owner walk is separate from automated Playwright evidence and is not a Lead acceptance PASS.
+- Publishes the already committed R8.537–R8.544 chain from main (previous remote main `707bfdd`, release input HEAD `60a37e4`): Workspace element/backend and board UI, popup/keyboard/responsiveness corrections, the committed BQ R8.543 correction, and existing Ideas/Workspace image-flow recovery. BQ work currently in progress and uncommitted is excluded.
+- **Verification evidence:** R8.544 full suite 1,069/1,069, typecheck, lint (one existing presentation warning), boundaries, legacy-runtime, production build and whitespace passed; targeted Ideas browser regression 1/1 on Edge. This publication changes documentation only; no code checks were rerun against Claude's in-progress BQ working files. Documentation diff and staged/unstaged whitespace checked.
+- **Remaining checks:** consolidated `[UNVERIFIED]` follow-up added to BACKLOG, with exact browser cases retained under R8.542/R8.544 in BROWSER-ACCEPTANCE-BACKLOG (Workspace → Ideas/Moodboard, uncertain request completion, module-disabled/read-only/private-user UI, desktop/phone, sustained board responsiveness). Owner says normal use is temporarily OK; wider review remains deferred.
+- **Migrations/dependencies:** none in this publication commit; previously committed migration details remain in their revision entries. No deployment, tag or independent acceptance claimed. Per the revision protocol, the next local revision starts at **R9.01**.
+
 ## R8.544 | 2026-10-13 | fix(ideas): Smooth and recover existing image placement flows (Executor)
 
 - **Owner 2026-10-13:** "coba buat smooth ... tanpa regresi terhadap seluruh kontrak"; scope clarified to **polish and secure existing flows only**, not build Ideas → Workspace intake. Maintenance after WO-SF-WORKSPACE-04; modules: ideas and studioflow, reusing the existing presentation copy action.
