@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.526 | 2026-10-13 | docs(plan): R8.525 accepted, Workspace canvas prototype brief (Lead)
+
+- **Reviewer verdict: PASS** for R8.525 (Workspace default section): migration backfill and guard, `defaultSection` for loose, client-answer and site-visit cards, default-delete refusal, `isDefault` on reads and audit, populated fixture. Independent re-run: `npm test` 1,040 passed, typecheck clean, kantor dev database up to date (108 migrations). Known `migrate diff` drift (Developer timestamps, `sf_holiday`) unchanged and outside this slice. Dev server restarted after the schema change.
+- **Owner direction 2026-10-13:** the board-first column UI and the Lead's four layout sketches are not what the owner pictures; the Workspace should feel like Notion (type directly, blocks) yet move as freely as Miro (free placement, frames, pan and zoom), and its position on the project page is open. The owner asked Codex to build a prototype first, so the board-first UI revision is on hold.
+- `PLAN.md` now holds READY `PROTO-SF-WORKSPACE-CANVAS` (Codex, target R8.527): a self-contained HTML/CSS/JS prototype in `prototypes/workspace-canvas/`, outside the app, with sample data and the locked rules (phase and round chips, default "Workspace" frame, Starred, Client feedback, dimming filters, 375 px fallback).
+- Correction to the R8.524 handoff: its commit is `06dba1b` (amended to include its changelog entry), not `40e1ee7`.
+- **Migrations/dependencies:** none. **Checks:** documentation only.
+
 ## R8.525 | 2026-10-13 | feat(studioflow): lock the project Workspace default section (Executor)
 
 - **WO-SF-WORKSPACE-02 backend.** `SfWorkspaceSection.system_key` gives each project's default loose-card destination the fixed `DEFAULT` identity with a per-project unique constraint. Loose cards, phase notes, Client answered cards and supervision-visit cards now use that identity instead of whichever section is first. The system creates a missing default lazily at the front as `Workspace`; simultaneous first cards still create exactly one.
