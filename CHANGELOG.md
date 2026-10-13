@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.538 | 2026-10-13 | docs(plan): WO-SF-WORKSPACE-04 correction after Executor BLOCKED (Lead)
+
+- The Executor stopped on WO-SF-WORKSPACE-04 at R8.537 without naming the conflict and without changing files. Lead inspection: the plan required `Content-Disposition` on signed file links, which the platform storage port and private asset route do not offer. Corrected to the existing deliverables pattern (same-origin signed link + anchor `download` attribute); 25 MB files reuse the streamed deliverable `PUT` route pattern; removal of frame UI and the in-migration drop of `sf_workspace_card_image` are stated as authorized. Any further block must use the full report format.
+- Executor target moves to R8.539. **Migrations/dependencies:** none. **Checks:** docs only.
+
 ## R8.537 | 2026-10-13 | docs(plan): Workspace board with standalone elements, WO-SF-WORKSPACE-04 (Lead)
 
 - **Owner 2026-10-13:** canvas → frame → card → image nesting felt odd for a designer; images should stand on their own and be resizable, files need a place, text must stay readable at any zoom. After reviewing a clickable concept (Text / Checklist / Sticky / Image / File elements, comment pins, client feedback with Done, round lens, photo tray, 100–200 % zoom with an overview map), the owner accepted the direction and decided that board client feedback will merge with the round feedback list (phase 2).

@@ -3,11 +3,11 @@
 Plan ID: WO-SF-WORKSPACE-04 (Workspace board: one board per project, standalone Text / Image / File elements)
 Scope: StudioFlow Workspace backend — element kinds, image and file elements, frames folded into the one board, data migration, follow-through in every reader; minimal UI wiring only
 Module(s): studioflow (core; Workspace is not an optional module)
-Target revision: R8.538 (Executor). The Lead's board UI follows as its own revision.
+Target revision: R8.539 (Executor; R8.538 is the Lead's plan correction). The Lead's board UI follows as its own revision.
 Status: READY
 Priority: P1
 Owner: owner 2026-10-13 — accepted the clickable board concept (https://claude.ai/artifact/TbUL52g4MYgm1Y3G3TBvhL) and the direction below ("sudah jalan, susun rencana kerjanya"). Recorded in R8.537.
-Last updated: 2026-10-13 (Lead, R8.537)
+Last updated: 2026-10-13 (Lead, R8.538 — correction after an Executor BLOCKED report that named no conflict; see "Corrections R8.538")
 
 ## Why
 
@@ -101,10 +101,19 @@ Keep the table `sf_workspace_card` and the model `SfWorkspaceCard` (the
 - **Create file:** the same shape for `FILE`, with the file limits above. The
   stored `content_type` comes from the allow-list by extension and a magic-byte
   check where the format has one (PDF `%PDF`, ZIP-based Office/ZIP `PK`, DWG
-  `AC10`), never from the client's claim. Reads return a signed link that
-  downloads with the original file name (`Content-Disposition: attachment`),
-  except PDF which may open inline. Reuse `ports.storage` and the existing
-  private object key helper; add no dependency.
+  `AC10`), never from the client's claim. The object key keeps the file's
+  real extension (`createPrivateObjectKey`). Reads return the existing signed
+  link (`ports.storage.createSignedReadUrl`) plus `fileName`; the original
+  name is applied by the UI with the anchor `download` attribute, exactly as
+  the deliverables panel does (`deliverables-panel.tsx`), because the private
+  asset route is same-origin. **No change to the platform storage port, the
+  private asset route or `contentTypeFromKey`** (PDF already opens inline,
+  unknown types already arrive as `application/octet-stream` with `nosniff`).
+- **File upload transport: REUSE the deliverable pattern.** Files up to 25 MB
+  go through a streamed `PUT` route under `src/app/api/studioflow/` modelled
+  on `api/studioflow/deliverables/route.ts` (`ports.storage.putStream` with
+  `maxBytes`, declared length required); images may stay a Server Action
+  `FormData` upload (3 MB). Add no dependency.
 - **Update:** text body edit and `textStyle` change for `TEXT` only (refused
   for other kinds); labels, client-answer flag, star and delete for every kind.
   Deleting an image/file element queues its object through the existing
@@ -134,12 +143,39 @@ Keep the table `sf_workspace_card` and the model `SfWorkspaceCard` (the
 
 ### Wiring (minimal; the Lead replaces the screen next)
 
+Authorized UI edits, so the purge does not leave dead or broken screens: in
+`_workspace-canvas/` and the Phases page, remove the frame controls (add /
+rename / delete frame, frame header drag and resize, card move-to-frame menu)
+and draw the elements on the one default frame; adapt `layoutBoard` and the
+pinned-notes dialog to the new read shape. This is wiring, not design: no new
+interaction, styling or layout beyond that.
+
 `workspaceAction` mirrors the service (new create-image / create-file
 actions as `FormData` uploads, `textStyle`, removed section commands). The
 current canvas must keep compiling and remain usable: render all elements in
 the single default frame, an image element through the existing image
 component with one image, a file element as a link with its name. No layout,
 interaction or styling work beyond that.
+
+## Corrections R8.538
+
+The Executor reported BLOCKED without naming a conflict. Lead inspection found
+one real mismatch and two possible readings, now resolved above:
+
+1. The plan asked for `Content-Disposition` on signed links; the platform
+   storage port and private asset route have no such option. Resolved by the
+   anchor `download` attribute (existing deliverables pattern) — no platform
+   change.
+2. 25 MB files: the transport is now fixed to the existing streamed deliverable
+   route pattern.
+3. Removing frame UI is explicitly authorized wiring (see Wiring), and
+   dropping `sf_workspace_card_image` inside the migration after its rows have
+   moved is an authorized, planned destructive step.
+
+If anything else blocks, the report must use the full `BLOCKED / CONFLICT`
+format of `docs/agent/EXECUTOR.md` (expected, actual with paths, the one
+conflict, options, recommendation); a report without the conflict cannot be
+decided.
 
 ## Tests (disposable database)
 
@@ -192,15 +228,16 @@ push.
 You are the Backend Executor on the same checkout (location: rumah, use
 `.env.rumah`). Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `PLAN.md`
 (WO-SF-WORKSPACE-04), the StudioFlow contract's Workspace section,
-`CHANGELOG.md` R8.519–R8.537 and `src/apps/studioflow/workspace/service.ts`.
-Implement the whole plan as one local revision commit R8.538 (confirm it is the
+`CHANGELOG.md` R8.519–R8.538 and `src/apps/studioflow/workspace/service.ts`.
+Implement the whole plan as one local revision commit R8.539 (confirm it is the
 next unused number): the migration that adds element kinds and folds frames and
 card images into standalone elements, the image and file element commands with
 their limits, the purge of section commands, every reader's follow-through, the
 contract update, minimal wiring that keeps the canvas usable, and every listed
 test. Where the plan leaves an ordinary implementation choice, make it and note
 it in the changelog; where completing it would change a locked decision or
-invent product behaviour, stop with BLOCKED / CONFLICT. Database commands only
+invent product behaviour, stop with the full BLOCKED / CONFLICT report
+(expected, actual with paths, the one conflict, options, recommendation). Database commands only
 against verified rebuild-only databases. Run every gate in Verification, update
 `CHANGELOG.md`, commit locally without pushing, and reply with only a
 Planner/Reviewer prompt: commit, checks with results, limitations, dirty files,
