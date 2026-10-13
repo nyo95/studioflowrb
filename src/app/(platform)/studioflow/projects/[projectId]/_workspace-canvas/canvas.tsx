@@ -1,6 +1,6 @@
 "use client";
 
-import { Maximize, Minus, Plus, SquarePlus, X } from "lucide-react";
+import { Minus, Plus, SquarePlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
@@ -8,7 +8,7 @@ import { Button, EmptyState, IconButton, InlineEdit, InlineError, Notice, RowAct
 
 import type { WorkspaceCommandInput } from "../../../actions";
 import { CardComposer, WorkspaceCard, runWorkspaceCommand, uploadCardImages, type LabelChoices, type PhaseOption, type RunCommand, type WorkspaceCardView } from "./card";
-import { CARD_TOP, DEFAULT_CARD_W, DEFAULT_FRAME, FRAME_HEAD, FRAME_PAD, ESTIMATED_CARD_H, MIN_CARD_W, MIN_FRAME, fitZoom, frameAt, layoutBoard, nextFramePlace, snapMove, snapToGrid, type CardSlot, type Rect } from "./geometry";
+import { CARD_TOP, DEFAULT_CARD_W, DEFAULT_FRAME, FRAME_HEAD, FRAME_PAD, ESTIMATED_CARD_H, MIN_CARD_W, MIN_FRAME, frameAt, layoutBoard, nextFramePlace, snapMove, snapToGrid, type CardSlot, type Rect } from "./geometry";
 
 export type WorkspaceSectionView = {
   id: string;
@@ -31,6 +31,10 @@ type Drag =
 
 const EMPTY: Overrides = { frames: {}, cards: {} };
 const DEFAULT_VIEW: View = { x: 24, y: 16, zoom: 1 };
+/** Blocks never shrink below the size their text is written at (owner, 2026-10-13); they can only be enlarged. */
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 2;
+const clampZoom = (zoom: number) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom));
 const isFeedback = (card: WorkspaceCardView) => card.origin === "CLIENT_ANSWER";
 
 /**
@@ -99,7 +103,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
     const sync = () => setNarrow(media.matches);
     // Read after hydration, so the server and the browser render the same page first.
     const timer = window.setTimeout(() => {
-      try { const saved = JSON.parse(window.localStorage.getItem(viewKey) ?? "null"); if (saved && typeof saved.zoom === "number") setView(saved); } catch { /* default view */ }
+      try { const saved = JSON.parse(window.localStorage.getItem(viewKey) ?? "null"); if (saved && typeof saved.zoom === "number") setView({ ...saved, zoom: clampZoom(saved.zoom) }); } catch { /* default view */ }
       sync();
     }, 0);
     media.addEventListener("change", sync);
@@ -316,11 +320,18 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   useEffect(() => {
     const element = viewportRef.current;
     if (!element) return;
+    // The wheel moves around (Shift + wheel sideways); Ctrl/Cmd + wheel, or a trackpad pinch, enlarges.
     const onWheel = (event: WheelEvent) => {
       event.preventDefault();
       const rect = element.getBoundingClientRect();
+      if (!event.ctrlKey && !event.metaKey) {
+        const dx = event.shiftKey && !event.deltaX ? event.deltaY : event.deltaX;
+        const dy = event.shiftKey && !event.deltaX ? 0 : event.deltaY;
+        setView((current) => ({ ...current, x: current.x - dx, y: current.y - dy }));
+        return;
+      }
       setView((current) => {
-        const zoom = Math.max(0.4, Math.min(1.6, current.zoom * (event.deltaY > 0 ? 0.9 : 1.1)));
+        const zoom = clampZoom(current.zoom * (event.deltaY > 0 ? 0.9 : 1.1));
         const ox = event.clientX - rect.left, oy = event.clientY - rect.top;
         return { zoom, x: ox - ((ox - current.x) / current.zoom) * zoom, y: oy - ((oy - current.y) / current.zoom) * zoom };
       });
@@ -354,16 +365,21 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
       while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
       return scroller ?? document.documentElement;
     };
+    // Whatever sits above the canvas (a phase bar loading in, an Undo bar) changes the page content's height, so the
+    // page content is watched as a whole; it is (re)found on each measure for the same streaming reason.
+    let watched: Element | null = null;
     const measure = () => {
       const area = scrollArea();
+      const content = area.firstElementChild ?? area;
+      if (content !== watched) { if (watched) observer.unobserve(watched); observer.observe(content); watched = content; }
       const top = element.getBoundingClientRect().top - area.getBoundingClientRect().top + area.scrollTop;
-      const next = Math.max(280, Math.floor(area.clientHeight - top - 24));
+      // The room the page keeps under the canvas (its bottom padding), measured rather than assumed.
+      const below = Math.max(0, area.scrollHeight - (top + element.offsetHeight));
+      const next = Math.max(280, Math.floor(area.clientHeight - top - below));
       setFitHeight((current) => (current === next ? current : next));
     };
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(() => measure());
     observer.observe(document.documentElement);
-    const above = element.closest("section")?.previousElementSibling;
-    if (above) observer.observe(above);
     window.addEventListener("resize", measure);
     // A page opened in a background tab is only put in place when the tab is shown: measure when the canvas
     // actually appears, and once more after the streamed page has settled.
@@ -376,7 +392,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
   const zoomBy = (factor: number) => setView((current) => {
     const element = viewportRef.current;
     const ox = (element?.clientWidth ?? 800) / 2, oy = (element?.clientHeight ?? 500) / 2;
-    const zoom = Math.max(0.4, Math.min(1.6, current.zoom * factor));
+    const zoom = clampZoom(current.zoom * factor);
     return { zoom, x: ox - ((ox - current.x) / current.zoom) * zoom, y: oy - ((oy - current.y) / current.zoom) * zoom };
   });
 
@@ -515,10 +531,9 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
           <span className="flex-1" />
           {!narrow ? (
             <div className="flex items-center gap-0.5">
-              <IconButton size="sm" variant="ghost" label="Zoom out" icon={<Minus aria-hidden="true" />} onClick={() => zoomBy(0.9)} />
+              <IconButton size="sm" variant="ghost" label="Zoom out" icon={<Minus aria-hidden="true" />} disabled={view.zoom <= MIN_ZOOM} onClick={() => zoomBy(0.9)} />
               <button type="button" className="h-8 min-w-12 rounded-action px-1 text-xs tabular-nums text-ink-secondary hover:bg-surface-muted" title="Back to 100%" onClick={() => setView(DEFAULT_VIEW)}>{Math.round(view.zoom * 100)}%</button>
-              <IconButton size="sm" variant="ghost" label="Zoom in" icon={<Plus aria-hidden="true" />} onClick={() => zoomBy(1.1)} />
-              <IconButton size="sm" variant="ghost" label="Fit everything" icon={<Maximize aria-hidden="true" />} onClick={() => setView({ x: 24, y: 16, zoom: fitZoom(layout.frames, viewportRef.current?.clientWidth ?? 1200) })} />
+              <IconButton size="sm" variant="ghost" label="Zoom in" icon={<Plus aria-hidden="true" />} disabled={view.zoom >= MAX_ZOOM} onClick={() => zoomBy(1.1)} />
             </div>
           ) : null}
           {canEditGeneral ? <Button size="sm" leadingIcon={<SquarePlus className="h-3.5 w-3.5" />} onClick={() => void addFrame()}>New frame</Button> : null}
@@ -642,7 +657,7 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
           </div>
         ) : null}
         {composerPanel}
-        <div className="pointer-events-none absolute bottom-3 left-3 rounded-action bg-surface px-2.5 py-1.5 text-xs text-ink-tertiary shadow-float">Middle-click and drag to move around · Wheel to zoom · Double-click to write · Paste or drop an image</div>
+        <div className="pointer-events-none absolute bottom-3 left-3 rounded-action bg-surface px-2.5 py-1.5 text-xs text-ink-tertiary shadow-float">Wheel or middle-click drag to move around · Ctrl + wheel to enlarge · Double-click to write · Paste or drop an image</div>
       </div>
       {confirm.dialog}
     </section>

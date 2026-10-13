@@ -239,7 +239,7 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
           ) : null}
           <RichTextEditor bare slashMenu aria-label="Block text" placeholder="Write, or type / for headings, lists and checklists" maxLength={NOTE_MAX} value={draft} autoFocus onChange={onType} onBlur={() => void leave()} />
           {card.images.length > 0 ? (
-            <ImageGallery images={card.images} size="sm" onRemove={(image) => void command({ command: "removeCardImage", projectId, imageId: image.id })} />
+            <ImageGallery images={card.images} size="fill" onRemove={(image) => void command({ command: "removeCardImage", projectId, imageId: image.id })} />
           ) : null}
           <Text size="sm" tone="tertiary" className="text-xs">{status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "Paste or drop an image to add it"}{busy ? " · adding image…" : ""}</Text>
         </div>
@@ -249,7 +249,7 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
           onClick={(event) => { if (!(event.target as HTMLElement).closest("a, button, input, img, [role=button]")) startEdit(); }}
         >
           {card.body ? <FormattedText text={card.body} className="text-sm" onToggleCheck={canWrite ? toggleCheck : undefined} /> : null}
-          {card.images.length > 0 ? <ImageGallery images={card.images} size="sm" viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} phaseId={card.phaseId} canUseIdeas={canUseIdeas} />} /> : null}
+          {card.images.length > 0 ? <ImageGallery images={card.images} size="fill" className={card.body ? "mt-2" : undefined} viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} phaseId={card.phaseId} canUseIdeas={canUseIdeas} />} /> : null}
           {!card.body && card.images.length === 0 ? <Text size="sm" tone="tertiary">Empty block</Text> : null}
         </div>
       )}

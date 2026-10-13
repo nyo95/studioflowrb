@@ -18,7 +18,8 @@ export type ImageGalleryProps = {
   viewerActions?: (image: GalleryImage) => ReactNode;
   /** Accessible name of the list, e.g. "Images". */
   label?: string;
-  size?: "sm" | "md";
+  /** Thumbnails (`sm`, `md`), or `fill`: each image as wide as its container, at its own proportions. */
+  size?: "sm" | "md" | "fill";
   className?: string;
 };
 
@@ -31,17 +32,18 @@ export function ImageGallery({ images, onRemove, removingId, viewerActions, labe
   if (images.length === 0) return null;
   const open = openIndex !== null ? images[openIndex] ?? null : null;
   const step = (delta: number) => setOpenIndex((index) => (index === null ? null : (index + delta + images.length) % images.length));
-  const box = size === "sm" ? "h-14 w-14" : "h-20 w-20";
+  const fill = size === "fill";
+  const box = fill ? "w-full" : size === "sm" ? "h-14 w-14" : "h-20 w-20";
   return (
     <>
-      <ul className={cx("m-0 flex list-none flex-wrap gap-2 p-0", className)} aria-label={label}>
+      <ul className={cx("m-0 list-none p-0", fill ? "grid gap-2" : "flex flex-wrap gap-2", className)} aria-label={label}>
         {images.map((image, index) => (
           <li key={image.id} className="relative">
             <button type="button" onClick={() => setOpenIndex(index)} className={cx("block overflow-hidden rounded-control border border-line-subtle bg-surface-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus", box)} aria-label={`Open image ${index + 1}`}>
               {image.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={image.url} alt="" className="h-full w-full object-cover" draggable={false} />
-              ) : <span className="grid h-full place-items-center text-xs text-ink-tertiary">Unavailable</span>}
+                <img src={image.url} alt="" className={fill ? "block h-auto w-full" : "h-full w-full object-cover"} draggable={false} />
+              ) : <span className={cx("grid place-items-center text-xs text-ink-tertiary", fill ? "h-24" : "h-full")}>Unavailable</span>}
             </button>
             {onRemove ? (
               <IconButton size="sm" variant="secondary" label={`Remove image ${index + 1}`} icon={<X aria-hidden="true" />} pending={removingId === image.id} onClick={() => onRemove(image)} className="!absolute -right-1.5 -top-1.5 !h-6 !min-h-6 !w-6 rounded-full !p-0" />

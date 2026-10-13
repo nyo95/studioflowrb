@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.536 | 2026-10-13 | fix(studioflow): Workspace images scale with their block, zoom only enlarges (Lead)
+
+- **Owner 2026-10-13:** an image in a block stayed a small thumbnail and could not be scaled; blocks should never be zoomed out below readable text, only enlarged.
+- Images in a block now fill its width at their own proportions (UI Engine `ImageGallery` gains `size="fill"`), so widening the block scales the image; the large viewer and its actions are unchanged.
+- Zoom is limited to 100–200 %: 100 % is the text's own size and the floor. The plain wheel now moves around the canvas (Shift + wheel sideways); Ctrl/Cmd + wheel or a trackpad pinch enlarges; the minus button is disabled at 100 % and the "fit everything" button is gone (it could only shrink). A saved personal view below 100 % opens at 100 %.
+- Canvas height (R8.533/R8.535 follow-up): the page content as a whole is watched, so the height follows a phase bar loading in, and the room under the canvas is measured rather than assumed (the page kept 8 px of scroll at 1440 × 900). Checked in the in-app browser: page scroll height equals its visible height; zoom stays at 100 % on Ctrl + wheel out.
+- **Migrations/dependencies:** none. **Checks:** `npm test`; typecheck; eslint 0 errors; in-app browser check as above.
+
 ## R8.535 | 2026-10-13 | feat(studioflow): Workspace cards behave like blocks (Lead)
 
 - **Owner decision 2026-10-13 (option A, after a Codex design review of R8.522):** keep the free canvas and make each card behave like a Notion block, rather than switching to a vertical block document (Codex's proposal) that would undo the accepted canvas, its backend and migrate data again. No schema or service change: a card already holds text, images or a checklist, so a card is the block.
