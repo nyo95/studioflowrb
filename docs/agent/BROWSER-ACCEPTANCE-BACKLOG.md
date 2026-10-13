@@ -30,6 +30,15 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R8.532] Workspace canvas on the Phases page
+- Surface: project Phases page (phase strip, workflow card, Phase details drawer, Workspace canvas, Drawing list lens)
+- Fixture: Designer and Drafter PICs, a viewer, a project with existing cards on two phases, a drafter phase with drawings
+- Viewport: desktop (default) and 375 px
+- Steps: 1. No Workspace tab; the canvas sits under the workflow card. 2. Middle-click drag and Space + left drag move the canvas; the wheel zooms; Fit and 100% work; reload keeps your own view. 3. Drag a card within its frame and into another frame (guide lines show, it snaps), widen it, reload: it stays. 4. Drag and resize a frame; its cards move with it. 5. Add card: type, Enter, type, Enter: two cards in a row, labelled with the selected phase; "+" on a frame adds there. 6. Double-click a card to edit; edit the same card in two sessions (Use theirs / Keep mine). 7. Star, client feedback, phase label, Move to, Delete (gone at once). 8. Filters dim; the phase filter offers its rounds. 9. Phase details shows Requirements, Deliverables, Rounds with counts on the button. 10. On Construction Drawing switch to Drawing list and back. 11. As the Drafter and the viewer: only allowed cards and frames move. 12. 375 px: frames stacked, no horizontal page scroll.
+- Acceptance: the canvas feels like the R8.529 prototype; nothing typed is lost; moving never makes a text edit stale; the phone view reads top to bottom.
+- Lead check 2026-10-13 (R8.532): steps 1, 3 (drag, kept after reload), 5, 7 (delete), 9, 10 and 12 passed on project 2026-536; test cards removed.
+- Status: PENDING (owner walk)
+
 ### [R8.527] Workspace canvas prototype interaction walk
 - Surface: `prototypes/workspace-canvas/index.html` opened directly as a local file
 - Fixture: built-in fictional Rumah Puri Indah sample content only

@@ -8,7 +8,6 @@ export const STUDIOFLOW_ROUTES = {
   project: (projectId: string) => `/studioflow/projects/${projectId}`,
   projectPhase: (projectId: string, phaseId: string) => `/studioflow/projects/${projectId}?phase=${phaseId}`,
   projectTimeline: (projectId: string) => `/studioflow/projects/${projectId}/timeline`,
-  projectWorkspace: (projectId: string) => `/studioflow/projects/${projectId}/workspace`,
   projectHistory: (projectId: string) => `/studioflow/projects/${projectId}/history`,
   projectSchedule: (projectId: string) => `/studioflow/projects/${projectId}/schedule`,
   projectSchedulePrint: (projectId: string) => `/studioflow/print/projects/${projectId}/schedule`,

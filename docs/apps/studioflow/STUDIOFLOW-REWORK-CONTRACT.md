@@ -320,6 +320,22 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   audited; moving a card between frames remains an audited membership change.
   Stored order follows canvas position for the phone's top-to-bottom document.
   Pan and zoom remain personal browser state and are never persisted.
+  A card's stored x/y are relative to its frame's top-left corner (so moving a
+  frame is one stored change); frame x/y are canvas coordinates.
+- **Where it lives** (Lead UI R8.532, owner board-first 2026-10-13): one
+  canvas on the project Phases page, under the phase strip and the selected
+  phase's workflow card. There is no separate Workspace tab or route and no
+  per-phase notes feed. Choosing a phase changes only the workflow controls and
+  the phase/round label new cards get; the canvas always shows every card,
+  with filters All · General · selected phase (with its rounds) · Starred ·
+  Client feedback that dim, never move, cards. Requirements, Files and the
+  round history sit in a "Phase details" drawer whose button shows the counts;
+  a drafter phase offers its Drawing list as a second lens of the canvas area.
+  Middle-click (or Space + left) drags the canvas, the wheel zooms, grips drag
+  cards (also into another frame) and frame headers drag frames, with 8 px
+  grid and 10 px edge snapping. Quick capture ("Add card", or "+" on a frame)
+  stays open for several cards in a row. Below 768 px the frames read top to
+  bottom in stored order.
 - **Requirements** (§6.2): the standard checklist.
 
 `sf_activity` (legacy feedback rows) is closed history: no command writes it.

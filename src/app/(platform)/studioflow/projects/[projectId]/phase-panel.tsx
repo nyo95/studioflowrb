@@ -1,54 +1,38 @@
 "use client";
 
-import { PanelRightClose, PanelRightOpen } from "lucide-react";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { PanelRight } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { Badge, Button, ButtonMenu, Dialog, Field, FormActions, InlineError, Input, RadioGroup, SectionCard, Text, Textarea } from "@/platform/ui_engine";
+import { Badge, Button, ButtonMenu, Dialog, Drawer, Field, FormActions, FormattedInstant, InlineError, Input, RadioGroup, RowActionMenu, SectionCard, Text, Textarea } from "@/platform/ui_engine";
 
-import { NotesWorkspace, ITERATION_STATE_LABEL as STATE_LABEL, ITERATION_STATE_TONE as STATE_TONE, type IterationRow, type PhaseNoteRow } from "./notes-workspace";
+import { ITERATION_STATE_LABEL as STATE_LABEL, ITERATION_STATE_TONE as STATE_TONE, type IterationRow } from "./round-labels";
 import { IterationButtons, UndoBar, usePhaseCommands, VisitDialog, type IterationView, type PhaseView } from "../../_components/phase-commands";
 
-
-const ASIDE_HIDDEN_KEY = "studioflow.phase.aside-hidden";
-const asideListeners = new Set<() => void>();
-let asideMemory: boolean | null = null;
-const readAsideHidden = () => {
-  if (asideMemory !== null) return asideMemory;
-  try { return window.localStorage.getItem(ASIDE_HIDDEN_KEY) === "1"; } catch { return false; }
-};
-const subscribeAside = (listener: () => void) => {
-  asideListeners.add(listener);
-  window.addEventListener("storage", listener);
-  return () => { asideListeners.delete(listener); window.removeEventListener("storage", listener); };
-};
-
-export function PhasePanel({ projectId, phase, current, iterations, notes, skippedReason, startBlockedReason, canAct, canSkip, canOverride, canUseIdeas, archived, children, aside }: {
+/**
+ * The selected phase's workflow: the current round, its steps, Undo and the less frequent commands. Requirements,
+ * files and the round history live behind "Phase details" (owner, board-first 2026-10-13) so the project Workspace
+ * canvas below gets the page; the button shows the counts, so nothing open goes unnoticed.
+ */
+export function PhasePanel({ projectId, phase, current, iterations, skippedReason, startBlockedReason, canAct, canSkip, canOverride, archived, aside, detailsSummary }: {
   projectId: string;
   phase: PhaseView;
   current: IterationView | null;
   iterations: IterationRow[];
-  notes: readonly PhaseNoteRow[];
   skippedReason: string | null;
   startBlockedReason: string | null;
   canAct: boolean;
   canSkip: boolean;
   canOverride: boolean;
-  canUseIdeas: boolean;
   archived: boolean;
-  children?: ReactNode;
   aside?: ReactNode;
+  /** e.g. "Requirements 2/4 · Files 3", shown on the Phase details button. */
+  detailsSummary: string;
 }) {
   const commands = usePhaseCommands(projectId);
   const { locale, timezone } = useDisplaySettings();
   const [visitOpen, setVisitOpen] = useState(false);
-  // The side column (Requirements, Deliverables) can be folded away so the notes get the whole width. Remembered per browser.
-  const asideHidden = useSyncExternalStore(subscribeAside, readAsideHidden, () => false);
-  const toggleAside = () => {
-    asideMemory = !asideHidden;
-    try { window.localStorage.setItem(ASIDE_HIDDEN_KEY, asideMemory ? "1" : "0"); } catch { /* kept for this visit only */ }
-    asideListeners.forEach((listener) => listener());
-  };
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [renaming, setRenaming] = useState<IterationRow | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [skipOpen, setSkipOpen] = useState(false);
@@ -79,50 +63,57 @@ export function PhasePanel({ projectId, phase, current, iterations, notes, skipp
   const title = current ? current.name : "Current iteration";
   const nextStep = phase.status === "PENDING" ? (startBlockedReason ?? "Start this phase when work begins.")
     : phase.status === "DONE" ? (skippedReason ? `Skipped: ${skippedReason}` : `Done in ${iterations.length} iteration${iterations.length === 1 ? "" : "s"}.`)
-      : current?.state === "SENT" ? "Waiting for the client. Their feedback goes in the notes below."
+      : current?.state === "SENT" ? "Waiting for the client. Their feedback goes on the Workspace below."
         : current?.state === "ANSWERED" ? "Choose the outcome when the team is ready."
           : "Prepare this iteration, then send it to the client.";
+  const ordered = [...iterations].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const outcomeOf = (row: IterationRow) => row.visitDate ? `Visit ${row.visitDate}` : row.id === closedBySkipId ? "Closed by skip" : row.id === current?.id ? STATE_LABEL[row.state] : row.state === "DONE" ? "Approved" : row.state === "REVISED" ? "Revision asked" : "Closed";
 
   return (
     <>
-      {aside ? (
-        <div className="mb-2 flex justify-end max-[1100px]:hidden">
-          <Button type="button" variant="ghost" size="sm" leadingIcon={asideHidden ? <PanelRightOpen /> : <PanelRightClose />} aria-pressed={asideHidden} onClick={toggleAside}>
-            {asideHidden ? "Show requirements & files" : "Hide requirements & files"}
-          </Button>
+      <SectionCard
+        title={title}
+        action={<div className="flex flex-wrap items-center gap-1.5">
+          <Button type="button" size="sm" leadingIcon={<PanelRight className="h-3.5 w-3.5" />} onClick={() => setDetailsOpen(true)}>Phase details <span className="text-ink-tertiary">{detailsSummary}</span></Button>
+          <IterationButtons phase={phase} current={current} commands={commands} canAct={acting} onNewVisit={() => setVisitOpen(true)} lead />
+          {currentMenu.length > 0 ? <ButtonMenu label="More" variant="ghost" items={currentMenu} /> : null}
+        </div>}
+      >
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={phase.status === "DONE" ? "success" : current ? STATE_TONE[current.state] : "neutral"} title={skippedReason ?? undefined}>{phase.status === "PENDING" ? "Not started" : phase.status === "DONE" ? (skippedReason ? "Skipped" : "Done") : current ? STATE_LABEL[current.state] : "In progress"}</Badge>
+            <Text tone="secondary" size="sm">{nextStep}</Text>
+          </div>
+          <UndoBar commands={commands} />
+          {commands.error && !visitOpen && !renaming && !skipOpen && !resetOpen ? <InlineError>{commands.error}</InlineError> : null}
         </div>
-      ) : null}
-      <div className={asideHidden ? "grid grid-cols-1 items-start gap-4" : "grid grid-cols-[minmax(0,1.6fr)_minmax(280px,1fr)] items-start gap-4 max-[1100px]:grid-cols-1"}>
-        <div className="grid min-w-0 gap-4">
-          <SectionCard
-            title={title}
-            action={<div className="flex flex-wrap items-center gap-1.5"><IterationButtons phase={phase} current={current} commands={commands} canAct={acting} onNewVisit={() => setVisitOpen(true)} lead />{currentMenu.length > 0 ? <ButtonMenu label="More" variant="ghost" items={currentMenu} /> : null}</div>}
-          >
-            <div className="grid gap-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={phase.status === "DONE" ? "success" : current ? STATE_TONE[current.state] : "neutral"} title={skippedReason ?? undefined}>{phase.status === "PENDING" ? "Not started" : phase.status === "DONE" ? (skippedReason ? "Skipped" : "Done") : current ? STATE_LABEL[current.state] : "In progress"}</Badge>
-                <Text tone="secondary" size="sm">{nextStep}</Text>
-              </div>
-              <UndoBar commands={commands} />
-              {commands.error && !visitOpen && !renaming && !skipOpen && !resetOpen ? <InlineError>{commands.error}</InlineError> : null}
-            </div>
+      </SectionCard>
+
+      <Drawer open={detailsOpen} onOpenChange={setDetailsOpen} title={`${phase.name} · Phase details`} description={detailsSummary}>
+        <div className="grid gap-4">
+          {aside}
+          <SectionCard title="Rounds" count={iterations.length || undefined}>
+            {ordered.length === 0 ? <Text size="sm" tone="tertiary">No rounds yet.</Text> : (
+              <ul className="m-0 grid list-none gap-2 p-0">
+                {ordered.map((row) => (
+                  <li key={row.id} className="flex items-start justify-between gap-2 rounded-control border border-line-subtle px-3 py-2">
+                    <div className="grid gap-0.5">
+                      <div className="flex flex-wrap items-center gap-2"><Text size="sm" weight="semibold"><span title={row.name}>{row.shortName}</span></Text><Badge tone={STATE_TONE[row.state]}>{outcomeOf(row)}</Badge></div>
+                      <Text size="sm" tone="tertiary">{row.sentAt ? <>sent <FormattedInstant value={row.sentAt} locale={locale} timeZone={timezone} /></> : <>created <FormattedInstant value={row.createdAt} locale={locale} timeZone={timezone} /></>}{row.answeredAt ? <> · answered <FormattedInstant value={row.answeredAt} locale={locale} timeZone={timezone} /></> : null}</Text>
+                    </div>
+                    {acting ? <RowActionMenu label={`${row.shortName} actions`} items={[{ label: "Rename round", onSelect: () => openRename(row) }]} /> : null}
+                  </li>
+                ))}
+              </ul>
+            )}
           </SectionCard>
-
-          <NotesWorkspace projectId={projectId} phaseId={phase.id} notes={notes} iterations={iterations} currentId={current?.id ?? null} closedBySkipId={closedBySkipId} canEdit={acting} canUseIdeas={canUseIdeas} locale={locale} timezone={timezone} onRename={openRename} />
-          {children}
         </div>
-
-        {asideHidden ? null : (
-          <aside className="grid min-w-0 gap-4">
-            {aside}
-          </aside>
-        )}
-      </div>
+      </Drawer>
 
       <VisitDialog open={visitOpen} onOpenChange={setVisitOpen} pending={commands.isPending("visit")} error={commands.error} onSave={(visitDate, visitNote) => commands.exec("visit", { command: "createVisit", phaseId: phase.id, visitDate, note: visitNote }, "Site visit added")} />
       {renaming ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("rename")) setRenaming(null); }} title="Rename iteration"><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("rename", { command: "renameIteration", phaseId: phase.id, iterationId: renaming.id, name: renameDraft }, renameDraft.trim() ? `Renamed to ${renameDraft.trim()}` : `${renaming.shortName}: name reset`)) setRenaming(null); }}><Field label="Name" description="Leave it empty to use the project name with the phase letter and number."><Input id="rename-iteration-name" value={renameDraft} maxLength={200} onChange={(event) => setRenameDraft(event.target.value)} /></Field>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setRenaming(null)} disabled={commands.isPending("rename")}>Cancel</Button><Button type="submit" variant="primary" pending={commands.isPending("rename")} disabled={renameDraft.trim() === renaming.name}>Save</Button></FormActions></form></Dialog> : null}
       {skipOpen ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("skip")) setSkipOpen(false); }} title="Skip this phase" description="The phase is marked done without work. A reason is recorded."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("skip", { command: "bypass", phaseId: phase.id, reason }, `${phase.name} skipped`)) setSkipOpen(false); }}><Field label="Reason" required><Textarea rows={2} value={reason} maxLength={500} placeholder="e.g. Moodboard supplied by the client" onChange={(event) => setReason(event.target.value)} /></Field>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setSkipOpen(false)} disabled={commands.isPending("skip")}>Cancel</Button><Button type="submit" variant="primary" pending={commands.isPending("skip")} disabled={!reason.trim()}>Skip phase</Button></FormActions></form></Dialog> : null}
-      {resetOpen ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("reset")) setResetOpen(false); }} title="Reset iterations (admin)" description="Deletes every iteration of this phase. Its notes stay in the Notes stream without their round label. A full snapshot is kept in History."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("reset", { command: "override", phaseId: phase.id, mode: reset.mode, major: Number(reset.iteration), note: reset.note }, "Iterations reset")) setResetOpen(false); }}><RadioGroup label="Result" value={reset.mode} onValueChange={(value) => setReset({ ...reset, mode: value as typeof reset.mode })} options={[{ value: "HARD_RESET_ACTIVE", label: "Restart at an iteration number", description: "The phase goes back to active" }, { value: "HARD_RESET_PENDING", label: "Back to not started" }]} />{reset.mode === "HARD_RESET_ACTIVE" ? <Field label="Iteration number" required description="Whole number, e.g. 2"><Input value={reset.iteration} inputMode="numeric" pattern="\d+" onChange={(event) => setReset({ ...reset, iteration: event.target.value })} /></Field> : null}<Field label="Note" required><Textarea rows={2} value={reset.note} maxLength={1000} onChange={(event) => setReset({ ...reset, note: event.target.value })} /></Field>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setResetOpen(false)} disabled={commands.isPending("reset")}>Cancel</Button><Button type="submit" variant="danger" pending={commands.isPending("reset")} disabled={!reset.note.trim()}>Reset iterations</Button></FormActions></form></Dialog> : null}
+      {resetOpen ? <Dialog open onOpenChange={(open) => { if (!open && !commands.isPending("reset")) setResetOpen(false); }} title="Reset iterations (admin)" description="Deletes every iteration of this phase. Its cards stay on the Workspace without their round label. A full snapshot is kept in History."><form className="grid gap-3" onSubmit={async (event) => { event.preventDefault(); if (await commands.exec("reset", { command: "override", phaseId: phase.id, mode: reset.mode, major: Number(reset.iteration), note: reset.note }, "Iterations reset")) setResetOpen(false); }}><RadioGroup label="Result" value={reset.mode} onValueChange={(value) => setReset({ ...reset, mode: value as typeof reset.mode })} options={[{ value: "HARD_RESET_ACTIVE", label: "Restart at an iteration number", description: "The phase goes back to active" }, { value: "HARD_RESET_PENDING", label: "Back to not started" }]} />{reset.mode === "HARD_RESET_ACTIVE" ? <Field label="Iteration number" required description="Whole number, e.g. 2"><Input value={reset.iteration} inputMode="numeric" pattern="\d+" onChange={(event) => setReset({ ...reset, iteration: event.target.value })} /></Field> : null}<Field label="Note" required><Textarea rows={2} value={reset.note} maxLength={1000} onChange={(event) => setReset({ ...reset, note: event.target.value })} /></Field>{commands.error ? <InlineError>{commands.error}</InlineError> : null}<FormActions><Button type="button" onClick={() => setResetOpen(false)} disabled={commands.isPending("reset")}>Cancel</Button><Button type="submit" variant="danger" pending={commands.isPending("reset")} disabled={!reset.note.trim()}>Reset iterations</Button></FormActions></form></Dialog> : null}
     </>
   );
 }

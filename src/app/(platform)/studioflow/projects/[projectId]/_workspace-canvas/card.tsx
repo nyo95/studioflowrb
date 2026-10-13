@@ -1,14 +1,14 @@
 "use client";
 
-import { GripVertical, Pin, Send } from "lucide-react";
+import { GripVertical, Send, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type DragEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type Ref } from "react";
 
-import { Badge, Button, Checkbox, FormattedInstant, FormattedText, IconButton, ImageGallery, InlineError, Notice, RichTextEditor, RowActionMenu, Select, Text, shrinkImageFile, type RowActionItem } from "@/platform/ui_engine";
+import { Button, Checkbox, FormattedText, ImageGallery, InlineError, RichTextEditor, RowActionMenu, Select, Text, shrinkImageFile, type RowActionItem } from "@/platform/ui_engine";
 
 import { addWorkspaceCardImageAction, workspaceAction, type WorkspaceCommandInput } from "../../../actions";
 import { NOTE_MAX, NoteDraftFields, useNoteDraft, type NoteImage } from "../../../_components/phase-note-composer";
-import { NoteImageActions } from "../notes-workspace";
+import { NoteImageActions } from "../round-labels";
 
 export type WorkspaceCardView = {
   id: string;
@@ -23,9 +23,11 @@ export type WorkspaceCardView = {
   createdAt: Date;
   editedAt: Date | null;
   images: readonly NoteImage[];
+  canvas: { x: number; y: number; w: number } | null;
 };
 
 export type PhaseOption = { id: string; name: string };
+export type LabelChoices = { allowNone: boolean; phases: readonly PhaseOption[] };
 
 /** What a failed command tells the screen; a stale version is told apart so the card can offer a merge. */
 export type CommandOutcome = { ok: true; data: unknown } | { ok: false; message: string; stale: boolean };
@@ -64,46 +66,32 @@ export async function runWorkspaceCommand(input: WorkspaceCommandInput): Promise
   }
 }
 
-const ORIGIN_BADGE: Record<WorkspaceCardView["origin"], { label: string; tone: "warning" | "neutral" } | null> = {
-  NOTE: null,
-  CLIENT_ANSWER: { label: "Client answer", tone: "warning" },
-  SITE_VISIT: { label: "Site visit", tone: "neutral" },
-};
-
-export type CardDrag = {
-  draggable: boolean;
-  dragging: boolean;
-  /** Where a dragged card would land relative to this one. */
-  dropEdge: "before" | "after" | null;
-  onDragStart: (event: DragEvent) => void;
-  onDragEnd: () => void;
-  onDragOver: (event: DragEvent) => void;
-};
-
 /**
- * One Workspace card: its labels, formatted text and images, and (for whoever may write it) edit, pin, client-answer,
- * phase label, move and delete. Editing keeps the version it started from; when someone else saves first, both
- * texts are shown and the person chooses, so nothing is overwritten silently.
+ * One Workspace card on the canvas: labels, formatted text and images; for whoever may write it, a grip to drag,
+ * a width handle, star, and a menu (edit, client feedback, phase label, move, delete). Its height always follows its
+ * content. Editing keeps the text and version it started from; when someone else changed the text first, both texts
+ * are shown and the person chooses, so nothing is overwritten silently. A move or a star by someone else is absorbed.
  */
-export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseIdeas, locale, timezone, menuExtra, drag, run, onDelete }: {
+export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseIdeas, dimmed, style, measureRef, menuExtra, run, onDelete, onGripDown, onWidthDown, dragging }: {
   card: WorkspaceCardView;
   projectId: string;
   canWrite: boolean;
-  /** Phase labels this person may move the card to (empty: the label menu is hidden). */
-  labelChoices: { allowNone: boolean; phases: readonly PhaseOption[] };
+  labelChoices: LabelChoices;
   canUseIdeas: boolean;
-  locale: string;
-  timezone: string;
+  dimmed: boolean;
+  style?: CSSProperties;
+  measureRef?: Ref<HTMLElement>;
   menuExtra: readonly RowActionItem[];
-  drag: CardDrag;
   run: RunCommand;
   onDelete: (card: WorkspaceCardView) => void;
+  /** Starts a drag of the card (canvas only); absent where the card cannot move. */
+  onGripDown?: (event: ReactPointerEvent) => void;
+  onWidthDown?: (event: ReactPointerEvent) => void;
+  dragging?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(card.body);
-  // The text and version the edit started from: a pin or a move by someone else bumps the version but keeps the text,
-  // so only a change of the text itself is a conflict to show.
   const [editBase, setEditBase] = useState({ body: card.body, version: card.version });
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -115,7 +103,11 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
   const changedMeanwhile = editing && card.body !== editBase.body;
   const adopt = () => setEditBase({ body: card.body, version: card.version });
 
-  const startEdit = () => { setDraft(card.body); adopt(); setProblems([]); added.clear(); setRemoved(new Set()); setEditing(true); };
+  const startEdit = () => {
+    setDraft(card.body); adopt(); setProblems([]); added.clear(); setRemoved(new Set());
+    // After the menu closes and hands focus back to its button, so the editor keeps the caret.
+    window.setTimeout(() => setEditing(true), 0);
+  };
   const cancel = () => { added.clear(); setRemoved(new Set()); setProblems([]); setEditing(false); };
 
   const command = async (input: WorkspaceCommandInput) => {
@@ -133,12 +125,10 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
       if (body !== (card.body || null)) {
         const result = await run({ command: "updateCard", projectId, cardId: card.id, body, version: card.body === editBase.body ? card.version : editBase.version });
         if (!result.ok) {
-          // A stale save refreshes the card; the editor keeps the text so the person can compare and decide.
           setProblems([result.stale ? "Someone else saved this card while you were editing. Their text is shown above yours; choose which to keep." : result.message]);
           return;
         }
       }
-      // New images first, so removing the last old image never leaves the card empty on the way.
       const { problems: failed, failed: left } = await uploadCardImages(projectId, card.id, added.files);
       for (const imageId of removed) {
         const result = await run({ command: "removeCardImage", projectId, imageId });
@@ -154,11 +144,11 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
     }
   };
 
-  const origin = ORIGIN_BADGE[card.origin];
+  const feedback = card.origin === "CLIENT_ANSWER";
   const canLabel = canWrite && (labelChoices.allowNone || labelChoices.phases.length > 0);
   const menu: RowActionItem[] = canWrite ? [
     { label: "Edit", onSelect: startEdit },
-    { label: card.origin === "CLIENT_ANSWER" ? "Not a client answer" : "Mark as client answer", onSelect: () => void command({ command: "setClientAnswer", projectId, cardId: card.id, clientAnswer: card.origin !== "CLIENT_ANSWER", version: card.version }) },
+    { label: feedback ? "Not client feedback" : "Mark as client feedback", onSelect: () => void command({ command: "setClientAnswer", projectId, cardId: card.id, clientAnswer: !feedback, version: card.version }) },
     ...(canLabel ? [{ label: card.phaseId ? "Change phase label" : "Add phase label", onSelect: () => setLabelOpen(true) }] : []),
     ...menuExtra,
     { label: "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(card) },
@@ -166,38 +156,38 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
 
   return (
     <article
-      draggable={drag.draggable && !editing}
-      onDragStart={drag.onDragStart}
-      onDragEnd={drag.onDragEnd}
-      onDragOver={drag.onDragOver}
+      ref={measureRef as Ref<HTMLElement>}
+      style={style}
       aria-label={`Card${card.phaseName ? ` · ${card.phaseName}` : ""}${card.authorName ? ` · ${card.authorName}` : ""}`}
       className={[
-        "group relative grid gap-2 rounded-control border px-3 py-2.5",
-        card.origin === "CLIENT_ANSWER" ? "border-warning/40 bg-warning/5" : card.pinned ? "border-line-strong bg-surface" : "border-line-subtle bg-surface",
-        drag.dragging ? "opacity-40" : "",
-        drag.draggable && !editing ? "cursor-grab active:cursor-grabbing" : "",
+        "group/card grid gap-1.5 rounded-[12px] px-3 pb-2 pt-2 transition-[opacity,box-shadow] duration-150",
+        feedback ? "bg-[color-mix(in_srgb,var(--ui-warning-bg)_70%,var(--ui-surface))] shadow-[0_0_0_1px_var(--ui-warning-border)]" : "bg-surface shadow-plane hover:shadow-raise focus-within:shadow-raise",
+        dimmed ? "pointer-events-none opacity-25" : "",
+        dragging ? "z-40 shadow-elevated" : "",
       ].join(" ")}
     >
-      {drag.dropEdge ? <span aria-hidden="true" className={`pointer-events-none absolute inset-x-1 h-0.5 rounded-full bg-line-focus ${drag.dropEdge === "before" ? "-top-1.5" : "-bottom-1.5"}`} /> : null}
-
-      <div className="flex items-start gap-1.5">
-        {drag.draggable && !editing ? <GripVertical aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-tertiary opacity-50 group-hover:opacity-100" /> : null}
+      <div className="flex min-h-6 items-center gap-1">
+        {onGripDown && !editing ? (
+          <button type="button" aria-label="Drag to move" onPointerDown={onGripDown} className="-ml-1.5 grid h-6 w-5 cursor-grab touch-none place-items-center rounded text-ink-tertiary opacity-40 group-hover/card:opacity-100 active:cursor-grabbing">
+            <GripVertical aria-hidden="true" className="h-3.5 w-3.5" />
+          </button>
+        ) : null}
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
-          {card.phaseName ? <Badge tone="neutral">{card.phaseName}{card.iterationLabel ? ` · ${card.iterationLabel}` : ""}</Badge> : null}
-          {origin ? <Badge tone={origin.tone}>{origin.label}</Badge> : null}
+          <span className="inline-flex h-5 items-center rounded-pill bg-surface-muted px-2 text-xs text-ink-secondary">{card.phaseName ? `${card.phaseName}${card.iterationLabel ? ` · ${card.iterationLabel}` : ""}` : "General"}</span>
+          {feedback ? <span className="inline-flex h-5 items-center rounded-pill bg-warning-surface px-2 text-xs text-warning shadow-[0_0_0_1px_var(--ui-warning-border)]">Client feedback</span> : null}
+          {card.origin === "SITE_VISIT" ? <span className="inline-flex h-5 items-center rounded-pill bg-surface-muted px-2 text-xs text-ink-secondary">Site visit</span> : null}
         </div>
-        <div className="-mr-1 -mt-1 flex shrink-0 items-center">
-          <IconButton
-            size="sm"
-            variant="ghost"
-            label={card.pinned ? "Unpin" : "Pin"}
+        <div className="-mr-1.5 flex shrink-0 items-center">
+          <button
+            type="button"
+            aria-label={card.pinned ? "Unstar" : "Star"}
             aria-pressed={card.pinned}
-            disabled={!canWrite}
-            pending={busy}
-            icon={<Pin aria-hidden="true" className={card.pinned ? "fill-current text-ink" : ""} />}
+            disabled={!canWrite || busy}
             onClick={() => void command({ command: "pinCard", projectId, cardId: card.id, pinned: !card.pinned, version: card.version })}
-            className={card.pinned || !canWrite ? "" : "opacity-50 group-hover:opacity-100 focus-visible:opacity-100"}
-          />
+            className={`grid h-6 w-6 place-items-center rounded hover:bg-surface-muted disabled:cursor-default ${card.pinned ? "text-warning" : "text-ink-tertiary opacity-0 group-hover/card:opacity-100 focus-visible:opacity-100"}`}
+          >
+            <Star aria-hidden="true" className={`h-3.5 w-3.5 ${card.pinned ? "fill-current" : ""}`} />
+          </button>
           {menu.length > 0 && !editing ? <RowActionMenu label="Card actions" items={menu} /> : null}
         </div>
       </div>
@@ -214,7 +204,7 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
               </div>
             </div>
           ) : null}
-          <RichTextEditor aria-label="Edit card" maxLength={NOTE_MAX} value={draft} autoFocus onChange={setDraft} onSubmit={() => void save()} />
+          <RichTextEditor compact aria-label="Edit card" maxLength={NOTE_MAX} value={draft} autoFocus onChange={setDraft} onSubmit={() => void save()} />
           <ImageGallery
             images={[...card.images.filter((image) => !removed.has(image.id)), ...added.attachments.map((item) => ({ id: item.url, url: item.url }))]}
             size="sm"
@@ -226,15 +216,18 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="primary" pending={saving} disabled={changedMeanwhile} onClick={() => void save()}>Save</Button>
             <Button size="sm" variant="ghost" disabled={saving} onClick={cancel}>Cancel</Button>
-            <Text size="sm" tone="tertiary">Paste or drop an image to add it.</Text>
           </div>
           {added.problem ? <InlineError>{added.problem}</InlineError> : null}
         </div>
       ) : (
-        <>
+        <div
+          className={canWrite ? "cursor-text" : undefined}
+          onDoubleClick={canWrite ? startEdit : undefined}
+          title={canWrite ? "Double-click to edit" : undefined}
+        >
           {card.body ? <FormattedText text={card.body} className="text-sm" /> : null}
           {card.images.length > 0 ? <ImageGallery images={card.images} size="sm" viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} phaseId={card.phaseId} canUseIdeas={canUseIdeas} />} /> : null}
-        </>
+        </div>
       )}
 
       {labelOpen ? (
@@ -246,23 +239,22 @@ export function WorkspaceCard({ card, projectId, canWrite, labelChoices, canUseI
         />
       ) : null}
 
-      <Text size="sm" tone="tertiary">
-        {card.authorName ? `${card.authorName} · ` : ""}<FormattedInstant value={card.createdAt} locale={locale} timeZone={timezone} style="datetime" />{card.editedAt ? " · edited" : ""}
-      </Text>
+      <Text size="sm" tone="tertiary" className="text-xs">{feedback && !card.authorName ? "Client" : card.authorName ?? ""}{card.editedAt ? " · edited" : ""}</Text>
       {problems.length > 0 ? <InlineError>{problems.join(" ")}</InlineError> : null}
+      {onWidthDown && !editing ? <span aria-hidden="true" onPointerDown={onWidthDown} className="absolute bottom-1 right-1 h-3 w-3 cursor-ew-resize touch-none opacity-0 transition-opacity group-hover/card:opacity-100 [background:linear-gradient(135deg,transparent_50%,var(--ui-border-strong)_50%_60%,transparent_60%_72%,var(--ui-border-strong)_72%_82%,transparent_82%)]" /> : null}
     </article>
   );
 }
 
 /** Inline phase-label choice; clearing or changing the label also drops the round label (the service rule). */
-function PhaseLabelPicker({ card, choices, onPick, onCancel }: { card: WorkspaceCardView; choices: { allowNone: boolean; phases: readonly PhaseOption[] }; onPick: (phaseId: string | null) => Promise<void>; onCancel: () => void }) {
+function PhaseLabelPicker({ card, choices, onPick, onCancel }: { card: WorkspaceCardView; choices: LabelChoices; onPick: (phaseId: string | null) => Promise<void>; onCancel: () => void }) {
   const [value, setValue] = useState(card.phaseId ?? "");
   const [pending, setPending] = useState(false);
   const options = card.phaseId && !choices.phases.some((phase) => phase.id === card.phaseId) ? [{ id: card.phaseId, name: card.phaseName ?? "Current phase" }, ...choices.phases] : choices.phases;
   return (
     <div className="grid gap-2 rounded-control border border-line-subtle bg-surface-muted/40 p-2">
       <Select aria-label="Phase label" value={value} onChange={(event) => setValue(event.target.value)}>
-        {choices.allowNone || !card.phaseId ? <option value="">No phase</option> : null}
+        {choices.allowNone || !card.phaseId ? <option value="">General</option> : null}
         {options.map((phase) => <option key={phase.id} value={phase.id}>{phase.name}</option>)}
       </Select>
       {card.iterationLabel ? <Text size="sm" tone="tertiary">Changing the phase also removes the round label ({card.iterationLabel}).</Text> : null}
@@ -275,16 +267,17 @@ function PhaseLabelPicker({ card, choices, onPick, onCancel }: { card: Workspace
 }
 
 /**
- * Writes a new card at the end of a section. Enter sends, Shift+Enter is a new line; images paste, drop or pick in.
- * The phase label starts from the board's phase filter, so a card written while looking at one phase belongs to it.
+ * Quick capture: write a card into a frame. Enter sends, Shift+Enter is a new line; images paste, drop or pick in.
+ * It stays open after sending so several points from one conversation go in one after another. The phase label
+ * starts from the phase chosen above the board, so a card written while working on a phase belongs to it.
  */
-export function CardComposer({ projectId, sectionId, labelChoices, defaultPhaseId, run, onDone, autoFocus = false }: {
+export function CardComposer({ projectId, sectionId, labelChoices, defaultPhaseId, run, onClose, autoFocus = false }: {
   projectId: string;
   sectionId?: string;
-  labelChoices: { allowNone: boolean; phases: readonly PhaseOption[] };
+  labelChoices: LabelChoices;
   defaultPhaseId: string | null;
   run: RunCommand;
-  onDone?: () => void;
+  onClose?: () => void;
   autoFocus?: boolean;
 }) {
   const router = useRouter();
@@ -316,7 +309,6 @@ export function CardComposer({ projectId, sectionId, labelChoices, defaultPhaseI
       pending.current = null;
       draft.clear();
       setClientAnswer(false);
-      onDone?.();
     } finally {
       setSending(false);
     }
@@ -335,23 +327,13 @@ export function CardComposer({ projectId, sectionId, labelChoices, defaultPhaseI
       />
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <Select aria-label="Phase label for the new card" value={phaseId} onChange={(event) => setPhaseId(event.target.value)} className="!w-auto min-w-0 max-w-full">
-          {labelChoices.allowNone ? <option value="">No phase</option> : null}
+          {labelChoices.allowNone ? <option value="">General</option> : null}
           {labelChoices.phases.map((phase) => <option key={phase.id} value={phase.id}>{phase.name}</option>)}
         </Select>
-        <Checkbox label="Client answer" checked={clientAnswer} onCheckedChange={(checked) => setClientAnswer(checked === true)} />
-        {onDone ? <Button type="button" size="sm" variant="ghost" disabled={sending} onClick={() => { draft.clear(); onDone(); }}>Cancel</Button> : null}
+        <Checkbox label="Client feedback" checked={clientAnswer} onCheckedChange={(checked) => setClientAnswer(checked === true)} />
+        {onClose ? <Button type="button" size="sm" variant="ghost" disabled={sending} onClick={() => { draft.clear(); onClose(); }}>Done</Button> : null}
       </div>
       {errors.length > 0 ? <InlineError>{errors.join(" ")}</InlineError> : null}
     </div>
   );
-}
-
-export function ReadOnlyBoardNotice({ reason }: { reason: "archived" | "inactive" | "permission" | "limited" }) {
-  const text = {
-    archived: "This project is archived, so its Workspace is read-only.",
-    inactive: "The Workspace can be changed once the project is active.",
-    permission: "You can read this Workspace. Only the project's designer or drafter can change it.",
-    limited: "You can write cards for your own phases only; the other cards are read-only for you.",
-  }[reason];
-  return <Notice tone="neutral">{text}</Notice>;
 }

@@ -32,7 +32,9 @@ async function discoverTests(directory) {
       (extname(entry.name) === ".ts" || extname(entry.name) === ".tsx") &&
       /\.test\.tsx?$/.test(entry.name)
     ) {
-      testFiles.push(path);
+      // `node --test` reads its arguments as glob patterns, so a route folder such as `[projectId]` would be a
+      // character class and the file would be skipped silently. Each bracket becomes a one-character class.
+      testFiles.push(path.replace(/[[\]]/g, (bracket) => `[${bracket}]`));
     }
   }
 }

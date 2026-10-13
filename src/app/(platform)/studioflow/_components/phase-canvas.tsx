@@ -6,14 +6,12 @@ import { SectionCard, Text } from "@/platform/ui_engine";
 
 import { DeliverablesPanel } from "../projects/[projectId]/phases/[phaseId]/deliverables-panel";
 import { PhasePanel } from "../projects/[projectId]/phase-panel";
-import { CdList } from "./cd-list";
 import { ReadOnlyNotice } from "./read-only-notice";
 import { RequirementList, type RequirementNode } from "./requirement-list";
 import { pageProjectAccess, pageSession } from "./session";
 
-type PersonItem = Awaited<ReturnType<typeof studioFlow.projects.listAssignablePeople>>[number];
 
-export async function PhaseCanvas({ projectId, phaseId, people, archived }: { projectId: string; phaseId: string; people: PersonItem[]; archived: boolean }) {
+export async function PhaseCanvas({ projectId, phaseId, archived }: { projectId: string; phaseId: string; archived: boolean }) {
   const { grants } = await pageSession();
   const caps = studioFlow.phases.capabilities(grants);
   const access = await pageProjectAccess(projectId);
@@ -23,9 +21,8 @@ export async function PhaseCanvas({ projectId, phaseId, people, archived }: { pr
   });
   if (!phase) return <SectionCard padded><Text tone="secondary" size="sm">Phase not found.</Text></SectionCard>;
 
-  const [deliverablesResult, cdItems, requirements] = await Promise.all([
+  const [deliverablesResult, requirements] = await Promise.all([
     studioFlow.phases.listDeliverables({ grants, projectId, phaseId: phase.id }),
-    phase.seat === "drafter" ? studioFlow.cdList.list({ grants, projectId, phaseId: phase.id }) : Promise.resolve(null),
     studioFlow.tasks.listChecklist({ grants, projectId }),
   ]);
   const phaseAccess = access.phases.find((item) => item.phaseId === phase.id);
@@ -51,13 +48,12 @@ export async function PhaseCanvas({ projectId, phaseId, people, archived }: { pr
         phase={{ id: phase.id, name: phase.label, status: phase.status, isSupervision: phase.isSupervision, canStart: phase.canStart }}
         current={current ? { id: current.id, name: current.shortName, state: current.state, waitingDays: current.waitingDays, choices: current.choices, answerChoices: current.answerChoices, nextStepName: current.nextStepName } : null}
         iterations={phase.iterations}
-        notes={phase.notes}
+        detailsSummary={`Requirements ${completedPhaseRequirements}/${phaseRequirements.length} · Files ${deliverablesResult.items.length}`}
         skippedReason={phase.skippedReason}
         startBlockedReason={phase.startBlockedReason}
         canAct={canAct}
         canSkip={canTransition && caps.review}
         canOverride={caps.override}
-        canUseIdeas={hasPermission(grants, P.ideasManage)}
         archived={archived}
         aside={<>
           <SectionCard title="Requirements" count={`${completedPhaseRequirements}/${phaseRequirements.length}`}>
@@ -72,9 +68,7 @@ export async function PhaseCanvas({ projectId, phaseId, people, archived }: { pr
           </SectionCard>
           <DeliverablesPanel projectId={projectId} phaseId={phase.id} deliverables={deliverablesResult.items} status={deliverablesResult.status} canWork={canWork} canManage={canManage} />
         </>}
-      >
-        {cdItems ? <SectionCard title="Drawing list" description="The drawings this phase needs. Tick them off as they are drawn; it never blocks a step."><CdList projectId={projectId} phaseId={phase.id} items={cdItems} people={people} canEdit={canWork} /></SectionCard> : null}
-      </PhasePanel>
+      />
     </>
   );
 }

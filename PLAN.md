@@ -4,7 +4,7 @@ Plan ID: WO-SF-WORKSPACE-03 (Workspace canvas backend: frames and cards keep the
 Scope: StudioFlow Workspace backend — geometry for sections (frames) and cards, one batch "place" command, reads, tests; minimal type pass-through only
 Module(s): studioflow (core; Workspace is not an optional module)
 Target revision: R8.531 (Executor). The Lead's canvas UI follows as its own revision.
-Status: READY
+Status: IMPLEMENTED (backend R8.531 PASS; Lead canvas UI R8.532) — AWAITING OWNER WALK
 Priority: P1
 Owner: owner 2026-10-13 — accepted the canvas prototype as built in R8.529 ("sudah oke"), including 10 px snapping and the stacked document on a phone. Recorded in R8.530.
 Last updated: 2026-10-13 (Lead, R8.530)

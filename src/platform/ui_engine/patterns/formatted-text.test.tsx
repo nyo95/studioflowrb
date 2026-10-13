@@ -45,4 +45,10 @@ describe("FormattedText", () => {
     const out = html("Size 60 * 60 cm, note *");
     assert.match(out, /Size 60 \* 60 cm, note \*/);
   });
+
+  it("shows characters the rich editor escaped as typed, without the backslash", () => {
+    const out = html("\\[TES\\] warna lantai \\*bukan miring\\* **\\[tebal\\]**");
+    assert.match(out, /\[TES\] warna lantai \*bukan miring\* <strong class="font-semibold">\[tebal\]<\/strong>/);
+    assert.doesNotMatch(out, /\\/);
+  });
 });

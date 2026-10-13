@@ -14,6 +14,7 @@ import {
 
 import { PhaseCanvas } from "../../_components/phase-canvas";
 import { pageSession } from "../../_components/session";
+import { ProjectWorkspace } from "./_workspace-canvas/project-workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -75,7 +76,6 @@ export default async function ProjectOverviewPage({
           <PhaseCanvas
             projectId={projectId}
             phaseId={selectedPhaseId}
-            people={people}
             archived={archived}
           />
         </Suspense>
@@ -84,6 +84,11 @@ export default async function ProjectOverviewPage({
           <Text tone="secondary" size="sm">No phases found for this project.</Text>
         </SectionCard>
       )}
+
+      {/* One Workspace canvas for the whole project (board-first, owner 2026-10-13); the phase only sets context. */}
+      <Suspense fallback={<SectionCard padded><SkeletonBlock className="h-[420px] w-full" /></SectionCard>}>
+        <ProjectWorkspace projectId={projectId} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />
+      </Suspense>
     </div>
   );
 }

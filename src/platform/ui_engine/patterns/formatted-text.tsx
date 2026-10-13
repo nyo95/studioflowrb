@@ -43,15 +43,20 @@ function blocksOf(text: string): Block[] {
   return blocks;
 }
 
-/** `**bold**` and `*italic*` inside one line; anything else is shown as typed. Never renders HTML. */
+/** The punctuation the rich-text editor escapes with a backslash when it saves Markdown (e.g. `\[TES\]`). */
+const ESCAPED = /\\([\\`*_{}[\]()#+\-.!>~|])/g;
+const unescape = (text: string) => text.replace(ESCAPED, "$1");
+
+/** `**bold**` and `*italic*` inside one line; anything else is shown as typed, escapes removed. Never renders HTML. */
 function inline(text: string): ReactNode[] {
   const parts: ReactNode[] = [];
-  const pattern = /\*\*(.+?)\*\*|\*(?!\s)(.+?)(?<!\s)\*/g;
+  // An escaped character is matched first, so `\*` is a literal star and never opens emphasis.
+  const pattern = /\\([\\`*_{}[\]()#+\-.!>~|])|\*\*(.+?)\*\*|\*(?!\s)(.+?)(?<!\s)\*/g;
   let cursor = 0;
   for (const match of text.matchAll(pattern)) {
     const index = match.index ?? 0;
     if (index > cursor) parts.push(text.slice(cursor, index));
-    parts.push(match[1] !== undefined ? <strong key={index} className="font-semibold">{match[1]}</strong> : <em key={index}>{match[2]}</em>);
+    parts.push(match[1] !== undefined ? match[1] : match[2] !== undefined ? <strong key={index} className="font-semibold">{unescape(match[2])}</strong> : <em key={index}>{unescape(match[3]!)}</em>);
     cursor = index + match[0].length;
   }
   if (cursor < text.length) parts.push(text.slice(cursor));
