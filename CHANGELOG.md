@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.05 | 2026-10-14 | docs(bq): Lead review of R9.03 (PASS) and the Slice 3 handoff notes (Lead)
+
+- **Review of R9.03 (`abf0be0`): PASS.** Read the service and the in-memory preview: moves stay inside one Work Item; `previewLineItemMove` is read-only and uses the same engine as the totals; a new group's quantity/markup are cast to the database scales before previewing; line order is renumbered with the same two-phase parking that the unique sibling indexes require; the moved rows' `item_id`/`sub_object_id` change in one statement so the one-parent check never sees both; each command writes one audit event and a no-op writes nothing. Re-ran BQ integration, engine and move tests: 49/49. Two minor notes (preview is not re-checked at move time; stale-before-locked message order) are in BACKLOG as `[CLEANUP]`.
+- **Owner 2026-10-14:** "pakai istilah kontrak saja, tetap centang + menu" — contract terms for the screen (revert the R8.545-R8.549 renames), and Slice 3 uses checkboxes and a menu, not drag.
+- **R9.04 (docs):** BACKLOG BQ section now holds the Slice 3 UI plan with the mockup link, the terms decision, the acceptance journeys and the left-out items.
+- **Migrations/dependencies:** none. **Checks:** BQ tests 49/49 (re-run); docs only otherwise. No push.
+
 ## R9.03 | 2026-10-14 | feat(bq): Group and move Cost Components with exact price previews (Executor)
 
 - **Authority/scope:** owner via Lead, current-session WO-BQ-GROUP-01; module `bq`, backend only. REUSE existing exact calculation engine/DecimalString, permission checks, editable-project guard, serializable command runner and transactional audit writer. Move/preview policy stays APP-OWNED; no shared-layer changes.
