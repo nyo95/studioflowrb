@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.02 | 2026-10-14 | feat(bq): Drag to re-order Pekerjaan in the Struktur panel (Lead)
+
+- **Owner 2026-10-14:** the left panel as layers ("bisa di-drag?"); first half only, after Codex's `reorderItems` (R9.01, reviewed PASS by the Lead: two-phase update is needed because partial unique sibling indexes exist on `bq_item`; the full-list check, lock/archive refusal, single audit and no-op skip are covered by 35/35 BQ tests).
+- **Panel:** each Bagian and Subbagian lists its Pekerjaan under it; a row is dragged to a new place in the same list, or moved with the up/down buttons (shown on hover and on keyboard focus, for keyboard and touch). A row accepts a drop only from its own list, so nothing can be moved to another Bagian or Subbagian from here; clicking a name jumps to the row. Read-only projects show the list without handles.
+- **Call:** `reorderItemsAction` with the new full order; a stale list is refused by the server (`bq.item.reorder-stale`) and shows in the page error line; prices and totals never change.
+- **Not in this change:** moving a Pekerjaan to another Bagian/Subbagian, grouping rincian into Kelompok and moving rincian between them (slice 3, needs an impact preview), re-ordering Subbagian or Bagian.
+- **Migrations/dependencies:** none (native drag and drop, no library). **Checks:** typecheck 0; eslint `src/app/(platform)/bq` 0. **Not done:** browser walk (drag within a Bagian and a Subbagian, arrow buttons, locked project shows no handles, narrow screen has no panel and so no re-order).
+
 ## R9.01 | 2026-10-14 | feat(bq): Reorder Work Items within one parent (Executor)
 
 - **Authority/scope:** owner via Lead, WO-BQ-REORDER-01 in the current session (supersedes the unrelated implemented Workspace `PLAN.md` for this slice); module `bq`, backend only. REUSE existing permission, editable-project guards, audit writer and serializable command runner; ordering policy stays app-owned.

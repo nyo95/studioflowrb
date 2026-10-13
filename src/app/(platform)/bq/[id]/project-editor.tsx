@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArchiveRestore, ChevronDown, ChevronRight, FileText, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -62,6 +62,7 @@ import {
   updateSubObjectAction,
   updateSectionAction,
   updateSubsectionAction,
+  reorderItemsAction,
   revertLineItemPriceAction,
   saveItemAsAssemblyAction,
   unlockProjectAction,
@@ -199,6 +200,85 @@ function workItemCount(section: BqSectionDetail) {
   return section.items.length + section.subsections.reduce((sum, subsection) => sum + subsection.items.length, 0);
 }
 
+type ReorderParent = { sectionId: string } | { subsectionId: string };
+
+/**
+ * The Pekerjaan of one Bagian or Subbagian as a list that can be re-ordered by dragging (or with the arrow buttons,
+ * for keyboard and touch). Only the order within this parent changes; nothing here moves a Pekerjaan elsewhere or
+ * touches a price. The server checks the whole list again (stale lists are refused).
+ */
+function OutlineItems({
+  items,
+  parent,
+  indent,
+  editable,
+  pending,
+  onReorder,
+}: {
+  items: readonly BqItemDetail[];
+  parent: ReorderParent;
+  indent: string;
+  editable: boolean;
+  pending: boolean;
+  onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
+}) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+  if (items.length === 0) return null;
+  const ids = items.map((item) => item.id);
+  const move = (id: string, to: number) => {
+    const from = ids.indexOf(id);
+    if (from < 0 || to < 0 || to >= ids.length || to === from) return;
+    const next = ids.filter((candidate) => candidate !== id);
+    next.splice(to, 0, id);
+    void onReorder(parent, next).catch(() => undefined);
+  };
+  return (
+    <ul className="m-0 grid list-none gap-0.5 p-0">
+      {items.map((item, index) => (
+        <li
+          key={item.id}
+          draggable={editable && !pending}
+          onDragStart={(event) => {
+            setDragId(item.id);
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData("text/plain", item.id);
+          }}
+          onDragOver={(event) => {
+            // Only rows of this same list accept a drop, so nothing can be moved to another parent from here.
+            if (dragId && dragId !== item.id && ids.includes(dragId)) {
+              event.preventDefault();
+              setOverId(item.id);
+            }
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            if (dragId && dragId !== item.id) move(dragId, index);
+            setDragId(null);
+            setOverId(null);
+          }}
+          onDragEnd={() => { setDragId(null); setOverId(null); }}
+          className={[
+            "group/outline flex items-center gap-1 rounded-control pr-1 text-sm text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink",
+            indent,
+            dragId === item.id ? "opacity-50" : "",
+            overId === item.id ? "bg-surface-muted ring-1 ring-line-focus" : "",
+          ].join(" ")}
+        >
+          {editable ? <GripVertical aria-hidden="true" className="size-3.5 shrink-0 cursor-grab text-ink-tertiary opacity-0 group-hover/outline:opacity-100" /> : null}
+          <a href={`#bq-row-${item.id}`} className="min-w-0 flex-1 truncate py-1" draggable={false}>{item.name}</a>
+          {editable ? (
+            <span className="flex shrink-0 opacity-0 focus-within:opacity-100 group-hover/outline:opacity-100">
+              <IconButton size="sm" variant="ghost" label={`Naikkan ${item.name}`} icon={<ChevronUp aria-hidden="true" />} disabled={pending || index === 0} onClick={() => move(item.id, index - 1)} />
+              <IconButton size="sm" variant="ghost" label={`Turunkan ${item.name}`} icon={<ChevronDown aria-hidden="true" />} disabled={pending || index === items.length - 1} onClick={() => move(item.id, index + 1)} />
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /**
  * The document's structure and the one place that changes it: each Bagian lists its Subbagian and offers
  * "+ Subbagian" right under them; "+ Bagian" closes the list. Shown from 1024 px; narrower screens get the same
@@ -210,12 +290,14 @@ function SectionOutline({
   editable,
   pending,
   onAddSubsection,
+  onReorder,
 }: {
   projectId: string;
   sections: readonly BqSectionDetail[];
   editable: boolean;
   pending: boolean;
   onAddSubsection: (sectionId: string, name: string) => Promise<void>;
+  onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
 }) {
   if (sections.length === 0 && !editable) return null;
   return (
@@ -235,15 +317,18 @@ function SectionOutline({
               <span className="truncate">{section.name}</span>
               <span className="shrink-0 text-xs tabular-nums text-ink-tertiary">{count}</span>
             </a>
+            <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-4" editable={editable} pending={pending} onReorder={onReorder} />
             {section.subsections.map((subsection) => (
-              <a
-                key={subsection.id}
-                href={`#bq-subsection-${subsection.id}`}
-                className="flex items-center justify-between gap-2 rounded-control py-1 pl-6 pr-2.5 text-sm text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
-              >
-                <span className="truncate">{subsection.name}</span>
-                <span className="shrink-0 text-xs tabular-nums">{subsection.items.length}</span>
-              </a>
+              <div key={subsection.id} className="grid gap-0.5">
+                <a
+                  href={`#bq-subsection-${subsection.id}`}
+                  className="flex items-center justify-between gap-2 rounded-control py-1 pl-4 pr-2.5 text-sm font-medium text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+                >
+                  <span className="truncate">{subsection.name}</span>
+                  <span className="shrink-0 text-xs tabular-nums">{subsection.items.length}</span>
+                </a>
+                <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-7" editable={editable} pending={pending} onReorder={onReorder} />
+              </div>
             ))}
             {editable ? (
               <div className="pl-4">
@@ -396,6 +481,7 @@ export function ProjectEditor({
           editable={editable}
           pending={pending}
           onAddSubsection={(sectionId, name) => run(addSubsectionAction, { sectionId, name })}
+          onReorder={(parent, orderedIds) => run(reorderItemsAction, { ...parent, orderedIds: JSON.stringify(orderedIds) })}
         />
         <div className="grid min-w-0 flex-1 gap-4">
           {/* Below 1024 px the Struktur panel is hidden, so its "+ Bagian" is offered here. */}
