@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { addSectionAction } from "../actions";
 import { Button, Dialog, Field, FormActions, InlineError, Input, Spinner } from "@/platform/ui_engine";
 
-export function AddSectionDialog({ projectId }: { projectId: string }) {
+/** Adds a Bagian. It lives in the Struktur panel (and as a small fallback above the list on narrow screens). */
+export function AddSectionDialog({ projectId, compact = false }: { projectId: string; compact?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -37,25 +38,31 @@ export function AddSectionDialog({ projectId }: { projectId: string }) {
 
   return (
     <>
-      <Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>
-        Add section
+      <Button
+        type="button"
+        size={compact ? "sm" : undefined}
+        variant={compact ? "ghost" : "primary"}
+        leadingIcon={<Plus aria-hidden="true" />}
+        onClick={() => setOpen(true)}
+      >
+        Bagian
       </Button>
       <Dialog
         open={open}
         onOpenChange={(nextOpen) => (nextOpen ? setOpen(true) : close())}
-        title="Add section"
-        description="Create a section manually, or use a template when a scaffold is available."
+        title="Tambah bagian"
+        description="Bagian adalah judul besar dokumen BQ, mis. Preliminaries atau Interior Works."
         size="sm"
       >
         <form onSubmit={submit} className="grid gap-4">
           {error ? <InlineError>{error}</InlineError> : null}
           <input type="hidden" name="projectId" value={projectId} />
-          <Field label="Section name" required>
+          <Field label="Nama bagian" required>
             <Input
               name="name"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="e.g. General Works"
+              placeholder="mis. Interior Works"
               maxLength={160}
               required
               autoFocus
@@ -63,10 +70,10 @@ export function AddSectionDialog({ projectId }: { projectId: string }) {
           </Field>
           <FormActions>
             <Button type="button" variant="ghost" onClick={close} disabled={pending}>
-              Cancel
+              Batal
             </Button>
             <Button type="submit" variant="primary" disabled={pending}>
-              {pending ? <Spinner /> : "Add section"}
+              {pending ? <Spinner /> : "Tambah bagian"}
             </Button>
           </FormActions>
         </form>

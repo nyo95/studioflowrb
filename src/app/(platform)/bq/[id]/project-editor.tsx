@@ -65,6 +65,7 @@ import {
   unlockProjectAction,
   updateQuotationAction,
 } from "./actions";
+import { AddSectionDialog } from "./add-section-dialog";
 import { AssemblyPickerDialog } from "./assembly-picker-dialog";
 import { NewWorkItemDialog } from "./new-work-item-dialog";
 import { ImportDialog } from "./source-picker-dialog";
@@ -195,12 +196,29 @@ function workItemCount(section: BqSectionDetail) {
   return section.items.length + section.subsections.reduce((sum, subsection) => sum + subsection.items.length, 0);
 }
 
-function SectionOutline({ sections }: { sections: readonly BqSectionDetail[] }) {
-  if (sections.length === 0) return null;
+/**
+ * The document's structure and the one place that changes it: each Bagian lists its Subbagian and offers
+ * "+ Subbagian" right under them; "+ Bagian" closes the list. Shown from 1024 px; narrower screens get the same
+ * actions in the work area (see ProjectEditor), so nothing disappears with the panel.
+ */
+function SectionOutline({
+  projectId,
+  sections,
+  editable,
+  pending,
+  onAddSubsection,
+}: {
+  projectId: string;
+  sections: readonly BqSectionDetail[];
+  editable: boolean;
+  pending: boolean;
+  onAddSubsection: (sectionId: string, name: string) => Promise<void>;
+}) {
+  if (sections.length === 0 && !editable) return null;
   return (
     <nav
       aria-label="Struktur dokumen"
-      className="sticky top-0 hidden w-[220px] shrink-0 flex-col gap-0.5 self-start py-1 xl:flex"
+      className="sticky top-0 hidden w-[200px] shrink-0 flex-col gap-0.5 self-start py-1 lg:flex xl:w-[232px]"
     >
       <Text tone="tertiary" size="sm" meta className="px-2.5 pb-1">Struktur</Text>
       {sections.map((section) => {
@@ -212,7 +230,7 @@ function SectionOutline({ sections }: { sections: readonly BqSectionDetail[] }) 
               className="flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
             >
               <span className="truncate">{section.name}</span>
-              {count > 0 ? <span className="shrink-0 text-xs tabular-nums text-ink-tertiary">{count}</span> : null}
+              <span className="shrink-0 text-xs tabular-nums text-ink-tertiary">{count}</span>
             </a>
             {section.subsections.map((subsection) => (
               <a
@@ -221,12 +239,28 @@ function SectionOutline({ sections }: { sections: readonly BqSectionDetail[] }) 
                 className="flex items-center justify-between gap-2 rounded-control py-1 pl-6 pr-2.5 text-sm text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
               >
                 <span className="truncate">{subsection.name}</span>
-                {subsection.items.length > 0 ? <span className="shrink-0 text-xs tabular-nums">{subsection.items.length}</span> : null}
+                <span className="shrink-0 text-xs tabular-nums">{subsection.items.length}</span>
               </a>
             ))}
+            {editable ? (
+              <div className="pl-4">
+                <AddRow
+                  label="Subbagian"
+                  placeholder="Nama subbagian"
+                  compact
+                  disabled={pending}
+                  onAdd={(name) => onAddSubsection(section.id, name)}
+                />
+              </div>
+            ) : null}
           </div>
         );
       })}
+      {editable ? (
+        <div className="mt-2 border-t border-line-subtle pt-2">
+          <AddSectionDialog projectId={projectId} compact />
+        </div>
+      ) : null}
     </nav>
   );
 }
@@ -304,6 +338,8 @@ export function ProjectEditor({
 
   const totalColumns = 8;
   const readiness = summarizeReadiness(project.sections);
+  /** The bar already states "X dari Y rincian sudah ada harga", so the footer drops its copy while the bar shows. */
+  const readinessBarShown = project.status === "ACTIVE" && readiness.total + readiness.counts.tbc + readiness.counts.byOwner > 0;
 
   /** Opens the Pekerjaan / Kelompok that holds the row, then scrolls to it once it is on screen. */
   const jumpTo = (jump: { rowId: string; open: string[] }) => {
@@ -345,13 +381,23 @@ export function ProjectEditor({
         </div>
       </div>
 
-      {project.status === "ACTIVE" && readiness.total + readiness.counts.tbc + readiness.counts.byOwner > 0 ? (
-        <ReadinessBar readiness={readiness} onJump={jumpTo} />
-      ) : null}
+      {readinessBarShown ? <ReadinessBar readiness={readiness} onJump={jumpTo} /> : null}
 
       <div className="flex items-start gap-5">
-        <SectionOutline sections={project.sections} />
+        <SectionOutline
+          projectId={project.id}
+          sections={project.sections}
+          editable={editable}
+          pending={pending}
+          onAddSubsection={(sectionId, name) => run(addSubsectionAction, { sectionId, name })}
+        />
         <div className="grid min-w-0 flex-1 gap-4">
+          {/* Below 1024 px the Struktur panel is hidden, so its "+ Bagian" is offered here. */}
+          {editable ? (
+            <div className="flex lg:hidden">
+              <AddSectionDialog projectId={project.id} compact />
+            </div>
+          ) : null}
           {project.sections.length === 0 ? (
             <SectionCard>
               <EmptyState
@@ -390,6 +436,19 @@ export function ProjectEditor({
             onApplyAssembly={setAssemblyItemId}
             columns={totalColumns}
           />
+          {editable ? (
+            <div className="flex">
+              <Button
+                size="sm"
+                variant="ghost"
+                leadingIcon={<Plus aria-hidden="true" />}
+                disabled={pending}
+                onClick={() => setNewItemTarget({ sectionId: section.id, where: section.name })}
+              >
+                <span className="max-w-[28ch] truncate">Pekerjaan di {section.name}</span>
+              </Button>
+            </div>
+          ) : null}
 
           {section.subsections.map((subsection) => (
             <div key={subsection.id} id={`bq-subsection-${subsection.id}`} className="grid gap-2 rounded-control border border-line-subtle p-3">
@@ -428,23 +487,15 @@ export function ProjectEditor({
                     disabled={pending}
                     onClick={() => setNewItemTarget({ subsectionId: subsection.id, where: `${section.name} › ${subsection.name}` })}
                   >
-                    Pekerjaan
+                    <span className="max-w-[28ch] truncate">Pekerjaan di {subsection.name}</span>
                   </Button>
                 </div>
               ) : null}
             </div>
           ))}
           {editable ? (
-            <div className="flex flex-wrap gap-1.5 border-t border-line-subtle pt-3">
-              <Button
-                size="sm"
-                variant="ghost"
-                leadingIcon={<Plus aria-hidden="true" />}
-                disabled={pending}
-                onClick={() => setNewItemTarget({ sectionId: section.id, where: section.name })}
-              >
-                Pekerjaan
-              </Button>
+            // Only where the Struktur panel is hidden (< 1024 px); from there on "+ Subbagian" lives in the panel.
+            <div className="flex flex-wrap gap-1.5 border-t border-line-subtle pt-3 lg:hidden">
               <AddRow
                 label="Subbagian"
                 placeholder="Nama subbagian"
@@ -459,7 +510,7 @@ export function ProjectEditor({
       </div>
 
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface/95 px-4 py-3 shadow-plane backdrop-blur-sm">
-        {readiness.total > 0 ? (
+        {readiness.total > 0 && !readinessBarShown ? (
           <Text
             tone="tertiary"
             size="sm"
@@ -1077,11 +1128,14 @@ function AddRow({
   label,
   placeholder,
   disabled,
+  compact = false,
   onAdd,
 }: {
   label: string;
   placeholder: string;
   disabled: boolean;
+  /** A narrower input, for the Struktur panel. */
+  compact?: boolean;
   onAdd: (name: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
@@ -1112,7 +1166,7 @@ function AddRow({
         value={name}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="h-8 w-[200px]"
+        className={compact ? "h-8 w-[104px]" : "h-8 w-[200px]"}
         onChange={(event) => setName(event.target.value)}
         onBlur={() => { if (!name.trim()) setOpen(false); }}
         onKeyDown={(event) => {

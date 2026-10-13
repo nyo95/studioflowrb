@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.548 | 2026-10-14 | feat(bq): Structure actions move into the Struktur panel; one "+ Pekerjaan" per table (Lead)
+
+- **Owner 2026-10-14:** after a screenshot of the project screen, "kerjakan ketiganya, mulai 1024 px" on the design critique's three priorities.
+- **Struktur panel:** "+ Subbagian" sits right under each Bagian's Subbagian and "+ Bagian" closes the list (the dialog is Indonesian now and was removed from the page header). The panel shows from 1024 px (it was 1280); below that the same two actions appear in the work area (`lg:hidden`), so no width loses them. Subbagian rows always show their count, also 0.
+- **"+ Pekerjaan":** one button directly under each table, labelled with its target ("Pekerjaan di <Bagian>" / "Pekerjaan di <Subbagian>"), so the Bagian's own button no longer reads as belonging to the Subbagian card above it. The old footer row with "+ Subbagian" is only the narrow-screen fallback.
+- **Header and copy:** "Add section" → panel; "Edit detail" → "Ubah detail"; "Client:" → "Klien:"; status shown as Aktif / Terkunci / Diarsipkan; breadcrumb "Project"; empty state "Belum ada bagian". The footer no longer repeats "X dari Y rincian sudah ada harga" while the readiness bar shows it.
+- **Migrations/dependencies:** none. **Checks:** typecheck and eslint on the BQ screen. **Not done:** browser walk (add Subbagian/Bagian from the panel at 1024 and 1280 px, narrow fallback, one "+ Pekerjaan" per table).
+
 ## R8.547 | 2026-10-14 | fix(bq): One plus sign on the add buttons of the project screen (Lead)
 
 - **Owner 2026-10-14** sent a screenshot of "+ + Subbagian". The button already draws a plus icon and the label text carried a second one; "Subbagian", "Kelompok rincian" and "Rincian biaya" no longer repeat it (the double plus also existed in the old "+ Subsection" and "+ Tambah Cost Component" labels).

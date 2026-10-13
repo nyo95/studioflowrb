@@ -7,10 +7,11 @@ import { Breadcrumb, PageHeader, SectionCard, EmptyState, buttonClasses } from "
 import { BQ_PERMISSIONS } from "@/apps/bq/service";
 import { bqPublicRead, masterDataRead } from "@/apps/bq/runtime";
 
-import { AddSectionDialog } from "./add-section-dialog";
 import { ProjectEditor } from "./project-editor";
 
 export const dynamic = "force-dynamic";
+
+const STATUS_LABEL: Record<string, string> = { ACTIVE: "Aktif", LOCKED: "Terkunci", ARCHIVED: "Diarsipkan" };
 
 export default async function BqProjectDetailPage({
   params,
@@ -35,17 +36,14 @@ export default async function BqProjectDetailPage({
   return (
     <div className="grid gap-6">
       <PageHeader
-        context={<Breadcrumb variant="capsule" appMark="BQ" entries={[{ label: "BQ", href: "/bq" }, { label: "Projects", href: "/bq" }, { label: project.title }]} />}
+        context={<Breadcrumb variant="capsule" appMark="BQ" entries={[{ label: "BQ", href: "/bq" }, { label: "Project", href: "/bq" }, { label: project.title }]} />}
         title={project.title}
-        description={`Client: ${project.clientName} · ${project.status}`}
+        description={`Klien: ${project.clientName} · ${STATUS_LABEL[project.status] ?? project.status}`}
         actions={
           canManage && !isLocked ? (
-            <div className="flex flex-wrap gap-2">
-              <Link href={`/bq/${project.id}/edit`} className={buttonClasses("secondary", "md")}>
-                Edit detail
-              </Link>
-              <AddSectionDialog projectId={project.id} />
-            </div>
+            <Link href={`/bq/${project.id}/edit`} className={buttonClasses("secondary", "md")}>
+              Ubah detail
+            </Link>
           ) : null
         }
         divider
@@ -53,7 +51,7 @@ export default async function BqProjectDetailPage({
 
       {project.sections.length === 0 && !canManage ? (
         <SectionCard>
-          <EmptyState title="Belum ada section" description="Project ini belum memiliki section." />
+          <EmptyState title="Belum ada bagian" description="Project ini belum memiliki bagian." />
         </SectionCard>
       ) : (
       <ProjectEditor key={`${project.updatedAt}:${project.sections.length}`} project={project} canManage={canManage} assemblies={assemblies} units={units} />
