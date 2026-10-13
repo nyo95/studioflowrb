@@ -4,8 +4,23 @@
     {
       "name": "studioflowrb-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3001
+    },
+    {
+      "name": "workspace-prototype",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4173",
+        "--directory",
+        "prototypes/workspace-canvas"
+      ],
+      "port": 4173
     }
   ]
 }

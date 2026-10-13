@@ -91,7 +91,8 @@ h1 { margin: 5px 0 0; font-family: Georgia, serif; font-size: 28px; font-weight:
 .block-content { min-height: 25px; outline: none; line-height: 1.48; font-size: 13px; cursor: text; }
 .block[data-type="heading"] .block-content { font-family: Georgia, serif; font-size: 20px; line-height: 1.25; }
 .block[data-type="bullet"] .block-content::before { content: '•'; margin-right: 8px; color: var(--accent); }
-.block[data-type="checklist"] .block-content::before { content: '□'; margin-right: 8px; color: #72756f; }
+.check { float: left; margin: 2px 8px 0 0; }
+.block-content.done { text-decoration: line-through; color: #72756f; }
 .block[data-type="feedback"] { border-left: 3px solid var(--warm); }
 .block[data-type="image"] { padding: 8px; }
 .block-image { width: 100%; height: calc(100% - 26px); min-height: 92px; object-fit: cover; display: block; border-radius: 6px; background: linear-gradient(145deg,#a79478,#e2d6bf 45%,#6a6a60); }

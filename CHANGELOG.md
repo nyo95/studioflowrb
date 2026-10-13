@@ -1,5 +1,12 @@
 # Changelog
 
+## R8.528 | 2026-10-13 | fix(prototype): Workspace canvas review fixes (Lead)
+
+- **Reviewer verdict on R8.527: PASS with Lead corrections.** Walked the prototype over a local static server (the browser pane cannot open `file://`): free drag of a block into another frame, `/` menu turning a block into a checklist, Client answered adding a labelled feedback block to the default frame, Starred filter dimming 8 of 9 blocks, 375 px stacked document with no page-level overflow. Prototype-only scope confirmed: no change under `src/` or `prisma/`.
+- Fixed in the prototype: a reload discarded every change although the README promised local storage (state now loads back; a **Reset** button restores the sample); new blocks from "+ New block", "+" in a frame and Client answered stacked on top of existing blocks (they now go under the frame's lowest block, and a frame grows to hold any block placed or dropped in it); the Client answered dialog always said "Design 3D · D2" even when another phase was selected (it now names the selected phase and round); checklist blocks had no box to tick (they now tick and strike through).
+- `.claude/launch.json` gains a `workspace-prototype` static-server entry (`python -m http.server 4173`) so the prototype can be previewed in the app's browser.
+- **Migrations/dependencies:** none. **Checks:** `node --check` on the prototype script; desktop and 375 px re-walk of the fixed behaviour.
+
 ## R8.527 | 2026-10-13 | feat(prototype): explore the Workspace canvas direction (Executor)
 
 - **PROTO-SF-WORKSPACE-CANVAS.** Added a standalone, dependency-free HTML/CSS/JavaScript prototype under `prototypes/workspace-canvas/`. It places one project Workspace below a compact five-phase workflow bar, with the active round and commands above the canvas and Requirements, Files and round history in a Phase details drawer.

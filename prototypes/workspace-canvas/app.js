@@ -32,7 +32,12 @@
   };
 
   const clone = value => JSON.parse(JSON.stringify(value));
-  let state = clone(initialState);
+  const STORAGE_KEY = 'sf-workspace-canvas-prototype';
+  function load() {
+    try { const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (saved && Array.isArray(saved.blocks) && Array.isArray(saved.frames)) return saved; } catch (_) { /* start from the sample */ }
+    return clone(initialState);
+  }
+  let state = load();
   let activeEditor = null;
   let interaction = null;
   let toastTimer = null;
@@ -54,7 +59,7 @@
     toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
   }
   function save() {
-    try { localStorage.setItem('sf-workspace-canvas-prototype', JSON.stringify(state)); } catch (_) { /* prototype works without persistence */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (_) { /* prototype works without persistence */ }
   }
 
   function renderPhaseStrip() {
@@ -91,7 +96,7 @@
       ? (block.image
         ? `<img class="block-image" src="${escapeHtml(block.image)}" alt="Pasted reference">`
         : `<div class="block-image image-placeholder">${escapeHtml(block.text)}</div>`)
-      : `<div class="block-content" contenteditable="true" spellcheck="false">${escapeHtml(block.text)}</div>`;
+      : `${block.type === 'checklist' ? `<label class="check"><input type="checkbox" data-action="tick" ${block.done ? 'checked' : ''}></label>` : ''}<div class="block-content ${block.done ? 'done' : ''}" contenteditable="true" spellcheck="false">${escapeHtml(block.text)}</div>`;
     const style = mobile ? '' : `left:${block.x}px;top:${block.y}px;width:${block.w}px;height:${block.h}px;`;
     return `<article class="block ${blockMatches(block) ? '' : 'dimmed'}" data-block-id="${block.id}" data-type="${block.type}" style="${style}">
       <div class="block-top">
@@ -145,11 +150,22 @@
     byId('zoomReset').textContent = `${Math.round(state.zoom * 100)}%`;
   }
 
+  /** A new block goes under the frame's lowest block, so it never lands on top of another one. */
   function defaultPosition(frameId) {
     const frame = state.frames.find(item => item.id === frameId);
-    const sameFrame = state.blocks.filter(item => item.frameId === frameId);
-    const offset = sameFrame.length % 5;
-    return frame ? { x: frame.x + 25 + offset * 22, y: frame.y + 70 + offset * 24 } : { x: 350, y: 240 };
+    if (!frame) return { x: 350, y: 240 };
+    const bottom = state.blocks.filter(item => item.frameId === frameId).reduce((max, item) => Math.max(max, item.y + item.h), frame.y + 54);
+    return { x: frame.x + 25, y: bottom + 16 };
+  }
+
+  /** A frame grows to hold every block placed in it. */
+  function fitFrame(frameId) {
+    const frame = state.frames.find(item => item.id === frameId);
+    if (!frame) return;
+    for (const block of state.blocks.filter(item => item.frameId === frameId)) {
+      frame.w = Math.max(frame.w, block.x + block.w - frame.x + 20);
+      frame.h = Math.max(frame.h, block.y + block.h - frame.y + 20);
+    }
   }
 
   function addBlock({ frameId = 'workspace', x, y, type = 'text', text = '' } = {}) {
@@ -157,6 +173,7 @@
     const phase = phaseById(state.selectedPhase);
     const block = { id: uid('block'), frameId, x: position.x, y: position.y, w: 235, h: type === 'image' ? 170 : 105, type, text, phase: phase.id, round: phase.round, feedback: type === 'feedback', starred: false };
     state.blocks.push(block);
+    fitFrame(frameId);
     render();
     requestAnimationFrame(() => {
       const element = document.querySelector(`[data-block-id="${block.id}"] .block-content`);
@@ -195,7 +212,10 @@
     notify('Client feedback added to the default Workspace frame.');
   }
 
-  function openAnswerDialog() { byId('answerDialog').hidden = false; setTimeout(() => byId('answerText').focus(), 0); }
+  function openAnswerDialog() {
+    const phase = phaseById(state.selectedPhase);
+    document.querySelector('#answerDialog .section-kicker').textContent = `CLIENT ANSWERED · ${phase.name.toUpperCase()} · ${phase.round}`;
+    byId('answerDialog').hidden = false; setTimeout(() => byId('answerText').focus(), 0); }
   function closeAnswerDialog() { byId('answerDialog').hidden = true; }
   function openDrawer() { byId('drawerScrim').hidden = false; byId('detailsDrawer').classList.add('open'); byId('detailsDrawer').setAttribute('aria-hidden', 'false'); }
   function closeDrawer() { byId('drawerScrim').hidden = true; byId('detailsDrawer').classList.remove('open'); byId('detailsDrawer').setAttribute('aria-hidden', 'true'); }
@@ -283,6 +303,7 @@
       const block = interaction.item;
       block.frameId = pointInFrame(block.x + block.w / 2, block.y + block.h / 2, null);
       notify(block.frameId ? `Moved into ${state.frames.find(frame => frame.id === block.frameId).name}.` : 'Block is now free on the canvas.');
+      if (block.frameId) { fitFrame(block.frameId); render(); }
     }
     interaction = null;
     viewport.classList.remove('panning');
@@ -362,7 +383,9 @@
     const blockElement = event.target.closest('[data-block-id]');
     const frameElement = event.target.closest('[data-frame-id]');
     const action = event.target.closest('[data-action]')?.dataset.action;
-    if (action === 'star' && blockElement) {
+    if (action === 'tick' && blockElement) {
+      const block = state.blocks.find(item => item.id === blockElement.dataset.blockId); block.done = event.target.checked; render();
+    } else if (action === 'star' && blockElement) {
       const block = state.blocks.find(item => item.id === blockElement.dataset.blockId); block.starred = !block.starred; render();
     } else if (action === 'delete-block' && blockElement) {
       state.blocks = state.blocks.filter(item => item.id !== blockElement.dataset.blockId); render(); notify('Block deleted.');
@@ -400,6 +423,7 @@
   byId('newBlockButton').addEventListener('click', () => addBlock());
   byId('zoomIn').addEventListener('click', () => setZoom(state.zoom + .1));
   byId('zoomOut').addEventListener('click', () => setZoom(state.zoom - .1));
+  byId('resetSample').addEventListener('click', () => { state = clone(initialState); render(); notify('Sample content restored.'); });
   byId('zoomReset').addEventListener('click', () => { state.zoom = 1; state.pan = { x: 40, y: 32 }; applyTransform(); save(); });
   byId('fitCanvas').addEventListener('click', () => { state.zoom = Math.min(.8, (viewport.clientWidth - 60) / 1500); state.pan = { x: 25, y: 25 }; applyTransform(); save(); });
   byId('phaseDetailsButton').addEventListener('click', openDrawer);

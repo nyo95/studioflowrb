@@ -4,7 +4,7 @@ Plan ID: PROTO-SF-WORKSPACE-CANVAS (clickable prototype: a Notion-like Workspace
 Scope: a throwaway, self-contained prototype for the owner to try; no product code, no backend, no database
 Module(s): none (prototype only; the eventual product work belongs to studioflow core)
 Target revision: R8.527 (Codex, prototype commit). The Lead reviews it with the owner, then locks the product plan.
-Status: READY
+Status: DELIVERED (R8.527, Lead fixes R8.528) — AWAITING OWNER VERDICT
 Priority: P1
 Owner: owner 2026-10-13 — rejected the board-first columns and the four Lead layout sketches ("kurang oke, lebih mirip Notion tapi feels-nya fleksibel seperti Miro"); asked that Codex build the prototype. Recorded in R8.526.
 Last updated: 2026-10-13 (Lead, R8.526)

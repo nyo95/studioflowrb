@@ -16,7 +16,7 @@ For the narrow fallback, resize the browser to **375 px** wide. The free canvas 
 
 ## What is faked
 
-All names, files, status and content are invented sample data. Nothing talks to StudioFlow, its database, users, permissions, files or workflow engine. “Send to client” only shows a notice. State is kept in the page memory/local browser storage only; this prototype does not define the production data model or final visual design.
+All names, files, status and content are invented sample data. Nothing talks to StudioFlow, its database, users, permissions, files or workflow engine. “Send to client” only shows a notice. State is kept in this browser's local storage, so a reload keeps your changes; **Reset** (next to the zoom buttons) restores the sample; this prototype does not define the production data model or final visual design.
 
 ## Three open questions for the owner
 
