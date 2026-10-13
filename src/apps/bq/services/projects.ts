@@ -243,10 +243,24 @@ async function lockProject(input: {
     throw new AppError("CONFLICT", "bq.project.lock-empty", "Add at least one item before locking the project.");
   }
   // TBC and By Owner rows are marker lines with no price by design, so they never count as Rp0 rows.
-  const zeroPriceRows = items.filter((item) => item.price_mode === "PRICED").reduce((count, item) => {
+  const pricedItems = items.filter((item) => item.price_mode === "PRICED");
+  // An empty price is not Rp0: the quotation would print "Incomplete" for the grand total, so it blocks the lock
+  // with no confirmation. A row that is really unpriced yet is marked TBC or By Owner instead.
+  const emptyPriceRows = pricedItems.filter((item) => item.sub_objects.length === 0
+    && item.line_items.length === 0
+    && item.harga_snapshot === null).length;
+  if (emptyPriceRows > 0) {
+    throw new AppError(
+      "CONFLICT",
+      "bq.project.lock-empty-prices",
+      `${emptyPriceRows} Work Item(s) have no price yet. Fill them in, or mark them TBC or By Owner, before locking.`,
+      { details: { count: emptyPriceRows } },
+    );
+  }
+  const zeroPriceRows = pricedItems.reduce((count, item) => {
     const standaloneZero = item.sub_objects.length === 0
       && item.line_items.length === 0
-      && (item.harga_snapshot === null || item.harga_snapshot.toString() === "0");
+      && item.harga_snapshot !== null && item.harga_snapshot.toString() === "0";
     const directZero = item.line_items.filter((line) => line.harga_snapshot.toString() === "0").length;
     const groupedZero = item.sub_objects.reduce(
       (subCount, subObject) => subCount + subObject.line_items.filter((line) => line.harga_snapshot.toString() === "0").length,
@@ -458,7 +472,8 @@ async function rejectProjectDeletion(input: {
       approver_user_id: input.actor.userId ?? "system",
       approver_label: input.actor.label,
       decided_at: new Date(),
-      reason,
+      // The requester's own reason stays in `reason`.
+      decision_reason: reason,
     },
   });
   if (requestTransition.count === 0) {

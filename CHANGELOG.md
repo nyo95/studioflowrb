@@ -1,5 +1,16 @@
 # Changelog
 
+## R8.543 | 2026-10-14 | fix(bq): Markup range, empty price blocks lock, deletion reasons kept apart (Lead)
+
+- **Owner 2026-10-14:** "kamu kerjakan saja langsung" after the BQ audit memo; the memo's recommended defaults D1 (markup 0–999.9999 %, no negative) and D2 (empty price blocks lock, Rp0 still lockable with confirmation) were taken as the working decision. D3 (revert for a Work Item's direct price) is not part of this slice.
+- **Markup:** `requireMarkupPercent` rejects values outside 0–999.9999 with `bq.markup.out-of-range` in `addItem`, `updateItem`, `addSubObject`, `updateSubObject`. Before, `100` passed the action's pattern check and failed inside the database on `DECIMAL(6,4)`, while a negative markup was stored silently.
+- **Lock:** a PRICED Work Item without children and with no price now stops `lockProject` with `bq.project.lock-empty-prices` (count in details); `acknowledgeZeroPrices` does not bypass it. Rp0 rows keep `bq.project.lock-zero-prices` and the acknowledgement; TBC / By Owner rows are still outside both checks. The editor shows the service message through its normal error path.
+- **Deletion requests:** a rejection writes the approver's reason to the new `decision_reason`; the requester's `reason` is no longer overwritten.
+- **Edit versus lock:** the suspected lost-update race was disproved from the runner (every non-read BQ operation runs through `runSerializableTransaction`, P2034 retried up to 3 times); a regression test now fires an edit and a lock together over 6 rounds.
+- **Migration `20261014090000_bq_markup_range_and_deletion_decision_reason`:** `bq_item.markup_l1_pct` and `bq_sub_object.markup_l2_pct` to `DECIMAL(7,4)`; `bq_project_deletion_request.decision_reason` added, and on existing REJECTED rows the stored reason (which was the approver's) moves to it. Applied to the rumah dev `masterdata` and `masterdata_test`.
+- **Not in this change:** the redesign of the project screen (structure panel, price-status vocabulary, readiness bar, Pekerjaan/Assembly dialog) and grouping with impact preview; both wait for the owner to approve the memo's slices 2 and 3.
+- **Checks:** BQ integration and engine tests 31/31; typecheck 0; eslint `src/apps/bq` 0; boundaries OK; `prisma generate` and both migrations applied cleanly. **Not done:** browser walk of the lock error message and markup input; full `npm test` not re-run in this change.
+
 ## R8.542 | 2026-10-13 | fix(studioflow): Keep Workspace dialogs interactive and reduce repeated board work (Executor)
 
 - **Owner 2026-10-13:** diagnose and repair Workspace images that cannot be sent to Schedule, unclickable/glitching modals, the reported keyboard exception, and sluggish board interactions. Maintenance correction to the implemented WO-SF-WORKSPACE-04 board; modules: studioflow and ideas (shared Schedule placement dialog).

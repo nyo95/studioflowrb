@@ -160,6 +160,7 @@ describe("BQ R6.1 invariants", () => {
     await assert.rejects(() => service.lockProject({ grants: GRANTS, actor: ACTOR, id: empty.id }), (error: unknown) => error instanceof AppError && error.code === "bq.project.lock-empty");
 
     const zero = await projectTree();
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: zero.item.id, hargaSnapshot: "0" });
     await assert.rejects(
       () => service.lockProject({ grants: GRANTS, actor: ACTOR, id: zero.project.id }),
       (error: unknown) => error instanceof AppError && error.code === "bq.project.lock-zero-prices" && error.details?.count === 1,
@@ -178,7 +179,80 @@ describe("BQ R6.1 invariants", () => {
     await assert.rejects(() => service.lockProject({ grants: GRANTS, actor: ACTOR, id: grouped.project.id }), (error: unknown) => error instanceof AppError && error.code === "bq.project.lock-zero-prices" && error.details?.count === 1);
 
     const nullPrice = await projectTree();
-    await assert.rejects(() => service.lockProject({ grants: GRANTS, actor: ACTOR, id: nullPrice.project.id }), (error: unknown) => error instanceof AppError && error.code === "bq.project.lock-zero-prices" && error.details?.count === 1);
+    // An empty price is not Rp0: it blocks the lock and no acknowledgement can bypass it.
+    for (const acknowledgeZeroPrices of [undefined, true]) {
+      await assert.rejects(
+        () => service.lockProject({ grants: GRANTS, actor: ACTOR, id: nullPrice.project.id, acknowledgeZeroPrices }),
+        (error: unknown) => error instanceof AppError && error.code === "bq.project.lock-empty-prices" && error.details?.count === 1,
+      );
+    }
+    // Marked TBC the same row is a marker line, so the project locks.
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: nullPrice.item.id, priceMode: "TBC" });
+    await service.lockProject({ grants: GRANTS, actor: ACTOR, id: nullPrice.project.id });
+  });
+
+  it("accepts markup from 0 to 999.9999 percent and rejects values outside that range in the service", async () => {
+    const { item } = await projectTree();
+    const group = await service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Body", qtyPerL1: "1" });
+    await service.addLineItem({ grants: GRANTS, actor: ACTOR, subObjectId: group.id, sourceType: "CUSTOM", titleSnapshot: "Plate", purchaseUnitSnapshot: "PCS", hargaSnapshot: "10", kategori: "ALAT", qty: "1" });
+    for (const accepted of ["0", "100", "250.5", "999.9999"]) {
+      const updatedItem = await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, markupL1Pct: accepted });
+      assert.equal(updatedItem.markup_l1_pct.toString(), accepted);
+      const updatedGroup = await service.updateSubObject({ grants: GRANTS, actor: ACTOR, id: group.id, markupL2Pct: accepted });
+      assert.equal(updatedGroup.markup_l2_pct.toString(), accepted);
+    }
+    for (const rejected of ["-0.01", "-10", "1000", "999.99991"]) {
+      await assert.rejects(
+        () => service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, markupL1Pct: rejected }),
+        (error: unknown) => error instanceof AppError && error.code === "bq.markup.out-of-range",
+        `Work Item markup ${rejected}`,
+      );
+      await assert.rejects(
+        () => service.updateSubObject({ grants: GRANTS, actor: ACTOR, id: group.id, markupL2Pct: rejected }),
+        (error: unknown) => error instanceof AppError && error.code === "bq.markup.out-of-range",
+        `Component Group markup ${rejected}`,
+      );
+    }
+    await assert.rejects(
+      () => service.addSubObject({ grants: GRANTS, actor: ACTOR, itemId: item.id, name: "Bad", qtyPerL1: "1", markupL2Pct: "1000" }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.markup.out-of-range",
+    );
+  });
+
+  it("keeps the requester's deletion reason when the approver rejects the request", async () => {
+    const { project } = await projectTree();
+    await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+    const request = await service.requestProjectDeletion({ grants: GRANTS, actor: ACTOR, id: project.id, reason: "Client cancelled" });
+    await service.rejectProjectDeletion({ grants: GRANTS, actor: ACTOR_B, requestId: request.id, reason: "Keep for the audit" });
+    const stored = await testDb.prisma.bqProjectDeletionRequest.findUniqueOrThrow({ where: { id: request.id } });
+    assert.equal(stored.status, "REJECTED");
+    assert.equal(stored.reason, "Client cancelled");
+    assert.equal(stored.decision_reason, "Keep for the audit");
+  });
+
+  it("never lets an edit commit into a project that a concurrent lock has locked", async () => {
+    // BQ operations run in serializable transactions with retry (platform runtime), so an edit that read ACTIVE
+    // while the lock committed must be aborted and retried into the locked rejection, never applied silently.
+    for (let round = 0; round < 6; round += 1) {
+      const { project, item } = await projectTree();
+      await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "100" });
+      const [edit, lock] = await Promise.allSettled([
+        service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "200" }),
+        service.lockProject({ grants: GRANTS, actor: ACTOR, id: project.id }),
+      ]);
+      const stored = await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: item.id } });
+      if (edit.status === "rejected") {
+        assert.ok(edit.reason instanceof AppError && edit.reason.code === "bq.project.locked", `round ${round}: a refused edit must say the project is locked`);
+        assert.equal(stored.harga_snapshot?.toString(), "100", `round ${round}: a refused edit leaves the price alone`);
+      }
+      assert.equal(lock.status, "fulfilled", `round ${round}: the lock itself is not lost to the edit`);
+      assert.equal((await testDb.prisma.bqProject.findUniqueOrThrow({ where: { id: project.id } })).status, "LOCKED");
+      // Whatever order won, the edit after lock is refused.
+      await assert.rejects(
+        () => service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "300" }),
+        (error: unknown) => error instanceof AppError && error.code === "bq.project.locked",
+      );
+    }
   });
 
   it("keeps the Library promotion state machine behind BQ request and Master Data approval grants", async () => {

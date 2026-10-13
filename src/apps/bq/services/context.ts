@@ -53,6 +53,17 @@ export function requirePositiveCoefficient(value: string): string {
   return normalized;
 }
 
+export const BQ_MARKUP_MAX_PCT = "999.9999";
+
+/** Markup is a percentage from 0 to 999.9999; a discount is a lower price or coefficient, not a negative markup. */
+export function requireMarkupPercent(value: string): string {
+  const normalized = toDecimalString(value);
+  if (compareDecimals(normalized, toDecimalString("0")) < 0 || compareDecimals(normalized, toDecimalString(BQ_MARKUP_MAX_PCT)) > 0) {
+    throw new AppError("VALIDATION", "bq.markup.out-of-range", "Markup must be between 0% and 999.9999%");
+  }
+  return normalized;
+}
+
 type AuditInput = {
   appId: string;
   action: string;

@@ -282,7 +282,9 @@ model BqProjectDeletionRequest {
   approver_user_id  String?
   approver_label    String?
   decided_at        DateTime?
+  /// The requester's reason. The approver's rejection reason lives in decision_reason so neither overwrites the other.
   reason            String?
+  decision_reason   String?
 
   @@index([project_id, status])
   @@index([status, requested_at])
@@ -335,7 +337,7 @@ model BqItem {
   unit           String
   harga_snapshot Decimal?      @db.Decimal(18, 4)  // dipakai hanya saat L1 tanpa child
   koefisien      Decimal       @default(1) @db.Decimal(18, 6)  // dipakai hanya saat L1 tanpa child
-  markup_l1_pct  Decimal       @default(0) @db.Decimal(6, 4)
+  markup_l1_pct  Decimal       @default(0) @db.Decimal(7, 4)
   price_mode     BqPriceMode   @default(PRICED)
   sort_order     Int           @default(0)
   notes          String?
@@ -358,7 +360,7 @@ model BqSubObject {
   item          BqItem    @relation(fields: [item_id], references: [id], onDelete: Cascade)
   name          String
   qty_per_l1    Decimal   @db.Decimal(18, 6)
-  markup_l2_pct Decimal   @default(0) @db.Decimal(6, 4)
+  markup_l2_pct Decimal   @default(0) @db.Decimal(7, 4)
   sort_order    Int       @default(0)
   notes         String?
   created_at    DateTime  @default(now())

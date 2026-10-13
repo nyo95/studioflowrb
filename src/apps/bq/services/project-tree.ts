@@ -8,6 +8,7 @@ import {
   decimalFieldUnchanged,
   fieldUnchanged,
   requireKategori,
+  requireMarkupPercent,
   requirePositiveCoefficient,
   type BqKategori,
   type BqServiceContext,
@@ -186,6 +187,7 @@ async function updateSubsection(input: {
     throw new AppError("VALIDATION", "bq.item.dual-parent", "Work Item cannot belong to both a Section and Subsection");
   }
 
+  if (input.markupL1Pct !== undefined) requireMarkupPercent(input.markupL1Pct);
   if (input.sectionId) await requireEditableProjectForSection(input.sectionId);
   else await requireEditableProjectForSubsection(input.subsectionId!);
 
@@ -240,6 +242,7 @@ async function updateItem(input: {
     throw new AppError("VALIDATION", "bq.item.price-mode-invalid", "Unknown price mode");
   }
   if (input.koefisien !== undefined) requirePositiveCoefficient(input.koefisien);
+  if (input.markupL1Pct !== undefined) requireMarkupPercent(input.markupL1Pct);
   await requireEditableProjectForItem(input.id);
 
   const existing = await db.bqItem.findUnique({ where: { id: input.id } });
@@ -309,6 +312,7 @@ async function addSubObject(input: {
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  if (input.markupL2Pct !== undefined) requireMarkupPercent(input.markupL2Pct);
   await requireEditableProjectForItem(input.itemId);
 
   const subObject = await (input.sortOrder === undefined ? runAutomaticSortTransaction : runTransaction)(async (tx) => {
@@ -353,6 +357,7 @@ async function updateSubObject(input: {
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  if (input.markupL2Pct !== undefined) requireMarkupPercent(input.markupL2Pct);
   await requireEditableProjectForSubObject(input.id);
 
   const existing = await db.bqSubObject.findUnique({ where: { id: input.id } });
