@@ -1,5 +1,10 @@
 # Changelog
 
+## R8.534 | 2026-10-13 | fix(studioflow): Workspace frame titles in the UI Engine sans (Lead)
+
+- **Owner 2026-10-13:** the frame title ("Workspace") was in a serif that does not match the UI Engine. It was Instrument Serif, carried over from the prototype; `DESIGN.md` keeps that face without a consumer and out of operational chrome unless the owner decides otherwise. Frame titles (canvas and phone view) now use Schibsted Grotesk semibold at the section-title size, like every other card title. No other serif use remains in StudioFlow.
+- **Migrations/dependencies:** none. **Checks:** eslint on the canvas; dev server recompiled on :3001.
+
 ## R8.533 | 2026-10-13 | feat(studioflow): Phases page as one fixed app screen, phase tabs without reload (Lead)
 
 - **Owner 2026-10-13:** make the Phases page a fixed page, merge the phase strip and the round card ("CD Mall") into one, and switch phases like tabs instead of moving to another page.

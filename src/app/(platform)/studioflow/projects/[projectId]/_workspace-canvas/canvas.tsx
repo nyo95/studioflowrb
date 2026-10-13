@@ -417,9 +417,9 @@ export function WorkspaceCanvas({ projectId, sections, phases, selectedPhase, re
       value={section.title}
       onCommit={async (title) => { const result = await run({ command: "renameSection", projectId, sectionId: section.id, title, version: section.version }); if (!result.ok) throw new Error(result.message); }}
       errorLabel={(failure) => (failure instanceof Error ? failure.message : "The title could not be saved.")}
-      display={(value) => <span className="truncate font-serif text-xl leading-none text-ink">{value}</span>}
+      display={(value) => <span className="truncate text-base font-semibold text-ink">{value}</span>}
     />
-  ) : <span className="truncate font-serif text-xl leading-none text-ink">{section.title}</span>;
+  ) : <span className="truncate text-base font-semibold text-ink">{section.title}</span>;
 
   const card = (item: WorkspaceCardView, sectionId: string, style: CSSProperties | undefined, canvas: boolean) => {
     const canWrite = canWriteCard(item);
