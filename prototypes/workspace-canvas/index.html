@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StudioFlow — Workspace canvas prototype</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="rail" aria-label="Project navigation">
+      <div class="brand">SF</div>
+      <button class="rail-button active" title="Projects">P</button>
+      <button class="rail-button" title="Ideas">I</button>
+      <button class="rail-button" title="Schedule">S</button>
+      <div class="rail-spacer"></div>
+      <div class="avatar">AR</div>
+    </aside>
+
+    <main class="project-page">
+      <header class="project-header">
+        <div>
+          <div class="eyebrow">Projects / Residential</div>
+          <div class="title-row">
+            <h1>Rumah Puri Indah</h1>
+            <span class="project-code">SF-0248</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="quiet-button" id="phaseDetailsButton">Phase details <span class="count">2/4 · 3</span></button>
+          <button class="icon-button" aria-label="More project actions">•••</button>
+        </div>
+      </header>
+
+      <section class="workflow" aria-label="Project workflow">
+        <div class="phase-strip" id="phaseStrip"></div>
+        <div class="workflow-actions">
+          <span class="round-chip" id="roundChip">D2</span>
+          <button class="quiet-button" id="sendButton">Send to client</button>
+          <button class="primary-button" id="clientAnsweredButton">Client answered</button>
+        </div>
+      </section>
+
+      <section class="workspace-shell">
+        <div class="workspace-heading">
+          <div>
+            <span class="section-kicker">PROJECT WORKSPACE</span>
+            <h2>Think in any direction.</h2>
+          </div>
+          <div class="workspace-actions">
+            <button class="quiet-button" id="newFrameButton">＋ New frame</button>
+            <button class="primary-button" id="newBlockButton">＋ New block</button>
+          </div>
+        </div>
+
+        <div class="toolbar" aria-label="Workspace controls">
+          <div class="filters" id="filters"></div>
+          <div class="canvas-controls">
+            <button class="tool-button" id="zoomOut" aria-label="Zoom out">−</button>
+            <button class="zoom-value" id="zoomReset">100%</button>
+            <button class="tool-button" id="zoomIn" aria-label="Zoom in">＋</button>
+            <button class="tool-button" id="fitCanvas" aria-label="Fit canvas">⌗</button>
+          </div>
+        </div>
+
+        <div class="mobile-note">Frames are stacked as a document on a narrow screen. Editing still works; free canvas movement returns on desktop.</div>
+        <div class="canvas-viewport" id="canvasViewport" tabindex="0" aria-label="Workspace canvas">
+          <div class="canvas-grid"></div>
+          <div class="world" id="world"></div>
+          <div class="canvas-hint">Drag empty space to pan · Wheel to zoom · Double-click anywhere to add</div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="slash-menu" id="slashMenu" hidden>
+    <div class="slash-label">TURN INTO</div>
+    <button data-type="text"><b>T</b><span>Text<small>Plain writing</small></span></button>
+    <button data-type="heading"><b>H</b><span>Heading<small>A topic title</small></span></button>
+    <button data-type="bullet"><b>•</b><span>Bullet<small>A simple list item</small></span></button>
+    <button data-type="checklist"><b>✓</b><span>Checklist<small>Track a decision</small></span></button>
+    <button data-type="feedback"><b>↳</b><span>Client feedback<small>Record their words</small></span></button>
+  </div>
+
+  <div class="drawer-scrim" id="drawerScrim" hidden></div>
+  <aside class="details-drawer" id="detailsDrawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div><span class="section-kicker">DESIGN 3D · D2</span><h2>Phase details</h2></div>
+      <button class="icon-button" id="closeDrawer" aria-label="Close details">×</button>
+    </div>
+    <section><h3>Requirements <span>2 / 4</span></h3><label><input type="checkbox" checked> Approved floor plan</label><label><input type="checkbox" checked> Mood direction</label><label><input type="checkbox"> Final material palette</label><label><input type="checkbox"> Lighting notes</label></section>
+    <section><h3>Files <span>3</span></h3><div class="file-row"><b>3D-D2-living.jpg</b><small>Today · 4.8 MB</small></div><div class="file-row"><b>material-shortlist.pdf</b><small>Yesterday · 1.2 MB</small></div><div class="file-row"><b>client-markup.pdf</b><small>12 Oct · 860 KB</small></div></section>
+    <section><h3>Round history</h3><div class="history"><i></i><div><b>D2 · In progress</b><small>Client answered today, 10:42</small></div></div><div class="history muted"><i></i><div><b>D1 · Revision requested</b><small>10 Oct, 16:15</small></div></div></section>
+  </aside>
+
+  <div class="answer-dialog" id="answerDialog" hidden>
+    <div class="answer-card">
+      <button class="icon-button answer-close" id="closeAnswer">×</button>
+      <span class="section-kicker">CLIENT ANSWERED · DESIGN 3D · D2</span>
+      <h2>What did the client say?</h2>
+      <textarea id="answerText" placeholder="Type the feedback here…"></textarea>
+      <div class="answer-actions"><button class="quiet-button" id="cancelAnswer">Cancel</button><button class="primary-button" id="saveAnswer">Add to Workspace</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>

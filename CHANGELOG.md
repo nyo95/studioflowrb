@@ -1,5 +1,13 @@
 # Changelog
 
+## R8.527 | 2026-10-13 | feat(prototype): explore the Workspace canvas direction (Executor)
+
+- **PROTO-SF-WORKSPACE-CANVAS.** Added a standalone, dependency-free HTML/CSS/JavaScript prototype under `prototypes/workspace-canvas/`. It places one project Workspace below a compact five-phase workflow bar, with the active round and commands above the canvas and Requirements, Files and round history in a Phase details drawer.
+- The sample canvas combines direct block editing, `/` block choices, Enter-to-continue and pasted images with free block/frame movement, side-by-side placement, resize, pan and zoom. It carries the locked Workspace rules: phase/round labels from the selected phase, a movable and renameable default Workspace frame that refuses deletion, Client answered creating Client feedback there, Starred, phase/general/feedback filters that dim instead of rearranging, and a 375 px stacked-document fallback.
+- `README.md` explains how to open the local file, separates working interactions from fake sample-only behavior, and asks the owner three bounded direction questions. No app route, product UI, backend, schema, package or dependency changed. The R8.523 screen and R8.525 backend remain untouched.
+- **Limitations:** no production integration or persistence contract; sample data and workflow results only. The automated browser surface refused the local `file://` URL, so the complete desktop/375 px interaction walk is queued in the browser-acceptance backlog for the Reviewer; JavaScript syntax and required interaction wiring were checked locally.
+- **Migrations/dependencies:** none. **Checks:** `npm test` (1,040 passed); typecheck; eslint (0 errors, one known Presentation `<img>` warning); architecture boundaries; legacy-runtime; production build; prototype syntax/structure assertions; staged and unstaged whitespace.
+
 ## R8.526 | 2026-10-13 | docs(plan): R8.525 accepted, Workspace canvas prototype brief (Lead)
 
 - **Reviewer verdict: PASS** for R8.525 (Workspace default section): migration backfill and guard, `defaultSection` for loose, client-answer and site-visit cards, default-delete refusal, `isDefault` on reads and audit, populated fixture. Independent re-run: `npm test` 1,040 passed, typecheck clean, kantor dev database up to date (108 migrations). Known `migrate diff` drift (Developer timestamps, `sf_holiday`) unchanged and outside this slice. Dev server restarted after the schema change.
