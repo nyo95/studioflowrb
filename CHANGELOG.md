@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.26 | 2026-10-14 | fix(masterdata,ui-engine): No "New SKU" for an existing name; "Already received" is not a warning (Lead)
+
+- **BACKLOG [CLEANUP][P3] closed (two):** the SKU picker on the sample shelf and in "Put on shelf" offered 'New SKU "X" (no price yet)' even when a SKU named exactly X existed, because the exact-match check only compared the full label (code + name + brand). UI Engine EXTEND: a CreatableSearch option may carry `exactNames` (names that count as that option exactly); the shared rule is `findExactOption` in `internal/creatable-options.ts` with a unit test. The shelf picker passes the SKU's name and code, so typing either selects the SKU and offers no create. Sample requests: "Already received" now uses the success tone instead of the danger (red) one; it is information, not a problem.
+- **Migrations/dependencies:** none. **Checks:** `creatable-options.test.ts` 1/1; typecheck and eslint PASS. No push.
+
 ## R9.25 | 2026-10-14 | fix(ui-engine): List buttons start a list on an empty note (Lead)
 
 - **BACKLOG [CLEANUP][P3] closed:** in `SimpleTextEditor` (MOM and other plain-text notes) the Bullet list / Numbered list buttons skipped empty lines, so on an empty note, or on the empty line after the last point, they did nothing. A selection on empty lines only now gets the first marker ("- " or "1. ") with the caret after it; lines with text behave as before (mark, renumber from 1, unmark, empty lines in between untouched). The rule is the exported pure `toggleListText`, with a unit test. The Notes `RichTextEditor` was checked in the browser (Playwright probe) and already starts a list on an empty note.

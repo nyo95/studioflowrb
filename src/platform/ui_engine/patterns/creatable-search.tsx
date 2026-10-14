@@ -5,7 +5,7 @@ import { Popover } from "radix-ui";
 import { useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 import { getComboboxNavigationIndex, type ComboboxNavigationKey } from "../internal/combobox-navigation";
-import { withCreatedOption } from "../internal/creatable-options";
+import { findExactOption, withCreatedOption } from "../internal/creatable-options";
 import { cx } from "../internal/cx";
 import { Button, Input, Text } from "../primitives";
 
@@ -14,6 +14,9 @@ export type CreatableSearchOption = {
   label: string;
   description?: ReactNode;
   keywords?: readonly string[];
+  /** Other names that count as this option exactly (e.g. a record's own name inside a longer label): typing one
+   *  selects this option and offers no "create" for it. */
+  exactNames?: readonly string[];
   disabled?: boolean;
   badge?: ReactNode;
 };
@@ -97,11 +100,7 @@ export function CreatableSearch({
     });
   }, [activeQuery, flatOptions]);
 
-  const exactMatch = useMemo(() => {
-    const term = normalize(activeQuery);
-    if (!term) return null;
-    return flatOptions.find((option) => normalize(option.label) === term) ?? null;
-  }, [activeQuery, flatOptions]);
+  const exactMatch = useMemo(() => findExactOption(flatOptions, activeQuery), [activeQuery, flatOptions]);
 
   const canCreate = Boolean(onCreate) && normalize(activeQuery).length > 0 && !exactMatch;
 

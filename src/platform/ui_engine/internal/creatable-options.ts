@@ -8,3 +8,10 @@ export function withCreatedOption<T extends { id: string; label: string }>(optio
   if (!created || options.some((option) => option.id === created.id)) return options;
   return [...options, created];
 }
+
+/** The option a typed query names exactly (its label or one of its `exactNames`, ignoring case and outer spaces). */
+export function findExactOption<T extends { label: string; exactNames?: readonly string[] }>(options: readonly T[], query: string): T | null {
+  const term = query.trim().toLowerCase();
+  if (!term) return null;
+  return options.find((option) => [option.label, ...(option.exactNames ?? [])].some((name) => name.trim().toLowerCase() === term)) ?? null;
+}

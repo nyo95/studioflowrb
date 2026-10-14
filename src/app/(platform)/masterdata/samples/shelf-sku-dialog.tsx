@@ -33,7 +33,8 @@ export function ShelfSkuPicker({ skus, value, onChange, refs }: { skus: readonly
       <CreatableSearch
         key={round}
         label="SKU"
-        options={all.map((sku) => ({ id: sku.id, label: skuLabel(sku) }))}
+        // A SKU's own name or code counts as an exact match, so typing an existing name never offers "New SKU".
+        options={all.map((sku) => ({ id: sku.id, label: skuLabel(sku), exactNames: [sku.name, sku.code].filter((name): name is string => Boolean(name)) }))}
         value={value}
         onValueChange={onChange}
         onCreate={refs ? (name) => { setDraftName(name); return value; } : undefined}

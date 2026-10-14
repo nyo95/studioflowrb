@@ -77,7 +77,8 @@ function statusBadge(row: SampleQueueRow) {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {primary}
-      <StatusBadge tone="danger">Already received</StatusBadge>
+      {/* Information, not a problem: the sample is already here. */}
+      <StatusBadge tone="success">Already received</StatusBadge>
     </div>
   );
 }
