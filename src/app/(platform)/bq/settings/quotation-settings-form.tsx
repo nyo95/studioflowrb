@@ -7,6 +7,7 @@ import type { ActionResult } from "@platform/core/actions";
 import { updateQuotationSettingsAction } from "./actions";
 
 type Settings = {
+  companyName: string | null;
   companyAddress: string | null;
   companyEmail: string | null;
   signerName: string | null;
@@ -14,17 +15,31 @@ type Settings = {
   defaultPpnPct: string;
 };
 
-export function QuotationSettingsForm({ settings, signatureUrl, organizationName, hasLogo }: {
+export function QuotationSettingsForm({ settings, signatureUrl, logoUrl, organizationName }: {
   settings: Settings;
   signatureUrl: string | null;
+  logoUrl: string | null;
   organizationName: string;
-  hasLogo: boolean;
 }) {
   const [state, action, pending] = useActionState(updateQuotationSettingsAction, null as ActionResult<{ saved: true }> | null);
   return (
     <form action={action} className="grid max-w-3xl gap-4">
-      <SectionCard title="Letterhead" description={`The logo is ${organizationName}'s Brand mark from the platform settings${hasLogo ? "" : " (none uploaded yet, so the name is printed)"}; these lines print under it on the first page.`}>
+      <SectionCard title="Letterhead" description="Who issues the quotation: it may be the contractor rather than the studio. Empty name and logo print the platform's organisation name and Brand mark.">
         <div className="grid gap-4 md:grid-cols-2">
+          <Field id="bq-company-name" label="Company name" description={`Printed in the header (when there is no logo) and in the signature box. Empty prints "${organizationName}".`}>
+            <Input id="bq-company-name" name="companyName" maxLength={120} defaultValue={settings.companyName ?? ""} placeholder={organizationName} />
+          </Field>
+          <Field id="bq-logo" label="Logo" description="PNG up to 2 MB, printed at the top right of every page.">
+            <div className="grid gap-2">
+              {logoUrl ? (
+                // A short-lived signed URL; next/image optimization would cache it.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="Current logo" className="h-12 w-auto justify-self-start rounded-control border border-line bg-white object-contain p-1" />
+              ) : null}
+              <input id="bq-logo" name="logoFile" type="file" accept="image/png,.png" className="text-sm" />
+              {logoUrl ? <label className="flex items-center gap-2 text-sm"><input name="removeLogo" type="checkbox" /> Remove the current logo</label> : null}
+            </div>
+          </Field>
           <Field id="bq-company-address" label="Address" description="One line per row, as printed.">
             <Textarea id="bq-company-address" name="companyAddress" rows={3} maxLength={2000} defaultValue={settings.companyAddress ?? ""} placeholder={"Jalan …\nKelurahan …\nKota - Kode pos"} />
           </Field>
@@ -39,7 +54,7 @@ export function QuotationSettingsForm({ settings, signatureUrl, organizationName
           <Field id="bq-signer" label="Signer name">
             <Input id="bq-signer" name="signerName" maxLength={120} defaultValue={settings.signerName ?? ""} />
           </Field>
-          <Field id="bq-signature" label="Signature image" description="PNG up to 1 MB; a transparent background prints best.">
+          <Field id="bq-signature" label="Signature image" description="PNG up to 2 MB; a transparent background prints best.">
             <div className="grid gap-2">
               {signatureUrl ? (
                 // A short-lived signed URL; next/image optimization would cache it.

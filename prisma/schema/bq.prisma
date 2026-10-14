@@ -286,6 +286,10 @@ model BqProject {
 /// own quotation identity and reads no other app; the logo stays the platform brand mark.
 model BqQuotationSettings {
   id                    String   @id @default("bq_quotation_settings")
+  /// The issuer printed on quotations (owner 2026-10-14: the contractor may not be the studio); null = the platform's organisation name.
+  company_name          String?
+  /// Private object key of the issuer's logo PNG; null = the platform brand mark.
+  logo_key              String?
   company_address       String?
   company_email         String?
   signer_name           String?

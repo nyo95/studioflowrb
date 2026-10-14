@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.49 | 2026-10-14 | feat(bq): The quotation's issuer has its own name and logo in Quotation settings (Lead)
+
+- **Owner 2026-10-14:** "di header ada RAD - sebenernya BQ itu namanya beda sih nantinya (kontraktor =/= konsultannya); tambahin di setting bisa?" Also: a box longer than one page may still split ("gamasalah sih, yang penting rapih tablingnya"); unchanged.
+- **Schema** (migration `20261014210000_bq_quotation_issuer`, kantor dev and test): `bq_quotation_settings.company_name`, `logo_key`.
+- **Quotation settings:** Company name and Logo (PNG up to 2 MB, private object storage) beside the address and e-mail; the signature limit is now 2 MB too. Old images are removed only after the new settings are saved; newly stored ones are removed when the save fails.
+- **Print:** the header and the signature box use the BQ issuer's name and logo; with neither set they fall back to the platform organisation name and Brand mark (a name without a logo prints the name, not the platform's mark).
+- **Checks:** typecheck, eslint, `npm test` 1112/1112, `npx playwright test e2e/bq-boq-walk.spec.ts` 5/5 PASS (now also sets the company name; the PDF shows it in the header and signature box). Logo upload not walked. No push.
+
 ## R9.48 | 2026-10-14 | fix(bq): A Bill of Quantity box is not cut across printed pages (Lead)
 
 - **Owner 2026-10-14** (screenshot of the exported PDF, D. MEP): "potongan pdf nya, harusnya per halaman per A4 rapih semua nya". A Subsection box broke between pages: its bottom line was missing on the first page and "SUBTOTAL D.I" stood alone under the column header of the next.

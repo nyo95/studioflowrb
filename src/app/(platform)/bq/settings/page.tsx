@@ -27,12 +27,13 @@ export default async function BqSettingsPage() {
     bqService.getQuotationSettings(),
     readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key)),
   ]);
-  const signatureUrl = settings.signatureKey ? await objectStorage.createSignedReadUrl(settings.signatureKey, 600).catch(() => null) : null;
+  const signed = (key: string | null) => (key ? objectStorage.createSignedReadUrl(key, 600).catch(() => null) : Promise.resolve(null));
+  const [signatureUrl, logoUrl] = await Promise.all([signed(settings.signatureKey), signed(settings.logoKey)]);
 
   return (
     <>
       <PageHeader eyebrow="Bill of Quantity" title="Quotation settings" description="The letterhead and defaults printed on every quotation. Each project can change its own payment terms and PPN under Detail quotation." divider />
-      <QuotationSettingsForm settings={settings} signatureUrl={signatureUrl} organizationName={platform.organizationName} hasLogo={Boolean(platform.brandMarkUrl)} />
+      <QuotationSettingsForm settings={settings} signatureUrl={signatureUrl} logoUrl={logoUrl} organizationName={platform.organizationName} />
     </>
   );
 }

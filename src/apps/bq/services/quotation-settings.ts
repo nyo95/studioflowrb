@@ -9,6 +9,10 @@ import { DEFAULT_PAYMENT_TERMS, DEFAULT_PPN_PCT, LETTER_TEXT_MAX } from "../lib/
 export const BQ_QUOTATION_SETTINGS_ID = "bq_quotation_settings";
 
 export type BqQuotationSettingsRead = {
+  /** The issuer printed on quotations; null prints the platform organisation name. */
+  companyName: string | null;
+  /** The issuer's logo; null prints the platform brand mark. */
+  logoKey: string | null;
   companyAddress: string | null;
   companyEmail: string | null;
   signerName: string | null;
@@ -25,6 +29,12 @@ export function requirePpnPct(value: string): string {
     throw new AppError("VALIDATION", "bq.quotation.ppn-invalid", "PPN must be a percentage between 0 and 100.");
   }
   return normalized;
+}
+
+export type ImageChange = { kind: "keep" } | { kind: "remove" } | { kind: "set"; key: string };
+
+function nextKey(change: ImageChange, current: string | null): string | null {
+  return change.kind === "keep" ? current : change.kind === "set" ? change.key : null;
 }
 
 export function requireLetterText(value: string | null, field: string): string | null {
@@ -44,6 +54,8 @@ export function createQuotationSettingsService(ctx: BqServiceContext) {
   async function getQuotationSettings(): Promise<BqQuotationSettingsRead> {
     const row = await db.bqQuotationSettings.findUnique({ where: { id: BQ_QUOTATION_SETTINGS_ID } });
     return {
+      companyName: row?.company_name ?? null,
+      logoKey: row?.logo_key ?? null,
       companyAddress: row?.company_address ?? null,
       companyEmail: row?.company_email ?? null,
       signerName: row?.signer_name ?? null,
@@ -53,17 +65,19 @@ export function createQuotationSettingsService(ctx: BqServiceContext) {
     };
   }
 
-  /** Returns the signature key this change replaced or removed, for the caller to discard after the commit. */
+  /** Returns the image keys this change replaced or removed, for the caller to discard after the commit. */
   async function updateQuotationSettings(input: {
     grants: PermissionGrants;
     actor: { kind: string; userId?: string; label: string };
+    companyName: string | null;
     companyAddress: string | null;
     companyEmail: string | null;
     signerName: string | null;
     defaultPaymentTerms: string | null;
     defaultPpnPct: string;
-    signature: { kind: "keep" } | { kind: "remove" } | { kind: "set"; key: string };
-  }): Promise<{ replacedSignatureKey: string | null }> {
+    signature: ImageChange;
+    logo: ImageChange;
+  }): Promise<{ replacedSignatureKey: string | null; replacedLogoKey: string | null }> {
     requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
     const email = requireLetterText(input.companyEmail, "E-mail");
     if (email !== null && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
@@ -71,9 +85,14 @@ export function createQuotationSettingsService(ctx: BqServiceContext) {
     }
     const signerName = requireLetterText(input.signerName, "Signer");
     if (signerName !== null && signerName.length > 120) throw new AppError("VALIDATION", "bq.quotation.signer-too-long", "Signer can be at most 120 characters.");
+    const companyName = requireLetterText(input.companyName, "Company name");
+    if (companyName !== null && companyName.length > 120) throw new AppError("VALIDATION", "bq.quotation.company-too-long", "Company name can be at most 120 characters.");
     const current = await db.bqQuotationSettings.findUnique({ where: { id: BQ_QUOTATION_SETTINGS_ID } });
-    const signatureKey = input.signature.kind === "keep" ? current?.signature_key ?? null : input.signature.kind === "set" ? input.signature.key : null;
+    const signatureKey = nextKey(input.signature, current?.signature_key ?? null);
+    const logoKey = nextKey(input.logo, current?.logo_key ?? null);
     const data = {
+      company_name: companyName,
+      logo_key: logoKey,
       company_address: requireLetterText(input.companyAddress, "Address"),
       company_email: email,
       signer_name: signerName,
@@ -84,8 +103,8 @@ export function createQuotationSettingsService(ctx: BqServiceContext) {
     };
     await db.bqQuotationSettings.upsert({ where: { id: BQ_QUOTATION_SETTINGS_ID }, create: { id: BQ_QUOTATION_SETTINGS_ID, ...data }, update: data });
     await auditWriter({ appId: "bq", action: "bq.quotation-settings.updated", entityType: "BqQuotationSettings", entityId: BQ_QUOTATION_SETTINGS_ID, actor: input.actor });
-    const previous = current?.signature_key ?? null;
-    return { replacedSignatureKey: previous !== null && previous !== signatureKey ? previous : null };
+    const replaced = (previous: string | null | undefined, next: string | null) => (previous && previous !== next ? previous : null);
+    return { replacedSignatureKey: replaced(current?.signature_key, signatureKey), replacedLogoKey: replaced(current?.logo_key, logoKey) };
   }
 
   return { getQuotationSettings, updateQuotationSettings };

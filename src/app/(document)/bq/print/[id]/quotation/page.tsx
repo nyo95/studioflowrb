@@ -292,7 +292,8 @@ export default async function BqQuotationPrintPage({
     bqService.getQuotationSettings(),
   ]);
   if (!project) notFound();
-  const signatureUrl = letterhead.signatureKey ? await objectStorage.createSignedReadUrl(letterhead.signatureKey, 600).catch(() => null) : null;
+  const signed = (key: string | null) => (key ? objectStorage.createSignedReadUrl(key, 600).catch(() => null) : Promise.resolve(null));
+  const [signatureUrl, issuerLogoUrl] = await Promise.all([signed(letterhead.signatureKey), signed(letterhead.logoKey)]);
 
   const q = project.quotation;
   const terms = lines(q.terms ?? BQ_DEFAULT_QUOTATION_TERMS);
@@ -302,7 +303,9 @@ export default async function BqQuotationPrintPage({
   const markers = (["TBC", "BY_OWNER"] as const).filter((mode) =>
     project.sections.some((section) => [...section.items, ...section.subsections.flatMap((subsection) => subsection.items)].some((item) => item.priceMode === mode)));
   const date = q.date ?? new Date().toISOString().slice(0, 10);
-  const organization = settings.organizationName;
+  // The issuer may be the contractor, not the studio (owner 2026-10-14): BQ's own name and logo first.
+  const organization = letterhead.companyName ?? settings.organizationName;
+  const logoUrl = letterhead.companyName || letterhead.logoKey ? issuerLogoUrl : settings.brandMarkUrl;
 
   return (
     <>
@@ -325,7 +328,7 @@ export default async function BqQuotationPrintPage({
         {/* The outer table's header is the logo, so it repeats at the top of every printed page. */}
         <table className="w-full border-collapse text-[9pt] leading-[1.35]" style={FONT}>
           <thead>
-            <tr><td className="pb-4"><Logo url={settings.brandMarkUrl} name={organization} small /></td></tr>
+            <tr><td className="pb-4"><Logo url={logoUrl} name={organization} small /></td></tr>
           </thead>
           <tbody>
             <tr>

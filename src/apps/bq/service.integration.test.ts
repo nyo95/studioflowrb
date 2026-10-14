@@ -1055,13 +1055,15 @@ describe("BQ quotation letter and settings (owner 2026-10-14)", () => {
     const before = await service.getQuotationSettings();
     assert.equal(before.defaultPpnPct, "11");
     assert.match(before.defaultPaymentTerms, /50% Down Payment/);
-    const base = { grants: GRANTS, actor: ACTOR, companyAddress: "Jalan Safir VII\nJakarta Barat", companyEmail: "info@rad-w.com", signerName: "Raychie A.", defaultPaymentTerms: null, defaultPpnPct: "11" };
-    assert.deepEqual(await service.updateQuotationSettings({ ...base, signature: { kind: "set", key: "bq/signatures/one.png" } }), { replacedSignatureKey: null });
-    assert.deepEqual(await service.updateQuotationSettings({ ...base, signature: { kind: "keep" } }), { replacedSignatureKey: null });
-    assert.deepEqual(await service.updateQuotationSettings({ ...base, signature: { kind: "set", key: "bq/signatures/two.png" } }), { replacedSignatureKey: "bq/signatures/one.png" });
+    const base = { grants: GRANTS, actor: ACTOR, companyName: "PT Kontraktor", logo: { kind: "keep" as const }, companyAddress: "Jalan Safir VII\nJakarta Barat", companyEmail: "info@rad-w.com", signerName: "Raychie A.", defaultPaymentTerms: null, defaultPpnPct: "11" };
+    assert.deepEqual(await service.updateQuotationSettings({ ...base, signature: { kind: "set", key: "bq/signatures/one.png" }, logo: { kind: "set", key: "bq/logos/one.png" } }), { replacedSignatureKey: null, replacedLogoKey: null });
+    assert.deepEqual(await service.updateQuotationSettings({ ...base, signature: { kind: "keep" } }), { replacedSignatureKey: null, replacedLogoKey: null });
+    assert.deepEqual(await service.updateQuotationSettings({ ...base, signature: { kind: "set", key: "bq/signatures/two.png" }, logo: { kind: "remove" } }), { replacedSignatureKey: "bq/signatures/one.png", replacedLogoKey: "bq/logos/one.png" });
     const after = await service.getQuotationSettings();
     assert.equal(after.signerName, "Raychie A.");
     assert.equal(after.signatureKey, "bq/signatures/two.png");
+    assert.equal(after.companyName, "PT Kontraktor");
+    assert.equal(after.logoKey, null);
     assert.match(after.defaultPaymentTerms, /50% Down Payment/, "an emptied default falls back to the standard one");
     await assert.rejects(
       () => service.updateQuotationSettings({ ...base, companyEmail: "not an e-mail", signature: { kind: "keep" } }),

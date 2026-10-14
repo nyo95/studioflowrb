@@ -184,6 +184,7 @@ for (const index of [0, 1, 2, 3]) {
     if (index === 3) {
       // The letter, as in the studio's quotation PDF: the letterhead in Quotation settings, the rest per project.
       await page.goto("/bq/settings");
+      await page.getByLabel("Company name").fill("RADIANT");
       await page.getByLabel("Address").fill("Jalan Safir VII C7/28a\nKembangan Selatan\nJakarta Barat - 11610");
       await page.getByLabel("E-mail").fill("info@rad-w.com");
       await page.getByLabel("Signer name").fill("Raychie A.");
