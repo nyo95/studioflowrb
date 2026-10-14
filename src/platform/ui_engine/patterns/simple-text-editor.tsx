@@ -12,6 +12,30 @@ export type SimpleTextEditorProps = TextareaHTMLAttributes<HTMLTextAreaElement> 
 const BULLET = /^[-*]\s/;
 const NUMBER = /^(\d+)[.)]\s/;
 
+/**
+ * Adds or removes a list marker on every line the selection touches; numbers count up from 1. A selection on empty
+ * lines only (an empty note, or the empty line after the last point) gets the first marker, so the button starts a list.
+ */
+export function toggleListText(value: string, start: number, end: number, kind: "bullet" | "number"): { text: string; from: number; to: number; caret: "select" | "end" } {
+  const lineStart = value.lastIndexOf("\n", start - 1) + 1;
+  const nextLine = value.indexOf("\n", end);
+  const lineEnd = nextLine === -1 ? value.length : nextLine;
+  const selectedLines = value.slice(lineStart, lineEnd).split("\n");
+  const populatedLines = selectedLines.filter((line) => line.length > 0);
+  if (populatedLines.length === 0) return { text: kind === "bullet" ? "- " : "1. ", from: start, to: end, caret: "end" };
+  const marker = kind === "bullet" ? BULLET : NUMBER;
+  const remove = populatedLines.every((line) => marker.test(line));
+  let count = 0;
+  const text = selectedLines.map((line) => {
+    if (!line) return line;
+    const bare = line.replace(BULLET, "").replace(NUMBER, "");
+    if (remove) return bare;
+    count += 1;
+    return kind === "bullet" ? `- ${bare}` : `${count}. ${bare}`;
+  }).join("\n");
+  return { text, from: lineStart, to: lineEnd, caret: "select" };
+}
+
 function notifyInput(textarea: HTMLTextAreaElement) {
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
   textarea.focus();
@@ -40,28 +64,11 @@ export const SimpleTextEditor = forwardRef<HTMLTextAreaElement, SimpleTextEditor
     notifyInput(textarea);
   };
 
-  /** Adds or removes a list marker on every selected line; numbers count up from 1. */
   const toggleList = (kind: "bullet" | "number") => {
     const textarea = textareaRef.current;
     if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const lineStart = textarea.value.lastIndexOf("\n", start - 1) + 1;
-    const nextLine = textarea.value.indexOf("\n", end);
-    const lineEnd = nextLine === -1 ? textarea.value.length : nextLine;
-    const selectedLines = textarea.value.slice(lineStart, lineEnd).split("\n");
-    const populatedLines = selectedLines.filter((line) => line.length > 0);
-    const marker = kind === "bullet" ? BULLET : NUMBER;
-    const remove = populatedLines.length > 0 && populatedLines.every((line) => marker.test(line));
-    let count = 0;
-    const replacement = selectedLines.map((line) => {
-      if (!line) return line;
-      const bare = line.replace(BULLET, "").replace(NUMBER, "");
-      if (remove) return bare;
-      count += 1;
-      return kind === "bullet" ? `- ${bare}` : `${count}. ${bare}`;
-    }).join("\n");
-    textarea.setRangeText(replacement, lineStart, lineEnd, "select");
+    const change = toggleListText(textarea.value, textarea.selectionStart, textarea.selectionEnd, kind);
+    textarea.setRangeText(change.text, change.from, change.to, change.caret);
     notifyInput(textarea);
   };
 

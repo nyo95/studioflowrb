@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.25 | 2026-10-14 | fix(ui-engine): List buttons start a list on an empty note (Lead)
+
+- **BACKLOG [CLEANUP][P3] closed:** in `SimpleTextEditor` (MOM and other plain-text notes) the Bullet list / Numbered list buttons skipped empty lines, so on an empty note, or on the empty line after the last point, they did nothing. A selection on empty lines only now gets the first marker ("- " or "1. ") with the caret after it; lines with text behave as before (mark, renumber from 1, unmark, empty lines in between untouched). The rule is the exported pure `toggleListText`, with a unit test. The Notes `RichTextEditor` was checked in the browser (Playwright probe) and already starts a list on an empty note.
+- **Migrations/dependencies:** none. **Checks:** new `simple-text-editor.test.tsx` 2/2; typecheck and eslint PASS. Full suite runs with the lane's last commit. No push.
+
 ## R9.24 | 2026-10-14 | docs(plan): WO-HARDEN-AUDIT-01 for Codex; Lead lane R9.25-R9.29 in parallel (Lead)
 
 - **Owner 2026-10-14:** "planning pekerjaan2 dan penyelesaian KB / error dari audit - bagi yg mana codex kerjakan ... kerjakan sekaligus"; plan approved, including the merge of the Codex branch after a review PASS (no push).
