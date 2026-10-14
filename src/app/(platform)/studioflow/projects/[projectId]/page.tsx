@@ -9,6 +9,7 @@ import { studioFlow } from "@/apps/studioflow/runtime";
 import { SectionCard, Text } from "@/platform/ui_engine";
 
 
+import { PhaseAside } from "../../_components/phase-aside";
 import { PhaseCanvas } from "../../_components/phase-canvas";
 import { pageSession } from "../../_components/session";
 import { ProjectNotes } from "./_notes-stream/project-notes";
@@ -63,29 +64,41 @@ export default async function ProjectOverviewPage({
 
   // Record workspace (DESIGN.md §6.2): the page fills the window below the header and the notes keep their own scroll.
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-4">
-      {/* One card: the phase tabs and the selected phase's workflow bar (owner, 2026-10-13). Switching a phase is a
-          transition, so the old bar stays until the new one is ready and the canvas below is never reloaded. */}
-      <SectionCard padded={false}>
-        <PhaseTabs steps={pipelineSteps} selectedId={selectedPhaseId} />
-        <div className="border-t border-line-subtle">
-          {selectedPhaseId ? (
-            <Suspense fallback={<PhaseBarSkeleton />}>
-              <PhaseCanvas projectId={projectId} phaseId={selectedPhaseId} archived={archived} />
-            </Suspense>
-          ) : (
-            <Text as="p" tone="secondary" size="sm" className="px-4 py-3">No phases found for this project.</Text>
-          )}
+    <div className="flex flex-1 flex-col gap-4 xl:min-h-0">
+      {/* One row (owner 2026-10-14, DESIGN.md §6.2): the phase strip, and at its right end the selected phase's round,
+          state and primary step. Below 1280px the workflow wraps under the strip. Switching a phase is a transition,
+          so the old bar stays until the new one is ready and the notes below are never reloaded. */}
+      <SectionCard padded={false} className="shrink-0">
+        <div className="flex flex-wrap items-stretch">
+          <div className="min-w-0 flex-[1_1_40rem]">
+            <PhaseTabs steps={pipelineSteps} selectedId={selectedPhaseId} />
+          </div>
+          <div className="flex min-w-0 flex-[1_1_100%] items-center border-t border-line-subtle xl:flex-[0_1_34rem] xl:border-l xl:border-t-0">
+            <div className="min-w-0 flex-1">
+              {selectedPhaseId ? (
+                <Suspense fallback={<PhaseBarSkeleton />}>
+                  <PhaseCanvas projectId={projectId} phaseId={selectedPhaseId} archived={archived} />
+                </Suspense>
+              ) : (
+                <Text as="p" tone="secondary" size="sm" className="px-4 py-3">No phases found for this project.</Text>
+              )}
+            </div>
+          </div>
         </div>
       </SectionCard>
 
-      {/* With the Workspace board module on (Developer, owner 2026-10-14): one canvas for the whole project, the phase
-          only sets context. Off: the selected phase's Notes stream. Both read the same notes. */}
-      <Suspense fallback={<SectionCard padded><SkeletonBlock className="h-[420px] w-full" /></SectionCard>}>
-        {boardEnabled
-          ? <ProjectWorkspace projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />
-          : <ProjectNotes projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />}
-      </Suspense>
+      {/* Notes (or, with the Workspace board module on, the board) with the phase's requirements and files beside them.
+          Both read the same notes; each column scrolls by itself. */}
+      <div className="flex flex-1 gap-4 max-xl:flex-col xl:min-h-0">
+        <div className="flex min-h-[28rem] min-w-0 flex-1 flex-col gap-4">
+          <Suspense fallback={<SectionCard padded><SkeletonBlock className="h-[420px] w-full" /></SectionCard>}>
+            {boardEnabled
+              ? <ProjectWorkspace projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />
+              : <ProjectNotes projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />}
+          </Suspense>
+        </div>
+        {selectedPhaseId ? <Suspense fallback={null}><PhaseAside projectId={projectId} phaseId={selectedPhaseId} archived={archived} /></Suspense> : null}
+      </div>
     </div>
   );
 }

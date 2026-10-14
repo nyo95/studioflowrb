@@ -118,7 +118,8 @@ async function boardJourney(page: Page) {
 
   // 3. A photo chosen from the toolbar becomes its own image element.
   const images = page.getByRole("article", { name: /^Image/ });
-  await page.locator('input[type="file"][accept*=".pdf"]').setInputFiles({ name: "board.png", mimeType: "image/png", buffer: PNG });
+  // The board's own file input, not the Files panel beside it (R9.62).
+  await page.locator('input[type="file"][accept*=".pdf"]:not(aside *)').setInputFiles({ name: "board.png", mimeType: "image/png", buffer: PNG });
   await expect(images).toHaveCount(1);
 
   // 4. A quick note sent as client feedback with an image: the text and the image are two elements, both feedback.

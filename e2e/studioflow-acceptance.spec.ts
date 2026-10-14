@@ -61,15 +61,25 @@ test("7.2 a note takes a PNG and refuses a PDF", async ({ page }) => {
   await expect(notes(page).getByRole("list", { name: "Images" }).getByRole("button")).toHaveCount(1);
 });
 
-// Since R8.532 the requirements and files live in the "Phase details" drawer instead of a column that folds away.
-test("8.5 the phase's requirements and files open in Phase details and close again", async ({ page }) => {
+// Since R9.62 the requirements and files are a panel beside the notes (DESIGN.md §6.2); narrower than 1280px a
+// "Phase details" bar opens them in a drawer.
+test("8.5 the phase's requirements and files sit beside the notes, fold away, and open in a drawer on a narrow screen", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
   await openProject(page, sf.aside);
-  await expect(page.getByRole("heading", { name: "Requirements" })).toBeHidden();
-  await page.getByRole("button", { name: /^Phase details/ }).click();
+  const panel = page.getByRole("complementary", { name: "Phase details" });
+  await expect(panel.getByRole("heading", { name: "Requirements" })).toBeVisible();
+  await panel.getByRole("button", { name: "Hide phase details" }).click();
+  await expect(panel).toHaveCount(0);
+  await page.getByRole("button", { name: /^Show phase details/ }).click();
+  await expect(page.getByRole("complementary", { name: "Phase details" })).toBeVisible();
+
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await expect(page.getByRole("complementary", { name: "Phase details" })).toBeHidden();
+  await page.getByRole("button", { name: "Phase details", exact: true }).click();
   const drawer = page.getByRole("dialog", { name: /Phase details/ });
   await expect(drawer.getByRole("heading", { name: "Requirements" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("heading", { name: "Requirements" })).toBeHidden();
+  await expect(drawer).toBeHidden();
 });
 
 test("7.6 a note image can be saved to Ideas, put on the moodboard and used in the schedule", async ({ page }) => {

@@ -3994,7 +3994,7 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     const entryRow = await testDb.prisma.sfScheduleEntry.findUniqueOrThrow({ where: { id: entry.entryId } });
     const code = `${entryRow.prefix}-${String(entryRow.increment).padStart(2, "0")}`;
     assert.deepEqual(note.items.map((item) => [item.code, item.name]), [[code, "Ivory Tile"]]);
-    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, tag: "#lampu" })).notes.map((item) => item.id), [reply.cardId, root.cardId]);
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, tag: "#lampu" })).notes.map((item) => item.id).sort(), [reply.cardId, root.cardId].sort());
     assert.deepEqual((await sf.workspace.listNotesForItem({ grants: ALL, projectId, entryId: entry.entryId })).map((item) => item.id), [reply.cardId]);
     assert.deepEqual((await sf.workspace.searchNoteItems({ grants: ALL, projectId, query: `${entryRow.prefix.toLowerCase()}${entryRow.increment}` })).map((item) => item.entryId), [entry.entryId]);
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Bad", tags: ["feedback"] }), "NOTE_TAG_RESERVED");

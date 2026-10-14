@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.62 | 2026-10-15 | feat(studioflow): One-row phase strip and the phase's requirements and files beside the notes (Lead)
+
+- **Owner 2026-10-15:** "grid project nya jg belum ada di kanan?" then "ya" to building the right panel together with the one-row phase strip (mockup https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF).
+- **Phase strip:** the strip and the selected phase's workflow share one row from 1280px (round + state, next step under it and on hover, the primary step such as Send to client, More); narrower, the workflow wraps under the strip. The "Phase details" button is gone; the round history moved to More → Round history.
+- **Detail panel** (`_components/phase-aside.tsx` + `phase-details-aside.tsx`): the selected phase's Requirements (with project-wide) and Files, moved out of `PhaseCanvas`, in a 320px column beside the notes or the board that scrolls by itself and folds to a button; below 1280px a one-line bar above the notes opens the same content in a drawer.
+- **Layout:** the body row (notes/board + panel) fills the window from 1280px; below it the page scrolls normally (min-h released).
+- **Tests:** `studioflow-acceptance` 8.5 rewritten for the panel (fold, show, narrow drawer); `workspace-board` picks the board's own file input (the panel's Files input is now on the page); the Executor's tag-filter assertion no longer depends on the order of two notes created in the same millisecond.
+- **Checks:** typecheck, eslint, `npm test` 1119/1119, `check:boundaries`, `check:legacy-runtime`, production build PASS; Playwright (installed Chrome) notes-chat, workspace-board, studioflow-acceptance and screen-size 86/86 PASS; screenshots at 1440×900 and 1024×800 reviewed. No push.
+
 ## R9.61 | 2026-10-15 | feat(studioflow): Project notes as one chat on a fixed Phases page (Lead)
 
 - **Owner 2026-10-14:** mockup https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF approved ("aku sudah oke"), then "ya" to the Lead building the UI on WO-SF-NOTES-CHAT-01 (R9.57/R9.59).

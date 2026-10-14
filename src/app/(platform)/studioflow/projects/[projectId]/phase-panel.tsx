@@ -1,7 +1,6 @@
 "use client";
 
-import { PanelRight } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { Badge, Button, ButtonMenu, Dialog, Drawer, Field, FormActions, FormattedInstant, InlineError, Input, RadioGroup, RowActionMenu, SectionCard, Text, Textarea } from "@/platform/ui_engine";
@@ -10,11 +9,11 @@ import { ITERATION_STATE_LABEL as STATE_LABEL, ITERATION_STATE_TONE as STATE_TON
 import { IterationButtons, UndoBar, usePhaseCommands, VisitDialog, type IterationView, type PhaseView } from "../../_components/phase-commands";
 
 /**
- * The selected phase's workflow: the current round, its steps, Undo and the less frequent commands. Requirements,
- * files and the round history live behind "Phase details" (owner, board-first 2026-10-13) so the project Workspace
- * canvas below gets the page; the button shows the counts, so nothing open goes unnoticed.
+ * The selected phase's workflow at the right end of the phase strip (owner 2026-10-14, DESIGN.md §6.2): the current
+ * round and its state, the one primary step (e.g. Send to client) and More. Requirements and files are the detail
+ * panel beside the notes; the round history opens from More.
  */
-export function PhasePanel({ projectId, phase, current, iterations, skippedReason, startBlockedReason, canAct, canSkip, canOverride, archived, aside, detailsSummary }: {
+export function PhasePanel({ projectId, phase, current, iterations, skippedReason, startBlockedReason, canAct, canSkip, canOverride, archived }: {
   projectId: string;
   phase: PhaseView;
   current: IterationView | null;
@@ -25,14 +24,11 @@ export function PhasePanel({ projectId, phase, current, iterations, skippedReaso
   canSkip: boolean;
   canOverride: boolean;
   archived: boolean;
-  aside?: ReactNode;
-  /** e.g. "Requirements 2/4 · Files 3", shown on the Phase details button. */
-  detailsSummary: string;
 }) {
   const commands = usePhaseCommands(projectId);
   const { locale, timezone } = useDisplaySettings();
   const [visitOpen, setVisitOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [roundsOpen, setRoundsOpen] = useState(false);
   const [renaming, setRenaming] = useState<IterationRow | null>(null);
   const [renameDraft, setRenameDraft] = useState("");
   const [skipOpen, setSkipOpen] = useState(false);
@@ -59,6 +55,7 @@ export function PhasePanel({ projectId, phase, current, iterations, skippedReaso
     ] : []),
     ...((phase.status === "PENDING" || phase.status === "ACTIVE") && canSkip && !archived ? [{ label: "Skip this phase…", description: "Marks it done without work. A reason is recorded.", onSelect: () => { setReason(""); setSkipOpen(true); } }] : []),
     ...(canOverride && !archived ? [{ label: "Admin reset iterations…", description: "Rewrites the iteration history. Audited.", onSelect: () => setResetOpen(true) }] : []),
+    ...(iterations.length > 0 ? [{ label: `Round history (${iterations.length})`, separatorBefore: true, onSelect: () => setRoundsOpen(true) }] : []),
   ];
   const title = current ? current.name : "Current iteration";
   const nextStep = phase.status === "PENDING" ? (startBlockedReason ?? "Start this phase when work begins.")
@@ -71,14 +68,17 @@ export function PhasePanel({ projectId, phase, current, iterations, skippedReaso
 
   return (
     <>
-      {/* The workflow bar sits inside the phase tabs card: round, state, what to do next, and the commands. */}
+      {/* The workflow at the strip's right end: round and state (what to do next on hover), the primary step, More. */}
       <div className="grid gap-2 px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <Text size="md" weight="semibold">{title}</Text>
-          <Badge tone={phase.status === "DONE" ? "success" : current ? STATE_TONE[current.state] : "neutral"} title={skippedReason ?? undefined}>{phase.status === "PENDING" ? "Not started" : phase.status === "DONE" ? (skippedReason ? "Skipped" : "Done") : current ? STATE_LABEL[current.state] : "In progress"}</Badge>
-          <Text tone="secondary" size="sm" className="min-w-0 flex-1 truncate">{nextStep}</Text>
+          <div className="grid min-w-0 flex-1 gap-0.5" title={nextStep}>
+            <span className="flex min-w-0 items-center gap-2">
+              <Text size="sm" weight="semibold" className="truncate">{title}</Text>
+              <Badge tone={phase.status === "DONE" ? "success" : current ? STATE_TONE[current.state] : "neutral"} title={skippedReason ?? undefined}>{phase.status === "PENDING" ? "Not started" : phase.status === "DONE" ? (skippedReason ? "Skipped" : "Done") : current ? STATE_LABEL[current.state] : "In progress"}</Badge>
+            </span>
+            <Text tone="tertiary" size="sm" className="max-w-[22rem] truncate">{nextStep}</Text>
+          </div>
           <div className="flex flex-wrap items-center gap-1.5">
-            <Button type="button" size="sm" variant="ghost" leadingIcon={<PanelRight className="h-3.5 w-3.5" />} onClick={() => setDetailsOpen(true)}>Phase details <span className="text-ink-tertiary">{detailsSummary}</span></Button>
             <IterationButtons phase={phase} current={current} commands={commands} canAct={acting} onNewVisit={() => setVisitOpen(true)} lead />
             {currentMenu.length > 0 ? <ButtonMenu label="More" variant="ghost" items={currentMenu} /> : null}
           </div>
@@ -87,9 +87,8 @@ export function PhasePanel({ projectId, phase, current, iterations, skippedReaso
         {commands.error && !visitOpen && !renaming && !skipOpen && !resetOpen ? <InlineError>{commands.error}</InlineError> : null}
       </div>
 
-      <Drawer open={detailsOpen} onOpenChange={setDetailsOpen} title={`${phase.name} · Phase details`} description={detailsSummary}>
+      <Drawer open={roundsOpen} onOpenChange={setRoundsOpen} title={`${phase.name} · Round history`}>
         <div className="grid gap-4">
-          {aside}
           <SectionCard title="Rounds" count={iterations.length || undefined}>
             {ordered.length === 0 ? <Text size="sm" tone="tertiary">No rounds yet.</Text> : (
               <ul className="m-0 grid list-none gap-2 p-0">

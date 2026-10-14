@@ -1,16 +1,13 @@
 import { AppError } from "@platform/core/errors";
-import { hasPermission } from "@platform/core/rbac";
-import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { SectionCard, Text } from "@/platform/ui_engine";
 
-import { DeliverablesPanel } from "../projects/[projectId]/phases/[phaseId]/deliverables-panel";
 import { PhasePanel } from "../projects/[projectId]/phase-panel";
 import { ReadOnlyNotice } from "./read-only-notice";
-import { RequirementList, type RequirementNode } from "./requirement-list";
 import { pageProjectAccess, pageSession } from "./session";
 
 
+/** The selected phase's workflow bar (round, state, steps). Its requirements and files are `PhaseAside`. */
 export async function PhaseCanvas({ projectId, phaseId, archived }: { projectId: string; phaseId: string; archived: boolean }) {
   const { grants } = await pageSession();
   const caps = studioFlow.phases.capabilities(grants);
@@ -21,24 +18,11 @@ export async function PhaseCanvas({ projectId, phaseId, archived }: { projectId:
   });
   if (!phase) return <SectionCard padded><Text tone="secondary" size="sm">Phase not found.</Text></SectionCard>;
 
-  const [deliverablesResult, requirements] = await Promise.all([
-    studioFlow.phases.listDeliverables({ grants, projectId, phaseId: phase.id }),
-    studioFlow.tasks.listChecklist({ grants, projectId }),
-  ]);
   const phaseAccess = access.phases.find((item) => item.phaseId === phase.id);
   const canTransition = phaseAccess?.canTransition ?? false;
   const canContent = phaseAccess?.canEditContent ?? false;
-  const canManage = hasPermission(grants, P.projectManage) && access.canEditProject;
-  const canWork = phase.modifiable && caps.work && canContent;
   const canAct = canTransition && caps.work;
-  const canTick = !archived && !access.completed && (access.override || access.isDesigner || access.isDrafter);
-  const canEditRequirements = canTick && hasPermission(grants, P.taskManage);
   const current = phase.currentIteration;
-  const toNodes = (rows: typeof requirements): RequirementNode[] => rows.map((item) => ({ id: item.id, label: item.label, isChecked: item.isChecked, children: item.children.map((child) => ({ id: child.id, label: child.label, isChecked: child.isChecked })) }));
-  const phaseRequirements = requirements.filter((item) => item.phaseId === phase.id);
-  const generalRequirements = requirements.filter((item) => item.phaseId === null);
-  const completedPhaseRequirements = phaseRequirements.filter((item) => item.isChecked).length;
-  const generalOpen = generalRequirements.filter((item) => !item.isChecked).length;
 
   return (
     <>
@@ -48,26 +32,12 @@ export async function PhaseCanvas({ projectId, phaseId, archived }: { projectId:
         phase={{ id: phase.id, name: phase.label, status: phase.status, isSupervision: phase.isSupervision, canStart: phase.canStart }}
         current={current ? { id: current.id, name: current.shortName, state: current.state, waitingDays: current.waitingDays, choices: current.choices, answerChoices: current.answerChoices, nextStepName: current.nextStepName } : null}
         iterations={phase.iterations}
-        detailsSummary={`Requirements ${completedPhaseRequirements}/${phaseRequirements.length} · Files ${deliverablesResult.items.length}`}
         skippedReason={phase.skippedReason}
         startBlockedReason={phase.startBlockedReason}
         canAct={canAct}
         canSkip={canTransition && caps.review}
         canOverride={caps.override}
         archived={archived}
-        aside={<>
-          <SectionCard title="Requirements" count={`${completedPhaseRequirements}/${phaseRequirements.length}`}>
-            <div className="grid gap-3">
-              <RequirementList projectId={projectId} phaseId={phase.id} nodes={toNodes(phaseRequirements)} canTick={canTick} canEdit={canEditRequirements} emptyText="No requirements for this phase." />
-              <details className="border-t border-line-subtle pt-3">
-                <summary className="cursor-pointer text-sm font-medium text-ink">Project-wide · {generalOpen} open</summary>
-                <div className="pt-2"><RequirementList projectId={projectId} phaseId={null} nodes={toNodes(generalRequirements)} canTick={canTick} canEdit={canEditRequirements} emptyText="No project-wide requirements." /></div>
-              </details>
-              <Text as="p" size="sm" tone="tertiary">Reminders only; they never block a step.</Text>
-            </div>
-          </SectionCard>
-          <DeliverablesPanel projectId={projectId} phaseId={phase.id} deliverables={deliverablesResult.items} status={deliverablesResult.status} canWork={canWork} canManage={canManage} />
-        </>}
       />
     </>
   );

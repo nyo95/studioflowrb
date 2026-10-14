@@ -262,8 +262,9 @@ project, Presentation board) does not scroll as a whole. Its head is fixed and
 its body is split into regions that each scroll on their own, so the record's
 identity, its phase and its primary action never leave the screen. Mockup:
 https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF. Built for the StudioFlow project
-Phases page in R9.61 (notes chat with its own scroll); the phase strip still has
-its second row (iteration bar), merging it is the next slice.
+Phases page in R9.61 (notes chat with its own scroll) and R9.62 (one-row stage
+strip, detail panel). Below 1280px the workflow wraps under the strip, the panel
+becomes a one-line "Phase details" bar opening a drawer, and the page scrolls.
 
 ```text
 AppShell (rail + top bar)                      fixed
