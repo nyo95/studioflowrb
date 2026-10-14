@@ -335,6 +335,11 @@ export function compareOptionLabels(a: string, b: string): number {
   return optionLabelIndex(a) - optionLabelIndex(b) || a.localeCompare(b);
 }
 
+/** The one Schedule option order: label sequence first, then creation time for a stable tie-break. */
+export function orderedScheduleOptions<T extends { label: string; created_at: Date }>(options: readonly T[]): T[] {
+  return [...options].sort((a, b) => compareOptionLabels(a.label, b.label) || a.created_at.getTime() - b.created_at.getTime());
+}
+
 /** Split a sheet code like "PT-03" into prefix and increment; null when it is not a schedule code. */
 export function parseScheduleCode(code: string): { prefix: string; increment: number } | null {
   const match = /^\s*([A-Za-z0-9]+)\s*-\s*(\d+)\s*$/.exec(code);

@@ -8,7 +8,7 @@ import { WORKSPACE_FILE_BYTES, WORKSPACE_FILE_NAME_MAX, WORKSPACE_FILE_TYPES, fi
 import { NOTE_IMAGE_BYTES, STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import { iterationKinds } from "../domain/iteration-kinds";
 import { iterationShortName } from "../domain/phase";
-import { parseTypedScheduleCode, scheduleCode } from "../domain/schedule";
+import { orderedScheduleOptions, parseTypedScheduleCode, scheduleCode } from "../domain/schedule";
 import {
   P,
   assertProjectWritable,
@@ -262,7 +262,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     }
     await tx.sfNoteTagLink.deleteMany({ where: { card_id: cardId } });
     if (tagIds.length) await tx.sfNoteTagLink.createMany({ data: tagIds.map((tag_id) => ({ card_id: cardId, tag_id })) });
-    await tx.sfNoteTag.deleteMany({ where: { links: { none: {} } } });
+    await tx.sfNoteTag.deleteMany({ where: { project_id: projectId, links: { none: {} } } });
   }
 
   async function syncItemLinks(tx: TxClient, cardId: string, projectId: string, entryIds: readonly string[] | undefined) {
@@ -557,14 +557,14 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     phase: { id: string; name_snapshot: string; prefix_snapshot: string; iteration_kinds_snapshot: unknown } | null;
     reply_to?: { id: string; kind: WorkspaceElementKind; body: string; file_name: string | null; author_name: string | null; origin: WorkspaceCardOrigin } | null;
     note_tag_links?: Array<{ tag: { name: string } }>;
-    note_item_links?: Array<{ code_snapshot: string; entry: { prefix: string; increment: number; section: string; location: string | null; active_index: number; options: Array<{ product_name: string }> } }>;
+    note_item_links?: Array<{ code_snapshot: string; entry: { prefix: string; increment: number; section: string; location: string | null; active_index: number; options: Array<{ label: string; created_at: Date; is_final: boolean; product_name: string }> } }>;
   };
   const CARD_INCLUDE = {
     iteration: { select: { id: true, major: true, name: true } },
     phase: { select: { id: true, name_snapshot: true, prefix_snapshot: true, iteration_kinds_snapshot: true } },
     reply_to: { select: { id: true, kind: true, body: true, file_name: true, author_name: true, origin: true } },
     note_tag_links: { include: { tag: { select: { name: true } } } },
-    note_item_links: { include: { entry: { select: { prefix: true, increment: true, section: true, location: true, active_index: true, options: { orderBy: { label: "asc" }, select: { product_name: true } } } } } },
+    note_item_links: { include: { entry: { select: { prefix: true, increment: true, section: true, location: true, active_index: true, options: { select: { label: true, created_at: true, is_final: true, product_name: true } } } } } },
   } as const;
 
   function roundLabel(row: Pick<CardReadRow, "iteration" | "phase">) {
@@ -598,7 +598,10 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       file: await elementFile(row),
       replyTo: row.reply_to ? { id: row.reply_to.id, kind: row.reply_to.kind, excerpt: row.reply_to.kind === "FILE" ? row.reply_to.file_name ?? "" : row.reply_to.kind === "IMAGE" ? "" : row.reply_to.body.slice(0, 120), authorName: row.reply_to.author_name, clientFeedback: row.reply_to.origin === "CLIENT_ANSWER" } : null,
       tags: row.note_tag_links?.map((link) => link.tag.name) ?? [],
-      items: row.note_item_links?.map((link) => ({ code: scheduleCode(link.entry.prefix, link.entry.increment) || link.code_snapshot, section: link.entry.section, name: link.entry.options[link.entry.active_index]?.product_name ?? null, location: link.entry.location, codeSnapshot: link.code_snapshot })) ?? [],
+      items: row.note_item_links?.map((link) => {
+        const options = orderedScheduleOptions(link.entry.options);
+        return { code: scheduleCode(link.entry.prefix, link.entry.increment) || link.code_snapshot, section: link.entry.section, name: options.find((option) => option.is_final)?.product_name ?? options[link.entry.active_index]?.product_name ?? null, location: link.entry.location, codeSnapshot: link.code_snapshot };
+      }) ?? [],
     };
   }
 
@@ -641,8 +644,8 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     async searchNoteItems(input: ReadContext & { projectId: string; query: string }) {
       requireRead(input.grants);
       const parsed = parseTypedScheduleCode(input.query);
-      const rows = await db.sfScheduleEntry.findMany({ where: { project_id: input.projectId, ...(parsed ? { prefix: parsed.prefix, increment: parsed.increment } : { options: { some: { product_name: { contains: input.query.trim(), mode: "insensitive" } } } }) }, take: 10, orderBy: [{ section: "asc" }, { sort_order: "asc" }], include: { options: { orderBy: { label: "asc" }, select: { product_name: true } } } });
-      return rows.map((entry) => ({ entryId: entry.id, code: scheduleCode(entry.prefix, entry.increment), section: entry.section, name: entry.options[entry.active_index]?.product_name ?? null, location: entry.location }));
+      const rows = await db.sfScheduleEntry.findMany({ where: { project_id: input.projectId, ...(parsed ? { prefix: parsed.prefix, increment: parsed.increment } : { options: { some: { product_name: { contains: input.query.trim(), mode: "insensitive" } } } }) }, take: 10, orderBy: [{ section: "asc" }, { sort_order: "asc" }], include: { options: { select: { label: true, created_at: true, is_final: true, product_name: true } } } });
+      return rows.map((entry) => { const options = orderedScheduleOptions(entry.options); return { entryId: entry.id, code: scheduleCode(entry.prefix, entry.increment), section: entry.section, name: options.find((option) => option.is_final)?.product_name ?? options[entry.active_index]?.product_name ?? null, location: entry.location }; });
     },
 
     async listNoteTags(input: ReadContext & { projectId: string; query?: string }) {

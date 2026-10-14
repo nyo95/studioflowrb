@@ -9,6 +9,7 @@ import {
   SCHEDULE_IMAGE_BYTES,
   SCHEDULE_SECTIONS,
   compareOptionLabels,
+  orderedScheduleOptions,
   fallbackPrefix,
   isPermutation,
   nextOptionLabel,
@@ -267,7 +268,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
   async function orderedOptions(tx: TxClient, entryId: string) {
     const rows = await tx.sfScheduleOption.findMany({ where: { entry_id: entryId } });
-    return rows.sort((a, b) => compareOptionLabels(a.label, b.label) || a.created_at.getTime() - b.created_at.getTime());
+    return orderedScheduleOptions(rows);
   }
 
   /** Keep `active_index` pointing at the final option (legacy smart delete / approve). */

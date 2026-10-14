@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.59 | 2026-10-14 | fix(studioflow): Correct Notes chat review findings (Executor)
+
+- **Safety and scope:** restored the generated Next declaration file to its R9.56 content; future generated changes stay out of revisions. Orphan topic tags are now deleted only within the affected project.
+- **Schedule links:** linked-note item names use the Schedule's canonical option ordering and prefer the final option, so a final `A10` cannot display another option's product name.
+- **Coverage:** added integration coverage for project boundaries, tag validation and project-local cleanup, all note filters, cursor paging, phase write rights, Schedule-link snapshots, and final-option display.
+- **Checks:** Prisma generate, typecheck, touched-file ESLint, StudioFlow correction integration cases, full `npm test`, boundary and legacy-runtime checks, production build, and whitespace checks passed. No schema change, migration or dependency change.
+
 ## R9.58 | 2026-10-14 | review(studioflow): WO-SF-NOTES-CHAT-01 R9.57 CORRECTION REQUIRED (Lead)
 
 - **Reviewed R9.57 (0c2356b)** against PLAN.md decisions 1–10. Schema, migration, parser, same-project checks, tag rules, paging, filters and actions accepted.

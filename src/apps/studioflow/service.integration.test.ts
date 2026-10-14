@@ -3997,4 +3997,46 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     await sf.workspace.deleteWorkspaceCard({ ...base, cardId: root.cardId, version: (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: root.cardId } })).version });
     assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId })).notes.find((item) => item.id === reply.cardId)!.replyTo, null);
   });
+
+  it("enforces project chat boundaries, cleans only local orphan tags, filters and pages its stream", async () => {
+    const { projectId, moodboard, base } = await setup();
+    const layout = await phaseOf(projectId, "layout");
+    const other = await setup("Other note project");
+    const ownEntry = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Tile", snapshot: { productName: "Own tile" } });
+    const foreignEntry = await sf.schedule.createEntry({ ...as(designer), projectId: other.projectId, section: "MATERIAL", category: "Tile", snapshot: { productName: "Foreign tile" } });
+    const root = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "one", tags: ["local"] });
+    const feedback = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "two", clientAnswer: true, tags: ["filter"], itemEntryIds: [ownEntry.entryId] });
+    const phaseB = await sf.workspace.createWorkspaceCard({ ...base, phaseId: layout.id, body: "three" });
+    await sf.workspace.setWorkspaceCardFlags({ ...base, cardId: phaseB.cardId, pinned: true, version: (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: phaseB.cardId } })).version });
+    await sf.workspace.createWorkspaceCard({ ...other.base, phaseId: other.moodboard.id, body: "other", tags: ["local"] });
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "foreign reply", replyToId: (await sf.workspace.readWorkspace({ grants: ALL, projectId: other.projectId }))[0]!.id }), "NOTE_REPLY_INVALID");
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "foreign item", itemEntryIds: [foreignEntry.entryId] }), "NOTE_ITEM_INVALID");
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "bad tag", tags: ["bad tag"] }), "NOTE_TAG_INVALID");
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "many tags", tags: ["a", "b", "c", "d", "e", "f"] }), "NOTE_TAG_LIMIT");
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: layout.id, body: "wrong phase" }), "PERMISSION_DENIED");
+    assert.equal((await testDb.prisma.sfNoteItemLink.findUniqueOrThrow({ where: { card_id_entry_id: { card_id: feedback.cardId, entry_id: ownEntry.entryId } } })).code_snapshot, "TI-01");
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, phaseId: moodboard.id })).notes.map((note) => note.id).sort(), [feedback.cardId, root.cardId].sort());
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, clientFeedback: true })).notes.map((note) => note.id), [feedback.cardId]);
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, starred: true })).notes.map((note) => note.id), [phaseB.cardId]);
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, entryId: ownEntry.entryId })).notes.map((note) => note.id), [feedback.cardId]);
+    const first = await sf.workspace.listProjectNotes({ grants: ALL, projectId, limit: 1 });
+    const second = await sf.workspace.listProjectNotes({ grants: ALL, projectId, limit: 10, cursor: first.cursor! });
+    assert.equal(new Set([...first.notes, ...second.notes].map((note) => note.id)).size, 3);
+    const rootRow = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: root.cardId } });
+    await sf.workspace.setNoteTags({ ...base, cardId: root.cardId, tags: [], version: rootRow.version });
+    assert.equal(await testDb.prisma.sfNoteTag.count({ where: { project_id: projectId, key: "local" } }), 0);
+    assert.equal(await testDb.prisma.sfNoteTag.count({ where: { project_id: other.projectId, key: "local" } }), 1);
+  });
+
+  it("uses the final Schedule option for linked-note item names", async () => {
+    const { projectId, moodboard, base } = await setup();
+    const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Tile", category_key: "tile", prefix: "HT", increment: 9, sort_order: 9, active_index: 0 } });
+    await testDb.prisma.sfScheduleOption.createMany({ data: [
+      { entry_id: entry.id, label: "A2", product_name: "Wrong option", search_key: "wrong" },
+      { entry_id: entry.id, label: "A10", product_name: "Final option", search_key: "final", is_final: true },
+    ] });
+    const note = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Uses final", itemEntryIds: [entry.id] });
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId })).notes.find((item) => item.id === note.cardId)!.items[0]!.name, "Final option");
+    assert.equal((await sf.workspace.searchNoteItems({ grants: ALL, projectId, query: "final" })).find((item) => item.entryId === entry.id)!.name, "Final option");
+  });
 });
