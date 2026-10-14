@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.06 | 2026-10-14 | chore(platform): Remove the leftover Vercel build file (Lead)
+
+- **Owner 2026-10-14 (kantor):** "ya kerjakan lgsg semua rekomendasi kamu", after the Lead's analysis of the external 14 October audit. The audit's P1 (25 MB Workspace files over Vercel's 4.5 MB request cap) assumed a Vercel deployment; the deployment target is the self-hosted PC with LocalFilesystemStorage behind a tunnel (`CORE.md`, `docs/apps/platform/PLATFORM-ASSET-STORAGE-ROADMAP.md` §8 "Cloud adapter removed"), so the cap does not apply.
+- **Change:** `vercel.json` (build/install command only, a reserved owner file since R5.03) is deleted so tools and reviewers stop reading the repository as a Vercel app. The GitHub-side Vercel integration is an account setting outside the repository; disconnecting it is left to the owner.
+- **Migrations/dependencies:** none. **Checks:** repository search shows no build, script or runtime reference to `vercel.json`; historical mentions in CHANGELOG and `scripts/work-orders/UIUX-CURATE.md` stay as history. No push.
+
 ## R9.05 | 2026-10-14 | docs(bq): Lead review of R9.03 (PASS) and the Slice 3 handoff notes (Lead)
 
 - **Review of R9.03 (`abf0be0`): PASS.** Read the service and the in-memory preview: moves stay inside one Work Item; `previewLineItemMove` is read-only and uses the same engine as the totals; a new group's quantity/markup are cast to the database scales before previewing; line order is renumbered with the same two-phase parking that the unique sibling indexes require; the moved rows' `item_id`/`sub_object_id` change in one statement so the one-parent check never sees both; each command writes one audit event and a no-op writes nothing. Re-ran BQ integration, engine and move tests: 49/49. Two minor notes (preview is not re-checked at move time; stale-before-locked message order) are in BACKLOG as `[CLEANUP]`.
