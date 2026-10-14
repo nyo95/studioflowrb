@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.08 | 2026-10-14 | docs(plan): WO-BQ-SLICE3-UI-01 for Codex, in parallel on its own worktree (Lead)
+
+- **Owner 2026-10-14:** "lanjutin jg si BQ - oper aja ke codex (termasuk ui nya - slice 3) jalan paralel". `PLAN.md` now holds WO-BQ-SLICE3-UI-01: the contract nouns on the BQ screen (R9.20) and the Slice 3 select / group / move UI on the R9.03 backend (R9.21), UI included for Codex by owner decision for this Work Order only. The mockup's behavior is written into the plan (preview always from the server, a dialog only when the price changes, nothing on locked/archived, no drag, same Work Item only).
+- **Parallel rules:** Codex works only in the worktree `studioflowrb-bq` on branch `codex/bq-slice3`, only on BQ files, with revisions R9.20/R9.21 reserved, its own disposable test database `studioflow_rebuild_test_bq` in the rebuild-only container, no dev server and no Playwright. The Lead continues on `main` (R9.09 onward) and merges the branch after review and the owner's OK. This replaces, for this run only, the serial same-checkout rule in AGENTS.md.
+- **Migrations/dependencies:** none. **Checks:** docs only. No push.
+
 ## R9.07 | 2026-10-14 | fix(studioflow): Workspace board hardening, recorded answers kept, one-step images, sections purged (Lead)
 
 - **Owner 2026-10-14 (kantor):** "ya kerjakan lgsg semua rekomendasi kamu" after the Lead's analysis of the external 14 October audit (P2/P3 items; P1 was answered by R9.06). Module: `studioflow` (Workspace, core). Implemented by the Lead on that instruction.
