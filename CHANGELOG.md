@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.44 | 2026-10-14 | feat(bq): "Isi dari rincian" suggests a Work Item's specification from its Cost Components (Lead)
+
+- **Owner 2026-10-14:** asked whether the workbook's specification relates to Master Data; Lead advice: keep the Work Item specification as its own free text (client wording, no silent change of sent quotations, most workbook rows have no breakdown) and offer a one-time copy from the breakdown. Owner: "boleh".
+- **`apps/bq/lib/specification.ts`:** `specificationFromComponents(item)` = the Cost Component names in table order (groups first, then direct lines), each once (case and spaces ignored), joined with " + ", cut before 1000 characters. Unit tests.
+- **Side panel:** under Spesifikasi, for an editable Work Item with Cost Components, "Isi dari rincian" (or "Ganti dengan isi dari rincian" when one is filled) with the suggested text shown; one click saves it through the normal update; hidden when the text is already the same. The field hint now names the Spesifikasi column.
+- **Docs:** bq-contract records the specification as Work Item free text, not linked to Master Data.
+- **Checks:** typecheck, eslint, unit tests, production build PASS. Not walked in the browser. No push.
+
 ## R9.43 | 2026-10-14 | feat(bq): Struktur folds: Sections and Subsections first, Work Items on demand; Sections fold in the table (Lead)
 
 - **Owner 2026-10-14:** "section nya bisa di collapse (ini dikiri hanya section dan subsection kan?)".

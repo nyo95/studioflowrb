@@ -452,7 +452,7 @@ bq.BqTemplateRecommendation
 
 **L1-only fields:**
 - `BqItem` memiliki `harga_snapshot NUMERIC(18,4)` dan `koefisien NUMERIC(18,6) DEFAULT 1`. Dipakai hanya saat L1 tidak memiliki child.
-- `BqItem.specification TEXT NULL` (owner 2026-10-14, maks. 1000 karakter): keterangan untuk klien, mis. "Gypsum 9mm rangka hollow". Tampil di bawah nama di tabel dan di penawaran cetak; tidak ikut perhitungan.
+- `BqItem.specification TEXT NULL` (owner 2026-10-14, maks. 1000 karakter): keterangan untuk klien, mis. "Gypsum 9mm rangka hollow". Tampil di kolom Spesifikasi tabel dan di penawaran cetak; tidak ikut perhitungan. Teks bebas milik Work Item, tidak tersambung ke Master Data (owner 2026-10-14): untuk Work Item dengan rincian, panel samping menawarkan "Isi dari rincian" yang menyalin nama Cost Component-nya (masing-masing sekali, digabung " + ") sebagai titik awal; salinan itu tidak ikut berubah bila rincian atau Master Data berubah.
 
 **Library Item fields:**
 - Seluruh library item (`BqLibMaterial`, `BqLibLabor`, `BqLibMaterialLabor`, `BqLibCustomItem`) memiliki `base_unit` (nullable) dan `kategori` (enum `BqKategori`).

@@ -48,6 +48,7 @@ import { BQ_PRICE_MODES, isMarkerPriceMode } from "@/apps/bq/lib/quotation";
 import type { UnitRead } from "@/apps/masterdata/public";
 
 import { resolveCalcExpression } from "@/apps/bq/lib/calc-expression";
+import { specificationFromComponents } from "@/apps/bq/lib/specification";
 
 import {
   addItemAction,
@@ -1634,9 +1635,27 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
     const hasChildren = item.subObjects.length > 0 || item.lineItems.length > 0;
     const marker = isMarkerPriceMode(item.priceMode);
     body = <>
-      <PanelField label="Spesifikasi" hint="Tampil di bawah nama pekerjaan, juga di penawaran untuk klien.">
+      <PanelField label="Spesifikasi" hint="Tampil di kolom Spesifikasi dan di penawaran untuk klien.">
         <InlineEdit label="Spesifikasi" placeholder="Belum diisi" value={item.specification ?? ""} disabled={!editable} commitOnBlur onCommit={commit(updateItemAction, item.id, "specification")} />
       </PanelField>
+      {(() => {
+        // A copy of the Cost Component names, edited freely afterwards; it does not follow later changes.
+        const suggestion = specificationFromComponents(item);
+        if (!editable || !suggestion || suggestion === (item.specification ?? "")) return null;
+        return (
+          <div className="-mt-1 grid gap-0.5">
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => void commit(updateItemAction, item.id, "specification")(suggestion).catch(() => undefined)}
+              className="justify-self-start rounded-control text-sm text-action underline-offset-2 hover:underline disabled:opacity-50"
+            >
+              {item.specification ? "Ganti dengan isi dari rincian" : "Isi dari rincian"}
+            </button>
+            <Text size="sm" tone="tertiary" className="line-clamp-2">{suggestion}</Text>
+          </div>
+        );
+      })()}
       {number("Jumlah", item.qty, updateItemAction, item.id, "qty")}
       <div className="grid gap-1">
         <Text size="sm" tone="secondary">Satuan</Text>
