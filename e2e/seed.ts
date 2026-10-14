@@ -99,6 +99,8 @@ async function main() {
     ]);
     const brand = await masterData.createBrand({ grants: masterDataGrants, actor, name: "ZZ-Test Brand", ownerVendorId: matA.vendorId, suppliers: [{ vendorId: matA.vendorId }] });
     const pcs = await db.unit.findUniqueOrThrow({ where: { code: "pcs" } });
+    // The office uses "ls" (lump sum), "unit" and "point" too; contractor BOQs (e2e/bq-boq-walk.spec.ts) need them.
+    for (const [code, name] of [["ls", "Lump sum"], ["unit", "Unit"], ["point", "Point"]] as const) await db.unit.upsert({ where: { code }, create: { code, name }, update: {} });
     const sku1 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 1", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "10000", currency: "IDR" }] });
     const sku2 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 2", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
     const sku3 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 3", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });

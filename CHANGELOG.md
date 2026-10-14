@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.39 | 2026-10-14 | test(bq): Walk a real contractor BOQ through the BQ screens, one sheet per part (Lead)
+
+- **Owner 2026-10-14:** option B for the Excel test ("enaknya si B jadi ketauan salahnya ... bisa ga di ambil per part"), after an opencode attempt that did not finish (R9.38).
+- **`e2e/bq-boq-walk.spec.ts`:** reads `test/BOQ TEST.xlsx` with the existing `exceljs` (the workbook is the owner's local file, not committed; the spec skips without it) and types it into the screens on the disposable e2e database: part 0 creates the project, parts 1-4 one sheet each (sheet → Section through the Struktur "+ Section" dialog, lettered group → Subsection through Struktur "+ Subsection", numbered row → Work Item through "Tambah Work Item" with name, quantity and unit, then the row's side panel for the unit price, or "By Owner" / TBC as price status). Problems are collected, not thrown, into `e2e/.tmp/boq-walk-findings.json`; each part compares "Total keseluruhan" with the Excel rows and checks the sheet's own TOTAL row.
+- **Result:** 5/5 parts pass; all 73 Work Items entered; the grand total matches the workbook after every part (Rp537.113.900 before VAT; Excel's floating-point 4,079,999.99 row is 4,080,000 on screen). One finding, 57 times: the workbook's **SPECIFICATION** column (e.g. "Gypsum 9mm Ex-Knauf Rangka Hollow") has no place on a Work Item, so it is left out; owner decision pending. Not app defects but fixed on the way: the e2e seed had no "ls", "unit" or "point" units (the kantor dev database has them), and a name holding an inch mark (`8"`) broke the spec's first panel selector.
+- **Checks:** `npx playwright test e2e/bq-boq-walk.spec.ts` 5/5 PASS (1.2 min); typecheck and eslint PASS. No push.
+
 ## R9.38 | 2026-10-14 | docs(changelog): Repair today's entries; drop an unverified opencode entry (Lead)
 
 - The Lead's R9.26-R9.37 entries were written through a placeholder replacement that also turned every "`" in "B`" into a backtick and left stray underscores after code marks ("B`", "`_PageShell`"). Both are repaired; wording is unchanged otherwise.
