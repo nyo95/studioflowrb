@@ -436,7 +436,30 @@ function SectionOutline({
   } : {};
   const dropMark = (id: string) => (drag?.over === id ? "bg-surface-muted ring-1 ring-line-focus" : drag?.id === id ? "opacity-50" : "");
   const sectionIds = sections.map((section) => section.id);
+  // Struktur shows Sections and Subsections (owner 2026-10-14): a Section folds away, and a Subsection lists its Work
+  // Items (to re-order them) only when opened.
+  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
+  const [itemsOpen, setItemsOpen] = useState<ReadonlySet<string>>(new Set());
+  const flip = (set: ReadonlySet<string>, id: string) => { const next = new Set(set); if (!next.delete(id)) next.add(id); return next; };
   if (sections.length === 0 && !editable) return null;
+  const chevron = (open: boolean, name: string, onToggle: () => void, hidden = false) => (
+    <button
+      type="button"
+      aria-label={open ? `Tutup ${name}` : `Buka ${name}`}
+      aria-expanded={open}
+      onClick={onToggle}
+      className={`grid size-5 shrink-0 place-items-center rounded-action text-ink-tertiary hover:bg-surface hover:text-ink ${hidden ? "invisible" : ""}`}
+    >
+      {open ? <ChevronDown aria-hidden="true" className="size-3.5" /> : <ChevronRight aria-hidden="true" className="size-3.5" />}
+    </button>
+  );
+  // The count, or the grip while the row is hovered (the whole row drags).
+  const tail = (count: number) => (
+    <span className="relative grid shrink-0 place-items-center">
+      <span className={`rounded-pill bg-surface-muted px-1.5 text-[11px] tabular-nums text-ink-tertiary ${editable ? "group-hover/outline:invisible" : ""}`} title={`${count} Work Item`}>{count}</span>
+      {editable ? <GripVertical aria-hidden="true" className="absolute size-3.5 cursor-grab text-ink-tertiary opacity-0 group-hover/outline:opacity-100" /> : null}
+    </span>
+  );
   const nameField = (id: string, name: string, onRename: (id: string, name: string) => Promise<void>, className: string) => (
     <OutlineRename
       key={id}
@@ -457,40 +480,46 @@ function SectionOutline({
         return (
           <div key={section.id} className="grid min-w-0 grid-cols-1 gap-0.5">
             {renaming === section.id ? nameField(section.id, section.name, onRenameSection, "px-1.5 py-1") : (
-            <a
-              href={`#bq-section-${section.id}`}
-              title={editable ? "Klik dua kali untuk mengganti nama" : undefined}
-              onDoubleClick={editable && !pending ? (event) => { event.preventDefault(); setRenaming(section.id); } : undefined}
+            <div
               {...dragProps(null, section.id, sectionIds)}
-              className={`group/outline flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink ${dropMark(section.id)}`}
+              className={`group/outline flex items-center gap-1 rounded-control py-1 pl-1 pr-2.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink ${dropMark(section.id)}`}
             >
-              <span className="flex min-w-0 items-center gap-1">
-                {editable ? <GripVertical aria-hidden="true" className="-ml-1.5 size-3.5 shrink-0 cursor-grab text-ink-tertiary opacity-0 group-hover/outline:opacity-100" /> : null}
-                <span className="truncate">{section.name}</span>
-              </span>
-              {/* A small chip, so the Work Item count never reads as a row number next to the table. */}
-              <span className="shrink-0 rounded-pill bg-surface-muted px-1.5 text-[11px] tabular-nums text-ink-tertiary" title={`${count} Work Item`}>{count}</span>
-            </a>
+              {chevron(!closed.has(section.id), section.name, () => setClosed(flip(closed, section.id)))}
+              <a
+                href={`#bq-section-${section.id}`}
+                draggable={false}
+                title={editable ? "Klik dua kali untuk mengganti nama" : undefined}
+                onDoubleClick={editable && !pending ? (event) => { event.preventDefault(); setRenaming(section.id); } : undefined}
+                className="min-w-0 flex-1 truncate py-0.5"
+              >
+                {section.name}
+              </a>
+              {tail(count)}
+            </div>
             )}
-            <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-4" editable={editable} pending={pending} onReorder={onReorder} />
+            {closed.has(section.id) ? null : <>
+            <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-7" editable={editable} pending={pending} onReorder={onReorder} />
             {section.subsections.map((subsection) => (
               <div key={subsection.id} className="grid min-w-0 grid-cols-1 gap-0.5">
-                {renaming === subsection.id ? nameField(subsection.id, subsection.name, onRenameSubsection, "py-1 pl-3 pr-1.5") : (
-                <a
-                  href={`#bq-subsection-${subsection.id}`}
-                  title={editable ? "Klik dua kali untuk mengganti nama" : undefined}
-                  onDoubleClick={editable && !pending ? (event) => { event.preventDefault(); setRenaming(subsection.id); } : undefined}
+                {renaming === subsection.id ? nameField(subsection.id, subsection.name, onRenameSubsection, "py-1 pl-5 pr-1.5") : (
+                <div
                   {...dragProps(section.id, subsection.id, section.subsections.map((row) => row.id))}
-                  className={`group/outline flex items-center justify-between gap-2 rounded-control py-1 pl-4 pr-2.5 text-sm font-medium text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink ${dropMark(subsection.id)}`}
+                  className={`group/outline flex items-center gap-1 rounded-control py-0.5 pl-4 pr-2.5 text-sm font-medium text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink ${dropMark(subsection.id)}`}
                 >
-                  <span className="flex min-w-0 items-center gap-1">
-                    {editable ? <GripVertical aria-hidden="true" className="-ml-1.5 size-3.5 shrink-0 cursor-grab text-ink-tertiary opacity-0 group-hover/outline:opacity-100" /> : null}
-                    <span className="truncate">{subsection.name}</span>
-                  </span>
-                  <span className="shrink-0 rounded-pill bg-surface-muted px-1.5 text-[11px] tabular-nums" title={`${subsection.items.length} Work Item`}>{subsection.items.length}</span>
-                </a>
+                  {chevron(itemsOpen.has(subsection.id), subsection.name, () => setItemsOpen(flip(itemsOpen, subsection.id)), subsection.items.length === 0)}
+                  <a
+                    href={`#bq-subsection-${subsection.id}`}
+                    draggable={false}
+                    title={editable ? "Klik dua kali untuk mengganti nama" : undefined}
+                    onDoubleClick={editable && !pending ? (event) => { event.preventDefault(); setRenaming(subsection.id); } : undefined}
+                    className="min-w-0 flex-1 truncate py-0.5"
+                  >
+                    {subsection.name}
+                  </a>
+                  {tail(subsection.items.length)}
+                </div>
                 )}
-                <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-7" editable={editable} pending={pending} onReorder={onReorder} />
+                {itemsOpen.has(subsection.id) ? <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-11" editable={editable} pending={pending} onReorder={onReorder} /> : null}
               </div>
             ))}
             {editable ? (
@@ -504,6 +533,7 @@ function SectionOutline({
                 />
               </div>
             ) : null}
+            </>}
           </div>
         );
       })}
@@ -1247,6 +1277,8 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
   // A Section split into Subsections takes new Work Items in a Subsection, unless it already holds its own.
   const directEntry = ctx.editable && (section.items.length > 0 || section.subsections.length === 0);
   const subtotal = sectionSubtotal(section);
+  // Folding a Section keeps its heading and subtotal on screen (owner 2026-10-14).
+  const [folded, setFolded] = useState(false);
   const entry = (target: { sectionId?: string; subsectionId?: string }, where: string) => (
     <QuickEntryRow
       units={ctx.units.map((unit) => unit.code)}
@@ -1258,11 +1290,18 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
   );
   return (
     <div className="grid gap-2">
-      <div className="flex items-baseline gap-2.5">
+      <div className="flex items-center gap-2">
+        <IconButton size="sm" variant="ghost" label={folded ? `Buka ${section.name}` : `Lipat ${section.name}`} aria-expanded={!folded} icon={folded ? <ChevronRight aria-hidden="true" /> : <ChevronDown aria-hidden="true" />} onClick={() => setFolded(!folded)} />
         <span className="font-ui-mono text-sm font-semibold text-ink-tertiary">{letter}</span>
         <Heading level={4}>{section.name}</Heading>
+        {folded ? (
+          <span className="ml-auto flex items-baseline gap-3 pr-2 text-sm">
+            <Text size="sm" tone="tertiary">{counter} pekerjaan</Text>
+            <span className="font-semibold tabular-nums">{subtotal === null ? "—" : money(subtotal)}</span>
+          </span>
+        ) : null}
       </div>
-      <DataTable minWidth="900px" density="compact">
+      {folded ? null : <DataTable minWidth="900px" density="compact">
         <TableHeader>
           <TableRow>
             <TableHead className="w-[36px]" aria-label="Buka atau tutup" />
@@ -1305,7 +1344,7 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
             </TableRow>
           </TableBody>
         ) : null}
-      </DataTable>
+      </DataTable>}
     </div>
   );
 }
@@ -1342,8 +1381,9 @@ function ItemRows({ item, number, ctx, columns }: { item: BqItemDetail; number: 
             {/* An L1 with children takes its cost from them (its own coefficient is dormant); a childless L1 has no
                 markup (zeroMarkupIfChildless). So only the one that applies is shown, and only when it is not neutral. */}
             {(() => {
+              // The TBC / By Owner badge already says the row is not counted.
               const note = isMarkerPriceMode(item.priceMode)
-                ? "Baris penanda — tidak masuk total"
+                ? null
                 : hasChildren
                   ? `Dari rincian (${lineItemIds(item).length} baris)${isZeroPrice(item.markupL1Pct) ? "" : ` · markup ${item.markupL1Pct}%`}`
                   : isOne(item.koefisien) ? null : `koef ${item.koefisien}`;

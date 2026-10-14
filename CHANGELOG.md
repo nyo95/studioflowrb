@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.43 | 2026-10-14 | feat(bq): Struktur folds: Sections and Subsections first, Work Items on demand; Sections fold in the table (Lead)
+
+- **Owner 2026-10-14:** "section nya bisa di collapse (ini dikiri hanya section dan subsection kan?)".
+- **Struktur:** each Section has a fold arrow (open by default); a Subsection lists its Work Items only when its arrow is opened (closed by default), so the panel shows Sections and Subsections and the Work Items appear when they are to be re-ordered. The count chip turns into the drag grip while a row is hovered; the whole row drags; double-click on the name still renames.
+- **Table:** a fold arrow on each Section heading; a folded Section keeps its heading, Work Item count and subtotal on screen. The "Baris penanda — tidak masuk total" note under TBC / By Owner rows is dropped (the badge says it).
+- **Checks:** typecheck, eslint, `npx playwright test e2e/bq-boq-walk.spec.ts` 5/5 PASS (grand total equal to the workbook), production build PASS. Folding not walked by hand. No push.
+
 ## R9.42 | 2026-10-14 | feat(bq): Drag Sections and Subsections in Struktur; no arrow buttons (Lead)
 
 - **Owner 2026-10-14:** "section bisa di rearrange jg bs?" and "tombol panah jg hapus aja, kan sudah bisa di grab".
