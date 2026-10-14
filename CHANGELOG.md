@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.33 | 2026-10-14 | fix(platform,studioflow): Prisma schema matches the migrated database (Lead, for the Executor lane)
+
+- **BACKLOG [CLEANUP][P3] closed** (schema drift from the R8.515 review). Taken over by the Lead after Codex's usage limit. The database was already right; only the schema annotations lagged: `_developer_access` (`_locked_until`, `_enrolled_at`), `_developer_recovery_code.used_at` and `_developer_session` (`_created_at`, `_last_seen_at`, `_expires_at`) are `_@db.Timestamptz(3)`; `_sf_holiday` has a `_@db.Uuid` id, `_@db.Timestamptz(6)` timestamps and `_updated_at` defaulting to `_now()` as created by its migration. No migration.
+- **Evidence:** `_prisma migrate diff --from-config-datasource --to-schema prisma/schema` against the freshly migrated `_studioflow_rebuild_test_bq` (all migrations applied) prints "This is an empty migration." (before: the six columns plus four `_sf_holiday` changes). No database was used as a shadow database.
+- **Checks:** Prisma client regenerated; typecheck PASS; full suite with the branch's last commit. No push.
+
 ## R9.32 | 2026-10-14 | fix(studioflow,presentation): Schedule and Presentation image deletes queue their cleanup inside the transaction (Executor, finished by the Lead)
 
 - **BACKLOG [CLEANUP][P3] closed.** Started by Codex (WO-HARDEN-AUDIT-01) and left uncommitted when its usage limit ran out; the Lead reviewed the diff, replaced one test and committed it. Schedule: deleting a template item, an entry, an option, replacing or removing an option photo now calls `_enqueueUnreferencedCleanup` inside the deleting transaction and `_discardObjects` after it (the R8.372 deliverable/MOM pattern), so a crash between commit and removal leaves a ledger entry the sweep retries; a still-referenced object is never queued. Presentation: deleting a slide, a board, or purging an archived project's slides queues each object in `_presentation_asset_cleanup_failure` inside the transaction (Presentation keeps its own copy behind its boundary) before the post-commit removal.

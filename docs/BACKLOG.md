@@ -118,7 +118,6 @@ Order matters; each item is its own Work Order.
   and schema, and later M5 customer build profiles, release tags and installer.
   Signed entitlement was dropped on 2026-10-10.
 
-- [ ] [CLEANUP][P3] Schema drift found in the R8.515 review (`prisma migrate diff` from a fresh 105-migration database to `prisma/schema`): `platform.developer_access`, `developer_recovery_code` and `developer_session` timestamps are `timestamptz` in the migration but plain `DateTime` (timestamp(3)) in the schema, and `studioflow.sf_holiday` differs in id type, timestamp precision and the `updated_at` default. No Presentation or Ideas drift. Align the schema annotations (or a corrective migration) so a future `migrate dev` does not generate a surprise migration.
 
 - [ ] [CLEANUP][P3] Archive retention residual window (R8.516, accepted): the eligibility re-check before the Presentation purge hook and the hook's own delete are separate steps, so a restore landing in the few milliseconds between them can still lose that project's Presentation slides. Closing it fully needs a purge-in-progress marker that restore respects; not justified for one office unless restores during the daily sweep become common.
 
