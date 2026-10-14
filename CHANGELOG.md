@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.60 | 2026-10-14 | review(studioflow): WO-SF-NOTES-CHAT-01 PASS (Lead)
+
+- **Reviewed R9.59 (3e00b30)** against the four R9.58 corrections: `next-env.d.ts` back to its R9.56 content; orphan-tag cleanup scoped to the project; one shared `orderedScheduleOptions` in the schedule domain used by Schedule and notes, item names prefer the final option; integration tests for foreign reply/item, bad and 6th tag, write right on another phase, phase/feedback/starred/item filters, cursor paging, project-local tag cleanup, and `A2`/`A10` final option.
+- **Verdict: PASS**, WO-SF-NOTES-CHAT-01 closed. Next is the Lead's UI slice: the WhatsApp-like project notes stream (albums, replies, `#`/`@` autocomplete, phase chips) and the fixed project frame (DESIGN.md §6.2).
+- **Checks:** diff review; Executor's `npm test` 1119/1119, typecheck, boundaries, legacy-runtime and build reported PASS (not re-run). No push.
+
 ## R9.59 | 2026-10-14 | fix(studioflow): Correct Notes chat review findings (Executor)
 
 - **Safety and scope:** restored the generated Next declaration file to its R9.56 content; future generated changes stay out of revisions. Orphan topic tags are now deleted only within the affected project.

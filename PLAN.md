@@ -4,7 +4,7 @@ Plan ID: WO-SF-NOTES-CHAT-01 (Notes as one project chat: replies, `#` topic tags
 Scope: backend + minimal wiring, one local commit
 Module(s): studioflow only (Notes/Workspace cards and Product Schedule entries, both in the `studioflow` schema). The `workspace-board` module manifest is unchanged.
 Target revision: Executor **R9.57** on `main` (the Lead used R9.56 for this plan)
-Status: CORRECTION REQUIRED — Executor R9.57 (0c2356b) reviewed by the Lead in R9.58; correction pass **R9.59**
+Status: DONE — Executor R9.57 (0c2356b) + correction R9.59 (3e00b30), Lead review PASS R9.60. Next: Lead UI slice (chat stream + fixed project frame)
 Baseline: `main` at the R9.56 plan commit; working tree clean
 
 ## Why
