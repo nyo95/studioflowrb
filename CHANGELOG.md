@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.21 | 2026-10-14 | feat(bq): Select, group, and move Cost Components on the project screen (Executor)
+
+- **Slice 3 UI:** each editable Work Item can select its direct and grouped Cost Components, select all, clear selection, create a Component Group, or move the selection to the Work Item or an existing group. Selecting another Work Item clears the previous selection; locked and archived projects expose no selection controls.
+- **Server-owned preview:** every real group/move asks `previewLineItemMoveAction` first. Neutral changes apply immediately; price-changing moves show the server's before/after unit rate, total, and exact total difference before apply. Same-place choices call nothing, stale lists show the locked refresh message, successful actions consume the returned project tree, keep expansion state, clear selection, and briefly highlight moved rows (or their collapsed target group).
+- **Interaction details:** the new-group form trims and requires its default name, validates quantity above zero and markup from 0–999.9999, keeps empty Component Groups visible, prevents duplicate submits, and uses the UI Engine's checkboxes, selection bar, menu, dialogs, notices, fields, errors, and table presentation.
+- **Tests/contracts:** five focused pure tests cover per-Work-Item selection, all-row selection order, menu targets, same-place no-op detection, and exact action inputs. The preview action adds a server-computed `totalDifference`; no calculation moved into the client. No schema, migration, dependency, permission, or service change.
+- **Verification:** `npm test`, `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, production build with `NEXT_DIST_DIR=.next-verify`, and staged/unstaged whitespace checks. Browser journeys are queued for independent Reviewer acceptance.
+
 ## R9.20 | 2026-10-14 | fix(bq): Restore contract nouns on the project screen (Executor)
 
 - **BQ project language:** the project screen and its Section, Work Item, Assembly, and Cost Component dialogs now use the canonical contract nouns: Section, Subsection, Work Item, Component Group, Cost Component, Assembly, TBC, and By Owner. Existing sentence language and behavior are unchanged.

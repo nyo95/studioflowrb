@@ -30,6 +30,54 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.21] Neutral grouping applies without a price dialog
+- Surface: `/bq/[id]` project editor
+- Fixture: estimator with an ACTIVE BQ project, one Work Item, and at least two direct Cost Components
+- Viewport: desktop (default)
+- Steps: 1. Select two direct Cost Components. 2. Choose **Kelompokkan…**. 3. Keep the default name, quantity 1, and markup 0. 4. Choose **Lanjut**.
+- Acceptance: the group is applied immediately without the price-change dialog; the returned tree shows both rows in the new Component Group, selection clears, moved rows/group highlight briefly, and the notice says the Work Item price did not change.
+- Status: PENDING
+
+### [R9.21] Price-changing move previews, cancels, then applies
+- Surface: `/bq/[id]` project editor
+- Fixture: estimator with an ACTIVE BQ project, one direct Cost Component, and an existing Component Group with quantity 2 and markup 10%
+- Viewport: desktop (default)
+- Steps: 1. Select the direct row and choose the quantity-2/markup-10 Component Group from **Pindahkan ke**. 2. Inspect the preview and choose **Batal**. 3. Verify the row stayed direct. 4. Repeat and choose **Pindahkan**.
+- Acceptance: the dialog names one row and its Component Group, shows server values for unit rate and total before/after plus total difference; cancel says nothing changed and writes nothing; apply moves once, updates the returned tree, clears selection, and highlights the destination.
+- Status: PENDING
+
+### [R9.21] Move a grouped Cost Component back to the Work Item
+- Surface: `/bq/[id]` project editor
+- Fixture: the applied state from the price-changing move journey
+- Viewport: desktop (default)
+- Steps: 1. Open the Component Group. 2. Select the moved row. 3. Choose **Pindahkan ke → Langsung di Work Item**. 4. Confirm if the server reports a price change.
+- Acceptance: the row moves back under the same Work Item, the empty Component Group remains and says **Component Group kosong**, selection clears, and no row moves to another Work Item.
+- Status: PENDING
+
+### [R9.21] Locked project hides selection controls
+- Surface: `/bq/[id]` project editor
+- Fixture: estimator with the same BQ project in LOCKED state (repeat for ARCHIVED when available)
+- Viewport: desktop (default)
+- Steps: 1. Open the project. 2. Inspect direct and grouped Cost Components and their Work Item row.
+- Acceptance: no Cost Component checkbox, select-all checkbox, or selection bar is rendered; the project remains read-only.
+- Status: PENDING
+
+### [R9.21] Stale selection refreshes safely
+- Surface: `/bq/[id]` project editor in two authenticated tabs
+- Fixture: estimator with an ACTIVE BQ project and selectable Cost Components
+- Viewport: desktop (default)
+- Steps: 1. Select a row in the first tab. 2. In the second tab, move or delete that row. 3. In the first tab, request a group or move.
+- Acceptance: nothing is applied from the stale request; the first tab says **Daftar berubah. Muat ulang untuk melihat yang terbaru.** and refreshes the project tree.
+- Status: PENDING
+
+### [R9.21] BQ project screen uses the contract nouns
+- Surface: `/bq/[id]` project editor and its add/save/apply dialogs
+- Fixture: readable BQ project with a Section, Subsection, Work Item, Component Group, Cost Component, Assembly, and rows marked TBC and BY_OWNER
+- Viewport: desktop (default)
+- Steps: 1. Read the project tree and price status controls. 2. Open the Section, Work Item, Assembly picker, and save-as-Assembly dialogs. 3. Open the Slice 3 selection/group/move controls.
+- Acceptance: the screen consistently reads **Section / Subsection / Work Item / Component Group / Cost Component / Assembly / TBC / By Owner**; none of the replaced Indonesian nouns reappear.
+- Status: PENDING
+
 ### [R8.544] Existing Ideas/Workspace image flows, destinations and recovery
 - Surface: Workspace image actions, Ideas image board, shared Use in schedule and Add to moodboard dialogs, Ideas details dialog
 - Fixture: private Ideas owner and another user; editable/read-only/completed project; Ideas/Presentation independently enabled and disabled; disposable rebuild fixture for writes

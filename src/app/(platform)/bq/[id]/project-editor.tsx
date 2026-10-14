@@ -3,21 +3,28 @@
 import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
   Badge,
   Button,
+  ButtonMenu,
   buttonClasses,
+  Checkbox,
   ConfirmDialog,
   DataTable,
+  Dialog,
   EmptyState,
+  Field,
+  FormActions,
   Heading,
   IconButton,
   InlineEdit,
   InlineError,
   Input,
+  Notice,
   SectionCard,
+  SelectionBar,
   Select,
   TableBody,
   TableCell,
@@ -63,6 +70,9 @@ import {
   updateSectionAction,
   updateSubsectionAction,
   reorderItemsAction,
+  previewLineItemMoveAction,
+  moveLineItemsAction,
+  groupLineItemsAction,
   revertLineItemPriceAction,
   saveItemAsAssemblyAction,
   unlockProjectAction,
@@ -74,6 +84,17 @@ import { NewWorkItemDialog } from "./new-work-item-dialog";
 import { SaveAsAssemblyDialog } from "./save-as-assembly-dialog";
 import { ImportDialog } from "./source-picker-dialog";
 import { QuotationDialog } from "./quotation-dialog";
+import {
+  buildLineItemMoveFields,
+  lineItemIds,
+  lineItemTargetOptions,
+  selectAllLineItems,
+  selectionAlreadyAtTarget,
+  selectionForItem,
+  toggleLineItemSelection,
+  type ExistingLineItemTarget,
+  type LineItemSelection,
+} from "@/apps/bq/lib/line-item-move-ui";
 
 const KATEGORI_LABEL: Record<string, string> = {
   MATERIAL: "Material",
@@ -88,6 +109,36 @@ const KATEGORI_LABEL: Record<string, string> = {
 type NewItemTarget = { sectionId?: string; subsectionId?: string; where: string };
 
 type Mutation = (prev: null, formData: FormData) => Promise<ActionResult<BqProjectDetail>>;
+type MovePreview = {
+  changes: boolean;
+  beforeRate: string;
+  afterRate: string;
+  beforeTotal: string;
+  afterTotal: string;
+  totalDifference: string;
+};
+type MoveRequest = {
+  itemId: string;
+  lineItemIds: readonly string[];
+  targetLabel: string;
+  target: ExistingLineItemTarget | { newGroup: { qtyPerL1: string; markupL2Pct: string } };
+  group?: { name: string; qtyPerL1: string; markupL2Pct: string };
+  preview: MovePreview;
+};
+
+function projectItem(project: BqProjectDetail, itemId: string): BqItemDetail | undefined {
+  for (const section of project.sections) {
+    const found = [...section.items, ...section.subsections.flatMap((subsection) => subsection.items)].find((item) => item.id === itemId);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+function actionData(fields: Record<string, string>): FormData {
+  const data = new FormData();
+  Object.entries(fields).forEach(([key, value]) => data.set(key, value));
+  return data;
+}
 
 /** Amounts arrive as canonical decimal strings; presentation never re-derives them. */
 function money(amount: string | null, currency = "IDR") {
@@ -380,9 +431,34 @@ export function ProjectEditor({
   const [zeroPriceRows, setZeroPriceRows] = useState<number | null>(null);
   const [lifecycleConfirm, setLifecycleConfirm] = useState<"archive" | "restore" | "delete" | null>(null);
   const [quotationOpen, setQuotationOpen] = useState(false);
+  const [selection, setSelection] = useState<LineItemSelection>(null);
+  const [groupItemId, setGroupItemId] = useState<string | null>(null);
+  const [moveConfirmation, setMoveConfirmation] = useState<MoveRequest | null>(null);
+  const [moveNotice, setMoveNotice] = useState<{ message: string; tone: "neutral" | "success" } | null>(null);
+  const [highlightedLineIds, setHighlightedLineIds] = useState<ReadonlySet<string>>(new Set());
+  const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const highlightTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const moveBusy = useRef(false);
 
   const locked = project.status === "LOCKED" || project.status === "ARCHIVED";
   const editable = canManage && !locked;
+
+  useEffect(() => () => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+  }, []);
+
+  const showMoveNotice = (message: string, tone: "neutral" | "success" = "neutral") => {
+    if (noticeTimer.current) clearTimeout(noticeTimer.current);
+    setMoveNotice({ message, tone });
+    noticeTimer.current = setTimeout(() => setMoveNotice(null), 3200);
+  };
+
+  const highlightMovedLines = (ids: readonly string[]) => {
+    if (highlightTimer.current) clearTimeout(highlightTimer.current);
+    setHighlightedLineIds(new Set(ids));
+    highlightTimer.current = setTimeout(() => setHighlightedLineIds(new Set()), 1800);
+  };
 
   const toggle = (id: string) =>
     setExpanded((current) => {
@@ -410,9 +486,87 @@ export function ProjectEditor({
         }
         setError(null);
         setProject(result.data);
+        setSelection(null);
         resolve();
       });
     });
+
+  const transition = <T,>(work: () => Promise<T>) => new Promise<T>((resolve, reject) => {
+    startTransition(async () => {
+      try { resolve(await work()); }
+      catch (caught) { reject(caught); }
+    });
+  });
+
+  const runMoveTransition = (work: () => Promise<unknown>) => {
+    if (moveBusy.current) return;
+    moveBusy.current = true;
+    void transition(work).catch(() => undefined).finally(() => { moveBusy.current = false; });
+  };
+
+  const invokeMoveAction = async <T,>(
+    action: (prev: null, formData: FormData) => Promise<ActionResult<T>>,
+    fields: Record<string, string>,
+  ): Promise<T> => {
+    const result = await action(null, actionData(fields));
+    if (result.ok === false) {
+      const stale = result.error.code === "bq.line-item.move-stale";
+      const message = stale ? "Daftar berubah. Muat ulang untuk melihat yang terbaru." : result.error.safeMessage;
+      setError(message);
+      if (stale) router.refresh();
+      throw Object.assign(new Error(message), { code: result.error.code });
+    }
+    setError(null);
+    return result.data;
+  };
+
+  const applyLineItemMove = async (request: MoveRequest) => {
+    const fields = buildLineItemMoveFields({
+      projectId: project.id,
+      itemId: request.itemId,
+      lineItemIds: request.lineItemIds,
+      ...(request.group ? { group: request.group } : { target: request.target as ExistingLineItemTarget }),
+    });
+    const nextProject = request.group
+      ? await invokeMoveAction(groupLineItemsAction, fields)
+      : await invokeMoveAction(moveLineItemsAction, fields);
+    setProject(nextProject);
+    setSelection(null);
+    setGroupItemId(null);
+    setMoveConfirmation(null);
+    highlightMovedLines(request.lineItemIds);
+    showMoveNotice(
+      request.preview.changes ? "Selesai. Cost Component dipindahkan." : "Selesai. Harga Work Item tidak berubah.",
+      "success",
+    );
+  };
+
+  const requestLineItemMove = async (
+    item: BqItemDetail,
+    targetLabel: string,
+    target: ExistingLineItemTarget | { newGroup: { qtyPerL1: string; markupL2Pct: string } },
+    group?: { name: string; qtyPerL1: string; markupL2Pct: string },
+  ) => {
+    const selectedIds = selectionForItem(selection, item.id);
+    if (selectedIds.length === 0) return;
+    if (!("newGroup" in target) && selectionAlreadyAtTarget(item, selectedIds, target)) {
+      showMoveNotice("Sudah di sana.");
+      return;
+    }
+    const preview = await invokeMoveAction(previewLineItemMoveAction, buildLineItemMoveFields({
+      projectId: project.id,
+      itemId: item.id,
+      lineItemIds: selectedIds,
+      target,
+    }));
+    const request: MoveRequest = { itemId: item.id, lineItemIds: [...selectedIds], targetLabel, target, group, preview };
+    setGroupItemId(null);
+    if (!preview.changes) {
+      await applyLineItemMove(request);
+      return;
+    }
+    setMoveConfirmation(request);
+  };
 
   /* InlineEdit restores the previous value when a commit rejects, so field
      validation surfaces in the cell rather than as a silent no-op. */
@@ -443,6 +597,7 @@ export function ProjectEditor({
   return (
     <div className="grid gap-4">
       {error ? <InlineError>{error}</InlineError> : null}
+      {moveNotice ? <Notice tone={moveNotice.tone}>{moveNotice.message}</Notice> : null}
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3">
         <Text tone="secondary" size="sm">
@@ -527,6 +682,14 @@ export function ProjectEditor({
             onImport={setImportTarget}
             onApplyAssembly={setAssemblyItemId}
             onSaveAssembly={setSaveAssemblyItem}
+            selection={selection}
+            highlightedLineIds={highlightedLineIds}
+            onSelectLine={(itemId, lineItemId, checked) => setSelection((current) => toggleLineItemSelection(current, itemId, lineItemId, checked))}
+            onSelectAll={(item, checked) => setSelection(selectAllLineItems(item, checked))}
+            onGroup={(itemId) => { setError(null); setGroupItemId(itemId); }}
+            onMove={(item, label, target) => {
+              runMoveTransition(() => requestLineItemMove(item, label, target));
+            }}
             columns={totalColumns}
           />
           {editable ? (
@@ -570,6 +733,14 @@ export function ProjectEditor({
                 onImport={setImportTarget}
                 onApplyAssembly={setAssemblyItemId}
                 onSaveAssembly={setSaveAssemblyItem}
+                selection={selection}
+                highlightedLineIds={highlightedLineIds}
+                onSelectLine={(itemId, lineItemId, checked) => setSelection((current) => toggleLineItemSelection(current, itemId, lineItemId, checked))}
+                onSelectAll={(item, checked) => setSelection(selectAllLineItems(item, checked))}
+                onGroup={(itemId) => { setError(null); setGroupItemId(itemId); }}
+                onMove={(item, label, target) => {
+                  runMoveTransition(() => requestLineItemMove(item, label, target));
+                }}
                 columns={totalColumns}
               />
               {editable ? (
@@ -748,6 +919,41 @@ export function ProjectEditor({
           }}
         />
       ) : null}
+
+      {groupItemId && projectItem(project, groupItemId) ? (
+        <GroupLineItemsDialog
+          key={groupItemId}
+          pending={pending}
+          error={error}
+          onClose={() => setGroupItemId(null)}
+          onContinue={(group) => {
+            const item = projectItem(project, groupItemId);
+            if (!item) return;
+            runMoveTransition(() => requestLineItemMove(
+              item,
+              `Component Group ${group.name}`,
+              { newGroup: { qtyPerL1: group.qtyPerL1, markupL2Pct: group.markupL2Pct } },
+              group,
+            ));
+          }}
+        />
+      ) : null}
+
+      {moveConfirmation ? (
+        <MovePriceDialog
+          request={moveConfirmation}
+          pending={pending}
+          error={error}
+          onCancel={() => {
+            setError(null);
+            setMoveConfirmation(null);
+            showMoveNotice("Dibatalkan. Tidak ada yang berubah.");
+          }}
+          onApply={() => {
+            runMoveTransition(() => applyLineItemMove(moveConfirmation));
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -765,6 +971,12 @@ function ItemTable({
   onImport,
   onApplyAssembly,
   onSaveAssembly,
+  selection,
+  highlightedLineIds,
+  onSelectLine,
+  onSelectAll,
+  onGroup,
+  onMove,
   columns,
 }: {
   items: readonly BqItemDetail[];
@@ -779,6 +991,12 @@ function ItemTable({
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
   onSaveAssembly?: (item: BqItemDetail) => void;
+  selection: LineItemSelection;
+  highlightedLineIds: ReadonlySet<string>;
+  onSelectLine: (itemId: string, lineItemId: string, checked: boolean) => void;
+  onSelectAll: (item: BqItemDetail, checked: boolean) => void;
+  onGroup: (itemId: string) => void;
+  onMove: (item: BqItemDetail, label: string, target: ExistingLineItemTarget) => void;
   columns: number;
 }) {
   if (items.length === 0) {
@@ -789,7 +1007,7 @@ function ItemTable({
     <DataTable minWidth="960px" density="compact">
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[36px]" aria-label="Buka atau tutup" />
+          <TableHead className="w-[72px]" aria-label="Pilih, buka, atau tutup" />
           <TableHead>Uraian</TableHead>
           <TableHead align="end" className="w-[90px]">Jumlah</TableHead>
           <TableHead className="w-[80px]">Satuan</TableHead>
@@ -821,6 +1039,12 @@ function ItemTable({
               onImport={onImport}
               onApplyAssembly={onApplyAssembly}
               onSaveAssembly={onSaveAssembly}
+              selectedLineIds={selectionForItem(selection, item.id)}
+              highlightedLineIds={highlightedLineIds}
+              onSelectLine={onSelectLine}
+              onSelectAll={onSelectAll}
+              onGroup={onGroup}
+              onMove={onMove}
               columns={columns + (editable ? 1 : 0)}
             />
           );
@@ -845,6 +1069,12 @@ function ItemRows({
   onImport,
   onApplyAssembly,
   onSaveAssembly,
+  selectedLineIds,
+  highlightedLineIds,
+  onSelectLine,
+  onSelectAll,
+  onGroup,
+  onMove,
   columns,
 }: {
   item: BqItemDetail;
@@ -861,19 +1091,50 @@ function ItemRows({
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
   onSaveAssembly?: (item: BqItemDetail) => void;
+  selectedLineIds: readonly string[];
+  highlightedLineIds: ReadonlySet<string>;
+  onSelectLine: (itemId: string, lineItemId: string, checked: boolean) => void;
+  onSelectAll: (item: BqItemDetail, checked: boolean) => void;
+  onGroup: (itemId: string) => void;
+  onMove: (item: BqItemDetail, label: string, target: ExistingLineItemTarget) => void;
   columns: number;
 }) {
+  const allLineIds = lineItemIds(item);
+  const selected = new Set(selectedLineIds);
+  const allSelected = allLineIds.length > 0 && allLineIds.every((id) => selected.has(id));
+  const moveMenuItems: Array<{ label: string; description?: string; disabled?: boolean; onSelect: () => void }> = [];
+  lineItemTargetOptions(item).forEach((option) => {
+    if (option.key === "new") moveMenuItems.push({ label: "────────────", disabled: true, onSelect: () => undefined });
+    moveMenuItems.push({
+      label: option.label,
+      description: option.description,
+      disabled: pending,
+      onSelect: () => "newGroup" in option.target
+        ? onGroup(item.id)
+        : onMove(item, "direct" in option.target ? option.label : `Component Group ${option.label}`, option.target),
+    });
+  });
   return (
     <>
       <TableRow id={`bq-row-${item.id}`}>
         <TableCell>
-          <IconButton
-            size="sm"
-            variant="ghost"
-            label={open ? `Tutup ${item.name}` : `Buka ${item.name}`}
-            icon={open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
-            onClick={() => toggle(item.id)}
-          />
+          <div className="flex items-center gap-1">
+            <IconButton
+              size="sm"
+              variant="ghost"
+              label={open ? `Tutup ${item.name}` : `Buka ${item.name}`}
+              icon={open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
+              onClick={() => toggle(item.id)}
+            />
+            {editable && allLineIds.length > 0 ? (
+              <Checkbox
+                label={<span className="sr-only">Pilih semua Cost Component dari {item.name}</span>}
+                checked={allSelected ? true : selectedLineIds.length > 0 ? "indeterminate" : false}
+                disabled={pending}
+                onCheckedChange={(checked) => onSelectAll(item, checked === true)}
+              />
+            ) : null}
+          </div>
         </TableCell>
         <TableCell wrap className="font-medium">
           <InlineEdit label="Nama Work Item" value={item.name} disabled={!editable} onCommit={commit(updateItemAction, item.id, "name")} />
@@ -947,6 +1208,18 @@ function ItemRows({
         ) : null}
       </TableRow>
 
+      {editable && selectedLineIds.length > 0 ? (
+        <TableRow>
+          <TableCell colSpan={columns}>
+            <SelectionBar count={selectedLineIds.length} label={(count) => `${count} dipilih`}>
+              <Button size="sm" variant="secondary" pending={pending} disabled={pending} onClick={() => onGroup(item.id)}>Kelompokkan…</Button>
+              <ButtonMenu label={pending ? "Memproses…" : "Pindahkan ke"} variant="secondary" align="start" items={moveMenuItems} />
+              <Button size="sm" variant="ghost" disabled={pending} onClick={() => onSelectAll(item, false)}>Batal pilih</Button>
+            </SelectionBar>
+          </TableCell>
+        </TableRow>
+      ) : null}
+
       {open ? (
         <>
           {item.subObjects.map((subObject) => (
@@ -961,6 +1234,10 @@ function ItemRows({
               commit={commit}
               commitNum={commitNum}
               onImport={onImport}
+              itemId={item.id}
+              selectedLineIds={selected}
+              highlightedLineIds={highlightedLineIds}
+              onSelectLine={onSelectLine}
               columns={columns}
             />
           ))}
@@ -975,6 +1252,10 @@ function ItemRows({
               run={run}
               commit={commit}
               commitNum={commitNum}
+              itemId={item.id}
+              selected={selected.has(line.id)}
+              highlighted={highlightedLineIds.has(line.id)}
+              onSelect={onSelectLine}
             />
           ))}
 
@@ -1058,6 +1339,10 @@ function SubObjectRows({
   commit,
   commitNum,
   onImport,
+  itemId,
+  selectedLineIds,
+  highlightedLineIds,
+  onSelectLine,
   columns,
 }: {
   subObject: BqSubObjectDetail;
@@ -1069,12 +1354,17 @@ function SubObjectRows({
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
+  itemId: string;
+  selectedLineIds: ReadonlySet<string>;
+  highlightedLineIds: ReadonlySet<string>;
+  onSelectLine: (itemId: string, lineItemId: string, checked: boolean) => void;
   columns: number;
 }) {
   const open = expanded.has(subObject.id);
+  const highlighted = subObject.lineItems.some((line) => highlightedLineIds.has(line.id));
   return (
     <>
-      <TableRow className="bg-[color-mix(in_srgb,var(--ui-surface-muted)_45%,transparent)]">
+      <TableRow selected={highlighted} className={highlighted ? undefined : "bg-[color-mix(in_srgb,var(--ui-surface-muted)_45%,transparent)]"}>
         <TableCell />
         <TableCell wrap>
           <div className="flex items-center gap-1 pl-4">
@@ -1090,7 +1380,9 @@ function SubObjectRows({
               {/* A Component Group is not a plain folder: its multiplier and extra % change the Work Item's price, so both
                   stay in view here, never behind a menu. */}
               <Text tone="tertiary" size="sm" className="block">
-                Component Group · jumlah per Work Item dan markup ikut menghitung harga
+                {subObject.lineItems.length === 0
+                  ? "Component Group kosong"
+                  : "Component Group · jumlah per Work Item dan markup ikut menghitung harga"}
               </Text>
             </div>
           </div>
@@ -1125,7 +1417,20 @@ function SubObjectRows({
       {open ? (
         <>
           {subObject.lineItems.map((line) => (
-            <LineItemRow key={line.id} line={line} depth={2} editable={editable} pending={pending} run={run} commit={commit} commitNum={commitNum} />
+            <LineItemRow
+              key={line.id}
+              line={line}
+              depth={2}
+              editable={editable}
+              pending={pending}
+              run={run}
+              commit={commit}
+              commitNum={commitNum}
+              itemId={itemId}
+              selected={selectedLineIds.has(line.id)}
+              highlighted={highlightedLineIds.has(line.id)}
+              onSelect={onSelectLine}
+            />
           ))}
           {editable ? (
             <TableRow>
@@ -1159,6 +1464,10 @@ function LineItemRow({
   run,
   commit,
   commitNum,
+  itemId,
+  selected,
+  highlighted,
+  onSelect,
 }: {
   line: BqLineItemDetail;
   depth: 1 | 2;
@@ -1167,10 +1476,23 @@ function LineItemRow({
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
+  itemId: string;
+  selected: boolean;
+  highlighted: boolean;
+  onSelect: (itemId: string, lineItemId: string, checked: boolean) => void;
 }) {
   return (
-    <TableRow id={`bq-row-${line.id}`}>
-      <TableCell />
+    <TableRow id={`bq-row-${line.id}`} selected={selected || highlighted}>
+      <TableCell>
+        {editable ? (
+          <Checkbox
+            label={<span className="sr-only">Pilih Cost Component {line.titleSnapshot}</span>}
+            checked={selected}
+            disabled={pending}
+            onCheckedChange={(checked) => onSelect(itemId, line.id, checked === true)}
+          />
+        ) : null}
+      </TableCell>
       <TableCell wrap>
         <div className={depth === 2 ? "pl-10" : "pl-4"}>
           <InlineEdit label="Nama Cost Component" value={line.titleSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "titleSnapshot")} />
@@ -1250,6 +1572,139 @@ function LineItemRow({
         </TableCell>
       ) : null}
     </TableRow>
+  );
+}
+
+function GroupLineItemsDialog({
+  pending,
+  error,
+  onClose,
+  onContinue,
+}: {
+  pending: boolean;
+  error: string | null;
+  onClose: () => void;
+  onContinue: (group: { name: string; qtyPerL1: string; markupL2Pct: string }) => void;
+}) {
+  const [name, setName] = useState("Component Group baru");
+  const [qtyPerL1, setQtyPerL1] = useState("1");
+  const [markupL2Pct, setMarkupL2Pct] = useState("0");
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+
+  const submit = () => {
+    const trimmedName = name.trim();
+    if (!trimmedName) { setValidationMessage("Nama Component Group wajib diisi."); return; }
+    try {
+      const normalizedQty = toDecimalString(qtyPerL1.trim());
+      if (compareDecimals(normalizedQty, toDecimalString("0")) <= 0) {
+        setValidationMessage("Quantity per Work Item harus lebih dari 0.");
+        return;
+      }
+      const normalizedMarkup = toDecimalString(markupL2Pct.trim());
+      if (compareDecimals(normalizedMarkup, toDecimalString("0")) < 0 || compareDecimals(normalizedMarkup, toDecimalString("999.9999")) > 0) {
+        setValidationMessage("Markup harus antara 0% dan 999.9999%.");
+        return;
+      }
+      setValidationMessage(null);
+      onContinue({ name: trimmedName, qtyPerL1: normalizedQty, markupL2Pct: normalizedMarkup });
+    } catch {
+      setValidationMessage("Quantity dan markup harus berupa angka desimal yang valid.");
+    }
+  };
+
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => { if (!open) onClose(); }}
+      title="Kelompokkan Cost Component"
+      description="Buat Component Group baru untuk Cost Component yang dipilih."
+      size="sm"
+      dismissible={!pending}
+    >
+      <form
+        className="grid gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!pending) submit();
+        }}
+      >
+        {validationMessage ? <InlineError>{validationMessage}</InlineError> : error ? <InlineError>{error}</InlineError> : null}
+        <Field label="Nama Component Group" required>
+          <Input autoFocus value={name} maxLength={160} required onChange={(event) => setName(event.target.value)} />
+        </Field>
+        <Field label="Quantity per Work Item" required>
+          <Input inputMode="decimal" value={qtyPerL1} required onChange={(event) => setQtyPerL1(event.target.value)} />
+        </Field>
+        <Field label="Markup %" required>
+          <Input inputMode="decimal" value={markupL2Pct} required onChange={(event) => setMarkupL2Pct(event.target.value)} />
+        </Field>
+        <Notice>Dengan ×1 dan 0%, harga Work Item tidak berubah.</Notice>
+        <FormActions>
+          <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>Batal</Button>
+          <Button type="submit" variant="primary" pending={pending} disabled={pending}>Lanjut</Button>
+        </FormActions>
+      </form>
+    </Dialog>
+  );
+}
+
+function MovePriceDialog({
+  request,
+  pending,
+  error,
+  onCancel,
+  onApply,
+}: {
+  request: MoveRequest;
+  pending: boolean;
+  error: string | null;
+  onCancel: () => void;
+  onApply: () => void;
+}) {
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => { if (!open) onCancel(); }}
+      title="Harga Work Item akan berubah"
+      description={request.targetLabel === "Langsung di Work Item"
+        ? `${request.lineItemIds.length} Cost Component akan dipindahkan langsung di Work Item.`
+        : `${request.lineItemIds.length} Cost Component akan dipindahkan ke ${request.targetLabel}.`}
+      size="md"
+      dismissible={!pending}
+    >
+      <div className="grid gap-4">
+        {error ? <InlineError>{error}</InlineError> : null}
+        <DataTable density="compact">
+          <TableHeader>
+            <TableRow>
+              <TableHead />
+              <TableHead align="end">Sebelum</TableHead>
+              <TableHead align="end">Sesudah</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <TableRow>
+              <TableCell>Harga satuan Work Item</TableCell>
+              <TableCell align="end">{money(request.preview.beforeRate)}</TableCell>
+              <TableCell align="end">{money(request.preview.afterRate)}</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>Total Work Item</TableCell>
+              <TableCell align="end">{money(request.preview.beforeTotal)}</TableCell>
+              <TableCell align="end">{money(request.preview.afterTotal)}</TableCell>
+            </TableRow>
+          </TableBody>
+        </DataTable>
+        <div className="flex items-baseline justify-between gap-3">
+          <Text tone="secondary" size="sm">Selisih total</Text>
+          <Text weight="semibold">{money(request.preview.totalDifference)}</Text>
+        </div>
+        <FormActions>
+          <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>Batal</Button>
+          <Button type="button" variant="primary" pending={pending} disabled={pending} onClick={onApply}>Pindahkan</Button>
+        </FormActions>
+      </div>
+    </Dialog>
   );
 }
 

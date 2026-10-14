@@ -7,7 +7,7 @@ import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
 import { AppError } from "@platform/core/errors";
-import { isDecimalString } from "@platform/utilities/decimal";
+import { addDecimals, isDecimalString, toDecimalString } from "@platform/utilities/decimal";
 import { bqPublicRead, bqService, masterDataRead } from "@/apps/bq/runtime";
 import { BQ_PRICE_MODES, QUOTATION_TERMS_MAX, type BqProjectDetail } from "@/apps/bq/public";
 import {
@@ -161,7 +161,14 @@ function parseMoveJson(value: FormDataEntryValue | null): unknown {
   catch { throw new AppError("VALIDATION", "bq.line-item.move-invalid", "Invalid move request"); }
 }
 
-type LineItemMovePreview = { changes: boolean; beforeRate: string; afterRate: string; beforeTotal: string; afterTotal: string };
+type LineItemMovePreview = {
+  changes: boolean;
+  beforeRate: string;
+  afterRate: string;
+  beforeTotal: string;
+  afterTotal: string;
+  totalDifference: string;
+};
 
 export async function previewLineItemMoveAction(
   _prev: ActionResult<LineItemMovePreview> | null,
@@ -173,7 +180,15 @@ export async function previewLineItemMoveAction(
     if (!parsed.success) throw validationError(parsed.error);
     const { itemId, lineItemIds, target } = parsed.data;
     const preview = await bqService.previewLineItemMove({ grants, itemId, lineItemIds, target });
-    return { changes: preview.changes, beforeRate: preview.before.rate, afterRate: preview.after.rate, beforeTotal: preview.before.total, afterTotal: preview.after.total };
+    const totalDifference = addDecimals(preview.after.total, toDecimalString(`-${preview.before.total}`));
+    return {
+      changes: preview.changes,
+      beforeRate: preview.before.rate,
+      afterRate: preview.after.rate,
+      beforeTotal: preview.before.total,
+      afterTotal: preview.after.total,
+      totalDifference,
+    };
   });
 }
 
