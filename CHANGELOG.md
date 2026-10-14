@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.63 | 2026-10-15 | docs(backlog): Workspace double-click note thread for Codex (Lead)
+
+- **Owner 2026-10-15:** "tulis aja di KB, nanti oper ke codex" — the last part of the notes chat mockup goes to `docs/BACKLOG.md` as [PLANNED][P1] (StudioFlow), with the storage and deletion questions the Lead settles in its Work Order.
+- **Checks:** docs only. Pushed with R9.54–R9.62 on the owner's "push semua commit ke gh".
+
 ## R9.62 | 2026-10-15 | feat(studioflow): One-row phase strip and the phase's requirements and files beside the notes (Lead)
 
 - **Owner 2026-10-15:** "grid project nya jg belum ada di kanan?" then "ya" to building the right panel together with the one-row phase strip (mockup https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF).

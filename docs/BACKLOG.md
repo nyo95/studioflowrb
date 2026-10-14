@@ -187,6 +187,24 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
 
 ## StudioFlow
 
+- [ ] [PLANNED][P1] Workspace board: a note thread where you double-click
+  (owner, 2026-10-15: "tulis aja di KB, nanti oper ke codex"). Mockup artboard
+  *Workspace — klik dua kali untuk catatan* in
+  https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF. With the Workspace board
+  module on, double-clicking anywhere on the board (empty space or an element)
+  opens a small chat window at that spot, the same chat as Notes (R9.61):
+  bubbles, albums, replies, the auto phase tag, `#` topics, `@` Schedule codes.
+  The spot keeps a speech-bubble marker with its message count (amber when it
+  holds client feedback); clicking it reopens the thread. "All notes · N" in the
+  board toolbar lists every thread as one stream. Builds on WO-SF-NOTES-CHAT-01
+  (replies, tags, item links already exist). **Lead to settle in the Work Order
+  before Codex:** how a thread is stored (a pin element with a canvas point,
+  optionally anchored to an element so it moves with it, whose messages are
+  notes replying to it, vs. a new kind), what happens to its messages when the
+  anchor element is deleted, and whether board threads show in Notes mode if an
+  office later switches the module off (MODULES-DECISION: switching never loses
+  data). Backend by Codex, the board UI by the Lead.
+
 - [ ] [PLANNED][P2] Ideas board (owner, 2026-10-08): a personal page where a
   user drops any image (Ctrl+V screenshot, a dropped download, picked files)
   and it becomes a card at once; title, source link and note are optional and
