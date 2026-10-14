@@ -215,6 +215,10 @@ hover: background: color-mix(in srgb, var(--ui-surface-muted) 50%, transparent)
 
 ### 3.4 Inline editing
 
+> **Superseded for numbers (owner 2026-10-14, bq-contract "Editing vs penyisipan").** Numbers and the unit / price
+> status are edited in the side panel of the clicked row; only names stay inline. The rest of this section describes
+> the earlier all-inline table and is kept as history.
+
 Semua angka di L3 (qty, koef, harga) dan L1 (qty, markup) bisa diedit inline:
 
 ```

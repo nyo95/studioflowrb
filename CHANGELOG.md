@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.37 | 2026-10-14 | feat(bq): The table is for reading and selecting; values change in a side panel; rename from Struktur (Lead)
+
+- **Owner 2026-10-14:** option **B** for the B` project screen ("di area ini viewer + selector aja"), names may stay in the table ("kecuali bagian keterangan oke lah di sebelah sini"), and "renamenya dari sini aja?" for the Struktur panel (Lead default: both places). This changes the owner lock of 2026-09-03 (every value inline); bq-contract "Editing vs penyisipan" now records option B, and bq-ux-spec §3.4 is marked superseded for numbers.
+- **Table:** quantity, unit, coefficient, markup and prices show as plain text (missing and Rp0 prices still stand out); the unit dropdowns, the per-Work-Item "Status harga" select and the per-line revert link leave the table. The Work Item, Component Group and Cost Component names stay editable in place; checkboxes (Slice 3), expand, add buttons and delete stay. Clicking a row (not one of those controls) marks it and opens its panel.
+- **Side panel (`_RowInspector`):** docked on the right from 1024 px (320/340 px, sticky), above the table on narrower screens. Work Item: quantity, unit, price status, then markup (with a breakdown) or unit price + coefficient (direct price), and the computed unit price and total; Component Group: quantity per Work Item, markup, subtotal before and after markup; Cost Component: category and source, quantity, unit (with the purchase-to-base factor as a hint), coefficient, unit price with "Harga diubah" and the revert to the copied price, and the cost. Fields reuse `_InlineEdit` in a boxed form and save on Enter or when left (`_commitOnBlur`); a refused value springs back. Locked or archived projects show the same panel read-only. The table's minimum width drops to 820 px so it does not scroll sideways next to the panel.
+- **Struktur:** double-click a Section or Subsection name to rename it in place (Enter or leaving saves, Escape keeps the old name); a single click still jumps to it.
+- **Docs:** bq-contract also records the 2026-09-23 rule (R8.119) that a Work Item with a direct price has no markup, which the formulas section did not say.
+- **Checks:** typecheck and eslint PASS; in the browser at 1708 px: clicking Infinity opens its panel beside the table (row marked, values right, no sideways scroll), double-clicking Flooring in Struktur opens the rename box and Escape cancels it. Not walked: saving a changed value or a new name (same commit functions as before). No push.
+
 ## R9.36 | 2026-10-14 | fix(bq,ui-engine): B` uses the whole window; Struktur counts read as counts (Lead)
 
 - **Owner 2026-10-14** (screenshot of the B` project screen, "ui nya error - coba buat lebih wide aja ... app bq maksudnya"): the numbers 4 / 3 / 1 at the left edge of the work table were the Struktur panel's Work Item counts, right-aligned in a 232 px panel so they sat against the table and read as stray row numbers.

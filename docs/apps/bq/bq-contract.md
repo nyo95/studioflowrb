@@ -164,6 +164,12 @@ rate    = L1.harga_snapshot × L1.koefisien × (1 + L1.markup_l1_pct / 100)
 total   = rate × L1.qty
 ```
 
+**Markup pada L1-only (owner, 2026-09-23, R8.119).** Work Item tanpa rincian
+tidak punya markup sendiri: layar menampilkan "—" dan tidak menawarkannya, dan
+`markup_l1_pct` otomatis kembali ke `0` saat rincian terakhir sebuah Work Item
+dihapus (`zeroMarkupIfChildless`), supaya tidak ada markup tersembunyi yang
+mengalikan total. Rumus di atas tetap benar karena faktornya selalu 1.
+
 **L1-only fields:**
 - `harga_snapshot Decimal @db.Decimal(18, 4)` — harga satuan untuk L1 tanpa breakdown. Snapshot/overrideable seperti nilai biaya BQ lain.
 - `koefisien Decimal @default(1) @db.Decimal(18, 6)` — koefisien efisiensi untuk L1-only. Default `1.0`.
@@ -498,10 +504,15 @@ Project baru → (opsional) Load Template → dapat scaffold Section/Subsection
         → biaya terhitung otomatis
 ```
 
-**Editing vs penyisipan (dikunci owner 2026-09-03).** Semua *pengubahan* nilai —
-nama, unit, harga, qty, koefisien, markup, di semua level — dilakukan inline di
-tabel, bukan lewat dialog: Enter commit, Escape batal, commit yang ditolak
-mengembalikan nilai sebelumnya. Ini yang mengaktifkan `InlineEdit` di UI Engine.
+**Editing vs penyisipan (dikunci owner 2026-09-03; diubah owner 2026-10-14, opsi B).**
+Tabel adalah tempat membaca dan memilih: angka (qty, satuan, koefisien, markup,
+harga, status harga) tampil sebagai teks, dan klik sebuah baris membuka **panel
+samping** baris itu (Work Item, Component Group atau Cost Component) tempat semua
+nilainya diubah — tetap tanpa dialog dan tanpa tombol Simpan: Enter atau
+meninggalkan kolom menyimpan, Escape batal, commit yang ditolak mengembalikan
+nilai sebelumnya (`InlineEdit`). **Nama** (uraian) tetap diubah langsung di tabel,
+dan nama Section/Subsection juga bisa diganti dengan klik dua kali di panel
+Struktur. Kotak centang tetap untuk memilih Cost Component (Slice 3).
 
 *Penyisipan* Cost Component tetap punya afordansnya sendiri, karena memilih sumber bukan
 mengubah nilai: "Baris custom" langsung membuat baris kosong yang siap diketik,

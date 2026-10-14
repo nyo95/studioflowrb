@@ -1,9 +1,9 @@
 "use client";
 
-import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 
 import {
   Badge,
@@ -104,6 +104,41 @@ const KATEGORI_LABEL: Record<string, string> = {
   TRANSPORTASI_AKOMODASI: "Transportasi",
   ALAT: "Alat",
 };
+
+/**
+ * The row whose values the side panel shows (owner 2026-10-14, option B: the table is for reading and selecting,
+ * values change in the panel; names stay editable in the table).
+ */
+type Inspected = { kind: "item" | "group" | "line"; id: string } | null;
+type InspectedFound =
+  | { kind: "item"; item: BqItemDetail }
+  | { kind: "group"; item: BqItemDetail; group: BqSubObjectDetail }
+  | { kind: "line"; item: BqItemDetail; group: BqSubObjectDetail | null; line: BqLineItemDetail };
+
+function findInspected(project: BqProjectDetail, target: Inspected): InspectedFound | null {
+  if (!target) return null;
+  for (const section of project.sections) {
+    for (const item of [...section.items, ...section.subsections.flatMap((subsection) => subsection.items)]) {
+      if (target.kind === "item" && item.id === target.id) return { kind: "item", item };
+      for (const group of item.subObjects) {
+        if (target.kind === "group" && group.id === target.id) return { kind: "group", item, group };
+        const line = target.kind === "line" ? group.lineItems.find((row) => row.id === target.id) : undefined;
+        if (line) return { kind: "line", item, group, line };
+      }
+      const line = target.kind === "line" ? item.lineItems.find((row) => row.id === target.id) : undefined;
+      if (line) return { kind: "line", item, group: null, line };
+    }
+  }
+  return null;
+}
+
+/** A click on a row opens it in the side panel, unless it was on a control (name editing, checkbox, buttons). */
+function inspectOnClick(onInspect: () => void) {
+  return (event: ReactMouseEvent<HTMLTableRowElement>) => {
+    if ((event.target as HTMLElement).closest("button, input, select, textarea, a, label, [role=checkbox], [contenteditable=true]")) return;
+    onInspect();
+  };
+}
 
 /** Where a new Work Item will land; `where` is the Section/Subsection name shown in its dialog. */
 type NewItemTarget = { sectionId?: string; subsectionId?: string; where: string };
@@ -335,12 +370,43 @@ function OutlineItems({
  * "+ Subsection" right under them; "+ Section" closes the list. Shown from 1024 px; narrower screens get the same
  * actions in the work area (see ProjectEditor), so nothing disappears with the panel.
  */
+/** The rename box of the Struktur panel: Enter or leaving it saves, Escape keeps the old name. */
+function OutlineRename({ name, className, onSave, onCancel }: { name: string; className: string; onSave: (name: string) => Promise<void>; onCancel: () => void }) {
+  const [draft, setDraft] = useState(name);
+  const done = useRef(false);
+  const save = () => {
+    if (done.current) return;
+    done.current = true;
+    const next = draft.trim();
+    if (!next) { onCancel(); return; }
+    void onSave(next);
+  };
+  return (
+    <div className={className}>
+      <Input
+        aria-label="Nama baru"
+        value={draft}
+        autoFocus
+        onFocus={(event) => event.currentTarget.select()}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={save}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") { event.preventDefault(); save(); }
+          if (event.key === "Escape") { event.preventDefault(); done.current = true; onCancel(); }
+        }}
+      />
+    </div>
+  );
+}
+
 function SectionOutline({
   projectId,
   sections,
   editable,
   pending,
   onAddSubsection,
+  onRenameSection,
+  onRenameSubsection,
   onReorder,
 }: {
   projectId: string;
@@ -348,9 +414,22 @@ function SectionOutline({
   editable: boolean;
   pending: boolean;
   onAddSubsection: (sectionId: string, name: string) => Promise<void>;
+  onRenameSection: (id: string, name: string) => Promise<void>;
+  onRenameSubsection: (id: string, name: string) => Promise<void>;
   onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
 }) {
+  // Double-click a Section or Subsection name to rename it here (owner 2026-10-14); a single click still jumps to it.
+  const [renaming, setRenaming] = useState<string | null>(null);
   if (sections.length === 0 && !editable) return null;
+  const nameField = (id: string, name: string, onRename: (id: string, name: string) => Promise<void>, className: string) => (
+    <OutlineRename
+      key={id}
+      name={name}
+      className={className}
+      onCancel={() => setRenaming(null)}
+      onSave={async (next) => { if (next !== name) await onRename(id, next).catch(() => undefined); setRenaming(null); }}
+    />
+  );
   return (
     <nav
       aria-label="Struktur dokumen"
@@ -361,24 +440,32 @@ function SectionOutline({
         const count = workItemCount(section);
         return (
           <div key={section.id} className="grid gap-0.5">
+            {renaming === section.id ? nameField(section.id, section.name, onRenameSection, "px-1.5 py-1") : (
             <a
               href={`#bq-section-${section.id}`}
+              title={editable ? "Klik dua kali untuk mengganti nama" : undefined}
+              onDoubleClick={editable && !pending ? (event) => { event.preventDefault(); setRenaming(section.id); } : undefined}
               className="flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
             >
               <span className="truncate">{section.name}</span>
               {/* A small chip, so the Work Item count never reads as a row number next to the table. */}
               <span className="shrink-0 rounded-pill bg-surface-muted px-1.5 text-[11px] tabular-nums text-ink-tertiary" title={`${count} Work Item`}>{count}</span>
             </a>
+            )}
             <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-4" editable={editable} pending={pending} onReorder={onReorder} />
             {section.subsections.map((subsection) => (
               <div key={subsection.id} className="grid gap-0.5">
+                {renaming === subsection.id ? nameField(subsection.id, subsection.name, onRenameSubsection, "py-1 pl-3 pr-1.5") : (
                 <a
                   href={`#bq-subsection-${subsection.id}`}
+                  title={editable ? "Klik dua kali untuk mengganti nama" : undefined}
+                  onDoubleClick={editable && !pending ? (event) => { event.preventDefault(); setRenaming(subsection.id); } : undefined}
                   className="flex items-center justify-between gap-2 rounded-control py-1 pl-4 pr-2.5 text-sm font-medium text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
                 >
                   <span className="truncate">{subsection.name}</span>
                   <span className="shrink-0 rounded-pill bg-surface-muted px-1.5 text-[11px] tabular-nums" title={`${subsection.items.length} Work Item`}>{subsection.items.length}</span>
                 </a>
+                )}
                 <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-7" editable={editable} pending={pending} onReorder={onReorder} />
               </div>
             ))}
@@ -437,6 +524,7 @@ export function ProjectEditor({
   const [lifecycleConfirm, setLifecycleConfirm] = useState<"archive" | "restore" | "delete" | null>(null);
   const [quotationOpen, setQuotationOpen] = useState(false);
   const [selection, setSelection] = useState<LineItemSelection>(null);
+  const [inspected, setInspected] = useState<Inspected>(null);
   const [groupItemId, setGroupItemId] = useState<string | null>(null);
   const [moveConfirmation, setMoveConfirmation] = useState<MoveRequest | null>(null);
   const [moveNotice, setMoveNotice] = useState<{ message: string; tone: "neutral" | "success" } | null>(null);
@@ -635,13 +723,15 @@ export function ProjectEditor({
 
       {readinessBarShown ? <ReadinessBar readiness={readiness} onJump={jumpTo} /> : null}
 
-      <div className="flex items-start gap-5">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
         <SectionOutline
           projectId={project.id}
           sections={project.sections}
           editable={editable}
           pending={pending}
           onAddSubsection={(sectionId, name) => run(addSubsectionAction, { sectionId, name })}
+          onRenameSection={(id, name) => run(updateSectionAction, { id, name })}
+          onRenameSubsection={(id, name) => run(updateSubsectionAction, { id, name })}
           onReorder={(parent, orderedIds) => run(reorderItemsAction, { ...parent, orderedIds: JSON.stringify(orderedIds) })}
         />
         <div className="grid min-w-0 flex-1 gap-4">
@@ -696,6 +786,8 @@ export function ProjectEditor({
             onMove={(item, label, target) => {
               runMoveTransition(() => requestLineItemMove(item, label, target));
             }}
+            inspected={inspected}
+            onInspect={setInspected}
             columns={totalColumns}
           />
           {editable ? (
@@ -747,6 +839,8 @@ export function ProjectEditor({
                 onMove={(item, label, target) => {
                   runMoveTransition(() => requestLineItemMove(item, label, target));
                 }}
+                inspected={inspected}
+                onInspect={setInspected}
                 columns={totalColumns}
               />
               {editable ? (
@@ -778,6 +872,21 @@ export function ProjectEditor({
         </SectionCard>
           ))}
         </div>
+        {(() => {
+          const found = findInspected(project, inspected);
+          return found ? (
+            <RowInspector
+              found={found}
+              units={units}
+              editable={editable}
+              pending={pending}
+              run={run}
+              commit={commit}
+              commitNum={commitNum}
+              onClose={() => setInspected(null)}
+            />
+          ) : null;
+        })()}
       </div>
 
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface/95 px-4 py-3 shadow-plane backdrop-blur-sm">
@@ -983,6 +1092,8 @@ function ItemTable({
   onSelectAll,
   onGroup,
   onMove,
+  inspected,
+  onInspect,
   columns,
 }: {
   items: readonly BqItemDetail[];
@@ -1003,6 +1114,8 @@ function ItemTable({
   onSelectAll: (item: BqItemDetail, checked: boolean) => void;
   onGroup: (itemId: string) => void;
   onMove: (item: BqItemDetail, label: string, target: ExistingLineItemTarget) => void;
+  inspected: Inspected;
+  onInspect: (target: Inspected) => void;
   columns: number;
 }) {
   if (items.length === 0) {
@@ -1010,7 +1123,7 @@ function ItemTable({
   }
 
   return (
-    <DataTable minWidth="960px" density="compact">
+    <DataTable minWidth="820px" density="compact">
       <TableHeader>
         <TableRow>
           <TableHead className="w-[72px]" aria-label="Pilih, buka, atau tutup" />
@@ -1019,9 +1132,9 @@ function ItemTable({
           <TableHead className="w-[80px]">Satuan</TableHead>
           <TableHead align="end" className="w-[90px]">Koef.</TableHead>
           <TableHead align="end" className="w-[90px]">Markup</TableHead>
-          <TableHead align="end" className="w-[150px]">Harga satuan</TableHead>
-          <TableHead align="end" className="w-[140px]">Total</TableHead>
-          {editable ? <TableHead align="end" className="w-[80px]" aria-label="Aksi" /> : null}
+          <TableHead align="end" className="w-[130px]">Harga satuan</TableHead>
+          <TableHead align="end" className="w-[130px]">Total</TableHead>
+          {editable ? <TableHead align="end" className="w-[56px]" aria-label="Aksi" /> : null}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -1051,6 +1164,8 @@ function ItemTable({
               onSelectAll={onSelectAll}
               onGroup={onGroup}
               onMove={onMove}
+              inspected={inspected}
+              onInspect={onInspect}
               columns={columns + (editable ? 1 : 0)}
             />
           );
@@ -1081,6 +1196,8 @@ function ItemRows({
   onSelectAll,
   onGroup,
   onMove,
+  inspected,
+  onInspect,
   columns,
 }: {
   item: BqItemDetail;
@@ -1103,6 +1220,8 @@ function ItemRows({
   onSelectAll: (item: BqItemDetail, checked: boolean) => void;
   onGroup: (itemId: string) => void;
   onMove: (item: BqItemDetail, label: string, target: ExistingLineItemTarget) => void;
+  inspected: Inspected;
+  onInspect: (target: Inspected) => void;
   columns: number;
 }) {
   const allLineIds = lineItemIds(item);
@@ -1122,7 +1241,12 @@ function ItemRows({
   });
   return (
     <>
-      <TableRow id={`bq-row-${item.id}`}>
+      <TableRow
+        id={`bq-row-${item.id}`}
+        selected={inspected?.kind === "item" && inspected.id === item.id}
+        className="cursor-pointer"
+        onClick={inspectOnClick(() => onInspect({ kind: "item", id: item.id }))}
+      >
         <TableCell>
           <div className="flex items-center gap-1">
             <IconButton
@@ -1152,24 +1276,18 @@ function ItemRows({
                 : "Harga langsung"}
           </Text>
         </TableCell>
-        <TableCell align="end">
-          <InlineEdit label="Jumlah" align="end" inputMode="decimal" value={item.qty} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "qty")} />
-        </TableCell>
-        <TableCell>{editable ? <Select aria-label="Satuan Work Item" value={item.unit} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "unit")(event.target.value).catch(() => undefined)}>{units.some((unit) => unit.code === item.unit) ? null : <option value={item.unit} disabled>{item.unit} (inactive snapshot)</option>}{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code}</option>)}</Select> : item.unit}</TableCell>
+        <TableCell align="end" className="tabular-nums">{item.qty}</TableCell>
+        <TableCell>{item.unit}</TableCell>
         {/* Koef. and Markup are two fixed columns rather than one cell that
             switches meaning: an L1 with children takes its cost from them, so
             its own coefficient is dormant (shown "—"); a childless L1 has no
             markup of its own (zeroed automatically — zeroMarkupIfChildless). */}
-        <TableCell align="end">
-          {hasChildren ? (
-            <Text tone="tertiary" size="sm">—</Text>
-          ) : (
-            <InlineEdit label="Coefficient" align="end" inputMode="decimal" value={item.koefisien} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "koefisien")} />
-          )}
+        <TableCell align="end" className="tabular-nums">
+          {hasChildren ? <Text tone="tertiary" size="sm">—</Text> : item.koefisien}
         </TableCell>
-        <TableCell align="end">
+        <TableCell align="end" className="tabular-nums">
           {hasChildren ? (
-            <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "markupL1Pct")} />
+            `${item.markupL1Pct}%`
           ) : (
             <Tooltip content="Markup tidak berlaku untuk Work Item tanpa breakdown — nilainya otomatis 0.">
               <span className="inline-block"><Text tone="tertiary" size="sm">—</Text></span>
@@ -1184,20 +1302,7 @@ function ItemRows({
           ) : hasChildren ? (
             money(item.rate)
           ) : (
-            <InlineEdit
-              label="Harga satuan"
-              align="end"
-              inputMode="decimal"
-              placeholder="Belum diisi"
-              value={item.hargaSnapshot ?? ""}
-              display={(value) => !value
-                ? <span className="font-medium text-warning">Belum diisi</span>
-                : isZeroPrice(value)
-                  ? <span className="font-medium text-warning">Rp 0</span>
-                  : formatMoney(createMoney(value, "IDR"))}
-              disabled={!editable}
-              onCommit={commitNum(updateItemAction, item.id, "hargaSnapshot")}
-            />
+            priceText(item.hargaSnapshot, "IDR")
           )}
         </TableCell>
         <TableCell align="end" className="font-semibold">
@@ -1244,6 +1349,8 @@ function ItemRows({
               selectedLineIds={selected}
               highlightedLineIds={highlightedLineIds}
               onSelectLine={onSelectLine}
+              inspected={inspected}
+              onInspect={onInspect}
               columns={columns}
             />
           ))}
@@ -1262,6 +1369,8 @@ function ItemRows({
               selected={selected.has(line.id)}
               highlighted={highlightedLineIds.has(line.id)}
               onSelect={onSelectLine}
+              inspected={inspected?.kind === "line" && inspected.id === line.id}
+              onInspect={() => onInspect({ kind: "line", id: line.id })}
             />
           ))}
 
@@ -1270,19 +1379,6 @@ function ItemRows({
               <TableCell />
               <TableCell colSpan={columns - 1}>
                 <div className="flex flex-wrap items-center gap-1.5 pl-4">
-                  {editable ? (
-                    <label className="mr-2 flex items-center gap-2 text-sm text-ink-secondary">
-                      Status harga
-                      <Select
-                        aria-label={`Status harga ${item.name}`}
-                        value={item.priceMode}
-                        disabled={pending}
-                        onChange={(event) => void commit(updateItemAction, item.id, "priceMode")(event.target.value).catch(() => undefined)}
-                      >
-                        {BQ_PRICE_MODES.map((mode) => <option key={mode} value={mode}>{mode === "PRICED" ? "Berharga" : `${PRICE_STATUS_LABEL[mode]} — tidak dihitung`}</option>)}
-                      </Select>
-                    </label>
-                  ) : null}
                   {isMarkerPriceMode(item.priceMode) ? (
                     <Text tone="tertiary" size="sm" className="mr-2">
                       Ditandai {PRICE_STATUS_LABEL[item.priceMode]}: quotation tidak menampilkan harga baris ini dan total keseluruhan tidak menghitungnya.
@@ -1349,6 +1445,8 @@ function SubObjectRows({
   selectedLineIds,
   highlightedLineIds,
   onSelectLine,
+  inspected,
+  onInspect,
   columns,
 }: {
   subObject: BqSubObjectDetail;
@@ -1364,13 +1462,19 @@ function SubObjectRows({
   selectedLineIds: ReadonlySet<string>;
   highlightedLineIds: ReadonlySet<string>;
   onSelectLine: (itemId: string, lineItemId: string, checked: boolean) => void;
+  inspected: Inspected;
+  onInspect: (target: Inspected) => void;
   columns: number;
 }) {
   const open = expanded.has(subObject.id);
   const highlighted = subObject.lineItems.some((line) => highlightedLineIds.has(line.id));
   return (
     <>
-      <TableRow selected={highlighted} className={highlighted ? undefined : "bg-[color-mix(in_srgb,var(--ui-surface-muted)_45%,transparent)]"}>
+      <TableRow
+        selected={highlighted || (inspected?.kind === "group" && inspected.id === subObject.id)}
+        className={`cursor-pointer ${highlighted ? "" : "bg-[color-mix(in_srgb,var(--ui-surface-muted)_45%,transparent)]"}`}
+        onClick={inspectOnClick(() => onInspect({ kind: "group", id: subObject.id }))}
+      >
         <TableCell />
         <TableCell wrap>
           <div className="flex items-center gap-1 pl-4">
@@ -1393,18 +1497,14 @@ function SubObjectRows({
             </div>
           </div>
         </TableCell>
-        <TableCell align="end">
-          <InlineEdit label="Jumlah per Work Item" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "qtyPerL1")} />
-        </TableCell>
+        <TableCell align="end" className="tabular-nums">×{subObject.qtyPerL1}</TableCell>
         <TableCell><Text tone="tertiary" size="sm">per Work Item</Text></TableCell>
         <TableCell align="end">
           <Text tone="tertiary" size="sm">—</Text>
         </TableCell>
         <TableCell align="end">
           <Tooltip content="Markup Component Group ini (%) — hanya berlaku untuk Cost Component di dalamnya.">
-            <span className="inline-block">
-              <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={subObject.markupL2Pct} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "markupL2Pct")} />
-            </span>
+            <span className="inline-block tabular-nums">{subObject.markupL2Pct}%</span>
           </Tooltip>
         </TableCell>
         <TableCell align="end">{money(subObject.subtotalL2Raw)}</TableCell>
@@ -1436,6 +1536,8 @@ function SubObjectRows({
               selected={selectedLineIds.has(line.id)}
               highlighted={highlightedLineIds.has(line.id)}
               onSelect={onSelectLine}
+              inspected={inspected?.kind === "line" && inspected.id === line.id}
+              onInspect={() => onInspect({ kind: "line", id: line.id })}
             />
           ))}
           {editable ? (
@@ -1474,6 +1576,8 @@ function LineItemRow({
   selected,
   highlighted,
   onSelect,
+  inspected,
+  onInspect,
 }: {
   line: BqLineItemDetail;
   depth: 1 | 2;
@@ -1486,9 +1590,11 @@ function LineItemRow({
   selected: boolean;
   highlighted: boolean;
   onSelect: (itemId: string, lineItemId: string, checked: boolean) => void;
+  inspected: boolean;
+  onInspect: () => void;
 }) {
   return (
-    <TableRow id={`bq-row-${line.id}`} selected={selected || highlighted}>
+    <TableRow id={`bq-row-${line.id}`} selected={selected || highlighted || inspected} className="cursor-pointer" onClick={inspectOnClick(onInspect)}>
       <TableCell>
         {editable ? (
           <Checkbox
@@ -1520,51 +1626,19 @@ function LineItemRow({
               <>
                 <Badge tone="warning">Harga diubah</Badge>
                 {/* Master Data is untouched: this only sets this row's price back to the copy taken when it was added. */}
-                {editable ? (
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => void run(revertLineItemPriceAction, { id: line.id }).catch(() => undefined)}
-                    className="inline-flex items-center gap-1 rounded-control text-sm text-action underline-offset-2 hover:underline disabled:opacity-50"
-                  >
-                    <RotateCcw aria-hidden="true" className="size-3.5" />
-                    Kembalikan ke {formatMoney(createMoney(line.sourcePriceSnapshot, line.currencySnapshot))}
-                  </button>
-                ) : (
-                  <Text tone="tertiary" size="sm">Harga awal {formatMoney(createMoney(line.sourcePriceSnapshot, line.currencySnapshot))}</Text>
-                )}
+                <Text tone="tertiary" size="sm">Harga awal {formatMoney(createMoney(line.sourcePriceSnapshot, line.currencySnapshot))}</Text>
               </>
             ) : null}
           </div>
         </div>
       </TableCell>
-      <TableCell align="end">
-        <InlineEdit label="Jumlah" align="end" inputMode="decimal" value={line.qty} disabled={!editable} onCommit={commitNum(updateLineItemAction, line.id, "qty")} />
-      </TableCell>
-      <TableCell>
-        <InlineEdit label="Satuan" value={line.purchaseUnitSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "purchaseUnitSnapshot")} />
-      </TableCell>
-      <TableCell align="end">
-        <InlineEdit label="Coefficient" align="end" inputMode="decimal" value={line.koefisien} disabled={!editable} onCommit={commitNum(updateLineItemAction, line.id, "koefisien")} />
-      </TableCell>
+      <TableCell align="end" className="tabular-nums">{line.qty}</TableCell>
+      <TableCell>{line.purchaseUnitSnapshot}</TableCell>
+      <TableCell align="end" className="tabular-nums">{line.koefisien}</TableCell>
       <TableCell align="end">
         <Text tone="tertiary" size="sm">—</Text>
       </TableCell>
-      <TableCell align="end">
-        <InlineEdit
-          label="Harga satuan"
-          align="end"
-          inputMode="decimal"
-          value={line.hargaSnapshot}
-          disabled={!editable}
-          display={(value) => !value
-            ? <span className="font-medium text-warning">Belum diisi</span>
-            : isZeroPrice(value)
-              ? <span className="font-medium text-warning">Rp 0</span>
-              : formatMoney(createMoney(value, line.currencySnapshot))}
-          onCommit={commitNum(updateLineItemAction, line.id, "hargaSnapshot")}
-        />
-      </TableCell>
+      <TableCell align="end">{priceText(line.hargaSnapshot, line.currencySnapshot)}</TableCell>
       <TableCell align="end">{money(line.biayaLine, line.currencySnapshot)}</TableCell>
       {editable ? (
         <TableCell align="end">
@@ -1578,6 +1652,154 @@ function LineItemRow({
         </TableCell>
       ) : null}
     </TableRow>
+  );
+}
+
+/** A price as the table shows it: missing and Rp0 stand out, everything else is plain money. */
+function priceText(value: string | null, currency: string): ReactNode {
+  if (!value) return <span className="font-medium text-warning">Belum diisi</span>;
+  if (isZeroPrice(value)) return <span className="font-medium text-warning">Rp 0</span>;
+  return formatMoney(createMoney(value, currency));
+}
+
+/** One labelled value in the side panel; editable fields show as a boxed value that becomes an input on click. */
+function PanelField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-1">
+      <Text size="sm" tone="secondary">{label}</Text>
+      <div className="min-h-9 rounded-control border border-line bg-surface px-1.5 py-1 text-sm [&_button]:w-full">{children}</div>
+      {hint ? <Text size="sm" tone="tertiary">{hint}</Text> : null}
+    </div>
+  );
+}
+
+function PanelValue({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3 text-sm">
+      <Text size="sm" tone="secondary">{label}</Text>
+      <span className="font-medium tabular-nums text-ink">{children}</span>
+    </div>
+  );
+}
+
+/**
+ * The side panel of the row chosen in the table (owner 2026-10-14, option B): every value of that Work Item,
+ * Component Group or Cost Component changes here; Enter or leaving a field saves it, a refused value springs back.
+ * A locked or archived project shows the same values read-only.
+ */
+function RowInspector({ found, units, editable, pending, run, commit, commitNum, onClose }: {
+  found: InspectedFound;
+  units: UnitRead[];
+  editable: boolean;
+  pending: boolean;
+  run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
+  commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
+  commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
+  onClose: () => void;
+}) {
+  const kindLabel = found.kind === "item" ? "Work Item" : found.kind === "group" ? "Component Group" : "Cost Component";
+  const title = found.kind === "item" ? found.item.name : found.kind === "group" ? found.group.name : found.line.titleSnapshot;
+  const number = (label: string, value: string, action: Mutation, id: string, field: string, hint?: string) => (
+    <PanelField label={label} hint={hint}>
+      <InlineEdit label={label} inputMode="decimal" value={value} disabled={!editable} commitOnBlur onCommit={commitNum(action, id, field)} />
+    </PanelField>
+  );
+
+  let body: ReactNode;
+  if (found.kind === "item") {
+    const item = found.item;
+    const hasChildren = item.subObjects.length > 0 || item.lineItems.length > 0;
+    const marker = isMarkerPriceMode(item.priceMode);
+    body = <>
+      {number("Jumlah", item.qty, updateItemAction, item.id, "qty")}
+      <div className="grid gap-1">
+        <Text size="sm" tone="secondary">Satuan</Text>
+        {editable ? (
+          <Select aria-label="Satuan Work Item" value={item.unit} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "unit")(event.target.value).catch(() => undefined)}>
+            {units.some((unit) => unit.code === item.unit) ? null : <option value={item.unit} disabled>{item.unit} (inactive snapshot)</option>}
+            {units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code}</option>)}
+          </Select>
+        ) : <Text size="sm">{item.unit}</Text>}
+      </div>
+      <div className="grid gap-1">
+        <Text size="sm" tone="secondary">Status harga</Text>
+        {editable ? (
+          <Select aria-label={`Status harga ${item.name}`} value={item.priceMode} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "priceMode")(event.target.value).catch(() => undefined)}>
+            {BQ_PRICE_MODES.map((mode) => <option key={mode} value={mode}>{mode === "PRICED" ? "Berharga" : `${PRICE_STATUS_LABEL[mode]} — tidak dihitung`}</option>)}
+          </Select>
+        ) : <Text size="sm">{item.priceMode === "PRICED" ? "Berharga" : PRICE_STATUS_LABEL[item.priceMode]}</Text>}
+      </div>
+      {hasChildren ? (
+        number("Markup (%)", item.markupL1Pct, updateItemAction, item.id, "markupL1Pct", "Berlaku untuk semua rincian di bawah Work Item ini; klien tidak melihatnya.")
+      ) : marker ? null : <>
+        <PanelField label="Harga satuan">
+          <InlineEdit label="Harga satuan" inputMode="decimal" placeholder="Belum diisi" value={item.hargaSnapshot ?? ""} display={(value) => priceText(value, "IDR")} disabled={!editable} commitOnBlur onCommit={commitNum(updateItemAction, item.id, "hargaSnapshot")} />
+        </PanelField>
+        {number("Koefisien", item.koefisien, updateItemAction, item.id, "koefisien")}
+      </>}
+      <div className="grid gap-1.5 border-t border-line-subtle pt-3">
+        <PanelValue label={hasChildren ? "Harga satuan (dari rincian)" : "Harga satuan"}>{marker ? PRICE_STATUS_LABEL[item.priceMode] : money(item.rate)}</PanelValue>
+        <PanelValue label="Total">{marker ? PRICE_STATUS_LABEL[item.priceMode] : money(item.total)}</PanelValue>
+      </div>
+      {hasChildren ? null : <Text size="sm" tone="tertiary">Work Item dengan harga langsung tidak memakai markup.</Text>}
+    </>;
+  } else if (found.kind === "group") {
+    const group = found.group;
+    body = <>
+      {number("Jumlah per Work Item", group.qtyPerL1, updateSubObjectAction, group.id, "qtyPerL1", "Rincian di dalam grup ini dikalikan angka ini.")}
+      {number("Markup (%)", group.markupL2Pct, updateSubObjectAction, group.id, "markupL2Pct", "Hanya untuk Cost Component di grup ini; klien tidak melihatnya.")}
+      <div className="grid gap-1.5 border-t border-line-subtle pt-3">
+        <PanelValue label="Subtotal sebelum markup">{money(group.subtotalL2Raw)}</PanelValue>
+        <PanelValue label="Subtotal">{money(group.subtotalL2)}</PanelValue>
+      </div>
+    </>;
+  } else {
+    const line = found.line;
+    const changed = line.sourcePriceSnapshot !== null && line.hargaSnapshot !== line.sourcePriceSnapshot;
+    body = <>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Badge tone="neutral">{KATEGORI_LABEL[line.kategori] ?? line.kategori}</Badge>
+        {line.sourceType !== "CUSTOM" ? <Text tone="tertiary" size="sm">{line.sourceType === "MASTERDATA" ? "Salinan harga Master Data" : "Salinan harga BQ Library"}</Text> : null}
+      </div>
+      {number("Jumlah", line.qty, updateLineItemAction, line.id, "qty")}
+      <PanelField label="Satuan" hint={line.purchaseToBaseFactorSnapshot && line.baseUnitSnapshot ? `1 ${line.purchaseUnitSnapshot} = ${line.purchaseToBaseFactorSnapshot} ${line.baseUnitSnapshot}` : undefined}>
+        <InlineEdit label="Satuan" value={line.purchaseUnitSnapshot} disabled={!editable} commitOnBlur onCommit={commit(updateLineItemAction, line.id, "purchaseUnitSnapshot")} />
+      </PanelField>
+      {number("Koefisien", line.koefisien, updateLineItemAction, line.id, "koefisien")}
+      <PanelField label="Harga satuan">
+        <InlineEdit label="Harga satuan" inputMode="decimal" value={line.hargaSnapshot} display={(value) => priceText(value, line.currencySnapshot)} disabled={!editable} commitOnBlur onCommit={commitNum(updateLineItemAction, line.id, "hargaSnapshot")} />
+      </PanelField>
+      {changed ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge tone="warning">Harga diubah</Badge>
+          {/* Master Data is untouched: this only sets this row's price back to the copy taken when it was added. */}
+          {editable ? (
+            <button type="button" disabled={pending} onClick={() => void run(revertLineItemPriceAction, { id: line.id }).catch(() => undefined)} className="inline-flex items-center gap-1 rounded-control text-sm text-action underline-offset-2 hover:underline disabled:opacity-50">
+              <RotateCcw aria-hidden="true" className="size-3.5" />
+              Kembalikan ke {formatMoney(createMoney(line.sourcePriceSnapshot!, line.currencySnapshot))}
+            </button>
+          ) : <Text tone="tertiary" size="sm">Harga awal {formatMoney(createMoney(line.sourcePriceSnapshot!, line.currencySnapshot))}</Text>}
+        </div>
+      ) : null}
+      <div className="grid gap-1.5 border-t border-line-subtle pt-3">
+        <PanelValue label="Biaya">{money(line.biayaLine, line.currencySnapshot)}</PanelValue>
+      </div>
+    </>;
+  }
+
+  return (
+    <aside aria-label={`${kindLabel} ${title}`} className="order-first grid w-full shrink-0 content-start gap-3 self-start rounded-card border border-line bg-surface p-4 shadow-plane lg:sticky lg:top-0 lg:order-none lg:w-[320px] xl:w-[340px]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="grid min-w-0 gap-0.5">
+          <Text size="sm" tone="tertiary" meta>{kindLabel}</Text>
+          <Text weight="semibold" className="break-words">{title}</Text>
+          {found.kind !== "item" ? <Text size="sm" tone="tertiary" className="truncate">di {found.item.name}{found.kind === "line" && found.group ? ` › ${found.group.name}` : ""}</Text> : null}
+        </div>
+        <IconButton size="sm" variant="ghost" label="Tutup panel" icon={<X aria-hidden="true" />} onClick={onClose} />
+      </div>
+      {body}
+      {!editable ? <Text size="sm" tone="tertiary">Project ini hanya baca.</Text> : null}
+    </aside>
   );
 }
 
