@@ -20,6 +20,12 @@
 - **Checks:** isolated copy of committed R9.49 plus exactly the four owned source/test files: npm test **1115/1115**, typecheck, full eslint (0 errors; one existing Presentation img warning), boundary check, legacy-runtime check, default Turbopack production build and whitespace PASS. A dedicated disposable rebuild-only test database was migrated from the committed baseline; the shared dev/test databases and uncommitted Presentation migration were not changed. Initial build attempts with a dependency junction failed; the final build used its own installed locked dependencies and passed.
 - **Limitations/handoff:** the supplied R9.50 plan/changelog are still uncommitted; execution uses the reserved R9.51 without staging them. Main-checkout typecheck exposes the existing unfinished Presentation schema/client changes, so whole-tree integration with that work remains for the Lead. Two Reviewer browser journeys appended to BROWSER-ACCEPTANCE-BACKLOG.md; browser acceptance pending. Preserve the original PLAN.md, R9.50 changelog entry, Presentation schema/migration and owner's test/. No push.
 
+## R9.50 | 2026-10-14 | docs(plan): WO-MD-PRICE-BRAND-01 for Codex (Lead)
+
+- **Owner 2026-10-14:** "dari price bisa add brand (create brand dari price tanpa perlu pindah halaman) - kasi wewenang utk codex kerjain".
+- **PLAN.md:** name-only Brand create from the Brand picker of Pricing → New price (Material), gated by brand-manage, selected after create; Executor revision R9.51.
+- **Checks:** docs only. No push.
+
 ## R9.49 | 2026-10-14 | feat(bq): The quotation's issuer has its own name and logo in Quotation settings (Lead)
 
 - **Owner 2026-10-14:** "di header ada RAD - sebenernya BQ itu namanya beda sih nantinya (kontraktor =/= konsultannya); tambahin di setting bisa?" Also: a box longer than one page may still split ("gamasalah sih, yang penting rapih tablingnya"); unchanged.
