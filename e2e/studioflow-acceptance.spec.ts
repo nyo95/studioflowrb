@@ -61,17 +61,15 @@ test("7.2 a note takes a PNG and refuses a PDF", async ({ page }) => {
   await expect(notes(page).getByRole("list", { name: "Images" }).getByRole("button")).toHaveCount(1);
 });
 
-test("8.5 the requirements and files column can be hidden and stays hidden after a reload", async ({ page }) => {
+// Since R8.532 the requirements and files live in the "Phase details" drawer instead of a column that folds away.
+test("8.5 the phase's requirements and files open in Phase details and close again", async ({ page }) => {
   await openProject(page, sf.aside);
-  await expect(page.getByRole("heading", { name: "Requirements" })).toBeVisible();
-  await page.getByRole("button", { name: "Hide requirements & files" }).click();
   await expect(page.getByRole("heading", { name: "Requirements" })).toBeHidden();
-  await page.reload();
-  await page.locator("main").first().waitFor();
-  await expect(page.getByRole("button", { name: "Show requirements & files" })).toBeVisible();
+  await page.getByRole("button", { name: /^Phase details/ }).click();
+  const drawer = page.getByRole("dialog", { name: /Phase details/ });
+  await expect(drawer.getByRole("heading", { name: "Requirements" })).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("heading", { name: "Requirements" })).toBeHidden();
-  await page.getByRole("button", { name: "Show requirements & files" }).click();
-  await expect(page.getByRole("heading", { name: "Requirements" })).toBeVisible();
 });
 
 test("7.6 a note image can be saved to Ideas, put on the moodboard and used in the schedule", async ({ page }) => {
@@ -137,7 +135,8 @@ test("8.3 an iteration goes to the client, comes back answered, and a revision o
   await answer.getByRole("textbox").last().click();
   await page.keyboard.type("Client wants a warmer palette");
   await answer.getByRole("button", { name: "Revision" }).click();
-  await expect(page.getByRole("heading", { name: "MB2", level: 3 })).toBeVisible();
+  // The phase tab names the round now running.
+  await expect(page.getByRole("button", { name: /^Moodboard MB2/ })).toBeVisible();
   await expect(page.getByText("Moodboard 1 needs a revision")).toBeVisible();
   await expect(notes(page).getByText("Client wants a warmer palette")).toBeVisible();
 });

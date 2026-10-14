@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.28 | 2026-10-14 | test(studioflow): The Stage 3 browser spec follows the current Phases page (Lead)
+
+- With the Notes stream back as the default (R9.09) the notes cases 7.1, 7.2 and 7.6 of `_e2e/studioflow-acceptance.spec.ts` pass again unchanged. Two cases still described screens replaced in R8.532/R8.533: 8.5 now checks that the phase's Requirements open in the "Phase details" drawer and close again (the folding column is gone); 8.3 finds the new round on the phase tab ("Moodboard MB2 …") instead of a level-3 heading. Behavior was already right in both (the failure snapshot showed MB2 in progress, the revision notice and the client's text in the notes).
+- **Checks:** `_npx playwright test e2e/studioflow-acceptance.spec.ts e2e/workspace-board.spec.ts` **10/10 PASS**. No push.
+
 ## R9.27 | 2026-10-14 | docs(backlog): Shell hydration mismatch not reproduced; evidence recorded (Lead)
 
 - **BACKLOG [BUG] (shell hydration mismatch) stays open on purpose.** A Playwright probe (not committed) moved 3 times through the six StudioFlow settings pages, `/settings` and `/account` with full loads, in-page link moves and back/forward, listening for hydration messages: none. Code reading: `AppShell` is hydration-safe; the rail depends only on the pathname (`isRailPath`) and `src/proxy.ts` does no rewrites, so the one observed "no rail on the server" points at a request outside an app root during the Developer spec. No fix without a reproduction; the next step is written on the BACKLOG line.
