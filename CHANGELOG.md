@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.56 | 2026-10-14 | docs(plan): WO-SF-NOTES-CHAT-01 for Codex (Lead)
+
+- **Owner 2026-10-14:** approved the Notes chat mockup (https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF): one WhatsApp-like note stream per project, albums, replies; only the PIC writes so no @person; `#` for phase (auto) and topic tags; `@` for Product Schedule codes ("@HT1"); Workspace keeps the same notes behind the Developer switch.
+- **PLAN.md:** backend for replies (`reply_to_id`), project topic tags, item links by code with a typed-code parser beside `scheduleCode`, and the project-wide notes reads; Executor revision R9.57. UI (chat stream, albums, autocomplete, fixed project frame) stays with the Lead after R9.57; the board's double-click note thread is a later Lead slice.
+- **Checks:** docs only. No push.
+
 ## R9.55 | 2026-10-14 | docs(design): The record workspace canvas follows the Workspace module switch (Lead)
 
 - **Owner 2026-10-14 (mockup comments):** the Notes/Workspace choice is "switch di system": Workspace (more advanced) when the office pays and the Developer switches it on, plain Notes by default. Also removed from the mockup: the client/designer/drafter line under the title, and the breadcrumb capsule (now plain "StudioFlow / Projects" text).
