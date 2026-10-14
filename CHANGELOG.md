@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.55 | 2026-10-14 | docs(design): The record workspace canvas follows the Workspace module switch (Lead)
+
+- **Owner 2026-10-14 (mockup comments):** the Notes/Workspace choice is "switch di system": Workspace (more advanced) when the office pays and the Developer switches it on, plain Notes by default. Also removed from the mockup: the client/designer/drafter line under the title, and the breadcrumb capsule (now plain "StudioFlow / Projects" text).
+- **DESIGN.md §6.2:** no user-facing Notes|Workspace switch; the canvas shows Notes with the Workspace module off and the board with it on.
+- **Open:** the breadcrumb form (plain text vs §10.3 capsule) is only changed in the mockup; §10.3 follows once the owner approves. Checks: docs only. No push.
+
 ## R9.54 | 2026-10-14 | docs(design): Record workspace with a fixed frame (Lead)
 
 - **Owner 2026-10-14:** annotated screenshot of the StudioFlow project page ("jadi semua fix page": breadcrumb, title, linear phases, Send to client, requirements panel on the right, canvas that defaults to Notes and switches to Workspace), then "coba dulu buat mockup nya" and "kalau design md nya mau di update boleh diupdate dengan opsi dari kamu".

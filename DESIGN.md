@@ -274,7 +274,7 @@ AppShell (rail + top bar)                      fixed
     │   └── current iteration + status + ONE primary action, right end
     └── Body                                   fills the rest
         ├── Canvas                             scrolls by itself
-        │   ├── toolbar: view switch [Notes | Workspace] + filters
+        │   ├── toolbar: canvas title + filters
         │   ├── content
         │   └── composer?                      pinned to the canvas bottom
         └── Detail panel?                      scrolls by itself, collapsible
@@ -283,9 +283,11 @@ AppShell (rail + top bar)                      fixed
 Rules:
 - **One primary action per record state**, at the right end of the stage strip
   (e.g. Send to client). It is not repeated in the canvas or the panel.
-- **The canvas has one view switch.** Notes is the default view; Workspace (the
-  board) is the same place, not another page or tab. Filters belong to the
-  view that uses them and disappear with it.
+- **What the canvas holds is a module choice, not a user choice** (owner,
+  2026-10-14). With the Workspace module off (the default) the canvas is Notes;
+  with it switched on by the Developer (§ MODULES-DECISION) the canvas is the
+  Workspace board. Users see no Notes/Workspace switch. Filters belong to the
+  canvas content that uses them.
 - **The detail panel** (requirements, files, details of the chosen stage) is
   320px on the right, follows the chosen stage, and collapses to a button in
   the canvas toolbar. Below `1280px` it starts collapsed; below `840px` it
