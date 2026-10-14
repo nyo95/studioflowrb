@@ -19,7 +19,7 @@ import { createMoney,currencyPrefix,formatMoney } from "@platform/utilities/mone
 import Link from "next/link";
 import { CircleHelp, Plus, Trash2, X } from "lucide-react";
 import { useEffect,useRef,useState,useTransition,type FormEvent,type ReactNode } from "react";
-import { archivePriceAction,saveBulkWorkPricesAction,saveMaterialSkuPricesBulkAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
+import { archivePriceAction,saveBulkWorkPricesAction,saveMaterialSkuPricesBulkAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
 type SkuRef = { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; base_unit: { id: string; code: string; name: string } | null; purchase_unit: { id: string; code: string; name: string } | null; dimension_length: string | null; dimension_width: string | null; dimension_thickness: string | null; dimension_unit: { id: string; code: string; name: string } | null; purchase_to_base_factor: string | null };
@@ -282,7 +282,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const workRow = !material && row ? row as WorkRow : undefined;
   const { options: vendorOptions, upsertOverlayOption } = useOptionOverlay(refs.vendors);
   const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(refs.workCategories);
-  const { options: brandOptions } = useOptionOverlay(refs.brands);
+  const { options: brandOptions, upsertOverlayOption: upsertBrandOption } = useOptionOverlay(refs.brands);
   const { options: productCategoryOptions, upsertOverlayOption: upsertProductCategoryOption } = useOptionOverlay(refs.productCategories);
   const [vendorId, setVendorId] = useState(materialRow?.supplier_vendor.id ?? workRow?.vendor.id ?? "");
   const [categoryId, setCategoryId] = useState(workRow?.category.id ?? "");
@@ -294,6 +294,8 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const [quickVendorTypeId, setQuickVendorTypeId] = useState("");
   const [quickError, setQuickError] = useState<string | null>(null);
   const [quickPending, setQuickPending] = useState(false);
+  const [brandCreateError, setBrandCreateError] = useState<string | null>(null);
+  const [brandCreatePending, setBrandCreatePending] = useState(false);
   const [productCategoryCreateError, setProductCategoryCreateError] = useState<string | null>(null);
   const [productCategoryCreatePending, setProductCategoryCreatePending] = useState(false);
   const [categoryCreateError, setCategoryCreateError] = useState<string | null>(null);
@@ -302,6 +304,29 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   // Material+Labor accepts a Supplier that supplies material, provides labor, or both (owner, 2026-10-08).
   const eligibleTypes = refs.vendorTypes.filter((type) => needsMaterial ? type.canSupplyMaterial : editor.kind === "material-labor" ? type.canSupplyMaterial || type.canSupplyLabor : type.canSupplyLabor);
 
+
+  const createBrand = async (name: string) => {
+    setBrandCreateError(null);
+    setBrandCreatePending(true);
+    let failureMessage = "Could not create that brand. Please try again.";
+    try {
+      const formData = new FormData();
+      formData.set("name", name);
+      const result = await createPricingBrandQuickAction(formData);
+      if (result.ok) {
+        upsertBrandOption({ id: result.data.brandId, name: result.data.name });
+        setMaterialBrandFilter(result.data.brandId);
+        return result.data.brandId;
+      }
+      failureMessage = result.error.safeMessage;
+      throw new Error(result.error.safeMessage);
+    } catch (error) {
+      setBrandCreateError(failureMessage);
+      throw error;
+    } finally {
+      setBrandCreatePending(false);
+    }
+  };
 
   const createProductCategory = async (name: string) => {
     setProductCategoryCreateError(null);
@@ -672,9 +697,14 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           placeholder="All brands"
           searchPlaceholder="Search brands…"
           emptyLabel="No brand matches this search."
+          onCreate={refs.canManageBrands ? createBrand : undefined}
+          createLabel={(name) => `Create brand “${name}”`}
+          createErrorLabel={() => null}
+          disabled={brandCreatePending}
           className="w-full"
         />
       </Field>
+      {brandCreateError ? <InlineError>{brandCreateError}</InlineError> : null}
       <div className="grid gap-2">
         <div className="flex items-center justify-between gap-2">
           <Text weight="semibold">Items</Text>

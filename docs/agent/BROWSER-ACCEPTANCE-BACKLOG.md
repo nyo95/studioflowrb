@@ -411,3 +411,19 @@ this backlog's former SF-A entries.)_
 - Steps: 1. With both modules enabled, open Ideas and Presentation and confirm their existing workflows. 2. Disable Ideas; reload and inspect the rail and project-note image actions, then open the old Ideas URL. 3. Re-enable Ideas and confirm the same card returns. 4. Repeat for Presentation, including its project tab, moodboard entry points, board URL, and print URL.
 - Acceptance: enabled behavior is unchanged; disabled entries disappear without breaking surrounding layouts; disabled URLs are not-found; enabling restores the same saved data.
 - Status: PASS except the note-image buttons (R8.500, Lead, home dev database): rail Ideas entry, Ideas URL not-found, Ideas-card "Add to moodboard…" hidden with Presentation off, project Presentation tab gone with the tab bar intact, Presentation URL not-found, both back with the same cards and board after enabling. The home database has no phase-note image, so the note-image buttons were checked in code only; still to walk once a note has an image.
+
+### [R9.51] Create and select a Brand without leaving New price
+- Surface: `/masterdata/pricing` → New price → Material → Brand
+- Fixture: staff with material-price, SKU and Brand manage access; an active product category, unit and supplier
+- Viewport: desktop (default)
+- Steps: 1. Fill a price row. 2. Search for a new Brand name and choose Create brand. 3. Confirm the stored, title-cased name is selected without losing the row. 4. Add a New SKU row and save its price. 5. Open Brands and inspect the new Brand.
+- Acceptance: the Brand is immediately available and selected, existing row input survives, the saved new SKU carries that Brand, and the Brand has no owner; supplier/category enrichment follows the existing price-save path.
+- Status: PENDING
+
+### [R9.51] Brand creation is hidden without Brand manage access
+- Surface: `/masterdata/pricing` → New price → Material → Brand
+- Fixture: staff with material-price manage and Brand read access, without Brand manage
+- Viewport: desktop (default)
+- Steps: 1. Open New price. 2. Search for an unknown Brand name. 3. Select an existing Brand.
+- Acceptance: no Create brand option is offered; existing Brands remain selectable.
+- Status: PENDING

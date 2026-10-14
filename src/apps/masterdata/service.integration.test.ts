@@ -86,6 +86,45 @@ after(async () => {
   await closeTestDb(testDb);
 });
 
+describe("Name-only Brand creation from pricing", () => {
+  it("returns the stored name and creates no owner or related profile records", async () => {
+    const result = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "  new panel brand  " });
+    const brand = await service.getBrand({ grants: GRANTS, brandId: result.brandId });
+    assert.equal(result.name, "New Panel Brand");
+    assert.equal(result.name, brand.name);
+    assert.equal(brand.owner_vendor_id, null);
+    assert.equal(brand.notes, null);
+    assert.deepEqual(brand.categories, []);
+    assert.deepEqual(brand.suppliers, []);
+    assert.deepEqual(brand.contacts, []);
+    assert.deepEqual(brand.links, []);
+    assert.deepEqual(brand.hashtags, []);
+    await assert.rejects(
+      service.createBrand({ grants: GRANTS, actor: ACTOR, name: "NEW PANEL BRAND" }),
+      (error: unknown) => error instanceof AppError && error.kind === "CONFLICT",
+    );
+    assert.equal(await testDb.prisma.brand.count(), 1);
+  });
+
+  it("requires brand-manage even when the user can manage prices and read brands", async () => {
+    await assert.rejects(
+      service.createBrand({ grants: GRANTS.filter((grant) => grant !== MASTERDATA_PERMISSIONS.brandManage), actor: ACTOR, name: "Forbidden Brand" }),
+      (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN",
+    );
+    assert.equal(await testDb.prisma.brand.count(), 0);
+  });
+
+  it("rejects an empty or whitespace-only name without creating a brand", async () => {
+    for (const name of ["", "   "]) {
+      await assert.rejects(
+        service.createBrand({ grants: GRANTS, actor: ACTOR, name }),
+        (error: unknown) => error instanceof AppError && error.code === "BRAND_NAME_REQUIRED",
+      );
+    }
+    assert.equal(await testDb.prisma.brand.count(), 0);
+  });
+});
+
 describe("Supplier and Brand contacts", () => {
   it("keeps up to three phone numbers per contact and rejects a fourth", async () => {
     const context = await createMaterialContext();

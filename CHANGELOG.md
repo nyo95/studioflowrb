@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.51 | 2026-10-14 | feat(masterdata): Create a Brand from the New price picker (Executor)
+
+- **WO-MD-PRICE-BRAND-01 / owner:** create a Brand without leaving Pricing. The existing Material Brand picker offers Create brand only with Brand manage access, selects the newly stored name immediately, and retains price-row input. Existing New SKU rows use the selected Brand through the unchanged bulk save path.
+- **Action/service:** name-only quick creation (1–64 characters), existing authentication, Brand manage enforcement, title casing, duplicate protection and audit. The Brand service additionally returns its stored name; no owner, supplier, category, contact, link or hashtag is supplied. Pricing, SKUs, Brands and Master Data are revalidated; failures stay inline and preserve selection.
+- **Schema/migrations/dependencies:** none for this change. Reuses the existing Brand service, CreatableSearch, option overlay and InlineError.
+- **Checks:** isolated copy of committed R9.49 plus exactly the four owned source/test files: npm test **1115/1115**, typecheck, full eslint (0 errors; one existing Presentation img warning), boundary check, legacy-runtime check, default Turbopack production build and whitespace PASS. A dedicated disposable rebuild-only test database was migrated from the committed baseline; the shared dev/test databases and uncommitted Presentation migration were not changed. Initial build attempts with a dependency junction failed; the final build used its own installed locked dependencies and passed.
+- **Limitations/handoff:** the supplied R9.50 plan/changelog are still uncommitted; execution uses the reserved R9.51 without staging them. Main-checkout typecheck exposes the existing unfinished Presentation schema/client changes, so whole-tree integration with that work remains for the Lead. Two Reviewer browser journeys appended to BROWSER-ACCEPTANCE-BACKLOG.md; browser acceptance pending. Preserve the original PLAN.md, R9.50 changelog entry, Presentation schema/migration and owner's test/. No push.
+
 ## R9.49 | 2026-10-14 | feat(bq): The quotation's issuer has its own name and logo in Quotation settings (Lead)
 
 - **Owner 2026-10-14:** "di header ada RAD - sebenernya BQ itu namanya beda sih nantinya (kontraktor =/= konsultannya); tambahin di setting bisa?" Also: a box longer than one page may still split ("gamasalah sih, yang penting rapih tablingnya"); unchanged.

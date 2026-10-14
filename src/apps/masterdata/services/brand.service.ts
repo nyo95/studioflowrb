@@ -129,7 +129,7 @@ export function createBrandService(db: PrismaClient, ports: MasterDataServicePor
         }
         if (input.contacts && input.contacts.length > 0) await syncBrandContacts(tx, brandId, input.contacts, { ownerVendorId: input.ownerVendorId ?? null, supplierIds: suppliers.map((supplier) => supplier.vendorId) });
         await writeAudit(ports, tx, { action: "brand.created", entityType: "brand", entityId: brandId, actor: input.actor, metadata: { slug, owner_vendor_id: input.ownerVendorId ?? null, contacts: input.contacts?.length ?? 0 } });
-        return { brandId };
+        return { brandId, name: brand!.name };
       });
     },
 
