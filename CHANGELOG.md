@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.58 | 2026-10-14 | review(studioflow): WO-SF-NOTES-CHAT-01 R9.57 CORRECTION REQUIRED (Lead)
+
+- **Reviewed R9.57 (0c2356b)** against PLAN.md decisions 1–10. Schema, migration, parser, same-project checks, tag rules, paging, filters and actions accepted.
+- **Corrections for R9.59:** `next-env.d.ts` (generated, owner-preserved) was committed and must be restored; orphan-tag cleanup deletes across all projects and must be scoped to the project; item names index options in database label order while `active_index` follows the Schedule's `compareOptionLabels` order, so `A2`/`A10` names can be wrong; most plan-named integration tests are missing.
+- **Checks:** review only (diff read; Executor's 1117/1117 not re-run). No push.
+
 ## R9.57 | 2026-10-14 | feat(studioflow): Make project notes one linked chat (Executor)
 
 - **Notes chat:** Workspace cards now support an in-project reply target, topic tags and Product Schedule item links. Reads expose the project-wide newest-first stream with cursor/filtering, tag suggestions, Schedule-item search, and notes for one item; phase-scoped notes keep working.
