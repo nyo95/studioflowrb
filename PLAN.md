@@ -1,75 +1,62 @@
 # Active Plan
 
-Plan ID: WO-BQ-SLICE3-UI-01 (BQ Slice 3 screen: select Cost Components, group them and move them, plus the contract nouns)
-Scope: BQ project screen only — Slice 3 UI on the R9.03 backend, and the user-facing nouns back to the contract's terms
-Module(s): bq (core)
-Target revisions: Executor R9.20 (nouns) and R9.21 (Slice 3 UI), on branch `codex/bq-slice3` in its own worktree
-Executor: Codex, with the UI included — owner 2026-10-14: "lanjutin jg si BQ - oper aja ke codex (termasuk ui nya - slice 3) jalan paralel". This overrides the usual Lead-owns-UI split for this Work Order only.
+Plan ID: WO-HARDEN-AUDIT-01 (open `[BUG]` / `[CLEANUP]` items and the 14 October audit leftovers, backend lane)
+Scope: five independent backend fixes, one local commit each
+Module(s): studioflow (core), presentation (optional), ideas (optional, only to move the moodboard path out), masterdata (tests only), platform (Prisma schema annotations only)
+Target revisions: Executor R9.30–R9.34 on branch `codex/harden-audit-01` in its own worktree
+Executor: Codex
 Status: READY
 
 ## Why
 
-The Slice 3 backend landed and was reviewed PASS in R9.03 (`previewLineItemMove`, `moveLineItems`, `groupLineItems`). The estimator still cannot use it: the screen has no way to select Cost Components, group them or move them. The owner also decided to use the contract's nouns on the screen (BACKLOG BQ, "Terms"), and the new UI must use them from the start.
+Owner 2026-10-14: "planning pekerjaan2 dan penyelesaian KB / error dari audit - bagi yg mana codex kerjakan ... kerjakan sekaligus". The Lead takes the UI items (R9.25–R9.29) on `main` at the same time; this plan is the backend lane. Items deliberately left out (accepted P3 risks, items waiting for the estimator) are listed in the Lead's plan and are not in scope here.
 
-## Running in parallel with the Lead (owner decision)
+## Running in parallel with the Lead (same rules as WO-BQ-SLICE3-UI-01)
 
-The Lead keeps working on `main` in the main checkout (StudioFlow Workspace module, R9.08 onward) at the same time. To keep both safe:
+- Work only in the worktree `D:\Misc\ProjectsHUB\studioflowrb-codex` on branch `codex/harden-audit-01` (created by the Lead from the commit holding this plan). Never edit, stage, commit or check out anything in `D:\Misc\ProjectsHUB\studioflowrb`.
+- Revisions **R9.30–R9.34** are yours (the Lead uses R9.24–R9.29). The Lead reviews and merges.
+- Test database: the existing disposable `studioflow_rebuild_test_bq` in the rebuild-only container `studioflowrb-gateb-test-db` on `localhost:5433` (never `studioflow-db-1` on :5432, legacy and forbidden). The worktree's own uncommitted `.env.test.local` points `DATABASE_URL` and `PLATFORM_TEST_DATABASE_URL` at it (derive from the main checkout's `.env.test.local`; never print or commit credentials). Run `prisma migrate deploy` against it first and after each migration you add. Never point a test or migration at `studioflow_rebuild_test` or `studioflow_rebuild`.
+- No dev server on :3001, no Playwright. `npm ci` in the worktree is fine. Production build with `NEXT_DIST_DIR=.next-verify`, delete that folder, restore `tsconfig.json` / `next-env.d.ts` if the build rewrote them.
+- Do not touch: `PLAN.md`, `src/platform/ui_engine/**`, `src/platform/authenticated-shell/**`, Master Data screens, `e2e/**`, `docs/agent/**` other than an append to `BROWSER-ACCEPTANCE-BACKLOG.md`. Those are the Lead's lane right now.
 
-- **Work only in the worktree** `D:\Misc\ProjectsHUB\studioflowrb-bq` on branch `codex/bq-slice3` (the Lead creates it from the commit that holds this plan). Never edit, stage, commit or check out anything in `D:\Misc\ProjectsHUB\studioflowrb`.
-- **Touch only BQ files**: `src/app/(platform)/bq/**`, `src/apps/bq/**` (only if a test needs it; no service change is planned), `docs/apps/bq/**`, `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` (append only), `CHANGELOG.md` (your own entries at the top), and the BQ section of `docs/BACKLOG.md`. Do not touch `PLAN.md`, StudioFlow, Platform, UI Engine, Prisma schema or migrations. If the outcome seems to need any of those, stop with BLOCKED / CONFLICT.
-- **Revisions R9.20 and R9.21** are reserved for you, so your numbers never collide with the Lead's (R9.08–R9.19). The Lead merges the branch into `main` later, after review and the owner's OK.
-- **Own test database.** Create (if missing) a disposable database `studioflow_rebuild_test_bq` in the rebuild-only container `studioflowrb-gateb-test-db` on `localhost:5433` (never the container `studioflow-db-1` on :5432, which is legacy and forbidden). Put its URL in the worktree's own, uncommitted `.env.test.local` (`DATABASE_URL` and `PLATFORM_TEST_DATABASE_URL`), derived from the credentials in the main checkout's `.env.test.local`; never print or commit them. Apply migrations to it with `prisma migrate deploy` before `npm test`. The shared `studioflow_rebuild_test` is the Lead's during this run: never point a test at it.
-- **No dev server on :3001, no Playwright** (both would collide with the Lead's). `npm ci` in the worktree is fine. Browser checks go to `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` for the Lead.
-- **Production build** with `NEXT_DIST_DIR=.next-verify` and delete that folder afterwards; restore `tsconfig.json` and `next-env.d.ts` if the build rewrote them.
+## R9.30 — Iteration kinds read from the project's snapshot (`[BUG][P3]`, contract §5.1)
 
-## Authority
+Problem: `iterationKinds(phase.definition.default_iteration_kinds)` reads the live phase definition, so editing a template's iteration kinds changes the CD Mall → CD Final workflow, step names and rename lock of projects already running.
+Fix: add a snapshot column on `sf_phase` (e.g. `iteration_kinds_snapshot Json`, not null after backfill), filled at project creation from the definition, backfilled for existing phases in a forward-only migration named `<timestamp>_studioflow_phase_iteration_kinds_snapshot`. Read the snapshot everywhere the live definition is read today: `src/apps/studioflow/phases/service.ts` (around lines 269, 349, 381, 600, 642), `src/apps/studioflow/projects/service.ts` (around 543, 753), `src/apps/studioflow/workspace/service.ts` (around 497, 616) — search `default_iteration_kinds` to be complete. Keep `iterationKinds()` as the parser. Tests: the existing CD chain test that edits the definition after the project exists must now show the old project unchanged; a migration test (pattern: `src/apps/studioflow/workspace/workflow-record-migration.integration.test.ts`) proves the backfill.
 
-- Owner-approved mockup (read already by the Lead; the essentials are below): https://claude.ai/artifact/JvC6p9CXuXmcrdYqcdmwwh
-- `docs/apps/bq/bq-contract.md` §3 for the user-facing nouns; `docs/apps/bq/bq-ux-spec.md` for the screen.
-- BACKLOG `## BQ`: the two `[PLANNED][P1]` items "Slice 3 UI wiring" and "Terms".
-- Backend: `src/apps/bq/services/line-item-moves.ts`, actions `previewLineItemMoveAction`, `moveLineItemsAction`, `groupLineItemsAction` in `src/app/(platform)/bq/[id]/actions.ts`.
-- UI Engine components only (`@/platform/ui_engine`): Checkbox, Button, Dialog, RowActionMenu or the existing menu component, Field/Input, InlineError, Notice, the existing toast/notice pattern on this screen. No raw legacy `ui-*` classes, no new dependency.
+## R9.31 — "Add to moodboard" from a Workspace image without Ideas (audit P3, module independence)
 
-## R9.20 — nouns (one pass, no behavior change)
+Problem: a Workspace/Notes image reaches the Presentation moodboard through `src/application/presentation-image-coordinator.ts` → `ideas.readNoteImageSource`, so the button needs the Ideas module on and the Ideas permission.
+Fix: Presentation reads the image source itself through StudioFlow's public bridge (`src/apps/studioflow/public/presentation-bridge.ts` / `-runtime.ts`; add a `readWorkspaceImageSource` there with the same checks as the Ideas bridge's), and exposes its own public action (under `src/apps/presentation/public/`) gated by the Presentation module and `STUDIOFLOW_PERMISSIONS.presentationManage`, reusing `addStoredImageToMoodboard`. Minimal wiring: `src/app/(platform)/studioflow/projects/[projectId]/round-labels.tsx` shows "Add to moodboard" when Presentation is enabled and the user may manage presentations, independent of Ideas. The Ideas *card* → moodboard path (`addIdeaImageToMoodboard`) stays. Remove `addNoteImageToPresentationMoodboard` and Ideas' `addNoteImageToMoodboardAction` once nothing calls them. Update manifests' `requires` so `check:boundaries` passes. Tests: the existing "adds a card or a note image to the project's Moodboard board" integration test, split so the note-image half runs with Ideas disabled.
 
-Revert the screen's nouns from the R8.545–R8.549 proposal to the contract's terms (bq-contract §3): Bagian → Section, Subbagian → Subsection, Pekerjaan → Work Item, Kelompok rincian → Component Group, Rincian biaya → Cost Component, Resep → Assembly; price modes TBC and By Owner ("Disediakan owner" → By Owner). Sentences stay in the screen's current language (mixed is acceptable); only the nouns change. Files: `bq/[id]/project-editor.tsx`, `new-work-item-dialog.tsx`, `save-as-assembly-dialog.tsx`, `add-section-dialog.tsx`, `page.tsx`, `assembly-picker-dialog.tsx`, and any other BQ screen string or test that names them. Update tests that assert the old nouns. Close the BACKLOG "Terms" item with the revision.
+## R9.32 — Schedule and Presentation image deletes enqueue their cleanup inside the transaction (`[CLEANUP][P3]`)
 
-## R9.21 — Slice 3 UI (locked behavior)
+Problem: they decide and remove after commit (`removeUnreferenced`); a crash between commit and removal leaves an orphaned object that the cleanup ledger never heard of.
+Fix: follow the deliverable/MOM pattern of R8.372 — `enqueueUnreferencedCleanup(tx, keys)` inside the deleting transaction, `discardObjects(db, storage, keys)` after it (`src/apps/studioflow/asset-cleanup.ts`; example `deleteCard` in `src/apps/studioflow/workspace/service.ts`). Presentation keeps its own copy of the pattern behind its own boundary if it cannot import StudioFlow internals. Tests: a storage failure after commit leaves a ledger entry that the sweep later removes; an object still referenced elsewhere is kept.
 
-Inside one Work Item's table (direct Cost Components and its Component Groups):
+## R9.33 — Schema drift (`[CLEANUP][P3]`)
 
-1. **Select.** A checkbox at the start of every Cost Component row (direct and inside groups), and a header checkbox "select all Cost Components of this Work Item". Selection is per Work Item: choosing rows in another Work Item clears the first selection. A selected row is tinted.
-2. **Selection bar** above that Work Item's rows while anything is selected: "N dipilih", **Kelompokkan…**, **Pindahkan ke ▾**, **Batal pilih**.
-3. **Pindahkan ke ▾** is a menu: "Langsung di Work Item" (direct), each existing Component Group of this Work Item with its quantity and markup shown small (e.g. "×2 · 10%"), a separator, "Component Group baru…" (opens the group dialog). If every selected row is already in the chosen place, show "Sudah di sana." and call nothing.
-4. **Kelompokkan…** opens a dialog: name (default "Component Group baru", trimmed, required), quantity per Work Item (default 1, must be > 0), markup % (default 0, 0 to 999.9999, the existing markup rule). Hint: with ×1 and 0% the Work Item price does not change. "Lanjut" runs the preview.
-5. **Every move or group first calls `previewLineItemMoveAction`** (target `{direct:true}`, `{subObjectId}`, or `{newGroup:{qtyPerL1,markupL2Pct}}`). The screen never computes prices itself.
-   - Preview says nothing changes → apply at once (`moveLineItemsAction` or `groupLineItemsAction`), no dialog, then a short confirmation ("Selesai. Harga Work Item tidak berubah.").
-   - Preview says it changes → a dialog "Harga Work Item akan berubah": a sentence naming how many rows go where, then a table Sebelum / Sesudah for unit rate and total, and the total difference. **Batal** changes nothing ("Dibatalkan. Tidak ada yang berubah."); **Pindahkan** applies.
-6. **After apply** the screen shows the returned project tree (the actions return the reloaded `BqProjectDetail`), clears the selection, briefly highlights the moved rows, and keeps the Work Item and groups open as they were.
-7. **Refused or stale.** A refusal shows in the screen's existing error place. A stale list (`bq.line-item.move-stale`) shows "Daftar berubah. Muat ulang untuk melihat yang terbaru." and refreshes the project; nothing is applied.
-8. **Locked or archived** project: no checkboxes, no selection bar (the server refuses anyway).
-9. **Empty groups stay**, shown as "Component Group kosong". No drag, no reordering inside a group, no move to another Work Item (owner 2026-10-14).
-10. Keyboard: checkboxes and menu reachable by Tab; Escape closes the menu and dialogs; buttons show pending while a call runs and cannot be pressed twice.
+`platform.developer_access`, `developer_recovery_code`, `developer_session` timestamps are `timestamptz` in the migrations but plain `DateTime` in `prisma/schema/platform.prisma`; `studioflow.sf_holiday` differs in id type, timestamp precision and the `updated_at` default. Align the schema annotations to what the migrations created (`@db.Timestamptz(…)`, the id type, `@default`); add a corrective migration only where the database itself must change. Evidence: `prisma migrate diff --from-config-datasource --to-schema prisma/schema --script` against a freshly migrated `studioflow_rebuild_test_bq` prints nothing. Never pass any database as `--shadow-database-url`.
 
-## Executor verification (before each commit)
+## R9.34 — Fault-injection test for the several-suppliers grid (`[CLEANUP][P3]`, R8.421)
 
-`npm test` (on `studioflow_rebuild_test_bq`), typecheck, lint, `check:boundaries`, `check:legacy-runtime`, production build (separate folder), `git diff --check` staged and unstaged. Add focused tests where the screen has pure logic (selection per Work Item, the menu's targets, the same-place no-op, building the action input), following the existing BQ UI tests. One local commit per revision on `codex/bq-slice3`, changelog entry per revision. No push, no merge.
+The unexpected-error branch of the several-suppliers grid has no test (the per-row isolation of R8.419 has none either). Add tests that inject an unexpected failure and prove the grid reports it without saving partial state, following the existing Master Data service test style. Tests only; no behavior change unless a test proves a defect (then stop and report it).
 
-## Reviewer acceptance (Lead, after the commits; browser)
+## Executor verification (each commit)
 
-Append these to `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`: group two direct rows with the defaults (price unchanged, no dialog); move one row into a group with quantity 2 and markup 10 (dialog shows the new rate; Batal changes nothing; Pindahkan applies); move it back to direct; locked project shows no checkboxes; a second tab makes the first stale and shows the refresh message; the nouns read Section / Subsection / Work Item / Component Group / Cost Component / Assembly / TBC / By Owner everywhere on the project screen.
+`npm test` (on `studioflow_rebuild_test_bq`), typecheck, lint, `check:boundaries`, `check:legacy-runtime`, production build (separate folder), `git diff --check` staged and unstaged. Changelog entry per revision; close the matching BACKLOG line in the same commit. No push, no merge.
 
-## Non-goals
+## Reviewer acceptance (Lead)
 
-Drag and drop; reordering Cost Components or Component Groups; moving to another Work Item; deleting empty groups automatically; changing the backend or the calculation; any StudioFlow or Platform change.
+Code review of each commit; after merge the Lead migrates the kantor dev and test databases and re-runs the full suite. Browser checks, if any, go to `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` (likely only: "Add to moodboard" visible with Ideas off and Presentation on).
 
 ## Executor Prompt
 
 ```text
-You are the BACKEND EXECUTOR (Codex) for StudioFlowRB, with the UI included for this Work Order by owner decision.
-Location: kantor. Read AGENTS.md, docs/agent/EXECUTOR.md, then PLAN.md (WO-BQ-SLICE3-UI-01) in the worktree D:\Misc\ProjectsHUB\studioflowrb-bq, branch codex/bq-slice3.
-The Lead works in parallel on main in D:\Misc\ProjectsHUB\studioflowrb: never touch that checkout, its dev server (:3001), Playwright, or the shared test database. Follow "Running in parallel with the Lead" in PLAN.md exactly (own test database studioflow_rebuild_test_bq in the rebuild-only container on :5433; never the legacy container on :5432).
-Deliver R9.20 (contract nouns on the BQ screen) and R9.21 (Slice 3 select / group / move UI on the R9.03 backend) as two local commits on codex/bq-slice3, with the full commit gate passing. No push, no merge.
-Stop with BLOCKED / CONFLICT if the outcome needs a file outside the BQ scope listed in PLAN.md.
-End with one copy-ready Planner/Reviewer prompt: outcome, commits, exact check results, browser-backlog additions, limitations, dirty files.
+You are the BACKEND EXECUTOR (Codex) for StudioFlowRB. Location: kantor.
+Read AGENTS.md, docs/agent/EXECUTOR.md, then PLAN.md (WO-HARDEN-AUDIT-01) in the worktree D:\Misc\ProjectsHUB\studioflowrb-codex, branch codex/harden-audit-01.
+The Lead works in parallel on main in D:\Misc\ProjectsHUB\studioflowrb: never touch that checkout, its dev server (:3001), Playwright, or the shared test databases. Follow "Running in parallel with the Lead" in PLAN.md exactly (test database studioflow_rebuild_test_bq in the rebuild-only container on :5433; never the legacy container on :5432; never use a database as a Prisma shadow database).
+Deliver R9.30-R9.34 as five local commits on codex/harden-audit-01, each with the full commit gate passing. No push, no merge.
+Stop with BLOCKED / CONFLICT if an item needs a file outside the scope in PLAN.md or contradicts the repository.
+End with one copy-ready Planner/Reviewer prompt: outcome per revision, commits, exact check results, browser-backlog additions, limitations, dirty files.
 ```

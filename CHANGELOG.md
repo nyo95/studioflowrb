@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.24 | 2026-10-14 | docs(plan): WO-HARDEN-AUDIT-01 for Codex; Lead lane R9.25-R9.29 in parallel (Lead)
+
+- **Owner 2026-10-14:** "planning pekerjaan2 dan penyelesaian KB / error dari audit - bagi yg mana codex kerjakan ... kerjakan sekaligus"; plan approved, including the merge of the Codex branch after a review PASS (no push).
+- **Codex lane (`PLAN.md`, R9.30-R9.34, branch `codex/harden-audit-01` in worktree `studioflowrb-codex`):** iteration kinds from the project snapshot (BACKLOG [BUG][P3]); Workspace image to moodboard through Presentation without Ideas (audit P3); Schedule/Presentation image deletes enqueue cleanup inside the transaction; schema drift annotations; fault-injection test for the several-suppliers grid.
+- **Lead lane on `main`:** notes editor list buttons on an empty note; SKU picker exact-match and sample "Already received" tone; shell hydration mismatch; the old Notes e2e spec; review and merge of the Codex branch.
+- **Left out on purpose:** accepted P3 risks (BQ move preview re-check and message order, archive restore/purge window, two-person board geometry), `setSampleStatus` caller-supplied name (one caller today), items waiting for the estimator.
+- The merged `codex/bq-slice3` branch is deleted; its worktree is reused for the new branch. **Migrations/dependencies:** none. **Checks:** docs only. No push.
+
 ## R9.23 | 2026-10-14 | merge(bq): BQ Slice 3 branch into main (Lead)
 
 - **Owner 2026-10-14:** "ya, gabungkan ke main". `codex/bq-slice3` (R9.20-R9.22) merged into `main` after the R9.22 review PASS; only CHANGELOG.md conflicted (both sides kept, branch entries above R9.09). **Checks:** typecheck PASS; full `npm test` **1,093/1,093 PASS** on the kantor test database. No push.
