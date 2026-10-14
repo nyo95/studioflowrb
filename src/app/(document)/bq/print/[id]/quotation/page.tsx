@@ -33,7 +33,7 @@ function ItemLine({ number, item }: { number: string; item: BqItemDetail }) {
   return (
     <tr className="break-inside-avoid border-b border-neutral-200 align-top">
       <td className="py-1.5 pr-2 tabular-nums text-neutral-500">{number}</td>
-      <td className="py-1.5 pr-2">{item.name}</td>
+      <td className="py-1.5 pr-2">{item.name}{item.specification ? <span className="block whitespace-pre-line text-xs text-neutral-500">{item.specification}</span> : null}</td>
       <td className="py-1.5 pr-2 text-right tabular-nums">{quantity(item.qty)}</td>
       <td className="py-1.5 pr-2">{item.unit}</td>
       <td className="py-1.5 pr-2 text-right tabular-nums">{marker ? BQ_PRICE_MODE_LABEL[item.priceMode] : idr(item.rate)}</td>

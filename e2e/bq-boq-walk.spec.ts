@@ -6,7 +6,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 /**
  * Owner 2026-10-14: type a real contractor BOQ ("test/BOQ TEST.xlsx", not committed) into the BQ screens, one sheet
  * per part, to see where the screens get in the way. Sheets → Sections, lettered groups → Subsections, numbered rows →
- * Work Items with a direct price; "By Owner" → By Owner, an empty rate → TBC. Every problem is collected (not thrown)
+ * Work Items with a direct price and their specification, typed in the quick entry row (the last sheet is pasted
+ * through "Tempel dari Excel"); "By Owner" → By Owner from the right-click menu, an empty rate → TBC. Every problem is collected (not thrown)
  * into e2e/.tmp/boq-walk-findings.json, and each part compares the screen's grand total with the Excel rows.
  */
 const WORKBOOK = "test/BOQ TEST.xlsx";
@@ -67,8 +68,6 @@ async function readWorkbook(): Promise<Sheet[]> {
   return sheets;
 }
 
-/** Excel units → the studio's unit codes. */
-const UNIT_MAP: Record<string, string> = { "ls": "ls", "m2": "m2", "m'": "m", "m": "m", "titik": "point", "unit": "unit", "pcs": "pcs", "set": "set" };
 
 function rupiah(text: string): number | null {
   const digits = text.replace(/[^\d]/g, "");
@@ -91,42 +90,44 @@ async function openProject(page: Page) {
 const subsectionBox = (page: Page, name: string) =>
   page.locator('[id^="bq-subsection-"]').filter({ has: page.getByRole("button", { name: `Nama Subsection: ${name}`, exact: true }) }).last();
 
+/** Types one Excel row into the quick entry row under the Subsection's table (Enter saves); By Owner by right-click. */
 async function addRow(page: Page, part: string, box: Locator, row: Row) {
   const where = `Excel row ${row.excelRow} "${row.name}"`;
-  await box.getByRole("button", { name: /^Work Item di / }).click();
-  const dialog = page.getByRole("dialog", { name: "Tambah Work Item" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Nama Work Item").fill(row.name);
-  await dialog.getByLabel("Jumlah").fill(String(row.qty));
-  const wanted = UNIT_MAP[row.unit.toLowerCase()] ?? row.unit.toLowerCase();
-  const options = await dialog.getByLabel("Satuan Work Item").locator("option").allTextContents();
-  if (options.includes(wanted)) await dialog.getByLabel("Satuan Work Item").selectOption(wanted);
-  else note(part, where, `Excel unit "${row.unit}" has no matching unit (looked for "${wanted}"); kept "${await dialog.getByLabel("Satuan Work Item").inputValue()}".`);
-  await dialog.getByRole("button", { name: "Tambah Work Item" }).click();
-  await expect(dialog).toBeHidden({ timeout: 15_000 });
-  if (row.spec) note(part, where, `Specification has no place on a Work Item and is left out: "${row.spec.slice(0, 80)}".`);
-
-  // The new row is the last one with this name in its Subsection; open it in the side panel.
-  const tableRow = box.locator('tr[id^="bq-row-"]').filter({ has: page.getByRole("button", { name: `Nama Work Item: ${row.name}`, exact: true }) }).last();
-  await expect(tableRow).toBeVisible();
-  await tableRow.locator("td").nth(2).click();
-  // By role and name: a name may hold quotes (e.g. 8" for inches), which would break a CSS attribute selector.
-  const panel = page.getByRole("complementary", { name: `Work Item ${row.name}`, exact: true });
-  await expect(panel).toBeVisible();
-  if (row.rate.mode === "PRICED") {
-    const amount = row.rate.amount;
-    await panel.getByRole("button", { name: /^Harga satuan/ }).click();
-    await page.keyboard.type(String(amount));
-    await page.keyboard.press("Enter");
-    await expect(panel.getByRole("button", { name: new RegExp(`^Harga satuan: ${row.rate.amount}(\\.0+)?$`) })).toBeVisible({ timeout: 15_000 })
-      .catch(() => note(part, where, `Unit price ${amount} did not show as saved in the panel.`));
-    expectedSoFar += Math.round(row.qty * amount * 100) / 100;
-  } else {
-    await panel.getByLabel(`Status harga ${row.name}`).selectOption(row.rate.mode);
-    await expect(panel.getByLabel(`Status harga ${row.name}`)).toHaveValue(row.rate.mode, { timeout: 15_000 })
-      .catch(() => note(part, where, `Price status ${row.rate.mode} did not stay selected.`));
+  const entry = box.getByRole("group", { name: /^Isi cepat di / });
+  const before = await box.locator('tr[id^="bq-row-"]').count();
+  await entry.getByLabel("Nama pekerjaan baru", { exact: true }).fill(row.name);
+  if (row.spec) await entry.getByLabel("Spesifikasi pekerjaan baru", { exact: true }).fill(row.spec.slice(0, 1000));
+  await entry.getByLabel("Jumlah pekerjaan baru", { exact: true }).fill(String(row.qty));
+  await entry.getByLabel("Satuan pekerjaan baru", { exact: true }).fill(row.unit);
+  await entry.getByLabel("Harga satuan pekerjaan baru", { exact: true }).fill(row.rate.mode === "PRICED" ? String(row.rate.amount) : "");
+  await entry.getByLabel("Harga satuan pekerjaan baru", { exact: true }).press("Enter");
+  await expect(box.locator('tr[id^="bq-row-"]')).toHaveCount(before + 1, { timeout: 15_000 });
+  await expect(entry.getByLabel("Nama pekerjaan baru", { exact: true })).toHaveValue("");
+  if (row.rate.mode === "PRICED") expectedSoFar += Math.round(row.qty * row.rate.amount * 100) / 100;
+  if (row.rate.mode === "BY_OWNER") {
+    const tableRow = box.locator('tr[id^="bq-row-"]').last();
+    await tableRow.locator("td").nth(2).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Tandai By Owner" }).click();
+    await expect(tableRow).toContainText("By Owner", { timeout: 15_000 }).catch(() => note(part, where, "By Owner from the right-click menu did not show."));
   }
-  await panel.getByRole("button", { name: "Tutup panel" }).click();
+}
+
+/** The whole group at once through "Tempel dari Excel", the way an estimator copies it out of the sheet. */
+async function pasteGroup(page: Page, part: string, box: Locator, group: Group) {
+  const before = await box.locator('tr[id^="bq-row-"]').count();
+  const cell = (text: string) => (/[\t\n"]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text);
+  const lines = ["DESCRIPTION\tSPECIFICATION\tVOL\tSAT\tRATE", ...group.rows.map((row) =>
+    [row.name, row.spec, String(row.qty), row.unit, row.rate.mode === "PRICED" ? String(row.rate.amount) : row.rate.mode === "BY_OWNER" ? "By Owner" : ""].map(cell).join("\t"))];
+  await box.getByRole("button", { name: "Tempel dari Excel" }).click();
+  const dialog = page.getByRole("dialog", { name: "Tempel dari Excel" });
+  await dialog.getByLabel("Kotak tempel").fill(lines.join("\n"));
+  await expect(dialog.getByText(`${group.rows.length} pekerjaan terbaca`)).toBeVisible()
+    .catch(async () => note(part, group.name, `Paste read ${(await dialog.getByText(/pekerjaan terbaca/).textContent()) ?? "nothing"}, expected ${group.rows.length}.`));
+  await dialog.getByRole("button", { name: /^Masukkan/ }).click();
+  await expect(dialog).toBeHidden({ timeout: 30_000 });
+  await expect(box.locator('tr[id^="bq-row-"]')).toHaveCount(before + group.rows.length, { timeout: 15_000 })
+    .catch(() => note(part, group.name, "Not every pasted row arrived."));
+  for (const row of group.rows) if (row.rate.mode === "PRICED") expectedSoFar += Math.round(row.qty * row.rate.amount * 100) / 100;
 }
 
 async function grandTotal(page: Page): Promise<number | null> {
@@ -161,6 +162,7 @@ for (const index of [0, 1, 2, 3]) {
     test.skip(!sheet, "The workbook has fewer sheets.");
     const part = sheet!.name;
     await openProject(page);
+    const started = Date.now();
     const outline = page.getByRole("navigation", { name: "Struktur dokumen" });
 
     await outline.getByRole("button", { name: "Section", exact: true }).click();
@@ -176,6 +178,11 @@ for (const index of [0, 1, 2, 3]) {
       await page.keyboard.press("Enter");
       const box = subsectionBox(page, group.name);
       await expect(box).toBeVisible({ timeout: 15_000 });
+      // The last sheet goes in by pasting, the others row by row.
+      if (index === 3) {
+        await pasteGroup(page, part, box, group).catch((error: Error) => note(part, group.name, `Paste stopped: ${error.message.split("\n")[0]}`));
+        continue;
+      }
       for (const row of group.rows) {
         try {
           await addRow(page, part, box, row);
@@ -186,6 +193,7 @@ for (const index of [0, 1, 2, 3]) {
       }
     }
 
+    note(part, "Waktu", `${sheet!.groups.reduce((sum, group) => sum + group.rows.length, 0)} rows in ${Math.round((Date.now() - started) / 1000)} s (${index === 3 ? "paste" : "quick entry"}).`);
     const shown = await grandTotal(page);
     const expected = Math.round(expectedSoFar);
     if (shown !== expected) note(part, "Total keseluruhan", `Screen shows ${shown ?? "no total"}, the Excel rows add up to ${expected} so far.`);

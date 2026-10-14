@@ -16,6 +16,15 @@ import {
 import { requireRupiah } from "../lib/currency";
 import { BQ_PRICE_MODES, type BqPriceMode } from "../lib/quotation";
 
+const ZERO = toDecimalString("0");
+
+/** A Work Item's specification is plain text the quotation prints; 1000 characters is a long paragraph. */
+function requireSpecification(value: string | null | undefined) {
+  if (value != null && value.trim().length > 1000) {
+    throw new AppError("VALIDATION", "bq.item.specification-too-long", "The specification is at most 1000 characters");
+  }
+}
+
 export function createProjectTreeService(ctx: BqServiceContext) {
   const {
     db,
@@ -175,10 +184,16 @@ async function updateSubsection(input: {
   hargaSnapshot?: string;
   koefisien?: string;
   markupL1Pct?: string;
+  priceMode?: BqPriceMode;
+  specification?: string | null;
   sortOrder?: number;
   notes?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  if (input.priceMode !== undefined && !BQ_PRICE_MODES.includes(input.priceMode)) {
+    throw new AppError("VALIDATION", "bq.item.price-mode-invalid", "Unknown price mode");
+  }
+  requireSpecification(input.specification);
 
   if (!input.sectionId && !input.subsectionId) {
     throw new AppError("VALIDATION", "bq.item.no-parent", "Work Item must belong to a Section or Subsection");
@@ -207,6 +222,8 @@ async function updateSubsection(input: {
         harga_snapshot: input.hargaSnapshot ?? null,
         koefisien: requirePositiveCoefficient(input.koefisien ?? "1"),
         markup_l1_pct: input.markupL1Pct ?? "0",
+        price_mode: input.priceMode ?? "PRICED",
+        specification: input.specification?.trim() || null,
         sort_order: sortOrder,
         notes: input.notes ?? null,
       },
@@ -221,6 +238,74 @@ async function updateSubsection(input: {
     actor: input.actor,
   });
   return item;
+}
+
+/**
+ * Several Work Items at the end of one Section or Subsection in one transaction and one audit event: the rows pasted
+ * from a spreadsheet (owner 2026-10-14). Every row is checked first, so a bad row stops the whole paste before anything
+ * is written; each row may carry its direct unit price, or TBC / By Owner.
+ */
+async function addItems(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  sectionId?: string;
+  subsectionId?: string;
+  rows: Array<{ name: string; qty: string; unit: string; specification?: string | null; hargaSnapshot?: string | null; priceMode?: BqPriceMode }>;
+}) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  if (!input.sectionId && !input.subsectionId) {
+    throw new AppError("VALIDATION", "bq.item.no-parent", "Work Item must belong to a Section or Subsection");
+  }
+  if (input.sectionId && input.subsectionId) {
+    throw new AppError("VALIDATION", "bq.item.dual-parent", "Work Item cannot belong to both a Section and Subsection");
+  }
+  if (input.rows.length === 0) throw new AppError("VALIDATION", "bq.items.empty", "Nothing to add");
+  if (input.rows.length > 500) throw new AppError("VALIDATION", "bq.items.too-many", "Add at most 500 Work Items at once");
+  input.rows.forEach((row, index) => {
+    if (!row.name.trim() || row.name.trim().length > 160) throw new AppError("VALIDATION", "bq.items.name-invalid", `Row ${index + 1}: a name of 1 to 160 characters is needed`);
+    if (compareDecimals(toDecimalString(row.qty), ZERO) <= 0) throw new AppError("VALIDATION", "bq.items.qty-invalid", `Row ${index + 1}: the quantity must be more than 0`);
+    if (row.unit.trim().length > 40) throw new AppError("VALIDATION", "bq.items.unit-invalid", `Row ${index + 1}: the unit is too long`);
+    if (row.priceMode !== undefined && !BQ_PRICE_MODES.includes(row.priceMode)) throw new AppError("VALIDATION", "bq.item.price-mode-invalid", "Unknown price mode");
+    if (row.hargaSnapshot != null && compareDecimals(toDecimalString(row.hargaSnapshot), ZERO) < 0) throw new AppError("VALIDATION", "bq.items.price-invalid", `Row ${index + 1}: the price cannot be negative`);
+    requireSpecification(row.specification);
+  });
+  if (input.sectionId) await requireEditableProjectForSection(input.sectionId);
+  else await requireEditableProjectForSubsection(input.subsectionId!);
+
+  const ids = await runAutomaticSortTransaction(async (tx) => {
+    const first = await nextSortOrder(() => tx.bqItem.aggregate({
+      where: input.sectionId ? { section_id: input.sectionId } : { subsection_id: input.subsectionId },
+      _max: { sort_order: true },
+    }));
+    const created: string[] = [];
+    for (const [index, row] of input.rows.entries()) {
+      const item = await tx.bqItem.create({
+        data: {
+          section_id: input.sectionId ?? null,
+          subsection_id: input.subsectionId ?? null,
+          name: row.name.trim(),
+          qty: toDecimalString(row.qty),
+          unit: row.unit.trim() || "ls",
+          harga_snapshot: row.priceMode && row.priceMode !== "PRICED" ? null : row.hargaSnapshot == null ? null : toDecimalString(row.hargaSnapshot),
+          price_mode: row.priceMode ?? "PRICED",
+          specification: row.specification?.trim() || null,
+          sort_order: first + index,
+        },
+        select: { id: true },
+      });
+      created.push(item.id);
+    }
+    return created;
+  });
+
+  await auditWriter({
+    appId: "bq",
+    action: "bq.items.created",
+    entityType: input.sectionId ? "BqSection" : "BqSubsection",
+    entityId: (input.sectionId ?? input.subsectionId)!,
+    actor: input.actor,
+  });
+  return { ids };
 }
 
 async function reorderItems(input: {
@@ -286,8 +371,10 @@ async function updateItem(input: {
   priceMode?: BqPriceMode;
   sortOrder?: number;
   notes?: string | null;
+  specification?: string | null;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  requireSpecification(input.specification);
   if (input.priceMode !== undefined && !BQ_PRICE_MODES.includes(input.priceMode)) {
     throw new AppError("VALIDATION", "bq.item.price-mode-invalid", "Unknown price mode");
   }
@@ -307,6 +394,7 @@ async function updateItem(input: {
     && fieldUnchanged(input.priceMode, existing.price_mode)
     && fieldUnchanged(input.sortOrder, existing.sort_order)
     && fieldUnchanged(input.notes, existing.notes)
+    && fieldUnchanged(input.specification, existing.specification)
   ) return existing;
 
   const item = await db.bqItem.update({
@@ -321,6 +409,7 @@ async function updateItem(input: {
       ...(input.priceMode !== undefined && { price_mode: input.priceMode }),
       ...(input.sortOrder !== undefined && { sort_order: input.sortOrder }),
       ...(input.notes !== undefined && { notes: input.notes }),
+      ...(input.specification !== undefined && { specification: input.specification?.trim() || null }),
     },
   });
 
@@ -653,6 +742,7 @@ async function deleteLineItem(input: {
     updateSection,
     updateSubsection,
     addItem,
+    addItems,
     reorderItems,
     updateItem,
     deleteItem,

@@ -452,6 +452,7 @@ bq.BqTemplateRecommendation
 
 **L1-only fields:**
 - `BqItem` memiliki `harga_snapshot NUMERIC(18,4)` dan `koefisien NUMERIC(18,6) DEFAULT 1`. Dipakai hanya saat L1 tidak memiliki child.
+- `BqItem.specification TEXT NULL` (owner 2026-10-14, maks. 1000 karakter): keterangan untuk klien, mis. "Gypsum 9mm rangka hollow". Tampil di bawah nama di tabel dan di penawaran cetak; tidak ikut perhitungan.
 
 **Library Item fields:**
 - Seluruh library item (`BqLibMaterial`, `BqLibLabor`, `BqLibMaterialLabor`, `BqLibCustomItem`) memiliki `base_unit` (nullable) dan `kategori` (enum `BqKategori`).
@@ -512,7 +513,33 @@ nilainya diubah — tetap tanpa dialog dan tanpa tombol Simpan: Enter atau
 meninggalkan kolom menyimpan, Escape batal, commit yang ditolak mengembalikan
 nilai sebelumnya (`InlineEdit`). **Nama** (uraian) tetap diubah langsung di tabel,
 dan nama Section/Subsection juga bisa diganti dengan klik dua kali di panel
-Struktur. Kotak centang tetap untuk memilih Cost Component (Slice 3).
+Struktur.
+
+**Memilih, klik kanan, seret (owner 2026-10-14, menggantikan kotak centang Slice 3).**
+Cost Component dipilih seperti di file manager: klik = satu, Ctrl/Cmd + klik =
+tambah/kurangi, Shift + klik = satu rentang dalam Work Item yang sama; Esc batal,
+Delete menghapus (dengan konfirmasi). Saat lebih dari satu dipilih, panel samping
+menjadi panel pilihan (Kelompokkan…, Pindahkan ke, Hapus). Klik kanan sebuah
+baris membuka menu tindakannya (Work Item: buka, tandai Berharga/TBC/By Owner,
+tambah Cost Component, hapus; Component Group: buka, tambah, hapus; Cost
+Component: buka, Kelompokkan…, Pindahkan ke …, hapus — atas pilihan bila baris
+itu termasuk pilihan). Cost Component bisa diseret ke Component Group lain atau
+ke baris Work Item-nya sendiri (keluar dari grup), hanya di dalam Work Item yang
+sama; pemindahan memakai pratinjau dan aturan Slice 3 yang sama. Urutan Work Item
+tetap diatur di panel Struktur.
+
+**Isi cepat dan tempel dari Excel (owner 2026-10-14).** Di bawah setiap tabel ada
+baris isi cepat: nama, spesifikasi, jumlah, satuan, harga; Tab pindah kolom,
+Enter menyimpan dan baris siap untuk pekerjaan berikutnya (satuan diingat). Harga
+kosong = TBC. Satuan kantor seperti "titik" atau "m'" dibaca sebagai kode studio
+(point, m). "Tempel dari Excel" menerima baris yang disalin dari spreadsheet
+(paling banyak 500): kolom ditebak dari judulnya atau isinya dan bisa diubah,
+baris judul grup dan total dilewati, pratinjau ditunjukkan sebelum disimpan, dan
+semuanya masuk dalam satu transaksi (`addItems`). Harga dari Excel ikut dibawa
+secara bawaan, atau bisa dipilih "Isi nanti (TBC)"; "By Owner" di kolom harga
+menjadi By Owner. Ini mengubah catatan BACKLOG 2026-10-08 ("tanpa harga, harga
+selalu dari Master Data") untuk Work Item berharga langsung; harga Cost Component
+tetap dari Master Data / BQ Library.
 
 *Penyisipan* Cost Component tetap punya afordansnya sendiri, karena memilih sumber bukan
 mengubah nilai: "Baris custom" langsung membuat baris kosong yang siap diketik,

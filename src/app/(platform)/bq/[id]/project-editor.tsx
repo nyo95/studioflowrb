@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, ClipboardPaste, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -10,8 +10,8 @@ import {
   Button,
   ButtonMenu,
   buttonClasses,
-  Checkbox,
   ConfirmDialog,
+  ContextActionMenu,
   DataTable,
   Dialog,
   EmptyState,
@@ -24,7 +24,6 @@ import {
   Input,
   Notice,
   SectionCard,
-  SelectionBar,
   Select,
   TableBody,
   TableCell,
@@ -33,6 +32,7 @@ import {
   TableRow,
   Text,
   Tooltip,
+  type RowActionItem,
 } from "@/platform/ui_engine";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
@@ -52,6 +52,7 @@ import { resolveCalcExpression } from "@/apps/bq/lib/calc-expression";
 
 import {
   addItemAction,
+  addItemsAction,
   addItemAndApplyAssemblyAction,
   addLineItemAction,
   addSubObjectAction,
@@ -84,14 +85,14 @@ import { NewWorkItemDialog } from "./new-work-item-dialog";
 import { SaveAsAssemblyDialog } from "./save-as-assembly-dialog";
 import { ImportDialog } from "./source-picker-dialog";
 import { QuotationDialog } from "./quotation-dialog";
+import { PasteRowsDialog } from "./paste-rows-dialog";
+import { QuickEntryRow, type QuickEntryFields } from "./quick-entry-row";
 import {
   buildLineItemMoveFields,
   lineItemIds,
   lineItemTargetOptions,
-  selectAllLineItems,
   selectionAlreadyAtTarget,
   selectionForItem,
-  toggleLineItemSelection,
   type ExistingLineItemTarget,
   type LineItemSelection,
 } from "@/apps/bq/lib/line-item-move-ui";
@@ -132,14 +133,6 @@ function findInspected(project: BqProjectDetail, target: Inspected): InspectedFo
   return null;
 }
 
-/** A click on a row opens it in the side panel, unless it was on a control (name editing, checkbox, buttons). */
-function inspectOnClick(onInspect: () => void) {
-  return (event: ReactMouseEvent<HTMLTableRowElement>) => {
-    if ((event.target as HTMLElement).closest("button, input, select, textarea, a, label, [role=checkbox], [contenteditable=true]")) return;
-    onInspect();
-  };
-}
-
 /** Where a new Work Item will land; `where` is the Section/Subsection name shown in its dialog. */
 type NewItemTarget = { sectionId?: string; subsectionId?: string; where: string };
 
@@ -167,6 +160,10 @@ function projectItem(project: BqProjectDetail, itemId: string): BqItemDetail | u
     if (found) return found;
   }
   return undefined;
+}
+
+function lineItemsOf(item: BqItemDetail): BqLineItemDetail[] {
+  return [...item.subObjects.flatMap((group) => group.lineItems), ...item.lineItems];
 }
 
 function actionData(fields: Record<string, string>): FormData {
@@ -525,6 +522,11 @@ export function ProjectEditor({
   const [quotationOpen, setQuotationOpen] = useState(false);
   const [selection, setSelection] = useState<LineItemSelection>(null);
   const [inspected, setInspected] = useState<Inspected>(null);
+  /** The last Cost Component clicked without Shift: where a Shift-click range starts. */
+  const anchor = useRef<string | null>(null);
+  const [dragging, setDragging] = useState<{ itemId: string; lineIds: readonly string[]; overId: string | null } | null>(null);
+  const [pasteTarget, setPasteTarget] = useState<NewItemTarget | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ title: string; run: () => Promise<void> } | null>(null);
   const [groupItemId, setGroupItemId] = useState<string | null>(null);
   const [moveConfirmation, setMoveConfirmation] = useState<MoveRequest | null>(null);
   const [moveNotice, setMoveNotice] = useState<{ message: string; tone: "neutral" | "success" } | null>(null);
@@ -640,8 +642,9 @@ export function ProjectEditor({
     targetLabel: string,
     target: ExistingLineItemTarget | { newGroup: { qtyPerL1: string; markupL2Pct: string } },
     group?: { name: string; qtyPerL1: string; markupL2Pct: string },
+    ids?: readonly string[],
   ) => {
-    const selectedIds = selectionForItem(selection, item.id);
+    const selectedIds = ids ?? selectionForItem(selection, item.id);
     if (selectedIds.length === 0) return;
     if (!("newGroup" in target) && selectionAlreadyAtTarget(item, selectedIds, target)) {
       showMoveNotice("Sudah di sana.");
@@ -674,6 +677,133 @@ export function ProjectEditor({
     const resolved = resolveCalcExpression(raw.trim()) ?? raw.trim();
     return run(action, { id, field, value: resolved });
   };
+
+  const askDeleteLines = (ids: readonly string[]) => setConfirmDelete({
+    title: ids.length === 1 ? "Hapus Cost Component ini?" : `Hapus ${ids.length} Cost Component?`,
+    run: async () => { for (const id of ids) await run(deleteLineItemAction, { id }); },
+  });
+  const moveTargets = (item: BqItemDetail) => lineItemTargetOptions(item).filter((option) => !("newGroup" in option.target));
+  const moveTo = (item: BqItemDetail, ids: readonly string[], option: ReturnType<typeof lineItemTargetOptions>[number]) =>
+    runMoveTransition(() => requestLineItemMove(item, "direct" in option.target ? option.label : `Component Group ${option.label}`, option.target as ExistingLineItemTarget, undefined, ids));
+
+  /** Ctrl/Cmd-click adds or removes one, Shift-click takes the range from the last one clicked, a plain click one. */
+  const pressLine = (item: BqItemDetail, line: BqLineItemDetail, event: ReactMouseEvent) => {
+    const order = lineItemIds(item);
+    const current = selectionForItem(selection, item.id);
+    let next: string[];
+    if (event.shiftKey && anchor.current && order.includes(anchor.current)) {
+      const from = order.indexOf(anchor.current);
+      const to = order.indexOf(line.id);
+      next = order.slice(Math.min(from, to), Math.max(from, to) + 1);
+    } else if (event.ctrlKey || event.metaKey) {
+      next = current.includes(line.id) ? current.filter((id) => id !== line.id) : [...current, line.id];
+      anchor.current = line.id;
+    } else {
+      next = [line.id];
+      anchor.current = line.id;
+    }
+    setSelection(next.length > 0 ? { itemId: item.id, lineItemIds: next } : null);
+    setInspected(next.length === 1 ? { kind: "line", id: next[0]! } : null);
+  };
+
+  const tableCtx: TableCtx = {
+    units, editable, pending, expanded, toggle, run, commit,
+    onImport: setImportTarget,
+    onApplyAssembly: setAssemblyItemId,
+    onSaveAssembly: setSaveAssemblyItem,
+    inspected, selection, highlighted: highlightedLineIds,
+    pressItem: (item) => { anchor.current = null; setSelection(null); setInspected({ kind: "item", id: item.id }); },
+    pressGroup: (group) => { anchor.current = null; setSelection(null); setInspected({ kind: "group", id: group.id }); },
+    pressLine,
+    menuItem: (item) => [
+      { label: "Buka di panel", onSelect: () => { setSelection(null); setInspected({ kind: "item", id: item.id }); } },
+      ...(editable ? [
+        ...BQ_PRICE_MODES.filter((mode) => mode !== item.priceMode).map((mode, index) => ({
+          label: mode === "PRICED" ? "Tandai berharga" : `Tandai ${PRICE_STATUS_LABEL[mode]}`,
+          separatorBefore: index === 0,
+          disabled: pending,
+          onSelect: () => void run(updateItemAction, { id: item.id, field: "priceMode", value: mode }).catch(() => undefined),
+        })),
+        { label: "Tambah Cost Component", separatorBefore: true, disabled: pending, onSelect: () => setImportTarget({ itemId: item.id }) },
+        { label: "Hapus Work Item", danger: true, separatorBefore: true, disabled: pending, onSelect: () => setConfirmDelete({ title: `Hapus ${item.name}?`, run: () => run(deleteItemAction, { id: item.id }) }) },
+      ] : []),
+    ],
+    menuGroup: (_item, group) => [
+      { label: "Buka di panel", onSelect: () => { setSelection(null); setInspected({ kind: "group", id: group.id }); } },
+      ...(editable ? [
+        { label: "Tambah Cost Component", disabled: pending, onSelect: () => setImportTarget({ subObjectId: group.id }) },
+        { label: "Hapus Component Group", danger: true, separatorBefore: true, disabled: pending, onSelect: () => setConfirmDelete({ title: `Hapus ${group.name}?`, run: () => run(deleteSubObjectAction, { id: group.id }) }) },
+      ] : []),
+    ],
+    // A right-click acts on the selection when the row is part of it, else on that row alone.
+    menuLine: (item, line) => {
+      const current = selectionForItem(selection, item.id);
+      const ids = current.includes(line.id) ? current : [line.id];
+      const many = ids.length > 1;
+      return [
+        ...(many ? [] : [{ label: "Buka di panel", onSelect: () => { setSelection({ itemId: item.id, lineItemIds: [line.id] }); setInspected({ kind: "line" as const, id: line.id }); } }]),
+        ...(editable ? [
+          { label: many ? `Kelompokkan ${ids.length} Cost Component…` : "Kelompokkan…", disabled: pending, onSelect: () => { setSelection({ itemId: item.id, lineItemIds: ids }); setError(null); setGroupItemId(item.id); } },
+          ...moveTargets(item).map((option, index) => ({ label: `Pindahkan ke: ${option.label}`, separatorBefore: index === 0, disabled: pending, onSelect: () => moveTo(item, ids, option) })),
+          { label: many ? `Hapus ${ids.length} Cost Component` : "Hapus", danger: true, separatorBefore: true, disabled: pending, onSelect: () => askDeleteLines(ids) },
+        ] : []),
+      ];
+    },
+    dragging: dragging ? { itemId: dragging.itemId, overId: dragging.overId } : null,
+    dragStart: (item, line) => {
+      const current = selectionForItem(selection, item.id);
+      setDragging({ itemId: item.id, lineIds: current.includes(line.id) ? current : [line.id], overId: null });
+    },
+    // Rows only accept Cost Components of their own Work Item (no move to another Work Item in this slice).
+    dragOver: (item, overId) => {
+      if (!dragging || dragging.itemId !== item.id) return false;
+      if (dragging.overId !== overId) setDragging({ ...dragging, overId });
+      return true;
+    },
+    dragEnd: () => setDragging(null),
+    drop: (item, target, label) => {
+      const current = dragging;
+      setDragging(null);
+      if (!current || current.itemId !== item.id) return;
+      runMoveTransition(() => requestLineItemMove(item, label, target, undefined, current.lineIds));
+    },
+    quickAdd: (target, fields) => {
+      const price = fields.hargaSnapshot ? (resolveCalcExpression(fields.hargaSnapshot) ?? fields.hargaSnapshot) : "";
+      return run(addItemAction, {
+        ...target, name: fields.name, qty: fields.qty, unit: fields.unit, specification: fields.specification || undefined,
+        ...(price ? { hargaSnapshot: price } : { priceMode: "TBC" }),
+      });
+    },
+  };
+
+  /** Work Items in screen order, for ↑ ↓ in the side panel. */
+  const orderedItems = project.sections.flatMap((section) => [...section.items, ...section.subsections.flatMap((subsection) => subsection.items)]);
+  const stepItem = (delta: number) => {
+    if (inspected?.kind !== "item") return;
+    const at = orderedItems.findIndex((item) => item.id === inspected.id);
+    const next = orderedItems[at + delta];
+    if (!next) return;
+    setInspected({ kind: "item", id: next.id });
+    window.setTimeout(() => document.getElementById(`bq-row-${next.id}`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 30);
+  };
+
+  // Escape clears the selection, Delete removes the selected Cost Components (after a confirmation); never while typing.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable=true], [role=dialog], [role=menu]")) return;
+      if (event.key === "Escape") { setSelection(null); return; }
+      if ((event.key === "Delete" || event.key === "Backspace") && editable && selection && selection.lineItemIds.length > 0) {
+        event.preventDefault();
+        setConfirmDelete({
+          title: selection.lineItemIds.length === 1 ? "Hapus Cost Component ini?" : `Hapus ${selection.lineItemIds.length} Cost Component?`,
+          run: async () => { for (const id of selection.lineItemIds) await run(deleteLineItemAction, { id }); },
+        });
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
 
   const totalColumns = 8;
   const readiness = summarizeReadiness(project.sections);
@@ -745,7 +875,10 @@ export function ProjectEditor({
             <SectionCard>
               <EmptyState
                 title="Belum ada Section"
-                description={editable ? "Tambahkan Section untuk mulai menyusun BQ." : "Project ini belum memiliki Section."}
+                description={editable
+                  ? "1. Buat Section, mis. \"Pekerjaan Sipil\". 2. Ketik pekerjaan di baris isi cepat (Enter untuk simpan), atau tempel langsung dari Excel. 3. Klik baris untuk mengubah nilainya di panel samping; klik kanan untuk pilihan lain."
+                  : "Project ini belum memiliki Section."}
+                action={editable ? <AddSectionDialog projectId={project.id} /> : undefined}
               />
             </SectionCard>
           ) : null}
@@ -765,31 +898,7 @@ export function ProjectEditor({
             )}
           </div>
 
-          <ItemTable
-            items={section.items}
-            units={units}
-            editable={editable}
-            pending={pending}
-            expanded={expanded}
-            toggle={toggle}
-            run={run}
-            commit={commit}
-            commitNum={commitNum}
-            onImport={setImportTarget}
-            onApplyAssembly={setAssemblyItemId}
-            onSaveAssembly={setSaveAssemblyItem}
-            selection={selection}
-            highlightedLineIds={highlightedLineIds}
-            onSelectLine={(itemId, lineItemId, checked) => setSelection((current) => toggleLineItemSelection(current, itemId, lineItemId, checked))}
-            onSelectAll={(item, checked) => setSelection(selectAllLineItems(item, checked))}
-            onGroup={(itemId) => { setError(null); setGroupItemId(itemId); }}
-            onMove={(item, label, target) => {
-              runMoveTransition(() => requestLineItemMove(item, label, target));
-            }}
-            inspected={inspected}
-            onInspect={setInspected}
-            columns={totalColumns}
-          />
+          <ItemTable items={section.items} target={{ sectionId: section.id }} where={section.name} ctx={tableCtx} columns={totalColumns} />
           {editable ? (
             <div className="flex">
               <Button
@@ -800,6 +909,9 @@ export function ProjectEditor({
                 onClick={() => setNewItemTarget({ sectionId: section.id, where: section.name })}
               >
                 <span className="max-w-[28ch] truncate">Work Item di {section.name}</span>
+              </Button>
+              <Button size="sm" variant="ghost" leadingIcon={<ClipboardPaste aria-hidden="true" />} disabled={pending} onClick={() => { setError(null); setPasteTarget({ sectionId: section.id, where: section.name }); }}>
+                Tempel dari Excel
               </Button>
             </div>
           ) : null}
@@ -818,31 +930,7 @@ export function ProjectEditor({
                   <Heading level={5} className="text-ink-secondary">{subsection.name}</Heading>
                 )}
               </div>
-              <ItemTable
-                items={subsection.items}
-                units={units}
-                editable={editable}
-                pending={pending}
-                expanded={expanded}
-                toggle={toggle}
-                run={run}
-                commit={commit}
-                commitNum={commitNum}
-                onImport={setImportTarget}
-                onApplyAssembly={setAssemblyItemId}
-                onSaveAssembly={setSaveAssemblyItem}
-                selection={selection}
-                highlightedLineIds={highlightedLineIds}
-                onSelectLine={(itemId, lineItemId, checked) => setSelection((current) => toggleLineItemSelection(current, itemId, lineItemId, checked))}
-                onSelectAll={(item, checked) => setSelection(selectAllLineItems(item, checked))}
-                onGroup={(itemId) => { setError(null); setGroupItemId(itemId); }}
-                onMove={(item, label, target) => {
-                  runMoveTransition(() => requestLineItemMove(item, label, target));
-                }}
-                inspected={inspected}
-                onInspect={setInspected}
-                columns={totalColumns}
-              />
+              <ItemTable items={subsection.items} target={{ subsectionId: subsection.id }} where={`${section.name} › ${subsection.name}`} ctx={tableCtx} columns={totalColumns} />
               {editable ? (
                 <div className="flex gap-1.5 pt-1">
                   <Button
@@ -853,6 +941,9 @@ export function ProjectEditor({
                     onClick={() => setNewItemTarget({ subsectionId: subsection.id, where: `${section.name} › ${subsection.name}` })}
                   >
                     <span className="max-w-[28ch] truncate">Work Item di {subsection.name}</span>
+                  </Button>
+                  <Button size="sm" variant="ghost" leadingIcon={<ClipboardPaste aria-hidden="true" />} disabled={pending} onClick={() => { setError(null); setPasteTarget({ subsectionId: subsection.id, where: `${section.name} › ${subsection.name}` }); }}>
+                    Tempel dari Excel
                   </Button>
                 </div>
               ) : null}
@@ -873,6 +964,35 @@ export function ProjectEditor({
           ))}
         </div>
         {(() => {
+          const multiItem = selection && selection.lineItemIds.length > 1 ? projectItem(project, selection.itemId) : undefined;
+          if (selection && multiItem) {
+            const ids = selection.lineItemIds;
+            const names = lineItemsOf(multiItem).filter((line) => ids.includes(line.id)).map((line) => line.titleSnapshot);
+            return (
+              <aside aria-label={`${ids.length} Cost Component dipilih`} className="order-first grid w-full shrink-0 content-start gap-3 self-start rounded-card border border-line bg-surface p-4 shadow-plane lg:sticky lg:top-0 lg:order-none lg:w-[320px] xl:w-[340px]">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="grid gap-0.5">
+                    <Text size="sm" tone="tertiary" meta>Dipilih</Text>
+                    <Text weight="semibold">{ids.length} Cost Component</Text>
+                    <Text size="sm" tone="tertiary">di {multiItem.name}</Text>
+                  </div>
+                  <IconButton size="sm" variant="ghost" label="Batal pilih" icon={<X aria-hidden="true" />} onClick={() => setSelection(null)} />
+                </div>
+                <ul className="m-0 grid list-none gap-1 p-0 text-sm">
+                  {names.slice(0, 6).map((name, index) => <li key={`${name}-${index}`} className="truncate">· {name}</li>)}
+                  {names.length > 6 ? <li className="text-ink-tertiary">dan {names.length - 6} lagi</li> : null}
+                </ul>
+                {editable ? (
+                  <div className="grid gap-2">
+                    <Button variant="secondary" disabled={pending} onClick={() => { setError(null); setGroupItemId(multiItem.id); }}>Kelompokkan…</Button>
+                    <ButtonMenu label={pending ? "Memproses…" : "Pindahkan ke"} variant="secondary" align="start" items={moveTargets(multiItem).map((option) => ({ label: option.label, description: option.description, disabled: pending, onSelect: () => moveTo(multiItem, ids, option) }))} />
+                    <Button variant="ghost" disabled={pending} onClick={() => askDeleteLines(ids)}>Hapus {ids.length} Cost Component</Button>
+                  </div>
+                ) : null}
+                <Text size="sm" tone="tertiary">Ctrl + klik menambah atau mengurangi, Shift + klik memilih satu rentang, Esc membatalkan, Delete menghapus. Atau seret ke Component Group.</Text>
+              </aside>
+            );
+          }
           const found = findInspected(project, inspected);
           return found ? (
             <RowInspector
@@ -883,7 +1003,8 @@ export function ProjectEditor({
               run={run}
               commit={commit}
               commitNum={commitNum}
-              onClose={() => setInspected(null)}
+              onStep={found.kind === "item" ? stepItem : undefined}
+              onClose={() => { setInspected(null); setSelection(null); }}
             />
           ) : null;
         })()}
@@ -1054,6 +1175,38 @@ export function ProjectEditor({
         />
       ) : null}
 
+      {pasteTarget ? (
+        <PasteRowsDialog
+          where={pasteTarget.where}
+          units={units.map((unit) => unit.code)}
+          pending={pending}
+          error={error}
+          onClose={() => setPasteTarget(null)}
+          onSubmit={(items) => {
+            const where = pasteTarget.sectionId ? { sectionId: pasteTarget.sectionId } : { subsectionId: pasteTarget.subsectionId };
+            void run(addItemsAction, {
+              ...where,
+              rows: JSON.stringify(items.map((row) => ({ name: row.name, qty: row.qty, unit: row.unit, specification: row.specification || undefined, hargaSnapshot: row.hargaSnapshot, priceMode: row.priceMode }))),
+            }).then(() => { setPasteTarget(null); showMoveNotice(`${items.length} pekerjaan dimasukkan.`, "success"); }).catch(() => undefined);
+          }}
+        />
+      ) : null}
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}
+        title={confirmDelete?.title ?? ""}
+        description="Tidak bisa dibatalkan."
+        confirmLabel="Hapus"
+        tone="danger"
+        pending={pending}
+        onConfirm={() => {
+          const current = confirmDelete;
+          if (!current) return;
+          void current.run().catch(() => undefined).finally(() => { setConfirmDelete(null); setSelection(null); });
+        }}
+      />
+
       {moveConfirmation ? (
         <MovePriceDialog
           request={moveConfirmation}
@@ -1073,30 +1226,11 @@ export function ProjectEditor({
   );
 }
 
-function ItemTable({
-  items,
-  units,
-  editable,
-  pending,
-  expanded,
-  toggle,
-  run,
-  commit,
-  commitNum,
-  onImport,
-  onApplyAssembly,
-  onSaveAssembly,
-  selection,
-  highlightedLineIds,
-  onSelectLine,
-  onSelectAll,
-  onGroup,
-  onMove,
-  inspected,
-  onInspect,
-  columns,
-}: {
-  items: readonly BqItemDetail[];
+/**
+ * What the tables need from the editor (owner 2026-10-14: no checkboxes; click, Ctrl/Shift-click, right-click and
+ * drag work like on the Workspace board). One object instead of a prop per callback.
+ */
+type TableCtx = {
   units: UnitRead[];
   editable: boolean;
   pending: boolean;
@@ -1104,277 +1238,143 @@ function ItemTable({
   toggle: (id: string) => void;
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
-  commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
   onSaveAssembly?: (item: BqItemDetail) => void;
-  selection: LineItemSelection;
-  highlightedLineIds: ReadonlySet<string>;
-  onSelectLine: (itemId: string, lineItemId: string, checked: boolean) => void;
-  onSelectAll: (item: BqItemDetail, checked: boolean) => void;
-  onGroup: (itemId: string) => void;
-  onMove: (item: BqItemDetail, label: string, target: ExistingLineItemTarget) => void;
   inspected: Inspected;
-  onInspect: (target: Inspected) => void;
+  selection: LineItemSelection;
+  highlighted: ReadonlySet<string>;
+  pressItem: (item: BqItemDetail) => void;
+  pressGroup: (group: BqSubObjectDetail) => void;
+  pressLine: (item: BqItemDetail, line: BqLineItemDetail, event: ReactMouseEvent) => void;
+  menuItem: (item: BqItemDetail) => RowActionItem[];
+  menuGroup: (item: BqItemDetail, group: BqSubObjectDetail) => RowActionItem[];
+  menuLine: (item: BqItemDetail, line: BqLineItemDetail) => RowActionItem[];
+  /** The Work Item whose Cost Component is being dragged, and the row it hovers. */
+  dragging: { itemId: string; overId: string | null } | null;
+  dragStart: (item: BqItemDetail, line: BqLineItemDetail) => void;
+  dragOver: (item: BqItemDetail, overId: string) => boolean;
+  dragEnd: () => void;
+  drop: (item: BqItemDetail, target: ExistingLineItemTarget, label: string) => void;
+  quickAdd: (target: { sectionId?: string; subsectionId?: string }, fields: QuickEntryFields) => Promise<void>;
+};
+
+/** A click that lands on a control inside a row (expand, delete, a name being edited) is that control's. */
+function onControl(event: { target: EventTarget }) {
+  return Boolean((event.target as HTMLElement).closest("button, input, select, textarea, a, label, [contenteditable=true]"));
+}
+
+function ItemTable({ items, target, where, ctx, columns }: {
+  items: readonly BqItemDetail[];
+  target: { sectionId?: string; subsectionId?: string };
+  where: string;
+  ctx: TableCtx;
   columns: number;
 }) {
-  if (items.length === 0) {
-    return <Text tone="tertiary" size="sm">Belum ada Work Item.</Text>;
-  }
-
   return (
-    <DataTable minWidth="820px" density="compact">
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-[72px]" aria-label="Pilih, buka, atau tutup" />
-          <TableHead>Uraian</TableHead>
-          <TableHead align="end" className="w-[90px]">Jumlah</TableHead>
-          <TableHead className="w-[80px]">Satuan</TableHead>
-          <TableHead align="end" className="w-[90px]">Koef.</TableHead>
-          <TableHead align="end" className="w-[90px]">Markup</TableHead>
-          <TableHead align="end" className="w-[130px]">Harga satuan</TableHead>
-          <TableHead align="end" className="w-[130px]">Total</TableHead>
-          {editable ? <TableHead align="end" className="w-[56px]" aria-label="Aksi" /> : null}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item) => {
-          const open = expanded.has(item.id);
-          const hasChildren = item.subObjects.length > 0 || item.lineItems.length > 0;
-          return (
-            <ItemRows
-              key={item.id}
-              item={item}
-              units={units}
-              open={open}
-              hasChildren={hasChildren}
-              editable={editable}
-              pending={pending}
-              expanded={expanded}
-              toggle={toggle}
-              run={run}
-              commit={commit}
-              commitNum={commitNum}
-              onImport={onImport}
-              onApplyAssembly={onApplyAssembly}
-              onSaveAssembly={onSaveAssembly}
-              selectedLineIds={selectionForItem(selection, item.id)}
-              highlightedLineIds={highlightedLineIds}
-              onSelectLine={onSelectLine}
-              onSelectAll={onSelectAll}
-              onGroup={onGroup}
-              onMove={onMove}
-              inspected={inspected}
-              onInspect={onInspect}
-              columns={columns + (editable ? 1 : 0)}
-            />
-          );
-        })}
-      </TableBody>
-    </DataTable>
+    <div className="grid gap-2">
+      {items.length === 0 ? (
+        <Text tone="tertiary" size="sm">Belum ada Work Item{ctx.editable ? " — ketik di baris di bawah ini." : "."}</Text>
+      ) : (
+        <DataTable minWidth="820px" density="compact">
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[40px]" aria-label="Buka atau tutup" />
+              <TableHead>Uraian &amp; spesifikasi</TableHead>
+              <TableHead align="end" className="w-[90px]">Jumlah</TableHead>
+              <TableHead className="w-[80px]">Satuan</TableHead>
+              <TableHead align="end" className="w-[90px]">Koef.</TableHead>
+              <TableHead align="end" className="w-[90px]">Markup</TableHead>
+              <TableHead align="end" className="w-[130px]">Harga satuan</TableHead>
+              <TableHead align="end" className="w-[130px]">Total</TableHead>
+              {ctx.editable ? <TableHead align="end" className="w-[56px]" aria-label="Aksi" /> : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((item) => <ItemRows key={item.id} item={item} ctx={ctx} columns={columns + (ctx.editable ? 1 : 0)} />)}
+          </TableBody>
+        </DataTable>
+      )}
+      {ctx.editable ? (
+        <QuickEntryRow where={where} units={ctx.units.map((unit) => unit.code)} disabled={ctx.pending} onAdd={(fields) => ctx.quickAdd(target, fields)} />
+      ) : null}
+    </div>
   );
 }
 
-function ItemRows({
-  item,
-  units,
-  open,
-  hasChildren,
-  editable,
-  pending,
-  expanded,
-  toggle,
-  run,
-  commit,
-  commitNum,
-  onImport,
-  onApplyAssembly,
-  onSaveAssembly,
-  selectedLineIds,
-  highlightedLineIds,
-  onSelectLine,
-  onSelectAll,
-  onGroup,
-  onMove,
-  inspected,
-  onInspect,
-  columns,
-}: {
-  item: BqItemDetail;
-  units: UnitRead[];
-  open: boolean;
-  hasChildren: boolean;
-  editable: boolean;
-  pending: boolean;
-  expanded: ReadonlySet<string>;
-  toggle: (id: string) => void;
-  run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
-  commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
-  commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
-  onImport: (target: { itemId?: string; subObjectId?: string }) => void;
-  onApplyAssembly?: (itemId: string) => void;
-  onSaveAssembly?: (item: BqItemDetail) => void;
-  selectedLineIds: readonly string[];
-  highlightedLineIds: ReadonlySet<string>;
-  onSelectLine: (itemId: string, lineItemId: string, checked: boolean) => void;
-  onSelectAll: (item: BqItemDetail, checked: boolean) => void;
-  onGroup: (itemId: string) => void;
-  onMove: (item: BqItemDetail, label: string, target: ExistingLineItemTarget) => void;
-  inspected: Inspected;
-  onInspect: (target: Inspected) => void;
-  columns: number;
-}) {
-  const allLineIds = lineItemIds(item);
-  const selected = new Set(selectedLineIds);
-  const allSelected = allLineIds.length > 0 && allLineIds.every((id) => selected.has(id));
-  const moveMenuItems: Array<{ label: string; description?: string; disabled?: boolean; separatorBefore?: boolean; onSelect: () => void }> = [];
-  lineItemTargetOptions(item).forEach((option) => {
-    moveMenuItems.push({
-      label: option.label,
-      description: option.description,
-      disabled: pending,
-      separatorBefore: option.key === "new",
-      onSelect: () => "newGroup" in option.target
-        ? onGroup(item.id)
-        : onMove(item, "direct" in option.target ? option.label : `Component Group ${option.label}`, option.target),
-    });
-  });
+function ItemRows({ item, ctx, columns }: { item: BqItemDetail; ctx: TableCtx; columns: number }) {
+  const open = ctx.expanded.has(item.id);
+  const hasChildren = item.subObjects.length > 0 || item.lineItems.length > 0;
+  const selectedIds = new Set(selectionForItem(ctx.selection, item.id));
+  const dropHere = ctx.dragging?.itemId === item.id && ctx.dragging.overId === item.id;
   return (
     <>
-      <TableRow
-        id={`bq-row-${item.id}`}
-        selected={inspected?.kind === "item" && inspected.id === item.id}
-        className="cursor-pointer"
-        onClick={inspectOnClick(() => onInspect({ kind: "item", id: item.id }))}
-      >
-        <TableCell>
-          <div className="flex items-center gap-1">
+      <ContextActionMenu items={ctx.menuItem(item)}>
+        <TableRow
+          id={`bq-row-${item.id}`}
+          selected={(ctx.inspected?.kind === "item" && ctx.inspected.id === item.id) || dropHere}
+          className={`cursor-pointer ${dropHere ? "outline-2 -outline-offset-2 outline-dashed outline-line-focus" : ""}`}
+          onClick={(event) => { if (!onControl(event)) ctx.pressItem(item); }}
+          // Dropping a Cost Component on its Work Item takes it out of its group.
+          onDragOver={(event) => { if (ctx.dragOver(item, item.id)) event.preventDefault(); }}
+          onDrop={(event) => { event.preventDefault(); ctx.drop(item, { direct: true }, "Langsung di Work Item"); }}
+        >
+          <TableCell>
             <IconButton
               size="sm"
               variant="ghost"
               label={open ? `Tutup ${item.name}` : `Buka ${item.name}`}
               icon={open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
-              onClick={() => toggle(item.id)}
+              onClick={() => ctx.toggle(item.id)}
             />
-            {editable && allLineIds.length > 0 ? (
-              <Checkbox
-                label={<span className="sr-only">Pilih semua Cost Component dari {item.name}</span>}
-                checked={allSelected ? true : selectedLineIds.length > 0 ? "indeterminate" : false}
-                disabled={pending}
-                onCheckedChange={(checked) => onSelectAll(item, checked === true)}
-              />
-            ) : null}
-          </div>
-        </TableCell>
-        <TableCell wrap className="font-medium">
-          <InlineEdit label="Nama Work Item" value={item.name} disabled={!editable} onCommit={commit(updateItemAction, item.id, "name")} />
-          <Text tone="tertiary" size="sm" className="mt-0.5 block font-normal">
-            {isMarkerPriceMode(item.priceMode)
-              ? "Baris penanda — tidak masuk total"
-              : hasChildren
-                ? `Harga dari rincian (${item.lineItems.length + item.subObjects.reduce((sum, group) => sum + group.lineItems.length, 0)} baris)`
-                : "Harga langsung"}
-          </Text>
-        </TableCell>
-        <TableCell align="end" className="tabular-nums">{item.qty}</TableCell>
-        <TableCell>{item.unit}</TableCell>
-        {/* Koef. and Markup are two fixed columns rather than one cell that
-            switches meaning: an L1 with children takes its cost from them, so
-            its own coefficient is dormant (shown "—"); a childless L1 has no
-            markup of its own (zeroed automatically — zeroMarkupIfChildless). */}
-        <TableCell align="end" className="tabular-nums">
-          {hasChildren ? <Text tone="tertiary" size="sm">—</Text> : item.koefisien}
-        </TableCell>
-        <TableCell align="end" className="tabular-nums">
-          {hasChildren ? (
-            `${item.markupL1Pct}%`
-          ) : (
-            <Tooltip content="Markup tidak berlaku untuk Work Item tanpa breakdown — nilainya otomatis 0.">
-              <span className="inline-block"><Text tone="tertiary" size="sm">—</Text></span>
-            </Tooltip>
-          )}
-        </TableCell>
-        <TableCell align="end">
-          {isMarkerPriceMode(item.priceMode) ? (
-            <Tooltip content="Tidak diberi harga dan tidak masuk total. Ubah di baris pengaturan harga Work Item ini.">
-              <span className="inline-block"><Badge tone="neutral">{PRICE_STATUS_LABEL[item.priceMode]}</Badge></span>
-            </Tooltip>
-          ) : hasChildren ? (
-            money(item.rate)
-          ) : (
-            priceText(item.hargaSnapshot, "IDR")
-          )}
-        </TableCell>
-        <TableCell align="end" className="font-semibold">
-          {isMarkerPriceMode(item.priceMode) ? <Text tone="tertiary" size="sm">{PRICE_STATUS_LABEL[item.priceMode]}</Text> : money(item.total)}
-        </TableCell>
-        {editable ? (
+          </TableCell>
+          <TableCell wrap className="font-medium">
+            <InlineEdit label="Nama Work Item" value={item.name} disabled={!ctx.editable} onCommit={ctx.commit(updateItemAction, item.id, "name")} />
+            {item.specification ? <Text tone="secondary" size="sm" className="mt-0.5 block px-1.5 font-normal">{item.specification}</Text> : null}
+            <Text tone="tertiary" size="sm" className="mt-0.5 block px-1.5 font-normal">
+              {isMarkerPriceMode(item.priceMode)
+                ? "Baris penanda — tidak masuk total"
+                : hasChildren
+                  ? `Harga dari rincian (${lineItemIds(item).length} baris)`
+                  : "Harga langsung"}
+            </Text>
+          </TableCell>
+          <TableCell align="end" className="tabular-nums">{item.qty}</TableCell>
+          <TableCell>{item.unit}</TableCell>
+          {/* Koef. and Markup are two fixed columns rather than one cell that switches meaning: an L1 with children takes
+              its cost from them, so its own coefficient is dormant (shown "—"); a childless L1 has no markup of its own
+              (zeroed automatically — zeroMarkupIfChildless). */}
+          <TableCell align="end" className="tabular-nums">
+            {hasChildren ? <Text tone="tertiary" size="sm">—</Text> : item.koefisien}
+          </TableCell>
+          <TableCell align="end" className="tabular-nums">
+            {hasChildren ? `${item.markupL1Pct}%` : (
+              <Tooltip content="Markup tidak berlaku untuk Work Item tanpa breakdown — nilainya otomatis 0.">
+                <span className="inline-block"><Text tone="tertiary" size="sm">—</Text></span>
+              </Tooltip>
+            )}
+          </TableCell>
           <TableCell align="end">
-            <RemoveButton
-              label={`Hapus ${item.name}`}
-              onRemove={() => run(deleteItemAction, { id: item.id })}
-              disabled={pending}
-            />
+            {isMarkerPriceMode(item.priceMode) ? (
+              <Badge tone="neutral">{PRICE_STATUS_LABEL[item.priceMode]}</Badge>
+            ) : hasChildren ? money(item.rate) : priceText(item.hargaSnapshot, "IDR")}
           </TableCell>
-        ) : null}
-      </TableRow>
-
-      {editable && selectedLineIds.length > 0 ? (
-        <TableRow>
-          <TableCell colSpan={columns}>
-            <SelectionBar count={selectedLineIds.length} label={(count) => `${count} dipilih`}>
-              <Button size="sm" variant="secondary" pending={pending} disabled={pending} onClick={() => onGroup(item.id)}>Kelompokkan…</Button>
-              <ButtonMenu label={pending ? "Memproses…" : "Pindahkan ke"} variant="secondary" align="start" items={moveMenuItems} />
-              <Button size="sm" variant="ghost" disabled={pending} onClick={() => onSelectAll(item, false)}>Batal pilih</Button>
-            </SelectionBar>
+          <TableCell align="end" className="font-semibold">
+            {isMarkerPriceMode(item.priceMode) ? <Text tone="tertiary" size="sm">{PRICE_STATUS_LABEL[item.priceMode]}</Text> : money(item.total)}
           </TableCell>
+          {ctx.editable ? (
+            <TableCell align="end">
+              <RemoveButton label={`Hapus ${item.name}`} onRemove={() => ctx.run(deleteItemAction, { id: item.id })} disabled={ctx.pending} />
+            </TableCell>
+          ) : null}
         </TableRow>
-      ) : null}
+      </ContextActionMenu>
 
       {open ? (
         <>
-          {item.subObjects.map((subObject) => (
-            <SubObjectRows
-              key={subObject.id}
-              subObject={subObject}
-              editable={editable}
-              pending={pending}
-              expanded={expanded}
-              toggle={toggle}
-              run={run}
-              commit={commit}
-              commitNum={commitNum}
-              onImport={onImport}
-              itemId={item.id}
-              selectedLineIds={selected}
-              highlightedLineIds={highlightedLineIds}
-              onSelectLine={onSelectLine}
-              inspected={inspected}
-              onInspect={onInspect}
-              columns={columns}
-            />
-          ))}
-
-          {item.lineItems.map((line) => (
-            <LineItemRow
-              key={line.id}
-              line={line}
-              depth={1}
-              editable={editable}
-              pending={pending}
-              run={run}
-              commit={commit}
-              commitNum={commitNum}
-              itemId={item.id}
-              selected={selected.has(line.id)}
-              highlighted={highlightedLineIds.has(line.id)}
-              onSelect={onSelectLine}
-              inspected={inspected?.kind === "line" && inspected.id === line.id}
-              onInspect={() => onInspect({ kind: "line", id: line.id })}
-            />
-          ))}
-
-          {editable || isMarkerPriceMode(item.priceMode) ? (
+          {item.subObjects.map((group) => <SubObjectRows key={group.id} item={item} group={group} ctx={ctx} columns={columns} selectedIds={selectedIds} />)}
+          {item.lineItems.map((line) => <LineItemRow key={line.id} item={item} line={line} depth={1} ctx={ctx} selected={selectedIds.has(line.id)} />)}
+          {ctx.editable || isMarkerPriceMode(item.priceMode) ? (
             <TableRow>
               <TableCell />
               <TableCell colSpan={columns - 1}>
@@ -1384,42 +1384,14 @@ function ItemRows({
                       Ditandai {PRICE_STATUS_LABEL[item.priceMode]}: quotation tidak menampilkan harga baris ini dan total keseluruhan tidak menghitungnya.
                     </Text>
                   ) : null}
-                  {editable ? <>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    leadingIcon={<Plus aria-hidden="true" />}
-                    disabled={pending}
-                    onClick={() => onImport({ itemId: item.id })}
-                  >
-                    Cost Component
-                  </Button>
-                  <AddRow
-                    label="Component Group"
-                    placeholder="Nama Component Group"
-                    disabled={pending}
-                    onAdd={(name) => run(addSubObjectAction, { itemId: item.id, name })}
-                  />
-                  {onApplyAssembly ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={pending}
-                      onClick={() => onApplyAssembly(item.id)}
-                    >
-                      Terapkan Assembly
-                    </Button>
-                  ) : null}
-                  {onSaveAssembly && item.lineItems.length > 0 && item.subObjects.length === 0 ? (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      disabled={pending}
-                      onClick={() => onSaveAssembly(item)}
-                    >
-                      Simpan sebagai Assembly
-                    </Button>
-                  ) : null}
+                  {ctx.editable ? <>
+                    <Button size="sm" variant="ghost" leadingIcon={<Plus aria-hidden="true" />} disabled={ctx.pending} onClick={() => ctx.onImport({ itemId: item.id })}>Cost Component</Button>
+                    <AddRow label="Component Group" placeholder="Nama Component Group" disabled={ctx.pending} onAdd={(name) => ctx.run(addSubObjectAction, { itemId: item.id, name })} />
+                    {ctx.onApplyAssembly ? <Button size="sm" variant="ghost" disabled={ctx.pending} onClick={() => ctx.onApplyAssembly?.(item.id)}>Terapkan Assembly</Button> : null}
+                    {ctx.onSaveAssembly && item.lineItems.length > 0 && item.subObjects.length === 0 ? (
+                      <Button size="sm" variant="ghost" disabled={ctx.pending} onClick={() => ctx.onSaveAssembly?.(item)}>Simpan sebagai Assembly</Button>
+                    ) : null}
+                    {lineItemIds(item).length > 1 ? <Text tone="tertiary" size="sm" className="ml-auto">Ctrl/Shift + klik untuk memilih beberapa · seret ke grup · klik kanan untuk menu</Text> : null}
                   </> : null}
                 </div>
               </TableCell>
@@ -1431,129 +1403,66 @@ function ItemRows({
   );
 }
 
-function SubObjectRows({
-  subObject,
-  editable,
-  pending,
-  expanded,
-  toggle,
-  run,
-  commit,
-  commitNum,
-  onImport,
-  itemId,
-  selectedLineIds,
-  highlightedLineIds,
-  onSelectLine,
-  inspected,
-  onInspect,
-  columns,
-}: {
-  subObject: BqSubObjectDetail;
-  editable: boolean;
-  pending: boolean;
-  expanded: ReadonlySet<string>;
-  toggle: (id: string) => void;
-  run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
-  commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
-  commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
-  onImport: (target: { itemId?: string; subObjectId?: string }) => void;
-  itemId: string;
-  selectedLineIds: ReadonlySet<string>;
-  highlightedLineIds: ReadonlySet<string>;
-  onSelectLine: (itemId: string, lineItemId: string, checked: boolean) => void;
-  inspected: Inspected;
-  onInspect: (target: Inspected) => void;
+function SubObjectRows({ item, group, ctx, columns, selectedIds }: {
+  item: BqItemDetail;
+  group: BqSubObjectDetail;
+  ctx: TableCtx;
   columns: number;
+  selectedIds: ReadonlySet<string>;
 }) {
-  const open = expanded.has(subObject.id);
-  const highlighted = subObject.lineItems.some((line) => highlightedLineIds.has(line.id));
+  const open = ctx.expanded.has(group.id);
+  const highlighted = group.lineItems.some((line) => ctx.highlighted.has(line.id));
+  const dropHere = ctx.dragging?.itemId === item.id && ctx.dragging.overId === group.id;
   return (
     <>
-      <TableRow
-        selected={highlighted || (inspected?.kind === "group" && inspected.id === subObject.id)}
-        className={`cursor-pointer ${highlighted ? "" : "bg-[color-mix(in_srgb,var(--ui-surface-muted)_45%,transparent)]"}`}
-        onClick={inspectOnClick(() => onInspect({ kind: "group", id: subObject.id }))}
-      >
-        <TableCell />
-        <TableCell wrap>
-          <div className="flex items-center gap-1 pl-4">
-            <IconButton
-              size="sm"
-              variant="ghost"
-              label={open ? `Tutup ${subObject.name}` : `Buka ${subObject.name}`}
-              icon={open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />}
-              onClick={() => toggle(subObject.id)}
-            />
-            <div className="min-w-0">
-              <InlineEdit label="Nama Component Group" value={subObject.name} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "name")} />
-              {/* A Component Group is not a plain folder: its multiplier and extra % change the Work Item's price, so both
-                  stay in view here, never behind a menu. */}
-              <Text tone="tertiary" size="sm" className="block">
-                {subObject.lineItems.length === 0
-                  ? "Component Group kosong"
-                  : "Component Group · jumlah per Work Item dan markup ikut menghitung harga"}
-              </Text>
+      <ContextActionMenu items={ctx.menuGroup(item, group)}>
+        <TableRow
+          selected={highlighted || dropHere || (ctx.inspected?.kind === "group" && ctx.inspected.id === group.id)}
+          className={`cursor-pointer ${highlighted ? "" : "bg-[color-mix(in_srgb,var(--ui-surface-muted)_45%,transparent)]"} ${dropHere ? "outline-2 -outline-offset-2 outline-dashed outline-line-focus" : ""}`}
+          onClick={(event) => { if (!onControl(event)) ctx.pressGroup(group); }}
+          onDragOver={(event) => { if (ctx.dragOver(item, group.id)) event.preventDefault(); }}
+          onDrop={(event) => { event.preventDefault(); ctx.drop(item, { subObjectId: group.id }, `Component Group ${group.name}`); }}
+        >
+          <TableCell />
+          <TableCell wrap>
+            <div className="flex items-center gap-1 pl-4">
+              <IconButton size="sm" variant="ghost" label={open ? `Tutup ${group.name}` : `Buka ${group.name}`} icon={open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />} onClick={() => ctx.toggle(group.id)} />
+              <div className="min-w-0">
+                <InlineEdit label="Nama Component Group" value={group.name} disabled={!ctx.editable} onCommit={ctx.commit(updateSubObjectAction, group.id, "name")} />
+                {/* A Component Group is not a plain folder: its multiplier and extra % change the Work Item's price. */}
+                <Text tone="tertiary" size="sm" className="block px-1.5">
+                  {group.lineItems.length === 0 ? "Component Group kosong — seret Cost Component ke sini" : "Component Group · jumlah per Work Item dan markup ikut menghitung harga"}
+                </Text>
+              </div>
             </div>
-          </div>
-        </TableCell>
-        <TableCell align="end" className="tabular-nums">×{subObject.qtyPerL1}</TableCell>
-        <TableCell><Text tone="tertiary" size="sm">per Work Item</Text></TableCell>
-        <TableCell align="end">
-          <Text tone="tertiary" size="sm">—</Text>
-        </TableCell>
-        <TableCell align="end">
-          <Tooltip content="Markup Component Group ini (%) — hanya berlaku untuk Cost Component di dalamnya.">
-            <span className="inline-block tabular-nums">{subObject.markupL2Pct}%</span>
-          </Tooltip>
-        </TableCell>
-        <TableCell align="end">{money(subObject.subtotalL2Raw)}</TableCell>
-        <TableCell align="end">{money(subObject.subtotalL2)}</TableCell>
-        {editable ? (
-          <TableCell align="end">
-            <RemoveButton
-              label={`Hapus ${subObject.name}`}
-              onRemove={() => run(deleteSubObjectAction, { id: subObject.id })}
-              disabled={pending}
-            />
           </TableCell>
-        ) : null}
-      </TableRow>
+          <TableCell align="end" className="tabular-nums">×{group.qtyPerL1}</TableCell>
+          <TableCell><Text tone="tertiary" size="sm">per Work Item</Text></TableCell>
+          <TableCell align="end"><Text tone="tertiary" size="sm">—</Text></TableCell>
+          <TableCell align="end">
+            <Tooltip content="Markup Component Group ini (%) — hanya berlaku untuk Cost Component di dalamnya.">
+              <span className="inline-block tabular-nums">{group.markupL2Pct}%</span>
+            </Tooltip>
+          </TableCell>
+          <TableCell align="end">{money(group.subtotalL2Raw)}</TableCell>
+          <TableCell align="end">{money(group.subtotalL2)}</TableCell>
+          {ctx.editable ? (
+            <TableCell align="end">
+              <RemoveButton label={`Hapus ${group.name}`} onRemove={() => ctx.run(deleteSubObjectAction, { id: group.id })} disabled={ctx.pending} />
+            </TableCell>
+          ) : null}
+        </TableRow>
+      </ContextActionMenu>
 
       {open ? (
         <>
-          {subObject.lineItems.map((line) => (
-            <LineItemRow
-              key={line.id}
-              line={line}
-              depth={2}
-              editable={editable}
-              pending={pending}
-              run={run}
-              commit={commit}
-              commitNum={commitNum}
-              itemId={itemId}
-              selected={selectedLineIds.has(line.id)}
-              highlighted={highlightedLineIds.has(line.id)}
-              onSelect={onSelectLine}
-              inspected={inspected?.kind === "line" && inspected.id === line.id}
-              onInspect={() => onInspect({ kind: "line", id: line.id })}
-            />
-          ))}
-          {editable ? (
+          {group.lineItems.map((line) => <LineItemRow key={line.id} item={item} line={line} depth={2} ctx={ctx} selected={selectedIds.has(line.id)} />)}
+          {ctx.editable ? (
             <TableRow>
               <TableCell />
               <TableCell colSpan={columns - 1}>
                 <div className="flex flex-wrap items-center gap-1.5 pl-10">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    leadingIcon={<Plus aria-hidden="true" />}
-                    disabled={pending}
-                    onClick={() => onImport({ subObjectId: subObject.id })}
-                  >
-                    Cost Component
-                  </Button>
+                  <Button size="sm" variant="ghost" leadingIcon={<Plus aria-hidden="true" />} disabled={ctx.pending} onClick={() => ctx.onImport({ subObjectId: group.id })}>Cost Component</Button>
                 </div>
               </TableCell>
             </TableRow>
@@ -1564,94 +1473,62 @@ function SubObjectRows({
   );
 }
 
-function LineItemRow({
-  line,
-  depth,
-  editable,
-  pending,
-  run,
-  commit,
-  commitNum,
-  itemId,
-  selected,
-  highlighted,
-  onSelect,
-  inspected,
-  onInspect,
-}: {
+function LineItemRow({ item, line, depth, ctx, selected }: {
+  item: BqItemDetail;
   line: BqLineItemDetail;
   depth: 1 | 2;
-  editable: boolean;
-  pending: boolean;
-  run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
-  commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
-  commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
-  itemId: string;
+  ctx: TableCtx;
   selected: boolean;
-  highlighted: boolean;
-  onSelect: (itemId: string, lineItemId: string, checked: boolean) => void;
-  inspected: boolean;
-  onInspect: () => void;
 }) {
+  const inspected = ctx.inspected?.kind === "line" && ctx.inspected.id === line.id;
   return (
-    <TableRow id={`bq-row-${line.id}`} selected={selected || highlighted || inspected} className="cursor-pointer" onClick={inspectOnClick(onInspect)}>
-      <TableCell>
-        {editable ? (
-          <Checkbox
-            label={<span className="sr-only">Pilih Cost Component {line.titleSnapshot}</span>}
-            checked={selected}
-            disabled={pending}
-            onCheckedChange={(checked) => onSelect(itemId, line.id, checked === true)}
-          />
-        ) : null}
-      </TableCell>
-      <TableCell wrap>
-        <div className={depth === 2 ? "pl-10" : "pl-4"}>
-          <InlineEdit label="Nama Cost Component" value={line.titleSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "titleSnapshot")} />
-          <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-            <Badge tone="neutral">{KATEGORI_LABEL[line.kategori] ?? line.kategori}</Badge>
-            {line.sourceType !== "CUSTOM" ? (
-              <Text tone="tertiary" size="sm">
-                {line.sourceType === "MASTERDATA" ? "Salinan harga Master Data" : "Salinan harga BQ Library"}
-              </Text>
-            ) : null}
-            {/* bq-contract K-03: the factor is context for setting a coefficient,
-                never a term in the formula. */}
-            {line.purchaseToBaseFactorSnapshot && line.baseUnitSnapshot ? (
-              <Text tone="tertiary" size="sm">
-                1 {line.purchaseUnitSnapshot} = {line.purchaseToBaseFactorSnapshot} {line.baseUnitSnapshot}
-              </Text>
-            ) : null}
-            {line.sourcePriceSnapshot !== null && line.hargaSnapshot !== line.sourcePriceSnapshot ? (
-              <>
-                <Badge tone="warning">Harga diubah</Badge>
-                {/* Master Data is untouched: this only sets this row's price back to the copy taken when it was added. */}
-                <Text tone="tertiary" size="sm">Harga awal {formatMoney(createMoney(line.sourcePriceSnapshot, line.currencySnapshot))}</Text>
-              </>
-            ) : null}
-          </div>
-        </div>
-      </TableCell>
-      <TableCell align="end" className="tabular-nums">{line.qty}</TableCell>
-      <TableCell>{line.purchaseUnitSnapshot}</TableCell>
-      <TableCell align="end" className="tabular-nums">{line.koefisien}</TableCell>
-      <TableCell align="end">
-        <Text tone="tertiary" size="sm">—</Text>
-      </TableCell>
-      <TableCell align="end">{priceText(line.hargaSnapshot, line.currencySnapshot)}</TableCell>
-      <TableCell align="end">{money(line.biayaLine, line.currencySnapshot)}</TableCell>
-      {editable ? (
-        <TableCell align="end">
-          <div className="flex items-center justify-end gap-0.5">
-            <RemoveButton
-              label={`Hapus ${line.titleSnapshot}`}
-              onRemove={() => run(deleteLineItemAction, { id: line.id })}
-              disabled={pending}
-            />
+    <ContextActionMenu items={ctx.menuLine(item, line)}>
+      <TableRow
+        id={`bq-row-${line.id}`}
+        selected={selected || inspected || ctx.highlighted.has(line.id)}
+        className={`cursor-pointer ${ctx.dragging ? "" : "select-none"}`}
+        draggable={ctx.editable && !ctx.pending}
+        onDragStart={(event) => { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", line.id); ctx.dragStart(item, line); }}
+        onDragEnd={ctx.dragEnd}
+        onClick={(event) => { if (!onControl(event)) ctx.pressLine(item, line, event); }}
+      >
+        <TableCell>
+          {ctx.editable ? <GripVertical aria-hidden="true" className="ml-2 size-3.5 text-ink-tertiary" /> : null}
+        </TableCell>
+        <TableCell wrap>
+          <div className={depth === 2 ? "pl-10" : "pl-4"}>
+            <InlineEdit label="Nama Cost Component" value={line.titleSnapshot} disabled={!ctx.editable} onCommit={ctx.commit(updateLineItemAction, line.id, "titleSnapshot")} />
+            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 px-1.5">
+              <Badge tone="neutral">{KATEGORI_LABEL[line.kategori] ?? line.kategori}</Badge>
+              {line.sourceType !== "CUSTOM" ? (
+                <Text tone="tertiary" size="sm">{line.sourceType === "MASTERDATA" ? "Salinan harga Master Data" : "Salinan harga BQ Library"}</Text>
+              ) : null}
+              {/* bq-contract K-03: the factor is context for setting a coefficient, never a term in the formula. */}
+              {line.purchaseToBaseFactorSnapshot && line.baseUnitSnapshot ? (
+                <Text tone="tertiary" size="sm">1 {line.purchaseUnitSnapshot} = {line.purchaseToBaseFactorSnapshot} {line.baseUnitSnapshot}</Text>
+              ) : null}
+              {line.sourcePriceSnapshot !== null && line.hargaSnapshot !== line.sourcePriceSnapshot ? (
+                <>
+                  <Badge tone="warning">Harga diubah</Badge>
+                  <Text tone="tertiary" size="sm">Harga awal {formatMoney(createMoney(line.sourcePriceSnapshot, line.currencySnapshot))}</Text>
+                </>
+              ) : null}
+            </div>
           </div>
         </TableCell>
-      ) : null}
-    </TableRow>
+        <TableCell align="end" className="tabular-nums">{line.qty}</TableCell>
+        <TableCell>{line.purchaseUnitSnapshot}</TableCell>
+        <TableCell align="end" className="tabular-nums">{line.koefisien}</TableCell>
+        <TableCell align="end"><Text tone="tertiary" size="sm">—</Text></TableCell>
+        <TableCell align="end">{priceText(line.hargaSnapshot, line.currencySnapshot)}</TableCell>
+        <TableCell align="end">{money(line.biayaLine, line.currencySnapshot)}</TableCell>
+        {ctx.editable ? (
+          <TableCell align="end">
+            <RemoveButton label={`Hapus ${line.titleSnapshot}`} onRemove={() => ctx.run(deleteLineItemAction, { id: line.id })} disabled={ctx.pending} />
+          </TableCell>
+        ) : null}
+      </TableRow>
+    </ContextActionMenu>
   );
 }
 
@@ -1687,7 +1564,7 @@ function PanelValue({ label, children }: { label: string; children: ReactNode })
  * Component Group or Cost Component changes here; Enter or leaving a field saves it, a refused value springs back.
  * A locked or archived project shows the same values read-only.
  */
-function RowInspector({ found, units, editable, pending, run, commit, commitNum, onClose }: {
+function RowInspector({ found, units, editable, pending, run, commit, commitNum, onStep, onClose }: {
   found: InspectedFound;
   units: UnitRead[];
   editable: boolean;
@@ -1695,8 +1572,12 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   commitNum: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
+  /** ↑ ↓ to the previous or next Work Item (only for Work Items). */
+  onStep?: (delta: number) => void;
   onClose: () => void;
 }) {
+  // Leave the field first so a changed value is saved before the panel shows the next row.
+  const step = (delta: number) => { (document.activeElement as HTMLElement | null)?.blur(); window.setTimeout(() => onStep?.(delta), 0); };
   const kindLabel = found.kind === "item" ? "Work Item" : found.kind === "group" ? "Component Group" : "Cost Component";
   const title = found.kind === "item" ? found.item.name : found.kind === "group" ? found.group.name : found.line.titleSnapshot;
   const number = (label: string, value: string, action: Mutation, id: string, field: string, hint?: string) => (
@@ -1711,6 +1592,9 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
     const hasChildren = item.subObjects.length > 0 || item.lineItems.length > 0;
     const marker = isMarkerPriceMode(item.priceMode);
     body = <>
+      <PanelField label="Spesifikasi" hint="Tampil di bawah nama pekerjaan, juga di penawaran untuk klien.">
+        <InlineEdit label="Spesifikasi" placeholder="Belum diisi" value={item.specification ?? ""} disabled={!editable} commitOnBlur onCommit={commit(updateItemAction, item.id, "specification")} />
+      </PanelField>
       {number("Jumlah", item.qty, updateItemAction, item.id, "qty")}
       <div className="grid gap-1">
         <Text size="sm" tone="secondary">Satuan</Text>
@@ -1795,7 +1679,13 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
           <Text weight="semibold" className="break-words">{title}</Text>
           {found.kind !== "item" ? <Text size="sm" tone="tertiary" className="truncate">di {found.item.name}{found.kind === "line" && found.group ? ` › ${found.group.name}` : ""}</Text> : null}
         </div>
-        <IconButton size="sm" variant="ghost" label="Tutup panel" icon={<X aria-hidden="true" />} onClick={onClose} />
+        <div className="flex shrink-0 items-center gap-0.5">
+          {onStep ? <>
+            <IconButton size="sm" variant="ghost" label="Work Item sebelumnya" icon={<ChevronUp aria-hidden="true" />} onClick={() => step(-1)} />
+            <IconButton size="sm" variant="ghost" label="Work Item berikutnya" icon={<ChevronDown aria-hidden="true" />} onClick={() => step(1)} />
+          </> : null}
+          <IconButton size="sm" variant="ghost" label="Tutup panel" icon={<X aria-hidden="true" />} onClick={onClose} />
+        </div>
       </div>
       {body}
       {!editable ? <Text size="sm" tone="tertiary">Project ini hanya baca.</Text> : null}

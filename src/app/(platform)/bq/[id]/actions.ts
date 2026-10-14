@@ -267,6 +267,9 @@ const ItemSchema = z.object({
   name: z.string().trim().min(1).max(160),
   qty: z.string().trim().optional(),
   unit: z.string().trim().max(40).optional(),
+  specification: z.string().trim().max(1000).optional(),
+  hargaSnapshot: z.string().trim().max(40).optional(),
+  priceMode: z.enum(BQ_PRICE_MODES).optional(),
 });
 
 export async function addItemAction(
@@ -289,12 +292,66 @@ export async function addItemAction(
       name: value.name,
       qty: value.qty ? positiveDecimal(value.qty, "Quantity") : "1",
       unit: value.unit || "ls",
+      // The quick entry row (owner 2026-10-14) sends the price and specification with the row; empty price = TBC.
+      specification: value.specification || null,
+      priceMode: value.priceMode,
+      ...(value.hargaSnapshot ? { hargaSnapshot: decimal(value.hargaSnapshot, "Unit price") } : {}),
     });
     return reload(value.projectId);
   });
 }
 
-const ITEM_FIELDS = ["name", "qty", "unit", "hargaSnapshot", "koefisien", "markupL1Pct", "priceMode", "notes"] as const;
+const PastedRow = z.strictObject({
+  name: z.string().trim().min(1).max(160),
+  qty: z.string().trim().min(1).max(40),
+  unit: z.string().trim().max(40),
+  specification: z.string().trim().max(1000).optional(),
+  hargaSnapshot: z.string().trim().max(40).nullable().optional(),
+  priceMode: z.enum(BQ_PRICE_MODES).optional(),
+});
+const PastedRowsSchema = z.object({
+  projectId: Id,
+  sectionId: Id.optional(),
+  subsectionId: Id.optional(),
+  rows: z.string().max(400_000),
+});
+
+/** Rows pasted from a spreadsheet, added at once (owner 2026-10-14); one bad row refuses the whole paste. */
+export async function addItemsAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const raw = Object.fromEntries(formData.entries());
+    if (!raw.sectionId) delete raw.sectionId;
+    if (!raw.subsectionId) delete raw.subsectionId;
+    const parsed = PastedRowsSchema.safeParse(raw);
+    if (!parsed.success) throw validationError(parsed.error);
+    const value = parsed.data;
+    let decoded: unknown;
+    try { decoded = JSON.parse(value.rows); } catch { throw new AppError("VALIDATION", "bq.items.rows-invalid", "Invalid rows"); }
+    const rows = z.array(PastedRow).max(500).safeParse(decoded);
+    if (!rows.success) throw validationError(rows.error);
+    await bqService.addItems({
+      grants,
+      actor,
+      sectionId: value.sectionId,
+      subsectionId: value.subsectionId,
+      rows: rows.data.map((row) => ({
+        name: row.name,
+        qty: positiveDecimal(row.qty, "Quantity"),
+        unit: row.unit || "ls",
+        specification: row.specification || null,
+        priceMode: row.priceMode,
+        hargaSnapshot: row.hargaSnapshot ? decimal(row.hargaSnapshot, "Unit price") : null,
+      })),
+    });
+    return reload(value.projectId);
+  });
+}
+
+const ITEM_FIELDS = ["name", "qty", "unit", "hargaSnapshot", "koefisien", "markupL1Pct", "priceMode", "notes", "specification"] as const;
 const ItemFieldSchema = z.object({
   projectId: Id,
   id: Id,
@@ -330,6 +387,8 @@ export async function updateItemAction(
       patch.markupL1Pct = percent(value, "Markup");
     } else if (field === "hargaSnapshot") {
       patch.hargaSnapshot = value.trim() ? decimal(value, "Unit price") : null;
+    } else if (field === "specification") {
+      patch.specification = value.trim() || null;
     } else {
       patch.notes = value.trim() || null;
     }

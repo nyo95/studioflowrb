@@ -25,7 +25,7 @@ const group = (id: string, ids: string[]): BqSubObjectDetail => ({
 
 const item = (id = "item-1"): BqItemDetail => ({
   id, name: "Work", qty: "1", unit: "pcs", hargaSnapshot: null, koefisien: "1", markupL1Pct: "0",
-  priceMode: "PRICED", sortOrder: 0, notes: null, subObjects: [group("group-1", ["grouped-1", "grouped-2"])],
+  priceMode: "PRICED", sortOrder: 0, notes: null, specification: null, subObjects: [group("group-1", ["grouped-1", "grouped-2"])],
   lineItems: [line("direct-1"), line("direct-2")], biayaPokok: "42", rate: "42", total: "42",
 });
 

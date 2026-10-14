@@ -144,6 +144,8 @@ export type BqItemDetail = {
   priceMode: BqPriceMode;
   sortOrder: number;
   notes: string | null;
+  /** Shown under the name and printed on the quotation (owner 2026-10-14). */
+  specification: string | null;
   subObjects: BqSubObjectDetail[];
   lineItems: BqLineItemDetail[];
   /**
@@ -616,6 +618,7 @@ function mapItemDetail(item: {
   price_mode: BqPriceMode;
   sort_order: number;
   notes: string | null;
+  specification: string | null;
   sub_objects: Array<{
     id: string;
     name: string;
@@ -670,6 +673,7 @@ function mapItemDetail(item: {
     priceMode: item.price_mode,
     sortOrder: item.sort_order,
     notes: item.notes,
+    specification: item.specification,
     subObjects: item.sub_objects.map((so) => ({
       id: so.id,
       name: so.name,
