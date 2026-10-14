@@ -7,6 +7,7 @@ import { initializeModuleRegistry, resetModuleRegistryForTests, type ModuleManif
 
 import PresentationPrintPage from "./(document)/studioflow/print/projects/[projectId]/presentation/[boardId]/page";
 import { createPresentationBoardAction } from "@/apps/presentation/public/actions";
+import { addWorkspaceImageToMoodboardAction } from "@/apps/presentation/public/image-actions";
 import { listIdeaCardsAction } from "@/apps/ideas/public/actions";
 import { createWorkspaceFileAction, createWorkspaceImageAction, workspaceAction } from "./(platform)/studioflow/actions";
 import IdeasPage from "./(platform)/studioflow/ideas/page";
@@ -54,6 +55,10 @@ describe("disabled StudioFlow module gates", () => {
     const presentation = await createPresentationBoardAction({ projectId: "not-a-uuid", title: "Ignored" });
     assert.equal(presentation.ok, false);
     if (!presentation.ok) assert.equal(presentation.error.code, "MODULE_DISABLED");
+
+    const moodboard = await addWorkspaceImageToMoodboardAction({ projectId: "not-a-uuid", imageId: "not-a-uuid" });
+    assert.equal(moodboard.ok, false);
+    if (!moodboard.ok) assert.equal(moodboard.error.code, "MODULE_DISABLED");
   });
 
   it("refuses every Workspace board command while the board module has never been switched on", async () => {

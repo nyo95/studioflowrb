@@ -58,6 +58,7 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
       canEditGeneral={writable && access.canEditDocuments}
       writablePhaseIds={writable ? access.phases.filter((item) => item.canTransition).map((item) => item.phaseId) : []}
       canUseIdeas={hasPermission(grants, P.ideasManage)}
+      canUsePresentation={hasPermission(grants, P.presentationManage)}
       drawingList={drawingList}
       elements={elements.map((card) => ({
         id: card.id,

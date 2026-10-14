@@ -3546,7 +3546,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     await rejectsWith(ideas.saveNoteImageToIdeas({ ...as(designer), projectId: other.projectId, phaseId: phase.id, imageId: image.id }), "NOTE_IMAGE_NOT_FOUND");
   });
 
-  it("adds a card or a note image to the project's Moodboard board, creating it once and copying the image", async () => {
+  it("adds an Ideas card to the project's Moodboard board, creating it once and copying the image", async () => {
     const { projectId } = await newProject("Moodboard project");
     const { cardId } = await ideas.createIdeaCard({ ...as(designer), file: cardImage(7) });
     const cardKey = (await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: cardId } })).image_key;
@@ -3559,26 +3559,43 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     assert.ok(slide.image_key !== cardKey && slide.image_key.startsWith(`presentation/${projectId}/`));
     assert.deepEqual(bytesOf(slide.image_key), bytesOf(cardKey));
 
-    // A board the team already named "moodboard" (any letter case) is reused, never duplicated; the slide goes last.
-    await testDb.prisma.sfPresentationBoard.update({ where: { id: board.id }, data: { title: "moodboard" } });
+    // Another person's card is not reachable.
+    const other = await seedUser("Other Mood", ALL);
+    const mine = await ideas.createIdeaCard({ ...as(designer), file: cardImage(8) });
+    await rejectsWith(ideas.readIdeaImageSource({ ...as(other), cardId: mine.cardId }), "IDEA_CARD_NOT_FOUND");
+  });
+
+  it("adds a Workspace image to Moodboard while Ideas is disabled", async () => {
+    await testDb.prisma.moduleState.createMany({ data: [
+      { module_id: "ideas", state: "DISABLED", last_version: "1.0.0", updated_by: "test" },
+      { module_id: "presentation", state: "ENABLED", last_version: "1.0.0", updated_by: "test" },
+    ] });
+    assert.deepEqual(
+      await testDb.prisma.moduleState.findMany({ orderBy: { module_id: "asc" }, select: { module_id: true, state: true } }),
+      [{ module_id: "ideas", state: "DISABLED" }, { module_id: "presentation", state: "ENABLED" }],
+    );
+
+    const { projectId } = await newProject("Moodboard note source");
     const phase = await phaseOf(projectId, "moodboard");
     await openIteration(phase.id);
     const base = { ...as(designer), projectId, phaseId: phase.id };
     const { imageId: noteId } = await sf.phases.postPhaseImage({ ...base, file: png() });
     const image = (await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { id: noteId, kind: "IMAGE" }, select: { id: true, storage_key: true } })) as { id: string; storage_key: string };
-    const second = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await ideas.readNoteImageSource({ ...base, imageId: image.id }) });
-    assert.deepEqual([second.created, second.boardId], [false, board.id]);
-    const slides = await testDb.prisma.sfPresentationSlide.findMany({ where: { board_id: board.id }, orderBy: { sort_order: "asc" } });
+    const bridge = createStudioFlowPresentationBridge(testDb.prisma);
+    const first = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await bridge.readWorkspaceImageSource({ ...base, imageId: image.id }) });
+    assert.equal(first.created, true);
+
+    // A board the team already named "moodboard" (any letter case) is reused, never duplicated; the next slide goes last.
+    await testDb.prisma.sfPresentationBoard.update({ where: { id: first.boardId }, data: { title: "moodboard" } });
+    const second = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await bridge.readWorkspaceImageSource({ ...base, imageId: image.id }) });
+    assert.deepEqual([second.created, second.boardId], [false, first.boardId]);
+    const slides = await testDb.prisma.sfPresentationSlide.findMany({ where: { board_id: first.boardId }, orderBy: { sort_order: "asc" } });
     assert.deepEqual(slides.map((row) => row.id), [first.slideId, second.slideId]);
     assert.equal(await testDb.prisma.sfPresentationBoard.count({ where: { project_id: projectId } }), 1);
 
-    // Deleting the card or the note never touches the slides' own copies.
-    await ideas.deleteIdeaCard({ ...as(designer), cardId });
+    // Deleting the note never touches the slides' own copies.
+    await sf.phases.deletePhaseNote({ ...base, noteId: image.id });
     for (const row of slides) assert.ok(storage.objects.has(row.image_key));
-    // Another person's card is not reachable.
-    const other = await seedUser("Other Mood", ALL);
-    const mine = await ideas.createIdeaCard({ ...as(designer), file: cardImage(8) });
-    await rejectsWith(ideas.readIdeaImageSource({ ...as(other), cardId: mine.cardId }), "IDEA_CARD_NOT_FOUND");
   });
 
   it("shows the current code after a reorder and drops a usage whose option is deleted, keeping the card", async () => {

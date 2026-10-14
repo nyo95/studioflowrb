@@ -44,7 +44,7 @@ function formatBytes(bytes: number): string {
  * written in; pasted images and files are their own messages. Starred messages sit on top; a message can be marked as
  * client feedback (except what a phase step recorded), edited or deleted. It reads the same notes as the board.
  */
-export function NotesStream({ projectId, projectName, phaseId, phaseName, notes, canEdit, canUseIdeas }: {
+export function NotesStream({ projectId, projectName, phaseId, phaseName, notes, canEdit, canUseIdeas, canUsePresentation }: {
   projectId: string;
   projectName: string;
   phaseId: string;
@@ -52,6 +52,7 @@ export function NotesStream({ projectId, projectName, phaseId, phaseName, notes,
   notes: readonly NotesStreamRow[];
   canEdit: boolean;
   canUseIdeas: boolean;
+  canUsePresentation: boolean;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
@@ -141,7 +142,7 @@ export function NotesStream({ projectId, projectName, phaseId, phaseName, notes,
             return (
               <div key={note.id} className="grid gap-2">
                 {header ? <div className="my-1 flex items-center gap-2 text-xs text-ink-tertiary"><span className="h-px flex-1 bg-line-subtle" />{header}<span className="h-px flex-1 bg-line-subtle" /></div> : null}
-                <NoteBubble note={note} projectId={projectId} projectName={projectName} phaseId={phaseId} canEdit={canEdit} canUseIdeas={canUseIdeas} locale={locale} timezone={timezone} busy={busy} run={run} onDelete={(target) => void remove(target)} />
+                <NoteBubble note={note} projectId={projectId} projectName={projectName} phaseId={phaseId} canEdit={canEdit} canUseIdeas={canUseIdeas} canUsePresentation={canUsePresentation} locale={locale} timezone={timezone} busy={busy} run={run} onDelete={(target) => void remove(target)} />
               </div>
             );
           })}
@@ -155,13 +156,14 @@ export function NotesStream({ projectId, projectName, phaseId, phaseName, notes,
   );
 }
 
-function NoteBubble({ note, projectId, projectName, phaseId, canEdit, canUseIdeas, locale, timezone, busy, run, onDelete }: {
+function NoteBubble({ note, projectId, projectName, phaseId, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, run, onDelete }: {
   note: NotesStreamRow;
   projectId: string;
   projectName: string;
   phaseId: string;
   canEdit: boolean;
   canUseIdeas: boolean;
+  canUsePresentation: boolean;
   locale: string;
   timezone: string;
   busy: string | null;
@@ -225,7 +227,7 @@ function NoteBubble({ note, projectId, projectName, phaseId, canEdit, canUseIdea
       ) : (
         <>
           {note.body ? <FormattedText text={note.body} className="text-sm" /> : null}
-          {note.images.length > 0 ? <ImageGallery images={note.images} viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} projectName={projectName} phaseId={phaseId} canUseIdeas={canUseIdeas} />} /> : null}
+          {note.images.length > 0 ? <ImageGallery images={note.images} viewerActions={(image) => <NoteImageActions image={image} projectId={projectId} projectName={projectName} phaseId={phaseId} canUseIdeas={canUseIdeas} canUsePresentation={canUsePresentation} />} /> : null}
           {note.file ? (
             <div className="flex items-center gap-3">
               <FileText aria-hidden="true" className="h-5 w-5 shrink-0 text-ink-secondary" />

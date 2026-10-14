@@ -240,12 +240,6 @@ export function createIdeaService(db: IdeasDb, ports: IdeasPorts) {
       return { key: card.image_key, contentType: card.content_type };
     },
 
-    async readNoteImageSource(input: IdeasContext & { projectId: string; phaseId?: string | null; imageId: string }) {
-      requireIdeas(input);
-      const image = await ports.studioFlow.readWorkspaceImageSource(input);
-      return { key: image.key, contentType: image.contentType };
-    },
-
     async saveNoteImageToIdeas(input: IdeasContext & { projectId: string; phaseId?: string | null; imageId: string }) {
       const userId = requireIdeas(input);
       const image = await ports.studioFlow.readWorkspaceImageSource(input);

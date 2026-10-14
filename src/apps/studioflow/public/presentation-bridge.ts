@@ -8,8 +8,10 @@ import {
   P,
   assertProjectWritable,
   getProjectAccess,
+  invalid,
   notFound,
   requireCommand,
+  requirePermission,
   requireProjectAccess,
   requireRead,
   type CommandContext,
@@ -40,6 +42,18 @@ export function createStudioFlowPresentationBridge(db: PrismaClient) {
 
   return {
     readProjectDocumentContext,
+
+    /** An image element on a project's Workspace, exposed to Presentation without going through Ideas. */
+    async readWorkspaceImageSource(input: CommandContext & { projectId: string; phaseId?: string | null; imageId: string }) {
+      requireCommand(input, P.presentationManage);
+      requirePermission(input.grants, P.projectRead);
+      const image = await db.sfWorkspaceCard.findFirst({
+        where: { id: input.imageId, kind: "IMAGE", project_id: input.projectId, ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
+        select: { id: true, storage_key: true, content_type: true },
+      });
+      if (!image?.storage_key || !image.content_type) throw invalid("NOTE_IMAGE_NOT_FOUND", "This note image no longer exists.");
+      return { key: image.storage_key, contentType: image.content_type };
+    },
 
     async requireProjectDocumentWrite(input: CommandContext & { projectId: string }) {
       const actorId = requireCommand(input, P.presentationManage);

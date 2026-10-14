@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.31 | 2026-10-14 | fix(presentation): own Workspace image moodboard intake (Executor)
+
+- **Module-independent Workspace path:** Presentation now reads a Workspace image through StudioFlow's public Presentation bridge and exposes its own module-gated Server Action. The bridge enforces `studioflow.presentation.manage`, StudioFlow read access, project/image scope, and an optional phase label before Presentation copies the image into the project's Moodboard board.
+- **Minimal screen wiring:** Notes and Workspace image viewers show **Add to moodboard** whenever Presentation is enabled and the person has the Presentation permission, independently of Ideas. **Save to Ideas** and **Use in schedule** still belong to Ideas; the Ideas-card → Moodboard path is unchanged. The obsolete Ideas note-image moodboard action/coordinator path was removed. Existing manifest requirements already declare the only runtime dependencies (`ideas → studioflow`, `presentation → studioflow`), and the boundary checker confirms no new edge.
+- **Tests:** the former combined Moodboard integration case is split: Ideas-card intake remains covered, while Workspace-image intake stores Ideas as DISABLED and Presentation as ENABLED, then proves the board reuse, slide ordering, independent copy, and source deletion behavior. The disabled-module action test now covers the new Presentation action. **Migrations/dependencies:** none. **Checks:** focused action/service tests PASS; full `npm test` 1,095/1,095 PASS; typecheck PASS; eslint PASS with one existing Presentation `<img>` warning; boundaries PASS; legacy-runtime PASS; production build PASS in `.next-verify`; staged and unstaged whitespace PASS. **Browser:** one independent Ideas-off/Presentation-on check added to `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`. **Limitations:** browser acceptance remains with the Reviewer.
+
 ## R9.30 | 2026-10-14 | fix(studioflow): snapshot project iteration kinds (Executor)
 
 - **Project workflow snapshot:** `sf_phase.iteration_kinds_snapshot` now captures each definition's ordered iteration kinds when the project is created. Every phase command and read model uses that snapshot, so later template edits cannot change an existing project's step names, continuation rule, or rename lock.

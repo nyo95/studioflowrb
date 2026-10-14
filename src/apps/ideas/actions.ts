@@ -11,7 +11,7 @@ import { requirePermission } from "@platform/core/rbac";
 import { validationError } from "@platform/core/validation";
 import { ideas } from "./runtime";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
-import { addIdeaImageToMoodboard, addNoteImageToPresentationMoodboard } from "@/application/presentation-image-coordinator";
+import { addIdeaImageToMoodboard } from "@/application/presentation-image-coordinator";
 
 /**
  * Ideas board actions (WO-SF-IDEAS-01). Transport validation only: ownership, limits and the schedule rules
@@ -177,19 +177,6 @@ export async function addIdeaToMoodboardAction(input: { cardId: string; projectI
     const ctx = await context();
     const data = parse(z.strictObject({ cardId: Id, projectId: Id }), input);
     const result = await addIdeaImageToMoodboard({ ...ctx, ...data });
-    refresh(data.projectId);
-    return result;
-  });
-}
-
-/** "Add to moodboard" from a phase-note image, in the note own project. */
-export async function addNoteImageToMoodboardAction(input: { projectId: string; phaseId?: string | null; imageId: string }): Promise<ActionResult<{ boardId: string; slideId: string; created: boolean }>> {
-  return runSafeAction(async () => {
-    await requireModuleEnabled("ideas");
-    await requireModuleEnabled("presentation");
-    const ctx = await context();
-    const data = parse(z.strictObject(NoteImageRef), input);
-    const result = await addNoteImageToPresentationMoodboard({ ...ctx, ...data });
     refresh(data.projectId);
     return result;
   });

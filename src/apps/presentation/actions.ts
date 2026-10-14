@@ -8,6 +8,7 @@ import { AppError } from "@platform/core/errors";
 import { requireModuleEnabled } from "@platform/core/modules";
 import { validationError } from "@platform/core/validation";
 import { presentation } from "./runtime";
+import { studioFlowPresentationBridge } from "@/apps/studioflow/public/presentation-bridge-runtime";
 
 const Id = z.uuid();
 const OptionalText = z.string().max(2000).nullish();
@@ -46,6 +47,19 @@ export async function addPresentationSlidesAction(formData: FormData): Promise<A
 const SlideRef = z.strictObject({ projectId: Id, slideId: Id });
 export async function deletePresentationSlideAction(input: z.infer<typeof SlideRef>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(SlideRef, input); await presentation.deleteSlide({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+}
+const WorkspaceImageRef = z.strictObject({ projectId: Id, phaseId: Id.nullable().optional(), imageId: Id });
+/** "Add to moodboard" from a Workspace image, owned entirely by Presentation. */
+export async function addWorkspaceImageToMoodboardAction(input: z.infer<typeof WorkspaceImageRef>): Promise<ActionResult<{ boardId: string; slideId: string; created: boolean }>> {
+  return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
+    const ctx = await context();
+    const data = parse(WorkspaceImageRef, input);
+    const source = await studioFlowPresentationBridge.readWorkspaceImageSource({ ...ctx, ...data });
+    const result = await presentation.addStoredImageToMoodboard({ ...ctx, projectId: data.projectId, source });
+    refresh(data.projectId);
+    return result;
+  });
 }
 const AnnotationInput = z.strictObject({ projectId: Id, slideId: Id.optional(), annotationId: Id.optional(), pinX: z.number().min(0).max(100).optional(), pinY: z.number().min(0).max(100).optional(), scheduleEntryId: Id.nullish(), labelSide: z.enum(["auto", "left", "right"]).optional(), note: OptionalText });
 export async function addPresentationAnnotationAction(input: z.infer<typeof AnnotationInput>): Promise<ActionResult<{ annotationId: string }>> {
