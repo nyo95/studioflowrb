@@ -12,6 +12,9 @@ home), the counts on rail items, and the Playwright size checks (§12,
 Settings) and BQ (Projects, Library; capsule on the project pages); `Tabs`
 remains only for sections inside panels, dialogs and drawers.
 
+**Amended 2026-10-14 (R9.54):** §6.2 record workspace — fixed frame, owner-asked
+direction, mockup stage, not built.
+
 ## 0. What changed from v1
 
 Owner direction (2026-10-06): an **Apple / Linear** feel — quiet, minimal, more
@@ -240,7 +243,9 @@ Rules:
 - apps may provide navigation configuration, not separate shell styling;
 - a canvas with a selection (a board, a plan, a schedule) may pair with a
   **detail panel** on the right: a white plane of label-left / value-right spec
-  rows, using `Drawer` or `DetailShell`.
+  rows, using `Drawer` or `DetailShell`;
+- a page where one record is worked on all day uses the record workspace
+  frame (§6.2) instead of a scrolling page.
 
 ## 6.1 Stat cards
 
@@ -249,6 +254,50 @@ large figure in `MetricValue`, one quiet caption. Use them only where the number
 drive a decision on that page (e.g. "3 of 12 final", "2 samples waiting"); never
 as decoration, never repeating a count the page already shows. They stack two-up,
 then one-up, on narrow screens.
+
+## 6.2 Record workspace — fixed frame (owner, 2026-10-14)
+
+A page where one record is *worked on* all day (StudioFlow project; later BQ
+project, Presentation board) does not scroll as a whole. Its head is fixed and
+its body is split into regions that each scroll on their own, so the record's
+identity, its phase and its primary action never leave the screen. Mockup:
+https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF. Not built yet.
+
+```text
+AppShell (rail + top bar)                      fixed
+└── RecordWorkspace                            one viewport high, no page scroll
+    ├── Head                                   fixed, never scrolls
+    │   ├── Context capsule                    (§10.3)
+    │   ├── Title + one line of context        on one baseline row
+    │   └── Pill tab bar                       (§10.3)
+    ├── Stage strip?                           fixed (StudioFlow: the phases)
+    │   └── current iteration + status + ONE primary action, right end
+    └── Body                                   fills the rest
+        ├── Canvas                             scrolls by itself
+        │   ├── toolbar: view switch [Notes | Workspace] + filters
+        │   ├── content
+        │   └── composer?                      pinned to the canvas bottom
+        └── Detail panel?                      scrolls by itself, collapsible
+```
+
+Rules:
+- **One primary action per record state**, at the right end of the stage strip
+  (e.g. Send to client). It is not repeated in the canvas or the panel.
+- **The canvas has one view switch.** Notes is the default view; Workspace (the
+  board) is the same place, not another page or tab. Filters belong to the
+  view that uses them and disappear with it.
+- **The detail panel** (requirements, files, details of the chosen stage) is
+  320px on the right, follows the chosen stage, and collapses to a button in
+  the canvas toolbar. Below `1280px` it starts collapsed; below `840px` it
+  opens as a full-width `Drawer`.
+- **Head height is fixed per row** (capsule, title row, tab bar, stage strip).
+  A row never overlaps the next; long titles truncate with a tooltip.
+- Every region that scrolls is a flex/grid child with `min-height: 0` (and
+  `min-width: 0`), so only that region scrolls; the page itself never shows a
+  scroll bar on desktop.
+- Below `840px` the frame is released: the head scrolls away and regions stack
+  in reading order (stage strip, canvas, panel), keeping §12's rules.
+- Ordinary list, settings and form pages keep the normal §6 structure.
 
 ## 7. Tables
 
@@ -439,7 +488,9 @@ Do not improve mobile by removing core information.
 and the navigation strip stay put; only the content scrolls. **The content never
 scrolls sideways.** Anything wider than the screen — a phase strip, a pill tab bar,
 a table — scrolls inside its own container, and every container between it and the
-page must be allowed to shrink (`min-w-0` on grid and flex items).
+page must be allowed to shrink (`min-w-0` on grid and flex items). A record
+workspace (§6.2) goes one step further: its head stays put too and each body
+region scrolls on its own.
 
 The collapsible rail is a desktop behavior. Below `840px` it becomes a labeled
 horizontal strip under the top bar, even when the desktop preference is collapsed;

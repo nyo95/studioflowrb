@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.54 | 2026-10-14 | docs(design): Record workspace with a fixed frame (Lead)
+
+- **Owner 2026-10-14:** annotated screenshot of the StudioFlow project page ("jadi semua fix page": breadcrumb, title, linear phases, Send to client, requirements panel on the right, canvas that defaults to Notes and switches to Workspace), then "coba dulu buat mockup nya" and "kalau design md nya mau di update boleh diupdate dengan opsi dari kamu".
+- **Mockup:** https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF (clickable: phase choice, Notes/Workspace switch, filters, collapsible panel). Uses the existing tokens, context capsule and pill tab bar.
+- **DESIGN.md §6.2 (new):** a record workspace is one viewport high; fixed head (capsule, title row, pill tabs) and stage strip with one primary action at its right end; body = canvas (one Notes|Workspace switch, Notes default, composer pinned) + 320px detail panel following the chosen stage, collapsible, collapsed below 1280px, a Drawer below 840px; each region scrolls by itself; frame released below 840px. Cross-references in §6 and §12; status note at the top.
+- **Not built.** Implementation waits for the owner's OK on the mockup. Checks: docs only. No push.
+
 ## R9.53 | 2026-10-14 | review(masterdata): WO-MD-PRICE-BRAND-01 PASS (Lead)
 
 - **Owner 2026-10-14:** "sekalian cek kerjaan codex, dia tadi nambahin add brand via price, cek dan push commit sekalian".
