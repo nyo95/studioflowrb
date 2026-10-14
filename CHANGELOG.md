@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.27 | 2026-10-14 | docs(backlog): Shell hydration mismatch not reproduced; evidence recorded (Lead)
+
+- **BACKLOG [BUG] (shell hydration mismatch) stays open on purpose.** A Playwright probe (not committed) moved 3 times through the six StudioFlow settings pages, `/settings` and `/account` with full loads, in-page link moves and back/forward, listening for hydration messages: none. Code reading: `AppShell` is hydration-safe; the rail depends only on the pathname (`isRailPath`) and `src/proxy.ts` does no rewrites, so the one observed "no rail on the server" points at a request outside an app root during the Developer spec. No fix without a reproduction; the next step is written on the BACKLOG line.
+- **Migrations/dependencies:** none. **Checks:** docs only. No push.
+
 ## R9.26 | 2026-10-14 | fix(masterdata,ui-engine): No "New SKU" for an existing name; "Already received" is not a warning (Lead)
 
 - **BACKLOG [CLEANUP][P3] closed (two):** the SKU picker on the sample shelf and in "Put on shelf" offered 'New SKU "X" (no price yet)' even when a SKU named exactly X existed, because the exact-match check only compared the full label (code + name + brand). UI Engine EXTEND: a CreatableSearch option may carry `exactNames` (names that count as that option exactly); the shared rule is `findExactOption` in `internal/creatable-options.ts` with a unit test. The shelf picker passes the SKU's name and code, so typing either selects the SKU and offers no create. Sample requests: "Already received" now uses the success tone instead of the danger (red) one; it is information, not a problem.
