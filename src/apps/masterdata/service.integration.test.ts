@@ -1865,6 +1865,54 @@ describe("Compare-suppliers grid", () => {
     assert.deepEqual(result.rejected.map((row) => [row.rowIndex, row.vendorId, row.field, row.code]), [[1, b, "name", "PRICE_IDENTITY_CONFLICT"]]);
   });
 
+  it("isolates an unexpected failure to its own row when saving valid rows (fault injection)", async () => {
+    const a = await workSupplier("Fault Row A");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Fault Row Works", kind: "WORK" });
+    // Each valid row commits in its own transaction; the second one fails with an error that is not an AppError.
+    let calls = 0;
+    const faulty = createMasterDataService(testDb.prisma, {
+      runTransaction: (work) => { calls += 1; if (calls === 2) return Promise.reject(new Error("disk full")); return testDb.prisma.$transaction(work); },
+      auditWriter: createAuditEventWriter(),
+    });
+    const result = await faulty.createWorkPricesBulk({ grants: GRANTS, actor: ACTOR, kind: "labor", vendorId: a, categoryId: category.categoryId, currency: "IDR", onInvalid: "save-valid", rows: [
+      { name: "Row one", unitId: unit.id, amount: "10" },
+      { name: "Row two", unitId: unit.id, amount: "11" },
+      { name: "Row three", unitId: unit.id, amount: "12" },
+    ] });
+    assert.equal(result.ids.length, 2, "the rows before and after the failure are saved");
+    assert.ok("rejected" in result);
+    assert.deepEqual(result.rejected.map((row) => [row.rowIndex, row.field, row.code]), [[1, null, "PRICE_SAVE_FAILED"]]);
+    assert.deepEqual((await testDb.prisma.priceLabor.findMany({ where: { vendor_id: a }, orderBy: { name: "asc" } })).map((row) => row.name), ["Row One", "Row Three"], "names keep the catalogue capitalization rule");
+  });
+
+  it("reports a supplier whose save fails unexpectedly as its cells, keeping the suppliers already saved (fault injection)", async () => {
+    const a = await workSupplier("Fault Grid A"); const b = await workSupplier("Fault Grid B");
+    const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });
+    const category = await service.createCategory({ grants: GRANTS, actor: ACTOR, name: "Fault Grid Works", kind: "WORK" });
+    // Supplier B's existing-price read fails with a plain error, after supplier A's cells were committed.
+    const prisma = testDb.prisma;
+    const failingDb = new Proxy(prisma, {
+      get(target, property) {
+        if (property === "priceLabor") {
+          return { ...target.priceLabor, findMany: (args: { where?: { vendor_id?: string } }) => args?.where?.vendor_id === b ? Promise.reject(new Error("connection reset")) : target.priceLabor.findMany(args as never) };
+        }
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+    const faulty = createMasterDataService(failingDb, { runTransaction: (work) => prisma.$transaction(work), auditWriter: createAuditEventWriter() });
+    const result = await faulty.createWorkPriceMatrix({ grants: GRANTS, actor: ACTOR, kind: "labor", categoryId: category.categoryId, currency: "IDR", vendorIds: [a, b], onInvalid: "save-valid", rows: [
+      { name: "Shared item", unitId: unit.id, amounts: { [a]: "10", [b]: "11" } },
+      { name: "Only B", unitId: unit.id, amounts: { [b]: "12" } },
+    ] });
+    assert.equal(result.ids.length, 1, "supplier A's cell stays saved");
+    assert.ok("rejected" in result);
+    assert.deepEqual(result.rejected.map((row) => [row.rowIndex, row.vendorId, row.code]), [[0, b, "PRICE_SAVE_FAILED"], [1, b, "PRICE_SAVE_FAILED"]], "every cell of the failed supplier comes back, none is lost silently");
+    assert.equal(await prisma.priceLabor.count({ where: { vendor_id: b } }), 0);
+    assert.equal(await prisma.priceLabor.count({ where: { vendor_id: a } }), 1);
+  });
+
   it("limits suppliers, requires an amount somewhere, and keeps blank grids out", async () => {
     const a = await workSupplier("Grid Limits A");
     const unit = await testDb.prisma.unit.findUniqueOrThrow({ where: { code: "m2" } });

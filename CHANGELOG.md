@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.34 | 2026-10-14 | test(masterdata): Fault injection for the price grids' save-valid mode (Lead, for the Executor lane)
+
+- **BACKLOG [CLEANUP][P3] closed** (R8.419/R8.421 had no fault-injection test). Taken over by the Lead after Codex's usage limit. Two integration tests: (1) one supplier, three rows, the second row's transaction fails with a plain error: rows one and three are saved, row two comes back as `_PRICE_SAVE_FAILED`; (2) the several-suppliers grid, supplier B's existing-price read fails with a plain error after supplier A was committed: A's cell stays saved and every cell of B comes back as `_PRICE_SAVE_FAILED`, none is lost. Both pass on the existing code, so no behavior change.
+- **Lead review of the Executor lane (R9.30-R9.34): PASS.** R9.30 (Codex): every reader of iteration kinds now uses `_sf_phase.iteration_kinds_snapshot`, filled at project creation and backfilled by migration `_20261014150000_studioflow_phase_iteration_kinds_snapshot`; no live `_default_iteration_kinds` read remains outside project creation. R9.31 (Codex): Presentation reads the Workspace image through StudioFlow's presentation bridge (presentation-manage + project-read) and owns `_addWorkspaceImageToMoodboardAction`; the Ideas detour is gone and the button needs only Presentation. R9.32-R9.34: see their entries.
+- **Checks (branch head):** full `_npm test` **1,099/1,099 PASS** on `_studioflow_rebuild_test_bq`; typecheck PASS; lint 0 errors (the one existing Presentation `_<img>` warning); boundaries PASS; legacy-runtime PASS; production build PASS (separate folder, removed). No push.
+
 ## R9.33 | 2026-10-14 | fix(platform,studioflow): Prisma schema matches the migrated database (Lead, for the Executor lane)
 
 - **BACKLOG [CLEANUP][P3] closed** (schema drift from the R8.515 review). Taken over by the Lead after Codex's usage limit. The database was already right; only the schema annotations lagged: `_developer_access` (`_locked_until`, `_enrolled_at`), `_developer_recovery_code.used_at` and `_developer_session` (`_created_at`, `_last_seen_at`, `_expires_at`) are `_@db.Timestamptz(3)`; `_sf_holiday` has a `_@db.Uuid` id, `_@db.Timestamptz(6)` timestamps and `_updated_at` defaulting to `_now()` as created by its migration. No migration.
