@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.53 | 2026-10-14 | review(masterdata): WO-MD-PRICE-BRAND-01 PASS (Lead)
+
+- **Owner 2026-10-14:** "sekalian cek kerjaan codex, dia tadi nambahin add brand via price, cek dan push commit sekalian".
+- **Reviewed R9.51 (61cdaea):** `createPricingBrandQuickAction` goes through `masterDataService.createBrand`, so brand-manage is enforced by the service (tested: refused with price-manage and brand-read alone); the Brand picker of New price → Material offers "Create brand …" only when `canManageBrands`; the new brand is added to the picker and selected, and a new SKU typed in Items then takes that brand (existing `materialBrandFilter` fallback). Name-only: no owner, categories, suppliers, contacts, links or hashtags; a case-insensitive duplicate is a conflict; empty names are refused; the returned name is the stored, title-cased one. Revalidates pricing, brands and Master Data home. No schema change, Master Data only.
+- **Verdict: PASS**, no correction. Minor, accepted: the action reuses the category quick-form schema (name ≤ 64 characters), stricter than the Brand screen.
+- **Checks:** `npm test` 1116/1116 on main with R9.51 and R9.52 together; typecheck and production build PASS. Browser journey stays in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` for the owner.
+- **Also committed:** the Lead's R9.50 plan (PLAN.md and its changelog entry), left uncommitted by the planning session. PLAN.md marked DONE.
+
 ## R9.52 | 2026-10-14 | feat(presentation): Slides with layouts of up to four images, a title and a caption (Lead)
 
 - **Owner 2026-10-14:** "cek modul presentasi - satu halaman bisa beberapa gambar ga? jadi seperti mini powerpoint?" → option **A** (layouts, not a free canvas), mockup https://claude.ai/artifact/YTFXgq8ExAfUHKqbYGBnhx, then "lanjut". Everything stays inside the Presentation module.

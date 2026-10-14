@@ -4,6 +4,7 @@ Plan ID: WO-MD-PRICE-BRAND-01 (create a Brand from the New price dialog)
 Scope: one small change, one local commit
 Module(s): masterdata only
 Target revision: Executor **R9.51** on `main` (the Lead used R9.50 for this plan)
+Status: DONE — Executor R9.51 (61cdaea), Lead review PASS R9.53
 Baseline: `main` at the R9.50 plan commit; working tree clean except the owner's untracked `test/` (do not touch or stage it)
 
 ## Why
