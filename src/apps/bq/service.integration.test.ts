@@ -1019,7 +1019,7 @@ describe("BQ R6.1 invariants", () => {
   });
 });
 
-describe("BQ quick entry and pasted rows (owner 2026-10-14)", () => {
+describe("BQ quick entry and specification (owner 2026-10-14)", () => {
   it("creates a Work Item with its specification, direct price or TBC in one step, and edits the specification", async () => {
     const { project, section } = await projectTree();
     const priced = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Cover Dinding", qty: "42.3", unit: "m2", hargaSnapshot: "275000", specification: "  Gypsum 9mm rangka hollow  " });
@@ -1040,35 +1040,5 @@ describe("BQ quick entry and pasted rows (owner 2026-10-14)", () => {
       () => service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Long", qty: "1", unit: "ls", specification: "x".repeat(1001) }),
       (error: unknown) => error instanceof AppError && error.code === "bq.item.specification-too-long",
     );
-  });
-
-  it("adds pasted rows at the end in order, in one audit event, and refuses the whole paste for one bad row", async () => {
-    const { project, section, item } = await projectTree();
-    const result = await service.addItems({
-      grants: GRANTS, actor: ACTOR, sectionId: section.id, rows: [
-        { name: "Cover Kolom", qty: "6.24", unit: "m2", specification: "Backing multiplek", hargaSnapshot: "780000" },
-        { name: "Titik Lampu", qty: "52", unit: "point", priceMode: "TBC" },
-        { name: "Bar Stool", qty: "8", unit: "unit", priceMode: "BY_OWNER", hargaSnapshot: "999" },
-      ],
-    });
-    assert.equal(result.ids.length, 3);
-    const items = (await createBqPublicRead(testDb.prisma).getProjectDetail(project.id))!.sections[0]!.items;
-    assert.deepEqual(items.map((row) => row.name), [item.name, "Cover Kolom", "Titik Lampu", "Bar Stool"], "appended after the existing Work Item, in paste order");
-    assert.deepEqual(items.slice(1).map((row) => [row.priceMode, row.hargaSnapshot, row.specification]), [
-      ["PRICED", "780000", "Backing multiplek"],
-      ["TBC", null, null],
-      ["BY_OWNER", null, null],
-    ], "a marker row never keeps a price");
-    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "bq.items.created" } }), 1);
-
-    const before = await testDb.prisma.bqItem.count();
-    await assert.rejects(
-      () => service.addItems({ grants: GRANTS, actor: ACTOR, sectionId: section.id, rows: [{ name: "Fine", qty: "1", unit: "ls" }, { name: "Zero", qty: "0", unit: "ls" }] }),
-      (error: unknown) => error instanceof AppError && error.code === "bq.items.qty-invalid",
-    );
-    assert.equal(await testDb.prisma.bqItem.count(), before, "nothing of a refused paste is written");
-    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "1" });
-    await service.lockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
-    await assert.rejects(() => service.addItems({ grants: GRANTS, actor: ACTOR, sectionId: section.id, rows: [{ name: "Late", qty: "1", unit: "ls" }] }));
   });
 });

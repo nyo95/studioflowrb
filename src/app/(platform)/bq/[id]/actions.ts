@@ -301,56 +301,6 @@ export async function addItemAction(
   });
 }
 
-const PastedRow = z.strictObject({
-  name: z.string().trim().min(1).max(160),
-  qty: z.string().trim().min(1).max(40),
-  unit: z.string().trim().max(40),
-  specification: z.string().trim().max(1000).optional(),
-  hargaSnapshot: z.string().trim().max(40).nullable().optional(),
-  priceMode: z.enum(BQ_PRICE_MODES).optional(),
-});
-const PastedRowsSchema = z.object({
-  projectId: Id,
-  sectionId: Id.optional(),
-  subsectionId: Id.optional(),
-  rows: z.string().max(400_000),
-});
-
-/** Rows pasted from a spreadsheet, added at once (owner 2026-10-14); one bad row refuses the whole paste. */
-export async function addItemsAction(
-  _prev: ActionResult<BqProjectDetail> | null,
-  formData: FormData,
-): Promise<ActionResult<BqProjectDetail>> {
-  return runSafeAction(async () => {
-    const { grants, actor } = await authorize();
-    const raw = Object.fromEntries(formData.entries());
-    if (!raw.sectionId) delete raw.sectionId;
-    if (!raw.subsectionId) delete raw.subsectionId;
-    const parsed = PastedRowsSchema.safeParse(raw);
-    if (!parsed.success) throw validationError(parsed.error);
-    const value = parsed.data;
-    let decoded: unknown;
-    try { decoded = JSON.parse(value.rows); } catch { throw new AppError("VALIDATION", "bq.items.rows-invalid", "Invalid rows"); }
-    const rows = z.array(PastedRow).max(500).safeParse(decoded);
-    if (!rows.success) throw validationError(rows.error);
-    await bqService.addItems({
-      grants,
-      actor,
-      sectionId: value.sectionId,
-      subsectionId: value.subsectionId,
-      rows: rows.data.map((row) => ({
-        name: row.name,
-        qty: positiveDecimal(row.qty, "Quantity"),
-        unit: row.unit || "ls",
-        specification: row.specification || null,
-        priceMode: row.priceMode,
-        hargaSnapshot: row.hargaSnapshot ? decimal(row.hargaSnapshot, "Unit price") : null,
-      })),
-    });
-    return reload(value.projectId);
-  });
-}
-
 const ITEM_FIELDS = ["name", "qty", "unit", "hargaSnapshot", "koefisien", "markupL1Pct", "priceMode", "notes", "specification"] as const;
 const ItemFieldSchema = z.object({
   projectId: Id,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, ClipboardPaste, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -31,11 +31,10 @@ import {
   TableHeader,
   TableRow,
   Text,
-  Tooltip,
   type RowActionItem,
 } from "@/platform/ui_engine";
 import { createMoney, formatMoney } from "@platform/utilities/money";
-import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
+import { addDecimals, compareDecimals, toDecimalString } from "@platform/utilities/decimal";
 import type { ActionResult } from "@platform/core/actions";
 import type {
   BqAssemblyTemplateRead,
@@ -52,7 +51,6 @@ import { resolveCalcExpression } from "@/apps/bq/lib/calc-expression";
 
 import {
   addItemAction,
-  addItemsAction,
   addItemAndApplyAssemblyAction,
   addLineItemAction,
   addSubObjectAction,
@@ -85,7 +83,6 @@ import { NewWorkItemDialog } from "./new-work-item-dialog";
 import { SaveAsAssemblyDialog } from "./save-as-assembly-dialog";
 import { ImportDialog } from "./source-picker-dialog";
 import { QuotationDialog } from "./quotation-dialog";
-import { PasteRowsDialog } from "./paste-rows-dialog";
 import { QuickEntryRow, type QuickEntryFields } from "./quick-entry-row";
 import {
   buildLineItemMoveFields,
@@ -317,7 +314,7 @@ function OutlineItems({
     void onReorder(parent, next).catch(() => undefined);
   };
   return (
-    <ul className="m-0 grid list-none gap-0.5 p-0">
+    <ul className="m-0 grid min-w-0 grid-cols-1 list-none gap-0.5 p-0">
       {items.map((item, index) => (
         <li
           key={item.id}
@@ -430,13 +427,13 @@ function SectionOutline({
   return (
     <nav
       aria-label="Struktur dokumen"
-      className="sticky top-0 hidden w-[220px] shrink-0 flex-col gap-0.5 self-start py-1 lg:flex xl:w-[260px]"
+      className="sticky top-0 hidden w-[220px] min-w-0 shrink-0 flex-col gap-0.5 self-start overflow-hidden py-1 lg:flex xl:w-[260px]"
     >
       <Text tone="tertiary" size="sm" meta className="px-2.5 pb-1">Struktur</Text>
       {sections.map((section) => {
         const count = workItemCount(section);
         return (
-          <div key={section.id} className="grid gap-0.5">
+          <div key={section.id} className="grid min-w-0 grid-cols-1 gap-0.5">
             {renaming === section.id ? nameField(section.id, section.name, onRenameSection, "px-1.5 py-1") : (
             <a
               href={`#bq-section-${section.id}`}
@@ -451,7 +448,7 @@ function SectionOutline({
             )}
             <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-4" editable={editable} pending={pending} onReorder={onReorder} />
             {section.subsections.map((subsection) => (
-              <div key={subsection.id} className="grid gap-0.5">
+              <div key={subsection.id} className="grid min-w-0 grid-cols-1 gap-0.5">
                 {renaming === subsection.id ? nameField(subsection.id, subsection.name, onRenameSubsection, "py-1 pl-3 pr-1.5") : (
                 <a
                   href={`#bq-subsection-${subsection.id}`}
@@ -525,7 +522,6 @@ export function ProjectEditor({
   /** The last Cost Component clicked without Shift: where a Shift-click range starts. */
   const anchor = useRef<string | null>(null);
   const [dragging, setDragging] = useState<{ itemId: string; lineIds: readonly string[]; overId: string | null } | null>(null);
-  const [pasteTarget, setPasteTarget] = useState<NewItemTarget | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ title: string; run: () => Promise<void> } | null>(null);
   const [groupItemId, setGroupItemId] = useState<string | null>(null);
   const [moveConfirmation, setMoveConfirmation] = useState<MoveRequest | null>(null);
@@ -883,84 +879,27 @@ export function ProjectEditor({
             </SectionCard>
           ) : null}
 
-          {project.sections.map((section) => (
-        <SectionCard key={section.id} id={`bq-section-${section.id}`} className="grid gap-3">
-          <div className="flex items-center">
-            {editable ? (
-              <InlineEdit
-                value={section.name}
-                label="Nama Section"
-                className="text-base font-semibold text-ink"
-                onCommit={(name) => run(updateSectionAction, { id: section.id, name })}
+          {project.sections.map((section, sectionIndex) => (
+            <SectionCard key={section.id} id={`bq-section-${section.id}`} className="grid gap-3">
+              <SectionTable
+                section={section}
+                letter={SECTION_LETTERS[sectionIndex] ?? String(sectionIndex + 1)}
+                ctx={tableCtx}
+                columns={totalColumns}
+                onMore={editable ? (target) => { setError(null); setNewItemTarget(target); } : undefined}
               />
-            ) : (
-              <Heading level={4}>{section.name}</Heading>
-            )}
-          </div>
-
-          <ItemTable items={section.items} target={{ sectionId: section.id }} where={section.name} ctx={tableCtx} columns={totalColumns} />
-          {editable ? (
-            <div className="flex">
-              <Button
-                size="sm"
-                variant="ghost"
-                leadingIcon={<Plus aria-hidden="true" />}
-                disabled={pending}
-                onClick={() => setNewItemTarget({ sectionId: section.id, where: section.name })}
-              >
-                <span className="max-w-[28ch] truncate">Work Item di {section.name}</span>
-              </Button>
-              <Button size="sm" variant="ghost" leadingIcon={<ClipboardPaste aria-hidden="true" />} disabled={pending} onClick={() => { setError(null); setPasteTarget({ sectionId: section.id, where: section.name }); }}>
-                Tempel dari Excel
-              </Button>
-            </div>
-          ) : null}
-
-          {section.subsections.map((subsection) => (
-            <div key={subsection.id} id={`bq-subsection-${subsection.id}`} className="grid gap-2 rounded-control border border-line-subtle p-3">
-              <div className="flex items-center">
-                {editable ? (
-                  <InlineEdit
-                    value={subsection.name}
-                    label="Nama Subsection"
-                    className="text-sm font-semibold text-ink-secondary"
-                    onCommit={(name) => run(updateSubsectionAction, { id: subsection.id, name })}
-                  />
-                ) : (
-                  <Heading level={5} className="text-ink-secondary">{subsection.name}</Heading>
-                )}
-              </div>
-              <ItemTable items={subsection.items} target={{ subsectionId: subsection.id }} where={`${section.name} › ${subsection.name}`} ctx={tableCtx} columns={totalColumns} />
               {editable ? (
-                <div className="flex gap-1.5 pt-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    leadingIcon={<Plus aria-hidden="true" />}
+                // Only where the Struktur panel is hidden (< 1024 px); from there on "+ Subsection" lives in the panel.
+                <div className="flex flex-wrap gap-1.5 lg:hidden">
+                  <AddRow
+                    label="Subsection"
+                    placeholder="Nama Subsection"
                     disabled={pending}
-                    onClick={() => setNewItemTarget({ subsectionId: subsection.id, where: `${section.name} › ${subsection.name}` })}
-                  >
-                    <span className="max-w-[28ch] truncate">Work Item di {subsection.name}</span>
-                  </Button>
-                  <Button size="sm" variant="ghost" leadingIcon={<ClipboardPaste aria-hidden="true" />} disabled={pending} onClick={() => { setError(null); setPasteTarget({ subsectionId: subsection.id, where: `${section.name} › ${subsection.name}` }); }}>
-                    Tempel dari Excel
-                  </Button>
+                    onAdd={(name) => run(addSubsectionAction, { sectionId: section.id, name })}
+                  />
                 </div>
               ) : null}
-            </div>
-          ))}
-          {editable ? (
-            // Only where the Struktur panel is hidden (< 1024 px); from there on "+ Subsection" lives in the panel.
-            <div className="flex flex-wrap gap-1.5 border-t border-line-subtle pt-3 lg:hidden">
-              <AddRow
-                label="Subsection"
-                placeholder="Nama Subsection"
-                disabled={pending}
-                onAdd={(name) => run(addSubsectionAction, { sectionId: section.id, name })}
-              />
-            </div>
-          ) : null}
-        </SectionCard>
+            </SectionCard>
           ))}
         </div>
         {(() => {
@@ -1175,23 +1114,6 @@ export function ProjectEditor({
         />
       ) : null}
 
-      {pasteTarget ? (
-        <PasteRowsDialog
-          where={pasteTarget.where}
-          units={units.map((unit) => unit.code)}
-          pending={pending}
-          error={error}
-          onClose={() => setPasteTarget(null)}
-          onSubmit={(items) => {
-            const where = pasteTarget.sectionId ? { sectionId: pasteTarget.sectionId } : { subsectionId: pasteTarget.subsectionId };
-            void run(addItemsAction, {
-              ...where,
-              rows: JSON.stringify(items.map((row) => ({ name: row.name, qty: row.qty, unit: row.unit, specification: row.specification || undefined, hargaSnapshot: row.hargaSnapshot, priceMode: row.priceMode }))),
-            }).then(() => { setPasteTarget(null); showMoveNotice(`${items.length} pekerjaan dimasukkan.`, "success"); }).catch(() => undefined);
-          }}
-        />
-      ) : null}
-
       <ConfirmDialog
         open={confirmDelete !== null}
         onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}
@@ -1264,45 +1186,100 @@ function onControl(event: { target: EventTarget }) {
   return Boolean((event.target as HTMLElement).closest("button, input, select, textarea, a, label, [contenteditable=true]"));
 }
 
-function ItemTable({ items, target, where, ctx, columns }: {
-  items: readonly BqItemDetail[];
-  target: { sectionId?: string; subsectionId?: string };
-  where: string;
+/** Section letters as on the printed quotation (A, B, …); Work Items are numbered A.1, A.2 … across the Section. */
+const SECTION_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+/** The Section's own total, as the quotation prints it under "Subtotal A"; null while a priced row has no total. */
+function sectionSubtotal(section: BqSectionDetail): string | null {
+  const items = [...section.items, ...section.subsections.flatMap((subsection) => subsection.items)].filter((item) => !isMarkerPriceMode(item.priceMode));
+  if (items.some((item) => item.total === null)) return null;
+  return items.reduce((sum, item) => addDecimals(sum, toDecimalString(item.total!)), toDecimalString("0"));
+}
+
+/**
+ * One Section as one sheet (owner 2026-10-14, "sesuai struktur Excel"): the workbook's columns (No, Uraian,
+ * Spesifikasi, Vol, Sat, Harga satuan, Total), Subsections as group heading rows inside the same table, an empty
+ * last row to type the next Work Item into, and the Section subtotal at the bottom. Names of Sections and
+ * Subsections change in Struktur only.
+ */
+function SectionTable({ section, letter, ctx, columns, onMore }: {
+  section: BqSectionDetail;
+  letter: string;
   ctx: TableCtx;
   columns: number;
+  onMore?: (target: NewItemTarget) => void;
 }) {
+  const span = columns + (ctx.editable ? 1 : 0);
+  let counter = 0;
+  const direct = section.items.map(() => `${letter}.${++counter}`);
+  const grouped = section.subsections.map((subsection) => subsection.items.map(() => `${letter}.${++counter}`));
+  // A Section split into Subsections takes new Work Items in a Subsection, unless it already holds its own.
+  const directEntry = ctx.editable && (section.items.length > 0 || section.subsections.length === 0);
+  const subtotal = sectionSubtotal(section);
+  const entry = (target: { sectionId?: string; subsectionId?: string }, where: string) => (
+    <QuickEntryRow
+      units={ctx.units.map((unit) => unit.code)}
+      disabled={ctx.pending}
+      editableColumn={ctx.editable}
+      onAdd={(fields) => ctx.quickAdd(target, fields)}
+      onMore={onMore ? () => onMore({ ...target, where }) : undefined}
+    />
+  );
   return (
     <div className="grid gap-2">
-      {items.length === 0 ? (
-        <Text tone="tertiary" size="sm">Belum ada Work Item{ctx.editable ? " — ketik di baris di bawah ini." : "."}</Text>
-      ) : (
-        <DataTable minWidth="820px" density="compact">
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[40px]" aria-label="Buka atau tutup" />
-              <TableHead>Uraian &amp; spesifikasi</TableHead>
-              <TableHead align="end" className="w-[90px]">Jumlah</TableHead>
-              <TableHead className="w-[80px]">Satuan</TableHead>
-              <TableHead align="end" className="w-[90px]">Koef.</TableHead>
-              <TableHead align="end" className="w-[90px]">Markup</TableHead>
-              <TableHead align="end" className="w-[130px]">Harga satuan</TableHead>
-              <TableHead align="end" className="w-[130px]">Total</TableHead>
-              {ctx.editable ? <TableHead align="end" className="w-[56px]" aria-label="Aksi" /> : null}
+      <div className="flex items-baseline gap-2.5">
+        <span className="font-ui-mono text-sm font-semibold text-ink-tertiary">{letter}</span>
+        <Heading level={4}>{section.name}</Heading>
+      </div>
+      <DataTable minWidth="900px" density="compact">
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[36px]" aria-label="Buka atau tutup" />
+            <TableHead className="w-[56px]">No</TableHead>
+            <TableHead>Uraian</TableHead>
+            <TableHead className="w-[26%]">Spesifikasi</TableHead>
+            <TableHead align="end" className="w-[84px]">Vol</TableHead>
+            <TableHead className="w-[72px]">Sat</TableHead>
+            <TableHead align="end" className="w-[130px]">Harga satuan</TableHead>
+            <TableHead align="end" className="w-[140px]">Total</TableHead>
+            {ctx.editable ? <TableHead align="end" className="w-[48px]" aria-label="Aksi" /> : null}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {section.items.map((item, index) => <ItemRows key={item.id} item={item} number={direct[index]!} ctx={ctx} columns={span} />)}
+          {directEntry ? entry({ sectionId: section.id }, section.name) : null}
+          {!ctx.editable && section.items.length === 0 && section.subsections.length === 0 ? (
+            <TableRow><TableCell colSpan={span}><Text tone="tertiary" size="sm">Belum ada Work Item.</Text></TableCell></TableRow>
+          ) : null}
+        </TableBody>
+        {section.subsections.map((subsection, subsectionIndex) => (
+          <TableBody key={subsection.id} id={`bq-subsection-${subsection.id}`} aria-label={`Subsection ${subsection.name}`}>
+            <TableRow className="hover:!bg-transparent">
+              <TableCell />
+              <TableCell colSpan={span - 1} className="!pt-4">
+                <span className="text-sm font-semibold uppercase tracking-[0.04em] text-ink">{subsection.name}</span>
+                <span className="ml-2 text-xs text-ink-tertiary">{subsection.items.length} pekerjaan</span>
+              </TableCell>
             </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => <ItemRows key={item.id} item={item} ctx={ctx} columns={columns + (ctx.editable ? 1 : 0)} />)}
+            {subsection.items.map((item, index) => <ItemRows key={item.id} item={item} number={grouped[subsectionIndex]![index]!} ctx={ctx} columns={span} />)}
+            {ctx.editable ? entry({ subsectionId: subsection.id }, `${section.name} › ${subsection.name}`) : null}
           </TableBody>
-        </DataTable>
-      )}
-      {ctx.editable ? (
-        <QuickEntryRow where={where} units={ctx.units.map((unit) => unit.code)} disabled={ctx.pending} onAdd={(fields) => ctx.quickAdd(target, fields)} />
-      ) : null}
+        ))}
+        {counter > 0 ? (
+          <TableBody>
+            <TableRow className="hover:!bg-transparent">
+              <TableCell colSpan={7} align="end" className="border-t border-line font-semibold">Subtotal {letter}</TableCell>
+              <TableCell align="end" className="border-t border-line font-semibold tabular-nums">{subtotal === null ? "—" : money(subtotal)}</TableCell>
+              {ctx.editable ? <TableCell className="border-t border-line" /> : null}
+            </TableRow>
+          </TableBody>
+        ) : null}
+      </DataTable>
     </div>
   );
 }
 
-function ItemRows({ item, ctx, columns }: { item: BqItemDetail; ctx: TableCtx; columns: number }) {
+function ItemRows({ item, number, ctx, columns }: { item: BqItemDetail; number: string; ctx: TableCtx; columns: number }) {
   const open = ctx.expanded.has(item.id);
   const hasChildren = item.subObjects.length > 0 || item.lineItems.length > 0;
   const selectedIds = new Set(selectionForItem(ctx.selection, item.id));
@@ -1328,32 +1305,25 @@ function ItemRows({ item, ctx, columns }: { item: BqItemDetail; ctx: TableCtx; c
               onClick={() => ctx.toggle(item.id)}
             />
           </TableCell>
+          <TableCell className="tabular-nums text-ink-tertiary">{number}</TableCell>
           <TableCell wrap className="font-medium">
             <InlineEdit label="Nama Work Item" value={item.name} disabled={!ctx.editable} onCommit={ctx.commit(updateItemAction, item.id, "name")} />
-            {item.specification ? <Text tone="secondary" size="sm" className="mt-0.5 block px-1.5 font-normal">{item.specification}</Text> : null}
-            <Text tone="tertiary" size="sm" className="mt-0.5 block px-1.5 font-normal">
-              {isMarkerPriceMode(item.priceMode)
+            {/* An L1 with children takes its cost from them (its own coefficient is dormant); a childless L1 has no
+                markup (zeroMarkupIfChildless). So only the one that applies is shown, and only when it is not neutral. */}
+            {(() => {
+              const note = isMarkerPriceMode(item.priceMode)
                 ? "Baris penanda — tidak masuk total"
                 : hasChildren
-                  ? `Harga dari rincian (${lineItemIds(item).length} baris)`
-                  : "Harga langsung"}
-            </Text>
+                  ? `Dari rincian (${lineItemIds(item).length} baris)${isZeroPrice(item.markupL1Pct) ? "" : ` · markup ${item.markupL1Pct}%`}`
+                  : isOne(item.koefisien) ? null : `koef ${item.koefisien}`;
+              return note ? <Text tone="tertiary" size="sm" className="mt-0.5 block px-1.5 font-normal">{note}</Text> : null;
+            })()}
+          </TableCell>
+          <TableCell wrap>
+            {item.specification ? <Text tone="secondary" size="sm" className="line-clamp-3 whitespace-pre-line">{item.specification}</Text> : null}
           </TableCell>
           <TableCell align="end" className="tabular-nums">{item.qty}</TableCell>
           <TableCell>{item.unit}</TableCell>
-          {/* Koef. and Markup are two fixed columns rather than one cell that switches meaning: an L1 with children takes
-              its cost from them, so its own coefficient is dormant (shown "—"); a childless L1 has no markup of its own
-              (zeroed automatically — zeroMarkupIfChildless). */}
-          <TableCell align="end" className="tabular-nums">
-            {hasChildren ? <Text tone="tertiary" size="sm">—</Text> : item.koefisien}
-          </TableCell>
-          <TableCell align="end" className="tabular-nums">
-            {hasChildren ? `${item.markupL1Pct}%` : (
-              <Tooltip content="Markup tidak berlaku untuk Work Item tanpa breakdown — nilainya otomatis 0.">
-                <span className="inline-block"><Text tone="tertiary" size="sm">—</Text></span>
-              </Tooltip>
-            )}
-          </TableCell>
           <TableCell align="end">
             {isMarkerPriceMode(item.priceMode) ? (
               <Badge tone="neutral">{PRICE_STATUS_LABEL[item.priceMode]}</Badge>
@@ -1424,6 +1394,7 @@ function SubObjectRows({ item, group, ctx, columns, selectedIds }: {
           onDrop={(event) => { event.preventDefault(); ctx.drop(item, { subObjectId: group.id }, `Component Group ${group.name}`); }}
         >
           <TableCell />
+          <TableCell />
           <TableCell wrap>
             <div className="flex items-center gap-1 pl-4">
               <IconButton size="sm" variant="ghost" label={open ? `Tutup ${group.name}` : `Buka ${group.name}`} icon={open ? <ChevronDown aria-hidden="true" /> : <ChevronRight aria-hidden="true" />} onClick={() => ctx.toggle(group.id)} />
@@ -1431,19 +1402,14 @@ function SubObjectRows({ item, group, ctx, columns, selectedIds }: {
                 <InlineEdit label="Nama Component Group" value={group.name} disabled={!ctx.editable} onCommit={ctx.commit(updateSubObjectAction, group.id, "name")} />
                 {/* A Component Group is not a plain folder: its multiplier and extra % change the Work Item's price. */}
                 <Text tone="tertiary" size="sm" className="block px-1.5">
-                  {group.lineItems.length === 0 ? "Component Group kosong — seret Cost Component ke sini" : "Component Group · jumlah per Work Item dan markup ikut menghitung harga"}
+                  {group.lineItems.length === 0 ? "Component Group kosong — seret Cost Component ke sini" : `Component Group${isZeroPrice(group.markupL2Pct) ? "" : ` · markup ${group.markupL2Pct}%`}`}
                 </Text>
               </div>
             </div>
           </TableCell>
+          <TableCell />
           <TableCell align="end" className="tabular-nums">×{group.qtyPerL1}</TableCell>
-          <TableCell><Text tone="tertiary" size="sm">per Work Item</Text></TableCell>
-          <TableCell align="end"><Text tone="tertiary" size="sm">—</Text></TableCell>
-          <TableCell align="end">
-            <Tooltip content="Markup Component Group ini (%) — hanya berlaku untuk Cost Component di dalamnya.">
-              <span className="inline-block tabular-nums">{group.markupL2Pct}%</span>
-            </Tooltip>
-          </TableCell>
+          <TableCell><Text tone="tertiary" size="sm">per item</Text></TableCell>
           <TableCell align="end">{money(group.subtotalL2Raw)}</TableCell>
           <TableCell align="end">{money(group.subtotalL2)}</TableCell>
           {ctx.editable ? (
@@ -1495,14 +1461,16 @@ function LineItemRow({ item, line, depth, ctx, selected }: {
         <TableCell>
           {ctx.editable ? <GripVertical aria-hidden="true" className="ml-2 size-3.5 text-ink-tertiary" /> : null}
         </TableCell>
+        <TableCell />
         <TableCell wrap>
           <div className={depth === 2 ? "pl-10" : "pl-4"}>
             <InlineEdit label="Nama Cost Component" value={line.titleSnapshot} disabled={!ctx.editable} onCommit={ctx.commit(updateLineItemAction, line.id, "titleSnapshot")} />
             <div className="mt-0.5 flex flex-wrap items-center gap-1.5 px-1.5">
               <Badge tone="neutral">{KATEGORI_LABEL[line.kategori] ?? line.kategori}</Badge>
               {line.sourceType !== "CUSTOM" ? (
-                <Text tone="tertiary" size="sm">{line.sourceType === "MASTERDATA" ? "Salinan harga Master Data" : "Salinan harga BQ Library"}</Text>
+                <Text tone="tertiary" size="sm">{line.sourceType === "MASTERDATA" ? "Master Data" : "BQ Library"}</Text>
               ) : null}
+              {isOne(line.koefisien) ? null : <Text tone="tertiary" size="sm">koef {line.koefisien}</Text>}
               {/* bq-contract K-03: the factor is context for setting a coefficient, never a term in the formula. */}
               {line.purchaseToBaseFactorSnapshot && line.baseUnitSnapshot ? (
                 <Text tone="tertiary" size="sm">1 {line.purchaseUnitSnapshot} = {line.purchaseToBaseFactorSnapshot} {line.baseUnitSnapshot}</Text>
@@ -1516,10 +1484,9 @@ function LineItemRow({ item, line, depth, ctx, selected }: {
             </div>
           </div>
         </TableCell>
+        <TableCell />
         <TableCell align="end" className="tabular-nums">{line.qty}</TableCell>
         <TableCell>{line.purchaseUnitSnapshot}</TableCell>
-        <TableCell align="end" className="tabular-nums">{line.koefisien}</TableCell>
-        <TableCell align="end"><Text tone="tertiary" size="sm">—</Text></TableCell>
         <TableCell align="end">{priceText(line.hargaSnapshot, line.currencySnapshot)}</TableCell>
         <TableCell align="end">{money(line.biayaLine, line.currencySnapshot)}</TableCell>
         {ctx.editable ? (
@@ -1530,6 +1497,10 @@ function LineItemRow({ item, line, depth, ctx, selected }: {
       </TableRow>
     </ContextActionMenu>
   );
+}
+
+function isOne(value: string): boolean {
+  try { return compareDecimals(toDecimalString(value), toDecimalString("1")) === 0; } catch { return false; }
 }
 
 /** A price as the table shows it: missing and Rp0 stand out, everything else is plain money. */

@@ -6,8 +6,8 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 /**
  * Owner 2026-10-14: type a real contractor BOQ ("test/BOQ TEST.xlsx", not committed) into the BQ screens, one sheet
  * per part, to see where the screens get in the way. Sheets → Sections, lettered groups → Subsections, numbered rows →
- * Work Items with a direct price and their specification, typed in the quick entry row (the last sheet is pasted
- * through "Tempel dari Excel"); "By Owner" → By Owner from the right-click menu, an empty rate → TBC. Every problem is collected (not thrown)
+ * Work Items with a direct price and their specification, typed in the empty last row of each Subsection;
+ * "By Owner" → By Owner from the right-click menu, an empty rate → TBC. Every problem is collected (not thrown)
  * into e2e/.tmp/boq-walk-findings.json, and each part compares the screen's grand total with the Excel rows.
  */
 const WORKBOOK = "test/BOQ TEST.xlsx";
@@ -87,13 +87,13 @@ async function openProject(page: Page) {
   await expect(page.getByRole("navigation", { name: "Struktur dokumen" })).toBeVisible();
 }
 
-const subsectionBox = (page: Page, name: string) =>
-  page.locator('[id^="bq-subsection-"]').filter({ has: page.getByRole("button", { name: `Nama Subsection: ${name}`, exact: true }) }).last();
+// A Subsection is its own row group inside the Section's table.
+const subsectionBox = (page: Page, name: string) => page.getByRole("rowgroup", { name: `Subsection ${name}`, exact: true }).last();
 
-/** Types one Excel row into the quick entry row under the Subsection's table (Enter saves); By Owner by right-click. */
+/** Types one Excel row into the empty last row of its Subsection (Enter saves); By Owner by right-click. */
 async function addRow(page: Page, part: string, box: Locator, row: Row) {
   const where = `Excel row ${row.excelRow} "${row.name}"`;
-  const entry = box.getByRole("group", { name: /^Isi cepat di / });
+  const entry = box.locator("tr[data-quick-entry]");
   const before = await box.locator('tr[id^="bq-row-"]').count();
   await entry.getByLabel("Nama pekerjaan baru", { exact: true }).fill(row.name);
   if (row.spec) await entry.getByLabel("Spesifikasi pekerjaan baru", { exact: true }).fill(row.spec.slice(0, 1000));
@@ -110,24 +110,6 @@ async function addRow(page: Page, part: string, box: Locator, row: Row) {
     await page.getByRole("menuitem", { name: "Tandai By Owner" }).click();
     await expect(tableRow).toContainText("By Owner", { timeout: 15_000 }).catch(() => note(part, where, "By Owner from the right-click menu did not show."));
   }
-}
-
-/** The whole group at once through "Tempel dari Excel", the way an estimator copies it out of the sheet. */
-async function pasteGroup(page: Page, part: string, box: Locator, group: Group) {
-  const before = await box.locator('tr[id^="bq-row-"]').count();
-  const cell = (text: string) => (/[\t\n"]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text);
-  const lines = ["DESCRIPTION\tSPECIFICATION\tVOL\tSAT\tRATE", ...group.rows.map((row) =>
-    [row.name, row.spec, String(row.qty), row.unit, row.rate.mode === "PRICED" ? String(row.rate.amount) : row.rate.mode === "BY_OWNER" ? "By Owner" : ""].map(cell).join("\t"))];
-  await box.getByRole("button", { name: "Tempel dari Excel" }).click();
-  const dialog = page.getByRole("dialog", { name: "Tempel dari Excel" });
-  await dialog.getByLabel("Kotak tempel").fill(lines.join("\n"));
-  await expect(dialog.getByText(`${group.rows.length} pekerjaan terbaca`)).toBeVisible()
-    .catch(async () => note(part, group.name, `Paste read ${(await dialog.getByText(/pekerjaan terbaca/).textContent()) ?? "nothing"}, expected ${group.rows.length}.`));
-  await dialog.getByRole("button", { name: /^Masukkan/ }).click();
-  await expect(dialog).toBeHidden({ timeout: 30_000 });
-  await expect(box.locator('tr[id^="bq-row-"]')).toHaveCount(before + group.rows.length, { timeout: 15_000 })
-    .catch(() => note(part, group.name, "Not every pasted row arrived."));
-  for (const row of group.rows) if (row.rate.mode === "PRICED") expectedSoFar += Math.round(row.qty * row.rate.amount * 100) / 100;
 }
 
 async function grandTotal(page: Page): Promise<number | null> {
@@ -178,11 +160,6 @@ for (const index of [0, 1, 2, 3]) {
       await page.keyboard.press("Enter");
       const box = subsectionBox(page, group.name);
       await expect(box).toBeVisible({ timeout: 15_000 });
-      // The last sheet goes in by pasting, the others row by row.
-      if (index === 3) {
-        await pasteGroup(page, part, box, group).catch((error: Error) => note(part, group.name, `Paste stopped: ${error.message.split("\n")[0]}`));
-        continue;
-      }
       for (const row of group.rows) {
         try {
           await addRow(page, part, box, row);
@@ -193,12 +170,15 @@ for (const index of [0, 1, 2, 3]) {
       }
     }
 
-    note(part, "Waktu", `${sheet!.groups.reduce((sum, group) => sum + group.rows.length, 0)} rows in ${Math.round((Date.now() - started) / 1000)} s (${index === 3 ? "paste" : "quick entry"}).`);
+    note(part, "Waktu", `${sheet!.groups.reduce((sum, group) => sum + group.rows.length, 0)} rows in ${Math.round((Date.now() - started) / 1000)} s (quick entry).`);
     const shown = await grandTotal(page);
     const expected = Math.round(expectedSoFar);
     if (shown !== expected) note(part, "Total keseluruhan", `Screen shows ${shown ?? "no total"}, the Excel rows add up to ${expected} so far.`);
     const rowsSum = sheet!.groups.flatMap((group) => group.rows).reduce((sum, row) => sum + (row.rate.mode === "PRICED" ? row.qty * row.rate.amount : 0), 0);
     if (sheet!.stated !== null && Math.abs(rowsSum - sheet!.stated) > 1) note(part, "Excel TOTAL row", `The sheet states ${sheet!.stated} but its rows add up to ${Math.round(rowsSum)}.`);
     expect.soft(shown, `${part}: grand total on screen`).toBe(expected);
+    // For a look at the screen afterwards (not compared).
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: `e2e/.tmp/boq-walk-part-${index + 1}.png`, fullPage: true });
   });
 }

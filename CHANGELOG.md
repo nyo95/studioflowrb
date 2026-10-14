@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.41 | 2026-10-14 | feat(bq): One sheet-like table per Section; entry row inside the table; no paste; names change in Struktur only (Lead)
+
+- **Owner 2026-10-14** (screenshots of R9.40): "rename hanya di struktur kiri aja", "tempel dari excel ga usalah (biar manual di konversi - pastiin aja kalau di pakai tetap sesuai sama struktur excel)", and the two-line quick entry box marked "jelek".
+- **Table as the workbook:** one table per Section with the contractor workbook's columns: No (A.1, A.2 … across the Section, as on the printed quotation), Uraian, Spesifikasi (its own column, up to three lines), Vol, Sat, Harga satuan, Total. Subsections are group heading rows (name and count) inside the same table, each its own row group (`tbody#bq-subsection-…`, so Struktur links still land on it); "Subtotal A" closes the table. The Koef. and Markup columns leave the table: a coefficient other than 1 or a markup other than 0 shows small under the name; "Harga langsung" is no longer written on every row. Component Group and Cost Component rows follow the same columns.
+- **Entry row:** the quick entry is now the table's empty last row in the same columns (borderless until hovered or focused, placeholders only once a name is typed): Tab between cells, Enter saves, Esc clears; an icon at the end opens the full "Tambah Work Item" form (Assembly), replacing the "+ Work Item di …" buttons. A Section that has Subsections offers its own entry row only when it already holds Work Items of its own.
+- **Names:** Section and Subsection names are headings in the work area and change in Struktur only (double-click). Struktur names now truncate inside the panel instead of running into the table.
+- **Removed (R9.40):** "Tempel dari Excel" — the dialog, `addItemsAction`, the `addItems` service with its test, and the paste parser; `resolveUnit` and the office unit words move to `apps/bq/lib/unit-alias.ts` with their test. BACKLOG's Excel note is back to "no import or paste".
+- **Checks:** typecheck, eslint, `npm test`, `check:boundaries`, `check:legacy-runtime`, production build PASS; `npx playwright test e2e/bq-boq-walk.spec.ts` 5/5 PASS (73 Work Items through the entry rows in 36 s, grand total Rp537.113.900 equal to the workbook, no findings; screenshots in `e2e/.tmp/`). No push.
+
 ## R9.40 | 2026-10-14 | feat(bq): Quick entry row, specification, paste from Excel; select, right-click and drag instead of checkboxes (Lead)
 
 - **Owner 2026-10-14:** "anggap aja km ini user (manusia) - estimator - awam ... bisa di pakai gampang tapi optimize" (mockup first), then "jujur ada cek box nya jelek ... bisa pakai klik kanan misalnya? drag drop misalnya?" and "kerjakan langsung". The checkbox selection of Slice 3 and its selection bar are replaced; this changes the morning call "centang + menu, bukan drag".

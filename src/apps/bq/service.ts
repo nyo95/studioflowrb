@@ -83,7 +83,6 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     "addSection",
     "addSubsection",
     "addItem",
-    "addItems",
     "addSubObject",
     "addLineItem",
   ]);

@@ -512,8 +512,16 @@ samping** baris itu (Work Item, Component Group atau Cost Component) tempat semu
 nilainya diubah — tetap tanpa dialog dan tanpa tombol Simpan: Enter atau
 meninggalkan kolom menyimpan, Escape batal, commit yang ditolak mengembalikan
 nilai sebelumnya (`InlineEdit`). **Nama** (uraian) tetap diubah langsung di tabel,
-dan nama Section/Subsection juga bisa diganti dengan klik dua kali di panel
-Struktur.
+sedangkan nama Section/Subsection hanya diganti di panel Struktur (klik dua kali;
+owner 2026-10-14).
+
+**Tabel seperti lembar Excel (owner 2026-10-14, "sesuai struktur Excel").** Satu
+tabel per Section dengan kolom workbook kontraktor: No (A.1, A.2 … seperti
+penawaran cetak), Uraian, Spesifikasi, Vol, Sat, Harga satuan, Total. Subsection
+adalah baris judul grup di dalam tabel yang sama; di bawah tabel ada baris
+"Subtotal A". Koefisien dan markup tidak punya kolom sendiri: tampil kecil di
+bawah nama hanya bila berlaku dan tidak netral (koef ≠ 1, markup ≠ 0), dan
+diubah di panel samping.
 
 **Memilih, klik kanan, seret (owner 2026-10-14, menggantikan kotak centang Slice 3).**
 Cost Component dipilih seperti di file manager: klik = satu, Ctrl/Cmd + klik =
@@ -528,18 +536,13 @@ ke baris Work Item-nya sendiri (keluar dari grup), hanya di dalam Work Item yang
 sama; pemindahan memakai pratinjau dan aturan Slice 3 yang sama. Urutan Work Item
 tetap diatur di panel Struktur.
 
-**Isi cepat dan tempel dari Excel (owner 2026-10-14).** Di bawah setiap tabel ada
-baris isi cepat: nama, spesifikasi, jumlah, satuan, harga; Tab pindah kolom,
-Enter menyimpan dan baris siap untuk pekerjaan berikutnya (satuan diingat). Harga
-kosong = TBC. Satuan kantor seperti "titik" atau "m'" dibaca sebagai kode studio
-(point, m). "Tempel dari Excel" menerima baris yang disalin dari spreadsheet
-(paling banyak 500): kolom ditebak dari judulnya atau isinya dan bisa diubah,
-baris judul grup dan total dilewati, pratinjau ditunjukkan sebelum disimpan, dan
-semuanya masuk dalam satu transaksi (`addItems`). Harga dari Excel ikut dibawa
-secara bawaan, atau bisa dipilih "Isi nanti (TBC)"; "By Owner" di kolom harga
-menjadi By Owner. Ini mengubah catatan BACKLOG 2026-10-08 ("tanpa harga, harga
-selalu dari Master Data") untuk Work Item berharga langsung; harga Cost Component
-tetap dari Master Data / BQ Library.
+**Baris isi (owner 2026-10-14).** Baris terakhir setiap Subsection (dan Section
+tanpa Subsection) adalah baris kosong di kolom yang sama: nama, spesifikasi, vol,
+sat, harga; Tab pindah kolom, Enter menyimpan dan baris siap untuk pekerjaan
+berikutnya (satuan diingat), Esc mengosongkan. Harga kosong = TBC. Satuan kantor
+seperti "titik" atau "m'" dibaca sebagai kode studio (point, m). Ikon di ujung
+baris membuka form lengkap (bisa memakai Assembly). Tidak ada tempel dari Excel:
+pekerjaan dari workbook dikonversi manual (owner 2026-10-14).
 
 *Penyisipan* Cost Component tetap punya afordansnya sendiri, karena memilih sumber bukan
 mengubah nilai: "Baris custom" langsung membuat baris kosong yang siap diketik,
