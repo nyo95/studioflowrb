@@ -15,10 +15,12 @@ import {
   type PresentationReadContext,
   type PresentationTx,
 } from "./shared";
+import { isPresentationLayout, layoutSpec, type PresentationImageFit, type PresentationLayout } from "./layouts";
 
 const BOARD_ENTITY = "presentation-board";
 const SLIDE_ENTITY = "presentation-slide";
 const ANNOTATION_ENTITY = "presentation-annotation";
+const IMAGE_ENTITY = "presentation-slide-image";
 const IMAGE_BYTES = 3 * 1024 * 1024;
 /** The board an image is put on by "Add to moodboard"; found by this title (any letter case), created when missing. */
 const MOODBOARD_TITLE = "Moodboard";
@@ -63,6 +65,31 @@ function sniffImage(body: Uint8Array, contentType: string): boolean {
   return false;
 }
 
+function layout(value: string): PresentationLayout {
+  if (!isPresentationLayout(value)) throw invalid("PRESENTATION_LAYOUT_INVALID", "Choose one of the slide layouts.");
+  return value;
+}
+
+function fit(value: string): PresentationImageFit {
+  if (value !== "cover" && value !== "contain") throw invalid("PRESENTATION_FIT_INVALID", "Choose fill or whole image.");
+  return value;
+}
+
+function focus(value: number, axis: "x" | "y"): number {
+  if (!Number.isFinite(value) || value < 0 || value > 100) throw invalid("PRESENTATION_FOCUS_INVALID", `Focus ${axis} must be between 0 and 100.`);
+  return value;
+}
+
+function slot(value: number, slots: number): number {
+  if (!Number.isInteger(value) || value < 0 || value >= slots) throw invalid("PRESENTATION_SLOT_INVALID", "Choose a box of this slide's layout.");
+  return value;
+}
+
+/** A lone image shows whole, as slides always did; an image in a box of a grid fills its box. */
+function defaultFit(slideLayout: string): PresentationImageFit {
+  return layoutSpec(slideLayout).slots === 1 ? "contain" : "cover";
+}
+
 function orderIds(ids: readonly string[], expected: readonly string[]): void {
   if (ids.length !== expected.length || new Set(ids).size !== ids.length || ids.some((id) => !expected.includes(id))) {
     throw invalid("PRESENTATION_ORDER_INVALID", "The reordered items must match the current list.");
@@ -97,7 +124,7 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
   async function enqueueUnreferencedCleanup(tx: PresentationTx, keys: readonly string[]): Promise<string[]> {
     const orphaned: string[] = [];
     for (const key of [...new Set(keys)]) {
-      if (await tx.sfPresentationSlide.count({ where: { image_key: key } })) continue;
+      if (await tx.sfPresentationSlideImage.count({ where: { image_key: key } })) continue;
       await tx.presentationAssetCleanupFailure.upsert({ where: { storage_key: key }, create: { storage_key: key, attempts: 0 }, update: { resolved_at: null } });
       orphaned.push(key);
     }
@@ -106,7 +133,7 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
 
   async function removeQueued(keys: readonly string[]) {
     for (const key of [...new Set(keys)]) {
-      if (await db.sfPresentationSlide.count({ where: { image_key: key } })) continue;
+      if (await db.sfPresentationSlideImage.count({ where: { image_key: key } })) continue;
       try {
         await storage.remove(key);
         await db.presentationAssetCleanupFailure.updateMany({ where: { storage_key: key, resolved_at: null }, data: { resolved_at: new Date() } });
@@ -144,10 +171,23 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
     return slide;
   }
 
+  async function loadImage(tx: PresentationDb | PresentationTx, projectId: string, imageId: string) {
+    const image = await tx.sfPresentationSlideImage.findUnique({ where: { id: imageId }, include: { slide: { include: { board: true } } } });
+    if (!image || image.slide.board.project_id !== projectId) throw notFound("presentation image");
+    return image;
+  }
+
   async function loadAnnotation(tx: PresentationDb | PresentationTx, projectId: string, annotationId: string) {
-    const annotation = await tx.sfPresentationAnnotation.findUnique({ where: { id: annotationId }, include: { slide: { include: { board: true } } } });
-    if (!annotation || annotation.slide.board.project_id !== projectId) throw notFound("presentation annotation");
+    const annotation = await tx.sfPresentationAnnotation.findUnique({ where: { id: annotationId }, include: { image: { include: { slide: { include: { board: true } } } } } });
+    if (!annotation || annotation.image.slide.board.project_id !== projectId) throw notFound("presentation annotation");
     return annotation;
+  }
+
+  async function storeImage(projectId: string, file: PresentationImageUpload): Promise<string> {
+    const extension = validateImage(file);
+    const key = createPrivateObjectKey(`presentation/${projectId}`, extension);
+    await storage.put({ key, body: file.body, bytes: file.body.byteLength, contentType: file.contentType });
+    return key;
   }
 
   async function validateScheduleEntry(input: PresentationReadContext & { projectId: string }, scheduleEntryId: string | null | undefined): Promise<string | null> {
@@ -183,16 +223,35 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
     async getBoard(input: PresentationReadContext & { projectId: string; boardId: string }) {
       requirePresentationRead(input);
       await ports.studioFlow.readProjectDocumentContext(input);
-      const board = await db.sfPresentationBoard.findUnique({ where: { id: input.boardId }, include: { slides: { orderBy: [{ sort_order: "asc" }, { created_at: "asc" }], include: { annotations: { orderBy: [{ sort_order: "asc" }, { created_at: "asc" }] } } } } });
+      const board = await db.sfPresentationBoard.findUnique({ where: { id: input.boardId }, include: { slides: { orderBy: [{ sort_order: "asc" }, { created_at: "asc" }], include: { images: { orderBy: { slot: "asc" }, include: { annotations: { orderBy: [{ sort_order: "asc" }, { created_at: "asc" }] } } } } } } });
       if (!board || board.project_id !== input.projectId) throw notFound("presentation board");
-      const links = await ports.studioFlow.resolvePresentationScheduleLinks({ ...input, entryIds: board.slides.flatMap((slide) => slide.annotations.flatMap((annotation) => annotation.schedule_entry_id ? [annotation.schedule_entry_id] : [])) });
+      const annotations = board.slides.flatMap((slide) => slide.images.flatMap((image) => image.annotations));
+      const links = await ports.studioFlow.resolvePresentationScheduleLinks({ ...input, entryIds: annotations.flatMap((annotation) => annotation.schedule_entry_id ? [annotation.schedule_entry_id] : []) });
       const byId = new Map(links.map((entry) => [entry.entryId, entry]));
-      const missing = board.slides.flatMap((slide) => slide.annotations).filter((annotation) => annotation.schedule_entry_id && !byId.has(annotation.schedule_entry_id)).map((annotation) => annotation.id);
+      const missing = annotations.filter((annotation) => annotation.schedule_entry_id && !byId.has(annotation.schedule_entry_id)).map((annotation) => annotation.id);
       if (missing.length) await db.sfPresentationAnnotation.updateMany({ where: { id: { in: missing } }, data: { schedule_entry_id: null } });
-      return { id: board.id, projectId: board.project_id, title: board.title, slides: await Promise.all(board.slides.map(async (slide) => ({ id: slide.id, imageUrl: await signedUrl(slide.image_key), imageRatio: slide.image_ratio, sortOrder: slide.sort_order, annotations: slide.annotations.map((annotation) => {
-        const entry = annotation.schedule_entry_id ? byId.get(annotation.schedule_entry_id) ?? null : null;
-        return { id: annotation.id, scheduleEntryId: entry?.entryId ?? null, pinX: annotation.pin_x, pinY: annotation.pin_y, labelSide: annotation.label_side.toLowerCase() as PresentationLabelSide, note: annotation.note, sortOrder: annotation.sort_order, scheduleEntry: entry ? { id: entry.entryId, code: entry.code, productName: entry.productName } : null };
-      }) }))) };
+      const slots = (slideLayout: string) => layoutSpec(slideLayout).slots;
+      return { id: board.id, projectId: board.project_id, title: board.title, slides: await Promise.all(board.slides.map(async (slide) => ({
+        id: slide.id,
+        layout: (isPresentationLayout(slide.layout) ? slide.layout : "one") as PresentationLayout,
+        title: slide.title,
+        caption: slide.caption,
+        sortOrder: slide.sort_order,
+        // An image left in a box the layout no longer has is not shown (layouts only shrink when those boxes are empty).
+        images: await Promise.all(slide.images.filter((image) => image.slot < slots(slide.layout)).map(async (image) => ({
+          id: image.id,
+          slot: image.slot,
+          imageUrl: await signedUrl(image.image_key),
+          imageRatio: image.image_ratio,
+          fit: (image.fit === "contain" ? "contain" : "cover") as PresentationImageFit,
+          focusX: image.focus_x,
+          focusY: image.focus_y,
+          annotations: image.annotations.map((annotation) => {
+            const entry = annotation.schedule_entry_id ? byId.get(annotation.schedule_entry_id) ?? null : null;
+            return { id: annotation.id, scheduleEntryId: entry?.entryId ?? null, pinX: annotation.pin_x, pinY: annotation.pin_y, labelSide: annotation.label_side.toLowerCase() as PresentationLabelSide, note: annotation.note, sortOrder: annotation.sort_order, scheduleEntry: entry ? { id: entry.entryId, code: entry.code, productName: entry.productName } : null };
+          }),
+        }))),
+      }))) };
     },
 
     async createBoard(input: PresentationCommandContext & { projectId: string; title: string }) {
@@ -219,7 +278,7 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
 
     async deleteBoard(input: PresentationCommandContext & { projectId: string; boardId: string }) {
       await requireProjectWrite(input);
-      const result = await runTransaction(async (tx) => { const board = await loadBoard(tx, input.projectId, input.boardId); const slides = await tx.sfPresentationSlide.findMany({ where: { board_id: board.id }, select: { image_key: true } }); await tx.sfPresentationBoard.delete({ where: { id: board.id } }); await writePresentationAudit(ports, tx, { action: "presentation.board.deleted", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, slideCount: slides.length } }); return { imageKeys: await enqueueUnreferencedCleanup(tx, slides.map((slide) => slide.image_key)) }; });
+      const result = await runTransaction(async (tx) => { const board = await loadBoard(tx, input.projectId, input.boardId); const slideCount = await tx.sfPresentationSlide.count({ where: { board_id: board.id } }); const images = await tx.sfPresentationSlideImage.findMany({ where: { slide: { board_id: board.id } }, select: { image_key: true } }); await tx.sfPresentationBoard.delete({ where: { id: board.id } }); await writePresentationAudit(ports, tx, { action: "presentation.board.deleted", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, slideCount } }); return { imageKeys: await enqueueUnreferencedCleanup(tx, images.map((image) => image.image_key)) }; });
       await removeQueued(result.imageKeys);
     },
 
@@ -235,7 +294,8 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
           const created = !board;
           if (!board) { const max = await tx.sfPresentationBoard.aggregate({ where: { project_id: input.projectId }, _max: { sort_order: true } }); board = await tx.sfPresentationBoard.create({ data: { project_id: input.projectId, title: MOODBOARD_TITLE, sort_order: (max._max.sort_order ?? -1) + 1, created_by_id: userId } }); await writePresentationAudit(ports, tx, { action: "presentation.board.created", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, source: "moodboard" } }); }
           const last = await tx.sfPresentationSlide.aggregate({ where: { board_id: board.id }, _max: { sort_order: true } });
-          const slide = await tx.sfPresentationSlide.create({ data: { board_id: board.id, image_key: key, image_ratio: null, sort_order: (last._max.sort_order ?? -1) + 1 } });
+          const slide = await tx.sfPresentationSlide.create({ data: { board_id: board.id, layout: "one", sort_order: (last._max.sort_order ?? -1) + 1 } });
+          await tx.sfPresentationSlideImage.create({ data: { slide_id: slide.id, slot: 0, image_key: key, image_ratio: null, fit: defaultFit("one") } });
           await writePresentationAudit(ports, tx, { action: "presentation.slides.added", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, count: 1, source: "moodboard" } });
           return { boardId: board.id, slideId: slide.id, created };
         });
@@ -250,7 +310,7 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
       const keys: string[] = [];
       try {
         for (const upload of uploads) { const key = createPrivateObjectKey(`presentation/${input.projectId}`, upload.extension); await storage.put({ key, body: upload.file.body, bytes: upload.file.body.byteLength, contentType: upload.file.contentType }); keys.push(key); }
-        return await runTransaction(async (tx) => { const board = await loadBoard(tx, input.projectId, input.boardId); const max = await tx.sfPresentationSlide.aggregate({ where: { board_id: board.id }, _max: { sort_order: true } }); const slides = []; for (const [index, key] of keys.entries()) slides.push(await tx.sfPresentationSlide.create({ data: { board_id: board.id, image_key: key, image_ratio: uploads[index].ratio, sort_order: (max._max.sort_order ?? -1) + index + 1 } })); await writePresentationAudit(ports, tx, { action: "presentation.slides.added", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, count: slides.length, bytes: uploads.reduce((total, item) => total + item.file.body.byteLength, 0) } }); return { slideIds: slides.map((slide) => slide.id) }; });
+        return await runTransaction(async (tx) => { const board = await loadBoard(tx, input.projectId, input.boardId); const max = await tx.sfPresentationSlide.aggregate({ where: { board_id: board.id }, _max: { sort_order: true } }); const slides = []; for (const [index, key] of keys.entries()) { const slide = await tx.sfPresentationSlide.create({ data: { board_id: board.id, layout: "one", sort_order: (max._max.sort_order ?? -1) + index + 1 } }); await tx.sfPresentationSlideImage.create({ data: { slide_id: slide.id, slot: 0, image_key: key, image_ratio: uploads[index].ratio, fit: defaultFit("one") } }); slides.push(slide); } await writePresentationAudit(ports, tx, { action: "presentation.slides.added", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, count: slides.length, bytes: uploads.reduce((total, item) => total + item.file.body.byteLength, 0) } }); return { slideIds: slides.map((slide) => slide.id) }; });
       } catch (error) { await discardNew(keys); throw error; }
     },
 
@@ -261,26 +321,106 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
 
     async deleteSlide(input: PresentationCommandContext & { projectId: string; slideId: string }) {
       await requireProjectWrite(input);
-      const result = await runTransaction(async (tx) => { const slide = await loadSlide(tx, input.projectId, input.slideId); await tx.sfPresentationSlide.delete({ where: { id: slide.id } }); await writePresentationAudit(ports, tx, { action: "presentation.slide.deleted", entityType: SLIDE_ENTITY, entityId: slide.id, actor: input.actor, metadata: { projectId: input.projectId, boardId: slide.board_id } }); return { imageKeys: await enqueueUnreferencedCleanup(tx, [slide.image_key]) }; });
+      const result = await runTransaction(async (tx) => { const slide = await loadSlide(tx, input.projectId, input.slideId); const images = await tx.sfPresentationSlideImage.findMany({ where: { slide_id: slide.id }, select: { image_key: true } }); await tx.sfPresentationSlide.delete({ where: { id: slide.id } }); await writePresentationAudit(ports, tx, { action: "presentation.slide.deleted", entityType: SLIDE_ENTITY, entityId: slide.id, actor: input.actor, metadata: { projectId: input.projectId, boardId: slide.board_id } }); return { imageKeys: await enqueueUnreferencedCleanup(tx, images.map((image) => image.image_key)) }; });
       await removeQueued(result.imageKeys);
     },
 
-    async addAnnotation(input: PresentationCommandContext & { projectId: string; slideId: string; pinX: number; pinY: number; scheduleEntryId?: string | null; labelSide?: string; note?: string | null }) {
+    /** An empty slide at the end of the board, in a chosen layout. */
+    async addSlide(input: PresentationCommandContext & { projectId: string; boardId: string; layout?: string }) {
+      await requireProjectWrite(input);
+      const chosen = layout(input.layout ?? "one");
+      return runTransaction(async (tx) => { const board = await loadBoard(tx, input.projectId, input.boardId); const max = await tx.sfPresentationSlide.aggregate({ where: { board_id: board.id }, _max: { sort_order: true } }); const slide = await tx.sfPresentationSlide.create({ data: { board_id: board.id, layout: chosen, sort_order: (max._max.sort_order ?? -1) + 1 } }); await writePresentationAudit(ports, tx, { action: "presentation.slide.created", entityType: SLIDE_ENTITY, entityId: slide.id, actor: input.actor, metadata: { projectId: input.projectId, boardId: board.id, layout: chosen } }); return { slideId: slide.id }; });
+    },
+
+    /** Layout, title and caption. A layout with fewer boxes is refused while a box it would drop still holds an image. */
+    async updateSlide(input: PresentationCommandContext & { projectId: string; slideId: string; layout?: string; title?: string | null; caption?: string | null }) {
+      await requireProjectWrite(input);
+      const chosen = input.layout === undefined ? undefined : layout(input.layout);
+      const title = input.title === undefined ? undefined : optionalText(input.title, 200);
+      const caption = input.caption === undefined ? undefined : optionalText(input.caption, 1000);
+      return runTransaction(async (tx) => {
+        const slide = await loadSlide(tx, input.projectId, input.slideId);
+        if (chosen !== undefined && chosen !== slide.layout) {
+          const dropped = await tx.sfPresentationSlideImage.count({ where: { slide_id: slide.id, slot: { gte: layoutSpec(chosen).slots } } });
+          if (dropped > 0) throw invalid("PRESENTATION_LAYOUT_TOO_SMALL", `This layout has fewer boxes. Take ${dropped === 1 ? "one image" : `${dropped} images`} out of the last boxes first.`);
+        }
+        await tx.sfPresentationSlide.update({ where: { id: slide.id }, data: { layout: chosen, title, caption } });
+        await writePresentationAudit(ports, tx, { action: "presentation.slide.updated", entityType: SLIDE_ENTITY, entityId: slide.id, actor: input.actor, metadata: { projectId: input.projectId, boardId: slide.board_id, layout: chosen ?? slide.layout } });
+        return { slideId: slide.id };
+      });
+    },
+
+    /** Puts an uploaded image in a box; an image already there is replaced (with its pins). */
+    async placeImage(input: PresentationCommandContext & { projectId: string; slideId: string; slot: number; file: PresentationImageUpload }) {
+      await requireProjectWrite(input);
+      const target = await loadSlide(db, input.projectId, input.slideId);
+      const box = slot(input.slot, layoutSpec(target.layout).slots);
+      const ratio = imageRatio(input.file.imageRatio);
+      const key = await storeImage(input.projectId, input.file);
+      try {
+        const result = await runTransaction(async (tx) => {
+          const slide = await loadSlide(tx, input.projectId, input.slideId);
+          slot(box, layoutSpec(slide.layout).slots);
+          const previous = await tx.sfPresentationSlideImage.findUnique({ where: { slide_id_slot: { slide_id: slide.id, slot: box } } });
+          if (previous) await tx.sfPresentationSlideImage.delete({ where: { id: previous.id } });
+          const image = await tx.sfPresentationSlideImage.create({ data: { slide_id: slide.id, slot: box, image_key: key, image_ratio: ratio, fit: defaultFit(slide.layout) } });
+          await writePresentationAudit(ports, tx, { action: "presentation.image.placed", entityType: IMAGE_ENTITY, entityId: image.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: slide.id, slot: box, replaced: Boolean(previous) } });
+          return { imageId: image.id, imageKeys: previous ? await enqueueUnreferencedCleanup(tx, [previous.image_key]) : [] };
+        });
+        await removeQueued(result.imageKeys);
+        return { imageId: result.imageId };
+      } catch (error) { await discardNew([key]); throw error; }
+    },
+
+    /** Moves an image to another box of its slide; an image in that box trades places with it. */
+    async moveImage(input: PresentationCommandContext & { projectId: string; imageId: string; slot: number }) {
+      await requireProjectWrite(input);
+      return runTransaction(async (tx) => {
+        const image = await loadImage(tx, input.projectId, input.imageId);
+        const box = slot(input.slot, layoutSpec(image.slide.layout).slots);
+        if (box === image.slot) return { imageId: image.id };
+        const other = await tx.sfPresentationSlideImage.findUnique({ where: { slide_id_slot: { slide_id: image.slide_id, slot: box } } });
+        // Box numbers are unique per slide: park the moving image outside the range before the swap.
+        await tx.sfPresentationSlideImage.update({ where: { id: image.id }, data: { slot: -1 } });
+        if (other) await tx.sfPresentationSlideImage.update({ where: { id: other.id }, data: { slot: image.slot } });
+        await tx.sfPresentationSlideImage.update({ where: { id: image.id }, data: { slot: box } });
+        await writePresentationAudit(ports, tx, { action: "presentation.image.moved", entityType: IMAGE_ENTITY, entityId: image.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: image.slide_id, from: image.slot, to: box, swapped: Boolean(other) } });
+        return { imageId: image.id };
+      });
+    },
+
+    /** How an image fills its box: whole or cropped, and where the crop sits. */
+    async updateImage(input: PresentationCommandContext & { projectId: string; imageId: string; fit?: string; focusX?: number; focusY?: number }) {
+      await requireProjectWrite(input);
+      const chosen = input.fit === undefined ? undefined : fit(input.fit);
+      const focusX = input.focusX === undefined ? undefined : focus(input.focusX, "x");
+      const focusY = input.focusY === undefined ? undefined : focus(input.focusY, "y");
+      return runTransaction(async (tx) => { const image = await loadImage(tx, input.projectId, input.imageId); await tx.sfPresentationSlideImage.update({ where: { id: image.id }, data: { fit: chosen, focus_x: focusX, focus_y: focusY } }); await writePresentationAudit(ports, tx, { action: "presentation.image.updated", entityType: IMAGE_ENTITY, entityId: image.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: image.slide_id } }); return { imageId: image.id }; });
+    },
+
+    /** Takes an image out of its slide (the box becomes empty); its pins go with it. */
+    async removeImage(input: PresentationCommandContext & { projectId: string; imageId: string }) {
+      await requireProjectWrite(input);
+      const result = await runTransaction(async (tx) => { const image = await loadImage(tx, input.projectId, input.imageId); await tx.sfPresentationSlideImage.delete({ where: { id: image.id } }); await writePresentationAudit(ports, tx, { action: "presentation.image.removed", entityType: IMAGE_ENTITY, entityId: image.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: image.slide_id, slot: image.slot } }); return { imageKeys: await enqueueUnreferencedCleanup(tx, [image.image_key]) }; });
+      await removeQueued(result.imageKeys);
+    },
+
+    async addAnnotation(input: PresentationCommandContext & { projectId: string; imageId: string; pinX: number; pinY: number; scheduleEntryId?: string | null; labelSide?: string; note?: string | null }) {
       const actorId = await requireProjectWrite(input);
       const pinX = pin(input.pinX, "x"); const pinY = pin(input.pinY, "y"); const side = labelSide(input.labelSide); const note = optionalText(input.note, 2000);
       const scheduleEntryId = await validateScheduleEntry({ grants: input.grants, actorId, projectId: input.projectId }, input.scheduleEntryId);
-      return runTransaction(async (tx) => { const slide = await loadSlide(tx, input.projectId, input.slideId); const max = await tx.sfPresentationAnnotation.aggregate({ where: { slide_id: slide.id }, _max: { sort_order: true } }); const annotation = await tx.sfPresentationAnnotation.create({ data: { slide_id: slide.id, schedule_entry_id: scheduleEntryId, pin_x: pinX, pin_y: pinY, label_side: storedLabelSide(side), note, sort_order: (max._max.sort_order ?? -1) + 1 } }); await writePresentationAudit(ports, tx, { action: "presentation.annotation.created", entityType: ANNOTATION_ENTITY, entityId: annotation.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: slide.id, scheduleEntryId } }); return { annotationId: annotation.id }; });
+      return runTransaction(async (tx) => { const image = await loadImage(tx, input.projectId, input.imageId); const max = await tx.sfPresentationAnnotation.aggregate({ where: { image_id: image.id }, _max: { sort_order: true } }); const annotation = await tx.sfPresentationAnnotation.create({ data: { image_id: image.id, schedule_entry_id: scheduleEntryId, pin_x: pinX, pin_y: pinY, label_side: storedLabelSide(side), note, sort_order: (max._max.sort_order ?? -1) + 1 } }); await writePresentationAudit(ports, tx, { action: "presentation.annotation.created", entityType: ANNOTATION_ENTITY, entityId: annotation.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: image.slide_id, imageId: image.id, scheduleEntryId } }); return { annotationId: annotation.id }; });
     },
 
     async updateAnnotation(input: PresentationCommandContext & { projectId: string; annotationId: string; pinX?: number; pinY?: number; scheduleEntryId?: string | null; labelSide?: string; note?: string | null }) {
       const actorId = await requireProjectWrite(input);
       const side = input.labelSide === undefined ? undefined : labelSide(input.labelSide); const note = input.note === undefined ? undefined : optionalText(input.note, 2000); const scheduleEntryId = input.scheduleEntryId === undefined ? undefined : await validateScheduleEntry({ grants: input.grants, actorId, projectId: input.projectId }, input.scheduleEntryId); const pinX = input.pinX === undefined ? undefined : pin(input.pinX, "x"); const pinY = input.pinY === undefined ? undefined : pin(input.pinY, "y");
-      return runTransaction(async (tx) => { const annotation = await loadAnnotation(tx, input.projectId, input.annotationId); await tx.sfPresentationAnnotation.update({ where: { id: annotation.id }, data: { pin_x: pinX, pin_y: pinY, schedule_entry_id: scheduleEntryId, label_side: side === undefined ? undefined : storedLabelSide(side), note } }); await writePresentationAudit(ports, tx, { action: "presentation.annotation.updated", entityType: ANNOTATION_ENTITY, entityId: annotation.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: annotation.slide_id } }); return { annotationId: annotation.id }; });
+      return runTransaction(async (tx) => { const annotation = await loadAnnotation(tx, input.projectId, input.annotationId); await tx.sfPresentationAnnotation.update({ where: { id: annotation.id }, data: { pin_x: pinX, pin_y: pinY, schedule_entry_id: scheduleEntryId, label_side: side === undefined ? undefined : storedLabelSide(side), note } }); await writePresentationAudit(ports, tx, { action: "presentation.annotation.updated", entityType: ANNOTATION_ENTITY, entityId: annotation.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: annotation.image.slide_id } }); return { annotationId: annotation.id }; });
     },
 
     async deleteAnnotation(input: PresentationCommandContext & { projectId: string; annotationId: string }) {
       await requireProjectWrite(input);
-      return runTransaction(async (tx) => { const annotation = await loadAnnotation(tx, input.projectId, input.annotationId); await tx.sfPresentationAnnotation.delete({ where: { id: annotation.id } }); await writePresentationAudit(ports, tx, { action: "presentation.annotation.deleted", entityType: ANNOTATION_ENTITY, entityId: annotation.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: annotation.slide_id } }); });
+      return runTransaction(async (tx) => { const annotation = await loadAnnotation(tx, input.projectId, input.annotationId); await tx.sfPresentationAnnotation.delete({ where: { id: annotation.id } }); await writePresentationAudit(ports, tx, { action: "presentation.annotation.deleted", entityType: ANNOTATION_ENTITY, entityId: annotation.id, actor: input.actor, metadata: { projectId: input.projectId, slideId: annotation.image.slide_id } }); });
     },
 
     async clearScheduleEntryLink(entryId: string) {
@@ -289,7 +429,7 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
 
     async purgeArchivedProjectAssets(projectId: string) {
       const actor = { kind: "SYSTEM" as const, label: "Presentation asset retention" };
-      const result = await runTransaction(async (tx) => { const slides = await tx.sfPresentationSlide.findMany({ where: { board: { project_id: projectId } }, select: { id: true, image_key: true } }); await tx.sfPresentationSlide.deleteMany({ where: { board: { project_id: projectId } } }); await writePresentationAudit(ports, tx, { action: "presentation.project.assets-purged", entityType: "project", entityId: projectId, actor, metadata: { projectId, presentationSlides: slides.length } }); return { presentationSlides: slides.length, imageKeys: await enqueueUnreferencedCleanup(tx, slides.map((slide) => slide.image_key)) }; });
+      const result = await runTransaction(async (tx) => { const slides = await tx.sfPresentationSlide.count({ where: { board: { project_id: projectId } } }); const images = await tx.sfPresentationSlideImage.findMany({ where: { slide: { board: { project_id: projectId } } }, select: { image_key: true } }); await tx.sfPresentationSlide.deleteMany({ where: { board: { project_id: projectId } } }); await writePresentationAudit(ports, tx, { action: "presentation.project.assets-purged", entityType: "project", entityId: projectId, actor, metadata: { projectId, presentationSlides: slides } }); return { presentationSlides: slides, imageKeys: await enqueueUnreferencedCleanup(tx, images.map((image) => image.image_key)) }; });
       await removeQueued(result.imageKeys);
       return { presentationSlides: result.presentationSlides };
     },

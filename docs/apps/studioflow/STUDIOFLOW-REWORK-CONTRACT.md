@@ -518,6 +518,22 @@ page; images are uploaded from the device (owner, 2026-09-28). Gate:
 images are cleaned up only when no slide references them and are part of the
 archive purge.
 
+**Slide layouts (owner 2026-10-14, "mini PowerPoint", option A).** A slide has
+a layout — `one`, `two-side`, `two-stack`, `one-two` (1 large + 2 small),
+`three`, `four` (`src/apps/presentation/layouts.ts`) — an optional title and
+caption, and up to four images (`SfPresentationSlideImage`: box number, private
+image, ratio, `cover` = fills the box cropped at a focus point, `contain` =
+whole). Pins belong to an image, as percentages of the picture, so they stay on
+the same spot whatever the box or paper; they are numbered across the slide, box
+by box, and the printed legend follows that numbering. A layout with fewer boxes
+is refused while a box it would drop holds an image. Dropping or choosing an
+image fills a box; dragging an image onto another box moves it (trading places).
+"Add images" and "Add to moodboard" still make one slide per image (layout
+`one`, whole image). Existing slides became layout `one` with their image whole
+and their pins kept (migration `20261014220000_presentation_slide_layouts`).
+Print: one slide per A4 page, title above, the layout's boxes (an empty box is
+blank paper), caption and legend below.
+
 ## 9. Overrides of earlier ratified decisions
 
 - D-SF-03 (MOM lifecycle DRAFT/ISSUED/SUPERSEDED) → replaced by §10.

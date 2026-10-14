@@ -35,7 +35,7 @@ test("P.1 a large photo is shrunk and becomes a slide", async ({ page }) => {
   await expect(page.getByLabel("Board title")).toHaveValue("ZZ-Test Upload");
   const photo = await bigJpeg(page);
   expect(photo.byteLength).toBeGreaterThan(3 * 1024 * 1024);
-  await page.locator('input[type="file"]').setInputFiles({ name: "big-photo.jpg", mimeType: "image/jpeg", buffer: photo });
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: "big-photo.jpg", mimeType: "image/jpeg", buffer: photo });
   await expect(page.getByRole("button", { name: "Slide 1" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/smaller than 3 MB|too large|could not be uploaded/)).toHaveCount(0);
 });
@@ -45,6 +45,6 @@ test("P.2 a file that is not an image says why", async ({ page }) => {
   await page.getByLabel("New board").fill("ZZ-Test Bad File");
   await page.getByRole("button", { name: /Create|Add|New/ }).first().click();
   await expect(page.getByLabel("Board title")).toHaveValue("ZZ-Test Bad File");
-  await page.locator('input[type="file"]').setInputFiles({ name: "note.png", mimeType: "image/png", buffer: Buffer.from("this is not an image") });
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: "note.png", mimeType: "image/png", buffer: Buffer.from("this is not an image") });
   await expect(page.getByText("This file is not a valid image.")).toBeVisible({ timeout: 30_000 });
 });

@@ -92,7 +92,7 @@ async function reset() {
     "sf_external_schedule_placement", "sf_project", "sf_client", "sf_settings", "sf_holiday",
   ].map((t) => `"studioflow"."${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
   await testDb.pool.query('TRUNCATE TABLE "ideas"."sf_idea_usage", "ideas"."sf_idea_card", "ideas"."asset_cleanup_failure" RESTART IDENTITY CASCADE');
-  await testDb.pool.query('TRUNCATE TABLE "presentation"."sf_presentation_annotation", "presentation"."sf_presentation_slide", "presentation"."sf_presentation_board", "presentation"."asset_cleanup_failure" RESTART IDENTITY CASCADE');
+  await testDb.pool.query('TRUNCATE TABLE "presentation"."sf_presentation_annotation", "presentation"."sf_presentation_slide_image", "presentation"."sf_presentation_slide", "presentation"."sf_presentation_board", "presentation"."asset_cleanup_failure" RESTART IDENTITY CASCADE');
   await truncatePlatformTables(testDb);
   await testDb.prisma.notification.deleteMany();
   await seedDefaultTemplate();
@@ -591,7 +591,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const board = await db.sfPresentationBoard.create({ data: { project_id: expired.projectId, title: "Board", sort_order: 0, created_by_id: designer.id } });
     const slideKey = `${expired.projectId}/slide`;
     await storage.put({ key: slideKey, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
-    const slide = await db.sfPresentationSlide.create({ data: { board_id: board.id, image_key: slideKey, sort_order: 0 } });
+    const slide = await db.sfPresentationSlide.create({ data: { board_id: board.id, sort_order: 0, images: { create: { slot: 0, image_key: slideKey } } } });
     const result = await retention().purgeExpiredArchivedAssets({}, (projectId) => presentation.purgeArchivedProjectAssets(projectId));
     assert.equal(result.projectsPurged, 1);
     assert.equal(result.presentationSlides, 1);
@@ -605,7 +605,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const board = await db.sfPresentationBoard.create({ data: { project_id: projectId, title: "Board", sort_order: 0, created_by_id: designer.id } });
     const key = `${projectId}/slide`;
     await storage.put({ key, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
-    const slide = await db.sfPresentationSlide.create({ data: { board_id: board.id, image_key: key, sort_order: 0 } });
+    const slide = await db.sfPresentationSlide.create({ data: { board_id: board.id, sort_order: 0, images: { create: { slot: 0, image_key: key } } } });
     return { slideId: slide.id, key };
   }
 
@@ -3572,7 +3572,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     assert.equal(first.created, true);
     const board = await testDb.prisma.sfPresentationBoard.findUniqueOrThrow({ where: { id: first.boardId } });
     assert.equal(board.title, "Moodboard");
-    const slide = await testDb.prisma.sfPresentationSlide.findUniqueOrThrow({ where: { id: first.slideId } });
+    const slide = await testDb.prisma.sfPresentationSlideImage.findFirstOrThrow({ where: { slide_id: first.slideId } });
     assert.ok(slide.image_key !== cardKey && slide.image_key.startsWith(`presentation/${projectId}/`));
     assert.deepEqual(bytesOf(slide.image_key), bytesOf(cardKey));
 
@@ -3612,7 +3612,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
 
     // Deleting the note never touches the slides' own copies.
     await sf.phases.deletePhaseNote({ ...base, noteId: image.id });
-    for (const row of slides) assert.ok(storage.objects.has(row.image_key));
+    for (const row of await testDb.prisma.sfPresentationSlideImage.findMany({ where: { slide_id: { in: slides.map((slide) => slide.id) } } })) assert.ok(storage.objects.has(row.image_key));
   });
 
   it("shows the current code after a reorder and drops a usage whose option is deleted, keeping the card", async () => {

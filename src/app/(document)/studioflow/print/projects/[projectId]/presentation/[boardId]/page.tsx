@@ -13,11 +13,12 @@ import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { formatInstant } from "@platform/utilities/date";
 
 import { printTitle } from "@/apps/studioflow/public/print-title";
+import { SlideGrid, SlideImageBox, numberPins } from "@/apps/presentation/ui/slide-frame";
 
 export const dynamic = "force-dynamic";
 
 /**
- * One slide per sheet, and the sheet is the paper: the screen shows exactly the pages the printer will give (same size, same
+ * One slide per sheet (owner 2026-10-14: in its layout of up to four images, with its title and caption), and the sheet is the paper: the screen shows exactly the pages the printer will give (same size, same
  * margins), so what is seen is what is printed. Each page: a quiet header, the image as large as the space allows with its
  * numbered pins, and a legend underneath set small, in columns, with a hairline between rows.
  */
@@ -72,9 +73,10 @@ export default async function PresentationPrintPage({ params, searchParams }: { 
         </DocumentPage>
       ) : null}
       {board.slides.map((slide, slideIndex) => {
-        const legend = slide.annotations.map((annotation, index) => ({
+        const numbers = numberPins(slide.images);
+        const legend = [...slide.images].sort((x, y) => x.slot - y.slot).flatMap((image) => image.annotations).map((annotation) => ({
           id: annotation.id,
-          number: index + 1,
+          number: numbers.get(annotation.id) ?? 0,
           code: annotation.scheduleEntry?.code ?? null,
           name: annotation.scheduleEntry?.productName ?? (annotation.scheduleEntry ? null : annotation.note) ?? null,
           note: annotation.scheduleEntry && annotation.note ? annotation.note : null,
@@ -83,27 +85,24 @@ export default async function PresentationPrintPage({ params, searchParams }: { 
         return (
           <DocumentPage key={slide.id} className="flex flex-col" style={{ "--doc-pad": "11mm 13mm" } as React.CSSProperties}>
             {header}
-            <div className="min-h-0 flex-1 py-[3.5mm] [container-type:size]">
-              <div className="grid h-full w-full place-items-center">
-                {slide.imageUrl ? (
-                  <div className="relative inline-block leading-[0] outline outline-[0.25mm] outline-black/15">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={slide.imageUrl} alt={`Slide ${slideIndex + 1}`} className="block h-auto w-auto" style={{ maxWidth: "100cqw", maxHeight: "100cqh" }} />
-                    {slide.annotations.map((annotation, index) => (
-                      <span
-                        key={annotation.id}
-                        style={{ left: `${annotation.pinX}%`, top: `${annotation.pinY}%` }}
-                        className="absolute grid size-[6mm] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black text-[8.5pt] font-bold leading-none text-white ring-[0.6mm] ring-white"
-                      >
-                        {index + 1}
-                      </span>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-neutral-400">No image</p>
-                )}
-              </div>
+            {slide.title ? <h2 className="m-0 mt-[3mm] shrink-0 text-[13pt] font-semibold leading-tight">{slide.title}</h2> : null}
+            <div className="min-h-0 flex-1 py-[3.5mm]">
+              {slide.images.length === 0 ? (
+                <p className="text-sm text-neutral-400">Slide {slideIndex + 1}: no images</p>
+              ) : (
+                <SlideGrid layout={slide.layout} gap="3mm" renderBox={(slot) => {
+                  const image = slide.images.find((candidate) => candidate.slot === slot);
+                  // An empty box prints as blank paper, so a half-filled layout still reads as a layout.
+                  return image ? (
+                    <SlideImageBox
+                      image={{ ...image, pins: image.annotations.map((annotation) => ({ id: annotation.id, number: numbers.get(annotation.id) ?? 0, pinX: annotation.pinX, pinY: annotation.pinY })) }}
+                      pinClassName="absolute grid size-[6mm] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black text-[8.5pt] font-bold leading-none text-white ring-[0.6mm] ring-white"
+                    />
+                  ) : null;
+                }} />
+              )}
             </div>
+            {slide.caption ? <p className="m-0 mb-[2mm] shrink-0 whitespace-pre-line text-[9pt] text-neutral-700">{slide.caption}</p> : null}
             {legend.length > 0 ? (
               <div className="shrink-0 border-t border-black pt-[2mm]">
                 <p className="mb-[1mm] text-[7pt] font-semibold uppercase tracking-[0.22em] text-neutral-500">Legend</p>

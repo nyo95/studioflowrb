@@ -8,6 +8,7 @@ import { AppError } from "@platform/core/errors";
 import { requireModuleEnabled } from "@platform/core/modules";
 import { validationError } from "@platform/core/validation";
 import { presentation } from "./runtime";
+import { PRESENTATION_LAYOUTS } from "./layouts";
 import { studioFlowPresentationBridge } from "@/apps/studioflow/public/presentation-bridge-runtime";
 
 const Id = z.uuid();
@@ -22,6 +23,12 @@ function parse<T extends z.ZodType>(schema: T, input: unknown): z.infer<T> {
   const parsed = schema.safeParse(input);
   if (!parsed.success) throw validationError(parsed.error);
   return parsed.data;
+}
+
+/** The width/height ratio the browser measured; anything else is left unknown (the image then shows whole). */
+function ratioOf(value: FormDataEntryValue | null): number | null {
+  const ratio = typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(ratio) && ratio > 0.05 && ratio < 20 ? ratio : null;
 }
 
 function refresh(projectId: string) { revalidatePath(`/studioflow/projects/${projectId}`, "layout"); }
@@ -42,7 +49,7 @@ export async function reorderPresentationSlidesAction(input: z.infer<typeof Slid
   return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(SlidesOrder, input); await presentation.reorderSlides({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
 }
 export async function addPresentationSlidesAction(formData: FormData): Promise<ActionResult<{ slideIds: string[] }>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const projectId = parse(Id, formData.get("projectId")); const boardId = parse(Id, formData.get("boardId")); const files = formData.getAll("files").filter((value): value is File => value instanceof File); const result = await presentation.addSlides({ ...(await context()), projectId, boardId, files: await Promise.all(files.map(async (file) => ({ body: new Uint8Array(await file.arrayBuffer()), contentType: file.type }))) }); refresh(projectId); return result; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const projectId = parse(Id, formData.get("projectId")); const boardId = parse(Id, formData.get("boardId")); const files = formData.getAll("files").filter((value): value is File => value instanceof File); const ratios = formData.getAll("ratios"); const result = await presentation.addSlides({ ...(await context()), projectId, boardId, files: await Promise.all(files.map(async (file, index) => ({ body: new Uint8Array(await file.arrayBuffer()), contentType: file.type, imageRatio: ratioOf(ratios[index] ?? null) }))) }); refresh(projectId); return result; });
 }
 const SlideRef = z.strictObject({ projectId: Id, slideId: Id });
 export async function deletePresentationSlideAction(input: z.infer<typeof SlideRef>): Promise<ActionResult<unknown>> {
@@ -61,9 +68,40 @@ export async function addWorkspaceImageToMoodboardAction(input: z.infer<typeof W
     return result;
   });
 }
-const AnnotationInput = z.strictObject({ projectId: Id, slideId: Id.optional(), annotationId: Id.optional(), pinX: z.number().min(0).max(100).optional(), pinY: z.number().min(0).max(100).optional(), scheduleEntryId: Id.nullish(), labelSide: z.enum(["auto", "left", "right"]).optional(), note: OptionalText });
+const NewSlide = z.strictObject({ projectId: Id, boardId: Id, layout: z.enum(PRESENTATION_LAYOUTS).optional() });
+/** An empty slide in a chosen layout (owner 2026-10-14, slide layouts). */
+export async function addPresentationSlideAction(input: z.infer<typeof NewSlide>): Promise<ActionResult<{ slideId: string }>> {
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(NewSlide, input); const result = await presentation.addSlide({ ...(await context()), ...data }); refresh(data.projectId); return result; });
+}
+const SlideUpdate = z.strictObject({ projectId: Id, slideId: Id, layout: z.enum(PRESENTATION_LAYOUTS).optional(), title: z.string().max(200).nullish(), caption: z.string().max(1000).nullish() });
+export async function updatePresentationSlideAction(input: z.infer<typeof SlideUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(SlideUpdate, input); await presentation.updateSlide({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+}
+/** An image put in one box of a slide (form data: projectId, slideId, slot, file). */
+export async function placePresentationImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
+  return runSafeAction(async () => {
+    await requireModuleEnabled("presentation");
+    const projectId = parse(Id, formData.get("projectId")); const slideId = parse(Id, formData.get("slideId")); const slot = parse(z.coerce.number().int().min(0).max(3), formData.get("slot"));
+    const file = formData.get("file"); if (!(file instanceof File)) throw new AppError("VALIDATION", "PRESENTATION_IMAGES_REQUIRED", "Choose an image.");
+    const result = await presentation.placeImage({ ...(await context()), projectId, slideId, slot, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type, imageRatio: ratioOf(formData.get("imageRatio")) } });
+    refresh(projectId); return result;
+  });
+}
+const ImageMove = z.strictObject({ projectId: Id, imageId: Id, slot: z.number().int().min(0).max(3) });
+export async function movePresentationImageAction(input: z.infer<typeof ImageMove>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(ImageMove, input); await presentation.moveImage({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+}
+const ImageUpdate = z.strictObject({ projectId: Id, imageId: Id, fit: z.enum(["cover", "contain"]).optional(), focusX: z.number().min(0).max(100).optional(), focusY: z.number().min(0).max(100).optional() });
+export async function updatePresentationImageAction(input: z.infer<typeof ImageUpdate>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(ImageUpdate, input); await presentation.updateImage({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+}
+const ImageRef = z.strictObject({ projectId: Id, imageId: Id });
+export async function removePresentationImageAction(input: z.infer<typeof ImageRef>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(ImageRef, input); await presentation.removeImage({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+}
+const AnnotationInput = z.strictObject({ projectId: Id, imageId: Id.optional(), annotationId: Id.optional(), pinX: z.number().min(0).max(100).optional(), pinY: z.number().min(0).max(100).optional(), scheduleEntryId: Id.nullish(), labelSide: z.enum(["auto", "left", "right"]).optional(), note: OptionalText });
 export async function addPresentationAnnotationAction(input: z.infer<typeof AnnotationInput>): Promise<ActionResult<{ annotationId: string }>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(AnnotationInput, input); if (!data.slideId || data.pinX === undefined || data.pinY === undefined) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose a slide and pin position."); const result = await presentation.addAnnotation({ ...(await context()), projectId: data.projectId, slideId: data.slideId, pinX: data.pinX, pinY: data.pinY, scheduleEntryId: data.scheduleEntryId, labelSide: data.labelSide, note: data.note }); refresh(data.projectId); return result; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(AnnotationInput, input); if (!data.imageId || data.pinX === undefined || data.pinY === undefined) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose an image and pin position."); const result = await presentation.addAnnotation({ ...(await context()), projectId: data.projectId, imageId: data.imageId, pinX: data.pinX, pinY: data.pinY, scheduleEntryId: data.scheduleEntryId, labelSide: data.labelSide, note: data.note }); refresh(data.projectId); return result; });
 }
 export async function updatePresentationAnnotationAction(input: z.infer<typeof AnnotationInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(AnnotationInput, input); if (!data.annotationId) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose a pin."); await presentation.updateAnnotation({ ...(await context()), projectId: data.projectId, annotationId: data.annotationId, pinX: data.pinX, pinY: data.pinY, scheduleEntryId: data.scheduleEntryId, labelSide: data.labelSide, note: data.note }); refresh(data.projectId); return {}; });

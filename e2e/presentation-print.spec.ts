@@ -38,7 +38,7 @@ test("P.6 the printed presentation is the same as the screen, one slide per page
   await page.getByLabel("New board").fill("Material Funan");
   await page.getByRole("button", { name: "Create board" }).click();
   await page.getByLabel("Board title").waitFor();
-  const file = page.locator('input[type="file"]');
+  const file = page.locator('input[type="file"][multiple]');
   await file.setInputFiles({ name: "room.jpg", mimeType: "image/jpeg", buffer: await room(page) });
   await page.getByRole("button", { name: "Slide 1" }).waitFor();
   await file.setInputFiles({ name: "room-2.jpg", mimeType: "image/jpeg", buffer: await room(page) });
@@ -48,10 +48,12 @@ test("P.6 the printed presentation is the same as the screen, one slide per page
   const notes = ["Emulsion Paint", "Blue Sand Texture", "Stone Texture"];
   const spots: Array<[number, number]> = [[0.25, 0.3], [0.7, 0.25], [0.5, 0.6], [0.85, 0.7]];
   for (const [index, [x, y]] of spots.entries()) {
-    const box = (await page.locator("main img").first().boundingBox())!;
+    // The first click on an image chooses it; a click on the chosen image puts a pin there.
+    if (index === 0) await page.locator('section[aria-label="Slide"] img').first().click();
+    const box = (await page.locator('section[aria-label="Slide"] img').first().boundingBox())!;
     await page.mouse.click(box.x + box.width * x, box.y + box.height * y);
     // The new pin is created by a request; its panel is replaced when that returns, so wait for it before typing.
-    await expect(page.getByRole("button", { name: String(index + 1), exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: `Pin ${index + 1}`, exact: true })).toBeVisible();
     await page.waitForLoadState("networkidle");
     await page.getByRole("button", { name: "Save pin" }).waitFor();
     if (index === 0) await page.getByRole("combobox", { name: "Product Schedule" }).selectOption({ label: "ST-01 — ZZ-Test Past Marble" });
@@ -126,13 +128,15 @@ test("P.7 a long legend grows sideways, the page stays the same size and the leg
   await page.getByLabel("New board").fill("Long legend");
   await page.getByRole("button", { name: "Create board" }).click();
   await page.getByLabel("Board title").waitFor();
-  await page.locator('input[type="file"]').setInputFiles({ name: "room.jpg", mimeType: "image/jpeg", buffer: await room(page) });
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: "room.jpg", mimeType: "image/jpeg", buffer: await room(page) });
   await page.getByRole("button", { name: "Slide 1" }).waitFor();
   const count = 26;
   for (let index = 0; index < count; index += 1) {
-    const box = (await page.locator("main img").first().boundingBox())!;
+    // The first click on an image chooses it; a click on the chosen image puts a pin there.
+    if (index === 0) await page.locator('section[aria-label="Slide"] img').first().click();
+    const box = (await page.locator('section[aria-label="Slide"] img').first().boundingBox())!;
     await page.mouse.click(box.x + box.width * (0.08 + (index % 9) * 0.1), box.y + box.height * (0.12 + Math.floor(index / 9) * 0.28));
-    await expect(page.getByRole("button", { name: String(index + 1), exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: `Pin ${index + 1}`, exact: true })).toBeVisible();
     await page.waitForLoadState("networkidle");
     await page.getByRole("textbox", { name: "Note" }).fill(`Item number ${index + 1} with a name`);
     await page.getByRole("button", { name: "Save pin" }).click();
@@ -150,4 +154,37 @@ test("P.7 a long legend grows sideways, the page stays the same size and the leg
   expect((await page.locator(".ui-document-page img").first().boundingBox())!.height).toBeGreaterThan(250);
   await sheet.screenshot({ path: `${SHOTS}/page-long-legend.png` });
   await expect(page.locator(".ui-document-page")).toHaveCount(1);
+});
+
+test("P.8 a slide in a layout holds several images, on screen and on its printed page", async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  await page.goto(`/studioflow/projects/${sf.reuse}/presentation`);
+  await page.locator("main").first().waitFor();
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("New board").fill("Layout board");
+  await page.getByRole("button", { name: "Create board" }).click();
+  await page.getByLabel("Board title").waitFor();
+  await page.getByRole("button", { name: "Slide baru", exact: true }).click();
+  await page.getByRole("button", { name: "Slide 1" }).waitFor();
+  await page.getByRole("button", { name: "Grid 4" }).click();
+  await expect(page.getByRole("button", { name: "Grid 4" })).toHaveAttribute("aria-pressed", "true");
+  const boxInput = page.locator('input[type="file"]:not([multiple])');
+  for (const [index, name] of ["a.jpg", "b.jpg"].entries()) {
+    await page.getByRole("button", { name: "Tambah gambar atau seret ke sini" }).first().click();
+    await boxInput.setInputFiles({ name, mimeType: "image/jpeg", buffer: await room(page) });
+    await expect(page.locator('section[aria-label="Slide"] img')).toHaveCount(index + 1, { timeout: 30_000 });
+  }
+  await page.getByLabel("Judul slide").fill("Area Display");
+  await page.getByLabel("Judul slide").blur();
+  await page.waitForLoadState("networkidle");
+  await page.locator("main").first().screenshot({ path: `${SHOTS}/editor-grid-4.png` });
+
+  const boardId = page.url().split("/").pop()!;
+  await page.goto(`/studioflow/print/projects/${sf.reuse}/presentation/${boardId}?paper=A4&orientation=landscape`);
+  const sheet = page.locator(".ui-document-page").first();
+  await expect(sheet).toBeVisible();
+  await expect(page.locator(".ui-document-page")).toHaveCount(1);
+  await expect(sheet.locator("img")).toHaveCount(2);
+  await expect(sheet.getByText("Area Display")).toBeVisible();
+  await sheet.screenshot({ path: `${SHOTS}/page-grid-4.png` });
 });

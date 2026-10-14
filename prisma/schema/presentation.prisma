@@ -24,26 +24,52 @@ model SfPresentationBoard {
   @@schema("presentation")
 }
 
+/// A page of a board (owner 2026-10-14, "mini PowerPoint"): a layout of up to four image boxes, an optional title and caption.
 model SfPresentationSlide {
-  id          String   @id @default(uuid())
-  board_id    String
-  image_key   String   @unique
-  image_ratio Float?
-  sort_order  Int
-  created_at  DateTime @default(now())
-  updated_at  DateTime @updatedAt
+  id         String   @id @default(uuid())
+  board_id   String
+  /// one | two-side | two-stack | one-two | three | four (see `presentation/layouts.ts`).
+  layout     String   @default("one")
+  title      String?
+  caption    String?
+  sort_order Int
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
-  board       SfPresentationBoard        @relation(fields: [board_id], references: [id], onDelete: Cascade)
-  annotations SfPresentationAnnotation[]
+  board  SfPresentationBoard        @relation(fields: [board_id], references: [id], onDelete: Cascade)
+  images SfPresentationSlideImage[]
 
   @@index([board_id, sort_order])
   @@map("sf_presentation_slide")
   @@schema("presentation")
 }
 
+/// One image in one box of a slide's layout; pins belong to the image.
+model SfPresentationSlideImage {
+  id          String   @id @default(uuid())
+  slide_id    String
+  /// The box of the layout, from 0.
+  slot        Int
+  image_key   String   @unique
+  image_ratio Float?
+  /// cover = fills the box (cropped at `focus_x`/`focus_y`, 0-100); contain = the whole image.
+  fit         String   @default("cover")
+  focus_x     Float    @default(50)
+  focus_y     Float    @default(50)
+  created_at  DateTime @default(now())
+  updated_at  DateTime @updatedAt
+
+  slide       SfPresentationSlide        @relation(fields: [slide_id], references: [id], onDelete: Cascade)
+  annotations SfPresentationAnnotation[]
+
+  @@unique([slide_id, slot])
+  @@map("sf_presentation_slide_image")
+  @@schema("presentation")
+}
+
 model SfPresentationAnnotation {
   id                String                  @id @default(uuid())
-  slide_id          String
+  image_id          String
   /// Live StudioFlow Schedule entry id. Missing entries resolve as unlinked.
   schedule_entry_id String?
   pin_x             Float
@@ -54,9 +80,9 @@ model SfPresentationAnnotation {
   created_at        DateTime                @default(now())
   updated_at        DateTime                @updatedAt
 
-  slide SfPresentationSlide @relation(fields: [slide_id], references: [id], onDelete: Cascade)
+  image SfPresentationSlideImage @relation(fields: [image_id], references: [id], onDelete: Cascade)
 
-  @@index([slide_id, sort_order])
+  @@index([image_id, sort_order])
   @@index([schedule_entry_id])
   @@map("sf_presentation_annotation")
   @@schema("presentation")

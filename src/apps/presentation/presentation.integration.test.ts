@@ -38,7 +38,7 @@ before(async () => {
 });
 
 beforeEach(async () => {
-  await testDb.pool.query('TRUNCATE TABLE "presentation"."sf_presentation_annotation", "presentation"."sf_presentation_slide", "presentation"."sf_presentation_board", "presentation"."asset_cleanup_failure" RESTART IDENTITY CASCADE');
+  await testDb.pool.query('TRUNCATE TABLE "presentation"."sf_presentation_annotation", "presentation"."sf_presentation_slide_image", "presentation"."sf_presentation_slide", "presentation"."sf_presentation_board", "presentation"."asset_cleanup_failure" RESTART IDENTITY CASCADE');
   await testDb.pool.query('TRUNCATE TABLE "studioflow"."sf_schedule_option", "studioflow"."sf_schedule_entry", "studioflow"."sf_project" RESTART IDENTITY CASCADE');
   await truncatePlatformTables(testDb);
   storage.objects.clear();
@@ -61,13 +61,15 @@ describe("Presentation extracted module", () => {
     assert.equal((await presentation.countProjectBoards(read())), 2);
     const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Stone", category_key: "stone", prefix: "ST", increment: 1, sort_order: 0 } });
     await testDb.prisma.sfScheduleOption.create({ data: { entry_id: entry.id, label: "A", product_name: "Travertine", search_key: "travertine", is_final: true } });
-    const pin = await presentation.addAnnotation({ ...command(), slideId: slideIds[0], pinX: 25, pinY: 75, scheduleEntryId: entry.id, note: "Warm finish" });
     let board = await presentation.getBoard({ ...read(), boardId: first.boardId });
-    assert.deepEqual(board.slides[0].annotations[0].scheduleEntry, { id: entry.id, code: "ST-01", productName: "Travertine" });
+    const pin = await presentation.addAnnotation({ ...command(), imageId: board.slides[0].images[0].id, pinX: 25, pinY: 75, scheduleEntryId: entry.id, note: "Warm finish" });
+    board = await presentation.getBoard({ ...read(), boardId: first.boardId });
+    assert.equal(slideIds.length, 2);
+    assert.deepEqual(board.slides[0].images[0].annotations[0].scheduleEntry, { id: entry.id, code: "ST-01", productName: "Travertine" });
 
     await testDb.prisma.sfScheduleEntry.delete({ where: { id: entry.id } });
     board = await presentation.getBoard({ ...read(), boardId: first.boardId });
-    assert.equal(board.slides[0].annotations[0].scheduleEntryId, null);
+    assert.equal(board.slides[0].images[0].annotations[0].scheduleEntryId, null);
     assert.equal((await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: pin.annotationId } })).schedule_entry_id, null);
     assert.ok((await testDb.prisma.auditEvent.findMany({ where: { app_id: "presentation" } })).every((event) => event.action.startsWith("presentation.")));
   });
@@ -85,14 +87,14 @@ describe("Presentation extracted module", () => {
   it("tracks failed slide cleanup, retries it, and purges archived project slides independently", async () => {
     const board = await presentation.createBoard({ ...command(), title: "Cleanup" });
     const { slideIds } = await presentation.addSlides({ ...command(), boardId: board.boardId, files: [png()] });
-    const key = (await testDb.prisma.sfPresentationSlide.findUniqueOrThrow({ where: { id: slideIds[0] } })).image_key;
+    const key = (await testDb.prisma.sfPresentationSlideImage.findFirstOrThrow({ where: { slide_id: slideIds[0] } })).image_key;
     const failure = mock.method(storage, "remove", async () => { throw new Error("storage unavailable"); });
     try { await presentation.deleteSlide({ ...command(), slideId: slideIds[0] }); } finally { failure.mock.restore(); }
     assert.equal((await testDb.prisma.presentationAssetCleanupFailure.findUniqueOrThrow({ where: { storage_key: key } })).resolved_at, null);
     assert.deepEqual(await presentation.retryAssetCleanup(), { attempted: 1, resolved: 1, failed: 0 });
 
     const { slideIds: later } = await presentation.addSlides({ ...command(), boardId: board.boardId, files: [png()] });
-    const laterKey = (await testDb.prisma.sfPresentationSlide.findUniqueOrThrow({ where: { id: later[0] } })).image_key;
+    const laterKey = (await testDb.prisma.sfPresentationSlideImage.findFirstOrThrow({ where: { slide_id: later[0] } })).image_key;
     await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date() } });
     assert.deepEqual(await presentation.purgeArchivedProjectAssets(projectId), { presentationSlides: 1 });
     assert.equal(await testDb.prisma.sfPresentationSlide.count({ where: { id: later[0] } }), 0);
@@ -100,10 +102,42 @@ describe("Presentation extracted module", () => {
     assert.equal(await testDb.prisma.sfPresentationBoard.count({ where: { id: board.boardId } }), 1);
   });
 
+  it("lays out a slide: boxes, swaps, fit and focus, refuses a smaller layout over a used box, and cleans up a replaced image", async () => {
+    const { boardId } = await presentation.createBoard({ ...command(), title: "Layouts" });
+    const { slideId } = await presentation.addSlide({ ...command(), boardId, layout: "one-two" });
+    const first = await presentation.placeImage({ ...command(), slideId, slot: 0, file: { ...png(), imageRatio: 1.5 } });
+    const second = await presentation.placeImage({ ...command(), slideId, slot: 2, file: png() });
+    await presentation.addAnnotation({ ...command(), imageId: second.imageId, pinX: 10, pinY: 20 });
+    let slide = (await presentation.getBoard({ ...read(), boardId })).slides[0]!;
+    assert.deepEqual(slide.images.map((image) => [image.slot, image.fit, image.imageRatio]), [[0, "cover", 1.5], [2, "cover", null]]);
+
+    await presentation.moveImage({ ...command(), imageId: second.imageId, slot: 0 });
+    slide = (await presentation.getBoard({ ...read(), boardId })).slides[0]!;
+    assert.deepEqual(slide.images.map((image) => [image.id, image.slot]), [[second.imageId, 0], [first.imageId, 2]], "the two images trade boxes");
+    assert.equal(slide.images[0]!.annotations.length, 1, "pins travel with their image");
+
+    await presentation.updateImage({ ...command(), imageId: first.imageId, fit: "contain", focusX: 20, focusY: 80 });
+    await rejectsWith(presentation.updateSlide({ ...command(), slideId, layout: "two-side" }), "PRESENTATION_LAYOUT_TOO_SMALL");
+    await rejectsWith(presentation.placeImage({ ...command(), slideId, slot: 3, file: png() }), "PRESENTATION_SLOT_INVALID");
+    await presentation.updateSlide({ ...command(), slideId, layout: "four", title: "Fasad", caption: "Material" });
+    slide = (await presentation.getBoard({ ...read(), boardId })).slides[0]!;
+    assert.deepEqual([slide.layout, slide.title, slide.caption], ["four", "Fasad", "Material"]);
+    assert.deepEqual([slide.images[1]!.fit, slide.images[1]!.focusX, slide.images[1]!.focusY], ["contain", 20, 80]);
+
+    const replacedKey = (await testDb.prisma.sfPresentationSlideImage.findUniqueOrThrow({ where: { id: second.imageId } })).image_key;
+    await presentation.placeImage({ ...command(), slideId, slot: 0, file: png() });
+    assert.equal(storage.objects.has(replacedKey), false, "a replaced image is removed from storage");
+    assert.equal(await testDb.prisma.sfPresentationAnnotation.count(), 0, "and its pins with it");
+    const removedKey = (await testDb.prisma.sfPresentationSlideImage.findUniqueOrThrow({ where: { id: first.imageId } })).image_key;
+    await presentation.removeImage({ ...command(), imageId: first.imageId });
+    assert.equal(storage.objects.has(removedKey), false);
+    assert.deepEqual((await presentation.getBoard({ ...read(), boardId })).slides[0]!.images.map((image) => image.slot), [0]);
+  });
+
   it("commits a slide delete with its cleanup already queued, so a failed object removal is retried later", async () => {
     const board = await presentation.createBoard({ ...command(), title: "Queued cleanup" });
     const { slideIds } = await presentation.addSlides({ ...command(), boardId: board.boardId, files: [png(), png()] });
-    const [first, second] = await Promise.all(slideIds.map((id) => testDb.prisma.sfPresentationSlide.findUniqueOrThrow({ where: { id } })));
+    const [first, second] = await Promise.all(slideIds.map(async (id) => ({ id, image_key: (await testDb.prisma.sfPresentationSlideImage.findFirstOrThrow({ where: { slide_id: id } })).image_key })));
 
     // Each slide owns its object (image_key is unique), so the queue entry is written inside the deleting transaction.
     const failure = mock.method(storage, "remove", async () => { throw new Error("storage unavailable"); });
