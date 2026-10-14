@@ -18,12 +18,13 @@ export function isMarkerPriceMode(mode: BqPriceMode): boolean {
 
 export const QUOTATION_TERMS_MAX = 8000;
 
-/** The studio's standard terms, printed whenever a project has none of its own. */
+/**
+ * The studio's standard terms, printed whenever a project has none of its own (owner 2026-10-14: as on the studio's
+ * quotation; validity, payment terms and PPN print in their own places on the letter).
+ */
 export const BQ_DEFAULT_QUOTATION_TERMS = [
-  "Prices are in Indonesian Rupiah (IDR) and exclude VAT unless stated otherwise.",
-  "This quotation is valid for 30 days from the quotation date.",
+  "Quotation is based on latest design drawings.",
+  "Any deposit charges by construction location management will be paid by Client.",
+  "Any additional / deduction works resulted by design changes or client's request will be quoted separately.",
   "Items marked TBC are priced once the specification is confirmed. Items marked By Owner are supplied by the owner and are not included in this quotation.",
-  "Payment terms: 50% down payment on order confirmation, 40% on delivery of materials to site, 10% on handover.",
-  "Work outside the listed items is quoted separately as additional work.",
-  "Quantities follow the approved drawings; changes to the drawings may change the quotation.",
 ].join("\n");

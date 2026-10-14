@@ -693,6 +693,16 @@ const QuotationSchema = z.object({
   date: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date")]),
   terms: z.string().max(QUOTATION_TERMS_MAX),
   useStandardTerms: z.enum(["true", "false"]),
+  // The letter (owner 2026-10-14); an empty field clears it (and prints the default where there is one).
+  clientContact: z.string().max(200).default(""),
+  clientAddress: z.string().max(2000).default(""),
+  area: z.string().max(200).default(""),
+  location: z.string().max(200).default(""),
+  validUntil: z.union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date")]).default(""),
+  schedule: z.string().max(2000).default(""),
+  paymentTerms: z.string().max(2000).default(""),
+  ppnPct: z.string().max(12).default(""),
+  rounding: z.string().max(40).default(""),
 });
 
 /** Quotation details stay editable on a LOCKED project; the service refuses an archived one. */
@@ -710,6 +720,17 @@ export async function updateQuotationAction(
       number: value.number || null,
       date: value.date || null,
       terms: value.useStandardTerms === "true" || !value.terms.trim() ? null : value.terms.trim(),
+      letter: {
+        clientContact: value.clientContact || null,
+        clientAddress: value.clientAddress || null,
+        area: value.area || null,
+        location: value.location || null,
+        validUntil: value.validUntil || null,
+        schedule: value.schedule || null,
+        paymentTerms: value.paymentTerms || null,
+        ppnPct: value.ppnPct.trim() || null,
+        rounding: value.rounding.replace(/[.\s]/g, "").replace(",", ".") || null,
+      },
     });
     revalidatePath(`/bq/print/${value.projectId}/quotation`);
     return reload(value.projectId);

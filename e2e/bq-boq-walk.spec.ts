@@ -182,6 +182,25 @@ for (const index of [0, 1, 2, 3]) {
     await page.screenshot({ path: `e2e/.tmp/boq-walk-part-${index + 1}.png`, fullPage: true });
     // After the last sheet, the printed quotation as a PDF, to compare with the workbook's print.
     if (index === 3) {
+      // The letter, as in the studio's quotation PDF: the letterhead in Quotation settings, the rest per project.
+      await page.goto("/bq/settings");
+      await page.getByLabel("Address").fill("Jalan Safir VII C7/28a\nKembangan Selatan\nJakarta Barat - 11610");
+      await page.getByLabel("E-mail").fill("info@rad-w.com");
+      await page.getByLabel("Signer name").fill("Raychie A.");
+      await page.getByRole("button", { name: "Save" }).click();
+      await expect(page.getByText("Saved.")).toBeVisible();
+      await page.goto(projectUrl);
+      await page.getByRole("button", { name: "Detail quotation" }).click();
+      const letter = page.getByRole("dialog", { name: "Quotation details" });
+      await letter.getByLabel("Ref# (quotation number)").fill("RDT/R/26-498/0869/BQ/S1");
+      await letter.getByLabel("To (contact person)").fill("Pieter Gunawan");
+      await letter.getByLabel("Client address").fill("Ruko Cordoba Blok D No. 26\nJl. Marina Indah Golf\nJakarta Utara 14460");
+      await letter.getByLabel("Project area").fill("103 sqm");
+      await letter.getByLabel("Project location").fill("Living World Pekanbaru");
+      await letter.getByLabel("Schedule").fill("9 Weeks upon confirmation and subject to stock availabilities of materials.");
+      await letter.getByLabel("Rounding").fill("537.000.000");
+      await letter.getByRole("button", { name: "Save" }).click();
+      await expect(letter).toBeHidden({ timeout: 15_000 });
       await page.goto(`/bq/print/${projectUrl.split("/").pop()}/quotation`);
       await page.waitForLoadState("networkidle");
       await page.emulateMedia({ media: "print" });

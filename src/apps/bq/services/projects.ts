@@ -5,6 +5,54 @@ import type { BqProjectStatus } from "@/generated/prisma/client";
 
 import { BQ_PERMISSIONS, fieldUnchanged, type BqServiceContext } from "./context";
 import { QUOTATION_TERMS_MAX } from "../lib/quotation";
+import { requireLetterText, requirePpnPct } from "./quotation-settings";
+import { compareDecimals, toDecimalString, type DecimalString } from "@platform/utilities/decimal";
+
+/** The letter part of a quotation (owner 2026-10-14): addressee, project facts, validity, schedule, payment, PPN. */
+export type QuotationLetterInput = {
+  clientContact: string | null;
+  clientAddress: string | null;
+  area: string | null;
+  location: string | null;
+  validUntil: string | null;
+  schedule: string | null;
+  paymentTerms: string | null;
+  ppnPct: string | null;
+  rounding: string | null;
+};
+
+function isoDate(value: string | null, code: string, label: string): Date | null {
+  if (value === null) return null;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00.000Z`) : null;
+  if (date === null || Number.isNaN(date.getTime())) throw new AppError("VALIDATION", code, `${label} must be a date (YYYY-MM-DD).`);
+  return date;
+}
+
+function letterData(letter: QuotationLetterInput) {
+  const short = (value: string | null, label: string) => {
+    const text = requireLetterText(value, label);
+    if (text !== null && text.length > 200) throw new AppError("VALIDATION", "bq.quotation.text-too-long", `${label} can be at most 200 characters.`);
+    return text;
+  };
+  let rounding: DecimalString | null = null;
+  if (letter.rounding !== null && letter.rounding.trim()) {
+    try { rounding = toDecimalString(letter.rounding.trim()); } catch { rounding = null; }
+    if (rounding === null || compareDecimals(rounding, toDecimalString("0")) < 0 || (rounding.split(".")[1]?.length ?? 0) > 2) {
+      throw new AppError("VALIDATION", "bq.quotation.rounding-invalid", "Rounding must be an amount of at least 0.");
+    }
+  }
+  return {
+    client_contact: short(letter.clientContact, "Contact"),
+    client_address: requireLetterText(letter.clientAddress, "Address"),
+    project_area: short(letter.area, "Area"),
+    project_location: short(letter.location, "Location"),
+    quotation_valid_until: isoDate(letter.validUntil, "bq.quotation.valid-until-invalid", "Valid until"),
+    quotation_schedule: requireLetterText(letter.schedule, "Schedule"),
+    quotation_payment_terms: requireLetterText(letter.paymentTerms, "Payment terms"),
+    quotation_ppn_pct: letter.ppnPct === null || !letter.ppnPct.trim() ? null : requirePpnPct(letter.ppnPct),
+    quotation_rounding: rounding,
+  };
+}
 
 export function createProjectLifecycleService(ctx: BqServiceContext) {
   const { db, runTransaction, auditWriter, requireEditableProject } = ctx;
@@ -173,6 +221,8 @@ async function updateQuotation(input: {
   number: string | null;
   date: string | null;
   terms: string | null;
+  /** Left out by callers that only change number, date and terms. */
+  letter?: QuotationLetterInput;
 }) {
   requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
   const existing = await db.bqProject.findUnique({ where: { id: input.id } });
@@ -190,14 +240,16 @@ async function updateQuotation(input: {
   if (date !== null && Number.isNaN(date.getTime())) {
     throw new AppError("VALIDATION", "bq.quotation.date-invalid", "Quotation date must be a date (YYYY-MM-DD).");
   }
+  const letter = input.letter ? letterData(input.letter) : {};
   if (
-    input.number === existing.quotation_number
+    !input.letter
+    && input.number === existing.quotation_number
     && input.terms === existing.quotation_terms
     && (date?.getTime() ?? null) === (existing.quotation_date?.getTime() ?? null)
   ) return existing;
   const project = await db.bqProject.update({
     where: { id: input.id },
-    data: { quotation_number: input.number, quotation_date: date, quotation_terms: input.terms },
+    data: { quotation_number: input.number, quotation_date: date, quotation_terms: input.terms, ...letter },
   });
   await auditWriter({
     appId: "bq",

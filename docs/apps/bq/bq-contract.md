@@ -385,7 +385,14 @@ tidak ada FK lintas schema atau pembacaan tabel internal aplikasi lain.
 | `external_ref` | string? | Referensi ke project system lain (opsional) |
 | `created_by` | string | FK ke User |
 | `notes` | text? | Keterangan umum |
-| `quotation_number` | string? | Nomor quotation (R8.328) |
+| `quotation_number` | string? | Nomor quotation (R8.328); dicetak sebagai Ref# |
+| `client_contact`, `client_address` | string? | Penerima surat: nama kontak dan alamat klien (owner 2026-10-14) |
+| `project_area`, `project_location` | string? | Project Information: luas dan lokasi |
+| `quotation_valid_until` | date? | Berlaku sampai; kosong = tanggal quotation + 30 hari |
+| `quotation_schedule` | string? | Blok SCHEDULE, mis. "9 Weeks upon confirmation …"; kosong = tidak dicetak |
+| `quotation_payment_terms` | string? | Satu baris "50% Down Payment" per termin; kosong = bawaan Quotation settings |
+| `quotation_ppn_pct` | decimal(6,3)? | PPN %; kosong = bawaan Quotation settings; 0 = tanpa baris PPN |
+| `quotation_rounding` | decimal(18,2)? | Subtotal yang dibulatkan; PPN dihitung dari angka ini; kosong = tanpa baris Rounding |
 | `quotation_date` | date? | Tanggal quotation; kosong = tanggal cetak |
 | `quotation_terms` | text? | T&C milik project; kosong = T&C standar studio |
 | `created_at` | timestamp | |
@@ -402,7 +409,9 @@ ARCHIVED ──▶ deletion request (terpisah)
 
 Project hanya boleh dikunci bila memiliki sedikitnya satu Work Item. Baris dengan harga Rp0 harus diisi, kecuali pemanggil secara eksplisit mengonfirmasi bahwa project boleh dikunci dengan baris harga nol; baris yang terdampak dihitung dan tidak diubah.
 
-**Quotation (R8.328).** Dokumen cetak `/bq/print/[id]/quotation` (Print / Save PDF lewat browser, seperti Product Schedule): kop studio (nama dan logo dari Platform settings), nomor/tanggal/klien, Section → Subsection → Work Item dengan No., uraian, qty, unit, rate, total; subtotal per Section, grand total, catatan TBC/By Owner, T&C bernomor (satu baris = satu butir), dan kolom tanda tangan. Klien hanya melihat rate dan total (§6.4) — tanpa markup, koefisien, atau breakdown. Nomor, tanggal, dan T&C menjelaskan surat, bukan isi harga, sehingga tetap bisa diubah saat project `LOCKED` (`updateQuotation`, `bq.project.manage`); project `ARCHIVED` menolaknya.
+**Quotation (R8.328; format surat studio sejak owner 2026-10-14, referensi PDF penawaran studio).** Dokumen cetak `/bq/print/[id]/quotation` (Print / Save PDF lewat browser). Logo (brand mark Platform, atau nama organisasi) di kanan atas setiap halaman. Halaman 1: alamat dan e-mail studio, QUOTATION, kotak To/Add | Date/Ref#/Valid, Project Information, kalimat pengantar, kotak Description | IDR berisi "SUBTOTAL A <Section>", lalu Subtotal / Rounding / PPN / TOTAL. Halaman 2: SCHEDULE, PAYMENT TERMS, TERMS OF CONDITION, kalimat penutup, kotak tanda tangan (studio + penanda tangan + gambar tanda tangan | "Confirm the above mentioned", kontak klien, Date). Lalu BILL OF QUANTITY: No / Description / Specification / Qty / Unit / Unit Price IDR / Total IDR, judul Section berhuruf, satu kotak per Subsection bernomor romawi dengan "SUBTOTAL B.I", "SUBTOTAL B", dan "GRAND TOTAL A+B+C". PPN = PPN % × (Rounding bila diisi, selain itu subtotal), dibulatkan ke rupiah; TOTAL = angka itu + PPN (`lib/quotation-letter.ts`).
+
+**Quotation settings (owner 2026-10-14).** Satu baris milik BQ (`bq.bq_quotation_settings`, layar `/bq/settings`, `bq.project.manage`): alamat dan e-mail studio, nama penanda tangan, gambar tanda tangan (PNG ≤ 1 MB di object storage privat Platform), termin pembayaran bawaan, PPN bawaan (11). BQ tetap mandiri: data surat dan kop ini milik BQ, tidak dibaca dari atau ditulis ke app lain; logo tetap brand mark Platform. Klien hanya melihat rate dan total (§6.4) — tanpa markup, koefisien, atau breakdown. Nomor, tanggal, dan T&C menjelaskan surat, bukan isi harga, sehingga tetap bisa diubah saat project `LOCKED` (`updateQuotation`, `bq.project.manage`); project `ARCHIVED` menolaknya.
 
 **Price mode (R8.328; owner 2026-09-23).** Setiap Work Item punya `price_mode`: `PRICED` (default), `TBC`, atau `BY_OWNER`. TBC dan By Owner adalah baris penanda: tidak ada rate/total yang ditampilkan atau dihitung (walau harga tersimpan), baris itu tidak masuk subtotal/grand total, tidak membuat grand total "belum lengkap", dan tidak dihitung sebagai baris Rp0 saat lock.
 

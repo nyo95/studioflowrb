@@ -109,6 +109,17 @@ export type BqProjectDetail = {
     date: string | null;
     /** The project's own terms; null prints the studio's standard terms. */
     terms: string | null;
+    /** The letter (owner 2026-10-14); null fields print nothing or the BQ quotation settings' default. */
+    clientContact: string | null;
+    clientAddress: string | null;
+    area: string | null;
+    location: string | null;
+    /** YYYY-MM-DD; null prints the quotation date + 30 days. */
+    validUntil: string | null;
+    schedule: string | null;
+    paymentTerms: string | null;
+    ppnPct: string | null;
+    rounding: string | null;
   };
   createdBy: string;
   createdAt: string;
@@ -490,6 +501,15 @@ export function createBqPublicRead(db: PrismaClient) {
           number: project.quotation_number,
           date: project.quotation_date ? project.quotation_date.toISOString().slice(0, 10) : null,
           terms: project.quotation_terms,
+          clientContact: project.client_contact,
+          clientAddress: project.client_address,
+          area: project.project_area,
+          location: project.project_location,
+          validUntil: project.quotation_valid_until ? project.quotation_valid_until.toISOString().slice(0, 10) : null,
+          schedule: project.quotation_schedule,
+          paymentTerms: project.quotation_payment_terms,
+          ppnPct: project.quotation_ppn_pct === null ? null : project.quotation_ppn_pct.toString(),
+          rounding: project.quotation_rounding === null ? null : project.quotation_rounding.toString(),
         },
         createdBy: project.created_by,
         createdAt: project.created_at.toISOString(),

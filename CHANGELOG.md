@@ -1,5 +1,16 @@
 # Changelog
 
+## R9.47 | 2026-10-14 | feat(bq): The quotation letter carries addressee, project facts, schedule, payment terms, PPN, rounding and the studio's letterhead (Lead)
+
+- **Owner 2026-10-14:** "ya perbaiki, semua ikut rekomendasi kamu", with "app bq ini independen, hanya mengkonsumsi price dari masterdata - tidak sebaliknya, tidak akses studioflow" and "fokus pada app ini sendiri". Everything below is BQ-owned (bq schema, BQ screens); the logo stays the platform brand mark, the signature image uses the platform's private object storage.
+- **Schema** (migration `20261014200000_bq_quotation_letter`, applied to the kantor dev and test databases): `bq_project` gains `client_contact`, `client_address`, `project_area`, `project_location`, `quotation_valid_until`, `quotation_schedule`, `quotation_payment_terms`, `quotation_ppn_pct`, `quotation_rounding`; new single-row `bq_quotation_settings` (address, e-mail, signer, signature key, default payment terms, default PPN 11).
+- **`lib/quotation-letter.ts`:** `quotationTotals` (PPN on the rounded subtotal when set, half up to whole rupiah: the studio PDF's 1.320.000.000 → PPN 145.200.000, TOTAL 1.465.200.000), `paymentTermRows`, `scheduleRow`, `addDaysIso`. Unit tests.
+- **Service:** `updateQuotation` takes an optional `letter` (validated: PPN 0-100, rounding ≥ 0 with at most 2 decimals, dates, lengths; an emptied field clears); `getQuotationSettings` / `updateQuotationSettings` (e-mail checked; returns the replaced signature key so the action removes the old image after saving). Integration tests.
+- **Screens:** "Quotation details" gains Ref#, Valid until, To (contact), client address, project area and location, Schedule, Payment terms, PPN, Rounding. New **Quotation settings** page in the BQ menu (letterhead, signer and signature PNG, default payment terms and PPN).
+- **Print:** address and e-mail under the logo on page 1; contact above the client in "To", address in "Add", Ref#, Valid (set or date + 30 days); Area and Location in Project Information; Subtotal / Rounding / PPN / TOTAL under the summary box; SCHEDULE and PAYMENT TERMS blocks before TERMS OF CONDITION; signer name and signature image in the signature box, the client contact on the right. A Section heading now travels with its first box (no heading alone at a page foot).
+- **Standard terms** now read as the studio's quotation (design drawings, deposit charges, additional works, TBC / By Owner); validity, payment and PPN print in their own places.
+- **Checks:** typecheck, eslint, `npm test` 1112/1112, `check:boundaries`, `check:legacy-runtime`, production build PASS; `npx playwright test e2e/bq-boq-walk.spec.ts` 5/5 PASS, now also filling Quotation settings and Quotation details through the screens; the exported PDF compared with `test/BOQ TEST 2 - PDF.pdf`. Signature upload not walked (no PNG in the walk). No push.
+
 ## R9.46 | 2026-10-14 | feat(bq): The printed quotation follows the studio's own quotation PDF (Lead)
 
 - **Owner 2026-10-14** (on R9.45): "fontnya salah, tulisan dll masih belum mirip. cek pdf di test (BOQ TEST 2 - PDF) ... pelajari footer, header, logo dll nya". Reference: `test/BOQ TEST 2 - PDF.pdf` (owner's local file, not committed), read page by page in Chrome's PDF viewer. This replaces the workbook-print layout of R9.45.

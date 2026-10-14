@@ -10,6 +10,7 @@ export const BQ_ROUTES = {
   root: "/bq",
   new: "/bq/new",
   library: "/bq/library",
+  settings: "/bq/settings",
   project: (id: string) => `/bq/${id}`,
   projectEdit: (id: string) => `/bq/${id}/edit`,
 } as const;
@@ -19,4 +20,5 @@ export type BqNavLink = { href: string; label: string; exact?: boolean };
 export const BQ_NAV_LINKS: readonly BqNavLink[] = [
   { href: "/bq", label: "Projects", exact: true },
   { href: "/bq/library", label: "BQ Library" },
+  { href: "/bq/settings", label: "Quotation settings" },
 ];

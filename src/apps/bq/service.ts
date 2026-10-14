@@ -11,6 +11,7 @@ import { createProjectTreeService } from "./services/project-tree";
 import { createLineItemMoveService } from "./services/line-item-moves";
 import { createPromotionService } from "./services/promotions";
 import { createTemplateService } from "./services/templates";
+import { createQuotationSettingsService } from "./services/quotation-settings";
 
 export { BQ_PERMISSIONS };
 export type { BqKategori, BqServiceDeps } from "./services/context";
@@ -24,6 +25,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   const lineItemMoves = createLineItemMoveService(ctx);
   const promotions = createPromotionService(ctx);
   const assemblies = createAssemblyService(ctx);
+  const quotationSettings = createQuotationSettingsService(ctx);
 
   /** Creates an L1 named after the selected template, then snapshots that template into it. */
   async function addItemAndApplyAssembly(input: {
@@ -70,12 +72,13 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     ...lineItemMoves,
     ...promotions,
     ...assemblies,
+    ...quotationSettings,
     addItemAndApplyAssembly,
   };
 
   // CORE.md §2: a command that writes records plus its audit event runs in one
   // transaction; simple independent reads do not open one.
-  const readOnlyOperations = new Set<string>(["getTemplateWithSections", "listPromotionRequests", "listProjectDeletionRequests", "previewLineItemMove"]);
+  const readOnlyOperations = new Set<string>(["getTemplateWithSections", "listPromotionRequests", "listProjectDeletionRequests", "previewLineItemMove", "getQuotationSettings"]);
   const automaticSortOperations = new Set<string>([
     "addTemplateSection",
     "addTemplateRecommendation",

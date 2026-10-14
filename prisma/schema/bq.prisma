@@ -258,6 +258,20 @@ model BqProject {
   quotation_date   DateTime? @db.Date
   /// Null prints the studio's standard terms.
   quotation_terms  String?
+  /// The letter's addressee and project facts (owner 2026-10-14, the studio's quotation PDF).
+  client_contact   String?
+  client_address   String?
+  project_area     String?
+  project_location String?
+  /// Null prints the quotation date + 30 days.
+  quotation_valid_until    DateTime? @db.Date
+  quotation_schedule       String?
+  /// One "50% Down Payment" per line; null prints the BQ quotation settings' default.
+  quotation_payment_terms  String?
+  /// Null uses the BQ quotation settings' default PPN.
+  quotation_ppn_pct        Decimal?  @db.Decimal(6, 3)
+  /// The rounded subtotal PPN is taken on; null = no rounding row.
+  quotation_rounding       Decimal?  @db.Decimal(18, 2)
   created_by   String
   created_at   DateTime    @default(now())
   updated_at   DateTime    @updatedAt
@@ -265,6 +279,24 @@ model BqProject {
   sections     BqSection[]
 
   @@map("bq_project")
+  @@schema("bq")
+}
+
+/// The studio's letterhead and defaults for printed quotations (owner 2026-10-14). One row, BQ-owned: BQ keeps its
+/// own quotation identity and reads no other app; the logo stays the platform brand mark.
+model BqQuotationSettings {
+  id                    String   @id @default("bq_quotation_settings")
+  company_address       String?
+  company_email         String?
+  signer_name           String?
+  /// Private object key of the signature PNG (platform object storage).
+  signature_key         String?
+  default_payment_terms String?
+  default_ppn_pct       Decimal  @default(11) @db.Decimal(6, 3)
+  updated_at            DateTime @updatedAt
+  updated_by_label      String?
+
+  @@map("bq_quotation_settings")
   @@schema("bq")
 }
 

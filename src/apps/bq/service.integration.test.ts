@@ -26,6 +26,7 @@ async function resetBq() {
       "bq"."bq_lib_labor",
       "bq"."bq_lib_material_labor",
       "bq"."bq_lib_custom_item",
+      "bq"."bq_quotation_settings",
       "platform"."AuditEvent"
     RESTART IDENTITY CASCADE
   `);
@@ -995,7 +996,7 @@ describe("BQ R6.1 invariants", () => {
 
     await service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: "Q-014", date: "2026-10-05", terms: "Valid 14 days." });
     const read = createBqPublicRead(testDb.prisma);
-    assert.deepEqual((await read.getProjectDetail(project.id))?.quotation, { number: "Q-014", date: "2026-10-05", terms: "Valid 14 days." });
+    assert.deepEqual((await read.getProjectDetail(project.id))?.quotation, { number: "Q-014", date: "2026-10-05", terms: "Valid 14 days.", clientContact: null, clientAddress: null, area: null, location: null, validUntil: null, schedule: null, paymentTerms: null, ppnPct: null, rounding: null });
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "bq.project.quotation-updated" } }), 1);
 
     await service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: "Q-014", date: "2026-10-05", terms: "Valid 14 days." });
@@ -1015,6 +1016,56 @@ describe("BQ R6.1 invariants", () => {
     await assert.rejects(
       () => service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: null, date: null, terms: null }),
       (error: unknown) => error instanceof AppError && error.code === "bq.project.archived",
+    );
+  });
+});
+
+describe("BQ quotation letter and settings (owner 2026-10-14)", () => {
+  const EMPTY_LETTER = { clientContact: null, clientAddress: null, area: null, location: null, validUntil: null, schedule: null, paymentTerms: null, ppnPct: null, rounding: null };
+
+  it("keeps the letter on the project, clears an emptied field, and refuses bad values", async () => {
+    const { project } = await projectTree();
+    await service.updateQuotation({
+      grants: GRANTS, actor: ACTOR, id: project.id, number: "RDT/26/1", date: "2026-06-19", terms: null,
+      letter: { clientContact: "Pieter Gunawan", clientAddress: "Ruko Cordoba\nJakarta Utara", area: "103 sqm", location: "Living World", validUntil: "2026-07-02", schedule: "9 Weeks upon confirmation", paymentTerms: "50% Down Payment", ppnPct: "11", rounding: "1320000000" },
+    });
+    const read = createBqPublicRead(testDb.prisma);
+    const quotation = (await read.getProjectDetail(project.id))!.quotation;
+    assert.equal(quotation.clientContact, "Pieter Gunawan");
+    assert.equal(quotation.validUntil, "2026-07-02");
+    assert.equal(quotation.ppnPct, "11");
+    assert.equal(quotation.rounding, "1320000000");
+
+    await service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: "RDT/26/1", date: "2026-06-19", terms: null, letter: { ...EMPTY_LETTER, area: "  " } });
+    const cleared = (await read.getProjectDetail(project.id))!.quotation;
+    assert.equal(cleared.area, null);
+    assert.equal(cleared.ppnPct, null, "an empty PPN falls back to the settings default");
+
+    await assert.rejects(
+      () => service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: null, date: null, terms: null, letter: { ...EMPTY_LETTER, ppnPct: "120" } }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.quotation.ppn-invalid",
+    );
+    await assert.rejects(
+      () => service.updateQuotation({ grants: GRANTS, actor: ACTOR, id: project.id, number: null, date: null, terms: null, letter: { ...EMPTY_LETTER, rounding: "-5" } }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.quotation.rounding-invalid",
+    );
+  });
+
+  it("reads defaults before anything is saved, then saves the letterhead and reports a replaced signature", async () => {
+    const before = await service.getQuotationSettings();
+    assert.equal(before.defaultPpnPct, "11");
+    assert.match(before.defaultPaymentTerms, /50% Down Payment/);
+    const base = { grants: GRANTS, actor: ACTOR, companyAddress: "Jalan Safir VII\nJakarta Barat", companyEmail: "info@rad-w.com", signerName: "Raychie A.", defaultPaymentTerms: null, defaultPpnPct: "11" };
+    assert.deepEqual(await service.updateQuotationSettings({ ...base, signature: { kind: "set", key: "bq/signatures/one.png" } }), { replacedSignatureKey: null });
+    assert.deepEqual(await service.updateQuotationSettings({ ...base, signature: { kind: "keep" } }), { replacedSignatureKey: null });
+    assert.deepEqual(await service.updateQuotationSettings({ ...base, signature: { kind: "set", key: "bq/signatures/two.png" } }), { replacedSignatureKey: "bq/signatures/one.png" });
+    const after = await service.getQuotationSettings();
+    assert.equal(after.signerName, "Raychie A.");
+    assert.equal(after.signatureKey, "bq/signatures/two.png");
+    assert.match(after.defaultPaymentTerms, /50% Down Payment/, "an emptied default falls back to the standard one");
+    await assert.rejects(
+      () => service.updateQuotationSettings({ ...base, companyEmail: "not an e-mail", signature: { kind: "keep" } }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.quotation.email-invalid",
     );
   });
 });

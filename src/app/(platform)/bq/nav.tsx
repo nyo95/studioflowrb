@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, Library } from "lucide-react";
+import { FileText, Library, Settings2 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem } from "@/platform/ui_engine";
@@ -9,6 +9,7 @@ import { BQ_NAV_LINKS } from "@/apps/bq/public/nav";
 const iconMap: Record<string, typeof FileText> = {
   "/bq": FileText,
   "/bq/library": Library,
+  "/bq/settings": Settings2,
 };
 
 export function BqNav() {
