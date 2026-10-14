@@ -180,5 +180,17 @@ for (const index of [0, 1, 2, 3]) {
     // For a look at the screen afterwards (not compared).
     await page.mouse.move(0, 0);
     await page.screenshot({ path: `e2e/.tmp/boq-walk-part-${index + 1}.png`, fullPage: true });
+    // After the last sheet, the printed quotation as a PDF, to compare with the workbook's print.
+    if (index === 3) {
+      await page.goto(`/bq/print/${projectUrl.split("/").pop()}/quotation`);
+      await page.waitForLoadState("networkidle");
+      await page.emulateMedia({ media: "print" });
+      await page.pdf({ path: "e2e/.tmp/boq-quotation.pdf", format: "A4", preferCSSPageSize: true, displayHeaderFooter: false });
+      await page.setViewportSize({ width: 794, height: 1123 });
+      const height = await page.evaluate(() => document.documentElement.scrollHeight);
+      for (let top = 0, at = 0; top < height; top += 1100, at += 1) {
+        await page.screenshot({ path: `e2e/.tmp/boq-quotation-${at}.png`, fullPage: true, clip: { x: 0, y: top, width: 794, height: Math.min(1100, height - top) } });
+      }
+    }
   });
 }

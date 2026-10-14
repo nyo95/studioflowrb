@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.45 | 2026-10-14 | feat(bq): The printed quotation follows the estimator's workbook: summary page, then one bill per Section (Lead)
+
+- **Owner 2026-10-14:** "skrg tinggal quotationnya aja, kalo di print buat seperti excel di print kalau bisa persis". Reference: the print setup and cells of `test/BOQ TEST.xlsx` (A4 portrait, fit to width, print titles, footer "&P / &N", Arial Narrow 10-11 pt, medium header borders, thin grid, accounting Rp formats).
+- **Page 1 (SUMMARY):** organisation, "PROJECT : <title>", number / date / client, then NO. / DESCRIPTION / TOTAL with one "BILL NO A. <Section>" row per Section and the TOTAL; the TBC / By Owner note, terms and signatures stay on this page.
+- **Bills:** each Section starts a new printed page with "BILL NO A. <Section>" and the workbook grid NO. / DESCRIPTION / VOL / SAT / SPECIFICATION / RATE / TOTAL RATE (the SPECIFICATION column only when a Work Item of that Section has one). Subsections are lettered group rows (A, B, …) with Work Items numbered from 1 and a "SUB TOTAL <Subsection>" row; Work Items directly under a Section come first (with their own SUB TOTAL when Subsections follow); "TOTAL" closes the bill. VOL with two decimals; RATE "Rp … ,00" and TOTAL RATE "Rp …" in accounting layout, "-" for nothing; TBC / By Owner in the RATE column. The column header repeats on every printed page; "n / N" page numbers at the foot (`@page` margin box).
+- **Not in the workbook print, kept:** the DRAFT box while the project is not locked. **Not built:** PPN and GRAND TOTAL (the workbook adds 11% PPN; BQ has no tax setting yet).
+- **`e2e/bq-boq-walk.spec.ts`:** after the last sheet, saves the quotation as `e2e/.tmp/boq-quotation.pdf` and page images.
+- **Checks:** typecheck, eslint, `npx playwright test e2e/bq-boq-walk.spec.ts` 5/5 PASS; quotation compared by eye with the workbook (summary A-D, B. CIVIL & INTERIOR and D. MEP bills). No push.
+
 ## R9.44 | 2026-10-14 | feat(bq): "Isi dari rincian" suggests a Work Item's specification from its Cost Components (Lead)
 
 - **Owner 2026-10-14:** asked whether the workbook's specification relates to Master Data; Lead advice: keep the Work Item specification as its own free text (client wording, no silent change of sent quotations, most workbook rows have no breakdown) and offer a one-time copy from the breakdown. Owner: "boleh".

@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
 import { hasAnyPermission } from "@platform/core/rbac";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { formatDateOnly, formatInstant } from "@platform/utilities/date";
-import { createMoney, formatMoney } from "@platform/utilities/money";
 import { brandMarkStorage } from "@platform/runtime";
 import {
   BQ_DEFAULT_QUOTATION_TERMS,
@@ -15,30 +15,120 @@ import {
   bqSectionTotal,
   isMarkerPriceMode,
   type BqItemDetail,
+  type BqSectionDetail,
 } from "@/apps/bq/public";
 import { bqPublicRead } from "@/apps/bq/runtime";
 import { DocumentBlock, DocumentSheet, PrintButton, PrintFormatPicker, printFormatFromSearchParams } from "@/platform/ui_engine";
 
 export const dynamic = "force-dynamic";
 
-const LABEL = "text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral-500";
+/*
+ * The quotation prints like the estimator's workbook (owner 2026-10-14, "seperti Excel di print ... persis"): a
+ * SUMMARY page (NO. / DESCRIPTION / TOTAL, one "BILL NO" row per Section), then one bill per Section on its own page
+ * with the workbook's grid: NO. / DESCRIPTION / VOL / SAT / SPECIFICATION / RATE / TOTAL RATE, Subsections as lettered
+ * groups numbered from 1 with a "SUB TOTAL" row, and the Section "TOTAL". Arial Narrow 10 pt, black grid lines,
+ * accounting-style Rp columns, the column header repeated on every printed page, page "n / N" at the foot.
+ */
 const SECTION_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const SHEET_FONT = { fontFamily: '"Arial Narrow", "Liberation Sans Narrow", "Roboto Condensed", Arial, sans-serif', fontSize: "10pt" };
+const CELL = "border border-black px-1.5 py-[3px] align-top";
+const HEAD = "border-[1.5px] border-black px-1.5 py-1.5 text-center align-middle font-bold";
+const STRONG_ROW = "border-y-[1.5px] border-black";
 
-const idr = (amount: string | null) => (amount === null ? "—" : formatMoney(createMoney(amount, "IDR")));
-const quantity = (value: string) => value.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "");
+const number = (value: string, digits: number) =>
+  new Intl.NumberFormat("id-ID", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(value));
 
-/** One Work Item as the client sees it: rate and total only (bq-contract §6.4), or its TBC/By Owner marker. */
-function ItemLine({ number, item }: { number: string; item: BqItemDetail }) {
+/** Excel's accounting format: "Rp" against the left edge, the amount against the right, "-" for nothing. */
+function Rupiah({ amount, digits }: { amount: string | null; digits: number }) {
+  const zero = amount === null || Number(amount) === 0;
+  return (
+    <span className="flex items-baseline justify-between gap-2 tabular-nums">
+      <span>Rp</span>
+      <span>{zero ? "-" : number(amount!, digits)}</span>
+    </span>
+  );
+}
+
+function hasSpecification(section: BqSectionDetail) {
+  return [...section.items, ...section.subsections.flatMap((subsection) => subsection.items)].some((item) => Boolean(item.specification));
+}
+
+/** One Work Item as the client sees it: rate and total only (bq-contract §6.4), or its TBC / By Owner marker. */
+function ItemLine({ number: no, item, withSpec }: { number: number; item: BqItemDetail; withSpec: boolean }) {
   const marker = isMarkerPriceMode(item.priceMode);
   return (
-    <tr className="break-inside-avoid border-b border-neutral-200 align-top">
-      <td className="py-1.5 pr-2 tabular-nums text-neutral-500">{number}</td>
-      <td className="py-1.5 pr-2">{item.name}{item.specification ? <span className="block whitespace-pre-line text-xs text-neutral-500">{item.specification}</span> : null}</td>
-      <td className="py-1.5 pr-2 text-right tabular-nums">{quantity(item.qty)}</td>
-      <td className="py-1.5 pr-2">{item.unit}</td>
-      <td className="py-1.5 pr-2 text-right tabular-nums">{marker ? BQ_PRICE_MODE_LABEL[item.priceMode] : idr(item.rate)}</td>
-      <td className="py-1.5 text-right tabular-nums">{marker ? BQ_PRICE_MODE_LABEL[item.priceMode] : idr(item.total)}</td>
+    <tr className="break-inside-avoid">
+      <td className={`${CELL} text-center`}>{no}</td>
+      <td className={CELL}>{item.name}</td>
+      <td className={`${CELL} text-right tabular-nums`}>{number(item.qty, 2)}</td>
+      <td className={`${CELL} text-center`}>{item.unit}</td>
+      {withSpec ? <td className={`${CELL} whitespace-pre-line`}>{item.specification}</td> : null}
+      <td className={CELL}>{marker ? <span className="block text-right">{BQ_PRICE_MODE_LABEL[item.priceMode]}</span> : <Rupiah amount={item.rate} digits={2} />}</td>
+      <td className={CELL}><Rupiah amount={marker ? null : item.total} digits={0} /></td>
     </tr>
+  );
+}
+
+/** A Subsection's (or the Section's own Work Items') total, the same way the Section total is taken. */
+function groupTotal(items: BqItemDetail[]): string | null {
+  return bqSectionTotal({ id: "", name: "", sortOrder: 0, items, subsections: [] });
+}
+
+function SpanRow({ label, amount, columns, strong }: { label: ReactNode; amount: string | null; columns: number; strong?: boolean }) {
+  return (
+    <tr className={`break-inside-avoid ${strong ? STRONG_ROW : ""}`}>
+      <td className={CELL} />
+      <td colSpan={columns - 2} className={`${CELL} text-center font-bold`} style={{ fontSize: "11pt" }}>{label}</td>
+      <td className={`${CELL} font-bold`}><Rupiah amount={amount} digits={0} /></td>
+    </tr>
+  );
+}
+
+function Bill({ section, letter }: { section: BqSectionDetail; letter: string }) {
+  const withSpec = hasSpecification(section);
+  const columns = withSpec ? 7 : 6;
+  return (
+    <section className="mt-10 break-before-page border-t-2 border-dashed border-neutral-300 pt-6 print:mt-0 print:border-0 print:pt-0">
+      <h2 className="mb-3 font-bold uppercase" style={{ fontSize: "11pt" }}>BILL NO {letter}. {section.name}</h2>
+      <table className="w-full border-collapse" style={SHEET_FONT}>
+        <colgroup>
+          <col style={{ width: "6%" }} />
+          <col style={{ width: withSpec ? "26%" : "40%" }} />
+          <col style={{ width: "7%" }} />
+          <col style={{ width: "6%" }} />
+          {withSpec ? <col style={{ width: "25%" }} /> : null}
+          <col style={{ width: withSpec ? "14%" : "20%" }} />
+          <col style={{ width: withSpec ? "16%" : "21%" }} />
+        </colgroup>
+        {/* A table header repeats at the top of every printed page, as the workbook's print titles do. */}
+        <thead>
+          <tr>
+            <th className={HEAD}>NO.</th>
+            <th className={HEAD}>DESCRIPTION</th>
+            <th className={HEAD}>VOL</th>
+            <th className={HEAD}>SAT</th>
+            {withSpec ? <th className={HEAD}>SPECIFICATION</th> : null}
+            <th className={HEAD}>RATE</th>
+            <th className={HEAD}>TOTAL RATE</th>
+          </tr>
+        </thead>
+        <tbody>
+          {section.items.map((item, index) => <ItemLine key={item.id} number={index + 1} item={item} withSpec={withSpec} />)}
+          {section.items.length > 0 && section.subsections.length > 0 ? (
+            <SpanRow label="SUB TOTAL" amount={groupTotal(section.items)} columns={columns} strong />
+          ) : null}
+          {section.subsections.map((subsection, index) => [
+            <tr key={subsection.id} className="break-after-avoid">
+              <td className={`${CELL} text-center font-bold`}>{SECTION_LETTERS[index] ?? index + 1}</td>
+              <td colSpan={columns - 1} className={`${CELL} font-bold`}>{subsection.name}</td>
+            </tr>,
+            ...subsection.items.map((item, itemIndex) => <ItemLine key={item.id} number={itemIndex + 1} item={item} withSpec={withSpec} />),
+            <SpanRow key={`${subsection.id}-total`} label={`SUB TOTAL ${subsection.name}`} amount={groupTotal(subsection.items)} columns={columns} strong />,
+          ])}
+          <SpanRow label="TOTAL" amount={bqSectionTotal(section)} columns={columns} />
+        </tbody>
+      </table>
+    </section>
   );
 }
 
@@ -67,6 +157,8 @@ export default async function BqQuotationPrintPage({
   return (
     <>
       <title>{`Quotation — ${project.title}`}</title>
+      {/* Page "n / N" at the foot of every printed page, as the workbook's footer. */}
+      <style>{"@page { margin: 13mm 6mm; @bottom-center { content: counter(page) \" / \" counter(pages); font: 9pt Arial, sans-serif; } }"}</style>
       <DocumentSheet
         printFormat={printFormat}
         toolbar={
@@ -81,103 +173,96 @@ export default async function BqQuotationPrintPage({
           </>
         }
       >
-        {project.status !== "LOCKED" ? (
-          <p className="mb-3 border-2 border-black px-3 py-1.5 text-center text-sm font-black uppercase tracking-[0.2em]">
-            Draft — this project is not locked yet; prices and quantities may still change
-          </p>
-        ) : null}
-        <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
-          <div className="flex min-w-0 items-start gap-3">
-            {settings.brandMarkUrl ? (
-              // A short-lived public-read URL; next/image optimization would cache it.
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={settings.brandMarkUrl} alt="" className="h-12 w-12 object-contain" />
-            ) : null}
-            <div className="min-w-0">
-              <p className="text-sm font-bold uppercase tracking-[0.08em]">{settings.organizationName}</p>
-              <p className={`${LABEL} mt-3`}>Quotation</p>
-              <h1 className="mt-1 font-ui-sans text-2xl font-black uppercase leading-tight">{project.title}</h1>
+        <div style={SHEET_FONT}>
+          {project.status !== "LOCKED" ? (
+            <p className="mb-3 border-2 border-black px-3 py-1.5 text-center font-black uppercase tracking-[0.2em]">
+              Draft — this project is not locked yet; prices and quantities may still change
+            </p>
+          ) : null}
+
+          <header className="flex items-start justify-between gap-6 pb-4">
+            <div className="flex min-w-0 items-start gap-3">
+              {settings.brandMarkUrl ? (
+                // A short-lived public-read URL; next/image optimization would cache it.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={settings.brandMarkUrl} alt="" className="h-12 w-12 object-contain" />
+              ) : null}
+              <div className="min-w-0">
+                <p className="font-bold uppercase">{settings.organizationName}</p>
+                <p className="mt-2 font-bold uppercase" style={{ fontSize: "11pt" }}>PROJECT : {project.title}</p>
+              </div>
             </div>
-          </div>
-          <dl className="grid shrink-0 grid-cols-[auto_auto] gap-x-4 gap-y-1 text-right text-sm">
-            <dt className={LABEL}>No.</dt>
-            <dd className="font-semibold">{project.quotation.number ?? "—"}</dd>
-            <dt className={LABEL}>Date</dt>
-            <dd className="font-semibold">{project.quotation.date ? formatDateOnly(project.quotation.date) : formatInstant(new Date(), { style: "date" })}</dd>
-            <dt className={LABEL}>Client</dt>
-            <dd className="font-semibold">{project.clientName}</dd>
-          </dl>
-        </header>
+            <dl className="grid shrink-0 grid-cols-[auto_auto] gap-x-3 gap-y-0.5">
+              <dt>No.</dt>
+              <dd className="font-bold">{project.quotation.number ?? "—"}</dd>
+              <dt>Date</dt>
+              <dd className="font-bold">{project.quotation.date ? formatDateOnly(project.quotation.date) : formatInstant(new Date(), { style: "date" })}</dd>
+              <dt>Client</dt>
+              <dd className="font-bold">{project.clientName}</dd>
+            </dl>
+          </header>
 
-        <table className="mt-6 w-full border-collapse text-xs">
-          <thead>
-            <tr className="border-b border-black text-left">
-              <th className="w-10 py-1.5 pr-2 font-semibold">No.</th>
-              <th className="py-1.5 pr-2 font-semibold">Description</th>
-              <th className="w-14 py-1.5 pr-2 text-right font-semibold">Qty</th>
-              <th className="w-12 py-1.5 pr-2 font-semibold">Unit</th>
-              <th className="w-28 py-1.5 pr-2 text-right font-semibold">Rate</th>
-              <th className="w-32 py-1.5 text-right font-semibold">Total</th>
-            </tr>
-          </thead>
-          {project.sections.map((section, sectionIndex) => {
-            const letter = SECTION_LETTERS[sectionIndex] ?? String(sectionIndex + 1);
-            let counter = 0;
-            const next = () => `${letter}.${++counter}`;
-            return (
-              <tbody key={section.id}>
-                <tr className="break-after-avoid">
-                  <td className="pb-1 pt-4 font-bold">{letter}</td>
-                  <td colSpan={5} className="pb-1 pt-4 font-bold uppercase tracking-[0.06em]">{section.name}</td>
-                </tr>
-                {section.items.map((item) => <ItemLine key={item.id} number={next()} item={item} />)}
-                {section.subsections.map((subsection) => [
-                  <tr key={subsection.id} className="break-after-avoid">
-                    <td />
-                    <td colSpan={5} className="pb-0.5 pt-2 font-semibold text-neutral-700">{subsection.name}</td>
-                  </tr>,
-                  ...subsection.items.map((item) => <ItemLine key={item.id} number={next()} item={item} />),
-                ])}
-                <tr className="border-t border-black">
-                  <td />
-                  <td colSpan={4} className="py-1.5 pr-2 text-right font-semibold">Subtotal {letter}</td>
-                  <td className="py-1.5 text-right font-semibold tabular-nums">{idr(bqSectionTotal(section))}</td>
-                </tr>
-              </tbody>
-            );
-          })}
-          <tfoot>
-            <tr className="border-y-2 border-black">
-              <td />
-              <td colSpan={4} className="py-2 pr-2 text-right text-sm font-bold uppercase tracking-[0.06em]">Grand total</td>
-              <td className="py-2 text-right text-sm font-bold tabular-nums">{project.grandTotal === null ? "Incomplete" : idr(project.grandTotal)}</td>
-            </tr>
-          </tfoot>
-        </table>
+          <table className="w-full border-collapse" style={{ ...SHEET_FONT, fontSize: "11pt" }}>
+            <colgroup>
+              <col style={{ width: "8%" }} />
+              <col style={{ width: "60%" }} />
+              <col style={{ width: "32%" }} />
+            </colgroup>
+            <thead>
+              <tr>
+                <th className={HEAD}>NO.</th>
+                <th className={HEAD}>DESCRIPTION</th>
+                <th className={HEAD}>TOTAL</th>
+              </tr>
+            </thead>
+            <tbody>
+              {project.sections.map((section, index) => {
+                const letter = SECTION_LETTERS[index] ?? String(index + 1);
+                return (
+                  <tr key={section.id} className="break-inside-avoid" style={{ fontSize: "10pt" }}>
+                    <td className={`${CELL} py-1.5 text-center font-bold`}>{letter}</td>
+                    <td className={`${CELL} py-1.5 font-bold uppercase`}>BILL NO {letter}. {section.name}</td>
+                    <td className={`${CELL} py-1.5 font-bold`}><Rupiah amount={bqSectionTotal(section)} digits={2} /></td>
+                  </tr>
+                );
+              })}
+              <tr><td colSpan={3} className="h-4" /></tr>
+              <tr>
+                <td />
+                <td className={`${CELL} text-center font-bold`}>{project.grandTotal === null ? "TOTAL (INCOMPLETE)" : "TOTAL"}</td>
+                <td className={`${CELL} font-bold`}><Rupiah amount={project.grandTotal} digits={0} /></td>
+              </tr>
+            </tbody>
+          </table>
 
-        {markers.length > 0 ? (
-          <p className="mt-2 text-[10px] text-neutral-600">
-            {markers.map((mode) => mode === "TBC" ? "TBC: price to be confirmed, not included in the total." : "By Owner: supplied by the owner, not included in the total.").join(" ")}
-          </p>
-        ) : null}
+          {markers.length > 0 ? (
+            <p className="mt-2" style={{ fontSize: "9pt" }}>
+              {markers.map((mode) => mode === "TBC" ? "TBC: price to be confirmed, not included in the total." : "By Owner: supplied by the owner, not included in the total.").join(" ")}
+            </p>
+          ) : null}
 
-        <DocumentBlock className="mt-8">
-          <h2 className="border-b border-black pb-1 text-sm font-bold uppercase tracking-[0.1em]">Terms &amp; Conditions</h2>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs">
-            {terms.map((term, index) => <li key={index}>{term}</li>)}
-          </ol>
-        </DocumentBlock>
+          <DocumentBlock className="mt-8">
+            <h2 className="border-b border-black pb-1 font-bold uppercase">Terms &amp; Conditions</h2>
+            <ol className="mt-2 list-decimal space-y-1 pl-5">
+              {terms.map((term, index) => <li key={index}>{term}</li>)}
+            </ol>
+          </DocumentBlock>
 
-        <DocumentBlock className="mt-12 grid grid-cols-2 gap-12 text-xs">
-          <div>
-            <p className={LABEL}>Prepared by</p>
-            <div className="mt-16 border-t border-neutral-400 pt-1">{settings.organizationName}</div>
-          </div>
-          <div>
-            <p className={LABEL}>Approved by</p>
-            <div className="mt-16 border-t border-neutral-400 pt-1">{project.clientName}</div>
-          </div>
-        </DocumentBlock>
+          <DocumentBlock className="mt-12 grid grid-cols-2 gap-12">
+            <div>
+              <p>Prepared by</p>
+              <div className="mt-16 border-t border-black pt-1">{settings.organizationName}</div>
+            </div>
+            <div>
+              <p>Approved by</p>
+              <div className="mt-16 border-t border-black pt-1">{project.clientName}</div>
+            </div>
+          </DocumentBlock>
+
+          {project.sections.map((section, index) => (
+            <Bill key={section.id} section={section} letter={SECTION_LETTERS[index] ?? String(index + 1)} />
+          ))}
+        </div>
       </DocumentSheet>
     </>
   );
