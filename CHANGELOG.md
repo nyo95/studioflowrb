@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.20 | 2026-10-14 | fix(bq): Restore contract nouns on the project screen (Executor)
+
+- **BQ project language:** the project screen and its Section, Work Item, Assembly, and Cost Component dialogs now use the canonical contract nouns: Section, Subsection, Work Item, Component Group, Cost Component, Assembly, TBC, and By Owner. Existing sentence language and behavior are unchanged.
+- **Scope:** UI strings, accessibility labels, and nearby implementation comments only; no schema, dependency, service, calculation, permission, or action contract change.
+- **Verification:** `npm test`, `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, production build with `NEXT_DIST_DIR=.next-verify`, and staged/unstaged whitespace checks.
+- **Remaining:** browser verification of the nouns belongs to the Reviewer and will be queued with the Slice 3 UI acceptance batch in R9.21.
+
 ## R9.08 | 2026-10-14 | docs(plan): WO-BQ-SLICE3-UI-01 for Codex, in parallel on its own worktree (Lead)
 
 - **Owner 2026-10-14:** "lanjutin jg si BQ - oper aja ke codex (termasuk ui nya - slice 3) jalan paralel". `PLAN.md` now holds WO-BQ-SLICE3-UI-01: the contract nouns on the BQ screen (R9.20) and the Slice 3 select / group / move UI on the R9.03 backend (R9.21), UI included for Codex by owner decision for this Work Order only. The mockup's behavior is written into the plan (preview always from the server, a dialog only when the price changes, nothing on locked/archived, no drag, same Work Item only).

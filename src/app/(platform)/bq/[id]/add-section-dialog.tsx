@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { addSectionAction } from "../actions";
 import { Button, Dialog, Field, FormActions, InlineError, Input, Spinner } from "@/platform/ui_engine";
 
-/** Adds a Bagian. It lives in the Struktur panel (and as a small fallback above the list on narrow screens). */
+/** Adds a Section. It lives in the Struktur panel (and as a small fallback above the list on narrow screens). */
 export function AddSectionDialog({ projectId, compact = false }: { projectId: string; compact?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -45,19 +45,19 @@ export function AddSectionDialog({ projectId, compact = false }: { projectId: st
         leadingIcon={<Plus aria-hidden="true" />}
         onClick={() => setOpen(true)}
       >
-        Bagian
+        Section
       </Button>
       <Dialog
         open={open}
         onOpenChange={(nextOpen) => (nextOpen ? setOpen(true) : close())}
-        title="Tambah bagian"
-        description="Bagian adalah judul besar dokumen BQ, mis. Preliminaries atau Interior Works."
+        title="Tambah Section"
+        description="Section adalah judul besar dokumen BQ, mis. Preliminaries atau Interior Works."
         size="sm"
       >
         <form onSubmit={submit} className="grid gap-4">
           {error ? <InlineError>{error}</InlineError> : null}
           <input type="hidden" name="projectId" value={projectId} />
-          <Field label="Nama bagian" required>
+          <Field label="Nama Section" required>
             <Input
               name="name"
               value={name}
@@ -73,7 +73,7 @@ export function AddSectionDialog({ projectId, compact = false }: { projectId: st
               Batal
             </Button>
             <Button type="submit" variant="primary" disabled={pending}>
-              {pending ? <Spinner /> : "Tambah bagian"}
+              {pending ? <Spinner /> : "Tambah Section"}
             </Button>
           </FormActions>
         </form>

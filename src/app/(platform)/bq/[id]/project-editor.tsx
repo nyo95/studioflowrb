@@ -84,7 +84,7 @@ const KATEGORI_LABEL: Record<string, string> = {
   ALAT: "Alat",
 };
 
-/** Where a new Pekerjaan will land; `where` is the Bagian/Subbagian name shown in its dialog. */
+/** Where a new Work Item will land; `where` is the Section/Subsection name shown in its dialog. */
 type NewItemTarget = { sectionId?: string; subsectionId?: string; where: string };
 
 type Mutation = (prev: null, formData: FormData) => Promise<ActionResult<BqProjectDetail>>;
@@ -99,7 +99,7 @@ function money(amount: string | null, currency = "IDR") {
  *  Components) so the header can show "X dari Y sudah ada harga" instead of
  *  only revealing incompleteness once the Grand Total goes blank. */
 type ReadinessKey = "empty" | "zero" | "tbc" | "byOwner";
-/** The first row of a kind: the row to scroll to, and the Pekerjaan / Kelompok to open so the row is visible. */
+/** The first row of a kind: the row to scroll to, and the Work Item / Component Group to open so the row is visible. */
 type ReadinessJump = { rowId: string; open: string[] };
 type Readiness = {
   total: number;
@@ -152,14 +152,14 @@ function summarizeReadiness(sections: BqProjectDetail["sections"]): Readiness {
 const PRICE_STATUS_LABEL: Record<"PRICED" | "TBC" | "BY_OWNER", string> = {
   PRICED: "Berharga",
   TBC: "TBC",
-  BY_OWNER: "Disediakan owner",
+  BY_OWNER: "By Owner",
 };
 
 const READINESS_COPY: Record<ReadinessKey, { label: string; hint: string; blocksLock: boolean }> = {
-  empty: { label: "Harga kosong", hint: "Belum diisi — harus diisi atau ditandai TBC / Disediakan owner sebelum dikunci.", blocksLock: true },
+  empty: { label: "Harga kosong", hint: "Belum diisi — harus diisi atau ditandai TBC / By Owner sebelum dikunci.", blocksLock: true },
   zero: { label: "Harga Rp0", hint: "Dihitung sebagai Rp0 — boleh dikunci dengan konfirmasi.", blocksLock: false },
   tbc: { label: "TBC", hint: "Baris penanda: tidak masuk total.", blocksLock: false },
-  byOwner: { label: "Disediakan owner", hint: "Baris penanda: tidak masuk total.", blocksLock: false },
+  byOwner: { label: "By Owner", hint: "Baris penanda: tidak masuk total.", blocksLock: false },
 };
 
 /** One strip that answers "can I lock this, and what is still open?"; each chip jumps to the first such row. */
@@ -203,8 +203,8 @@ function workItemCount(section: BqSectionDetail) {
 type ReorderParent = { sectionId: string } | { subsectionId: string };
 
 /**
- * The Pekerjaan of one Bagian or Subbagian as a list that can be re-ordered by dragging (or with the arrow buttons,
- * for keyboard and touch). Only the order within this parent changes; nothing here moves a Pekerjaan elsewhere or
+ * The Work Items of one Section or Subsection as a list that can be re-ordered by dragging (or with the arrow buttons,
+ * for keyboard and touch). Only the order within this parent changes; nothing here moves a Work Item elsewhere or
  * touches a price. The server checks the whole list again (stale lists are refused).
  */
 function OutlineItems({
@@ -280,8 +280,8 @@ function OutlineItems({
 }
 
 /**
- * The document's structure and the one place that changes it: each Bagian lists its Subbagian and offers
- * "+ Subbagian" right under them; "+ Bagian" closes the list. Shown from 1024 px; narrower screens get the same
+ * The document's structure and the one place that changes it: each Section lists its Subsections and offers
+ * "+ Subsection" right under them; "+ Section" closes the list. Shown from 1024 px; narrower screens get the same
  * actions in the work area (see ProjectEditor), so nothing disappears with the panel.
  */
 function SectionOutline({
@@ -333,8 +333,8 @@ function SectionOutline({
             {editable ? (
               <div className="pl-4">
                 <AddRow
-                  label="Subbagian"
-                  placeholder="Nama subbagian"
+                  label="Subsection"
+                  placeholder="Nama Subsection"
                   compact
                   disabled={pending}
                   onAdd={(name) => onAddSubsection(section.id, name)}
@@ -369,10 +369,10 @@ export function ProjectEditor({
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [importTarget, setImportTarget] = useState<{ itemId?: string; subObjectId?: string } | null>(null);
-  /** A Pekerjaan to apply a resep to as a Kelompok rincian. */
+  /** A Work Item to apply an Assembly to as a Component Group. */
   const [assemblyItemId, setAssemblyItemId] = useState<string | null>(null);
   const [newItemTarget, setNewItemTarget] = useState<NewItemTarget | null>(null);
-  /** The Pekerjaan whose rincian are being saved as a resep. */
+  /** The Work Item whose Cost Components are being saved as an Assembly. */
   const [saveAssemblyItem, setSaveAssemblyItem] = useState<BqItemDetail | null>(null);
   const router = useRouter();
   const [lockOpen, setLockOpen] = useState(false);
@@ -432,7 +432,7 @@ export function ProjectEditor({
   /** The bar already states "X dari Y rincian sudah ada harga", so the footer drops its copy while the bar shows. */
   const readinessBarShown = project.status === "ACTIVE" && readiness.total + readiness.counts.tbc + readiness.counts.byOwner > 0;
 
-  /** Opens the Pekerjaan / Kelompok that holds the row, then scrolls to it once it is on screen. */
+  /** Opens the Work Item / Component Group that holds the row, then scrolls to it once it is on screen. */
   const jumpTo = (jump: { rowId: string; open: string[] }) => {
     if (jump.open.length > 0) {
       setExpanded((current) => new Set([...current, ...jump.open]));
@@ -446,7 +446,7 @@ export function ProjectEditor({
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-4 py-3">
         <Text tone="secondary" size="sm">
-          {project.sections.length} bagian
+          {project.sections.length} Section
           {canManage && project.status === "ACTIVE" ? " · dapat diedit" : null}
         </Text>
         <div className="flex flex-wrap items-center gap-2">
@@ -484,7 +484,7 @@ export function ProjectEditor({
           onReorder={(parent, orderedIds) => run(reorderItemsAction, { ...parent, orderedIds: JSON.stringify(orderedIds) })}
         />
         <div className="grid min-w-0 flex-1 gap-4">
-          {/* Below 1024 px the Struktur panel is hidden, so its "+ Bagian" is offered here. */}
+          {/* Below 1024 px the Struktur panel is hidden, so its "+ Section" is offered here. */}
           {editable ? (
             <div className="flex lg:hidden">
               <AddSectionDialog projectId={project.id} compact />
@@ -493,8 +493,8 @@ export function ProjectEditor({
           {project.sections.length === 0 ? (
             <SectionCard>
               <EmptyState
-                title="Belum ada bagian"
-                description={editable ? "Tambahkan bagian untuk mulai menyusun BQ." : "Project ini belum memiliki bagian."}
+                title="Belum ada Section"
+                description={editable ? "Tambahkan Section untuk mulai menyusun BQ." : "Project ini belum memiliki Section."}
               />
             </SectionCard>
           ) : null}
@@ -505,7 +505,7 @@ export function ProjectEditor({
             {editable ? (
               <InlineEdit
                 value={section.name}
-                label="Nama bagian"
+                label="Nama Section"
                 className="text-base font-semibold text-ink"
                 onCommit={(name) => run(updateSectionAction, { id: section.id, name })}
               />
@@ -538,7 +538,7 @@ export function ProjectEditor({
                 disabled={pending}
                 onClick={() => setNewItemTarget({ sectionId: section.id, where: section.name })}
               >
-                <span className="max-w-[28ch] truncate">Pekerjaan di {section.name}</span>
+                <span className="max-w-[28ch] truncate">Work Item di {section.name}</span>
               </Button>
             </div>
           ) : null}
@@ -549,7 +549,7 @@ export function ProjectEditor({
                 {editable ? (
                   <InlineEdit
                     value={subsection.name}
-                    label="Nama subbagian"
+                    label="Nama Subsection"
                     className="text-sm font-semibold text-ink-secondary"
                     onCommit={(name) => run(updateSubsectionAction, { id: subsection.id, name })}
                   />
@@ -581,18 +581,18 @@ export function ProjectEditor({
                     disabled={pending}
                     onClick={() => setNewItemTarget({ subsectionId: subsection.id, where: `${section.name} › ${subsection.name}` })}
                   >
-                    <span className="max-w-[28ch] truncate">Pekerjaan di {subsection.name}</span>
+                    <span className="max-w-[28ch] truncate">Work Item di {subsection.name}</span>
                   </Button>
                 </div>
               ) : null}
             </div>
           ))}
           {editable ? (
-            // Only where the Struktur panel is hidden (< 1024 px); from there on "+ Subbagian" lives in the panel.
+            // Only where the Struktur panel is hidden (< 1024 px); from there on "+ Subsection" lives in the panel.
             <div className="flex flex-wrap gap-1.5 border-t border-line-subtle pt-3 lg:hidden">
               <AddRow
-                label="Subbagian"
-                placeholder="Nama subbagian"
+                label="Subsection"
+                placeholder="Nama Subsection"
                 disabled={pending}
                 onAdd={(name) => run(addSubsectionAction, { sectionId: section.id, name })}
               />
@@ -655,7 +655,7 @@ export function ProjectEditor({
         open={lockOpen}
         onOpenChange={setLockOpen}
         title="Kunci project ini?"
-        description={`Project terkunci tidak bisa diubah (struktur maupun angkanya) sampai kuncinya dibuka kembali.${readiness.counts.empty > 0 ? ` Masih ada ${readiness.counts.empty} harga kosong; isi atau tandai TBC / Disediakan owner dulu.` : ""}`}
+        description={`Project terkunci tidak bisa diubah (struktur maupun angkanya) sampai kuncinya dibuka kembali.${readiness.counts.empty > 0 ? ` Masih ada ${readiness.counts.empty} harga kosong; isi atau tandai TBC / By Owner dulu.` : ""}`}
         confirmLabel="Kunci project"
         tone="primary"
         pending={pending}
@@ -723,7 +723,7 @@ export function ProjectEditor({
             void run(saveItemAsAssemblyAction, { itemId: saveAssemblyItem.id, name })
               .then(() => {
                 setSaveAssemblyItem(null);
-                // The resep list comes from the page, so fetch it again for the picker.
+                // The Assembly list comes from the page, so fetch it again for the picker.
                 router.refresh();
               })
               .catch(() => undefined);
@@ -782,7 +782,7 @@ function ItemTable({
   columns: number;
 }) {
   if (items.length === 0) {
-    return <Text tone="tertiary" size="sm">Belum ada Pekerjaan.</Text>;
+    return <Text tone="tertiary" size="sm">Belum ada Work Item.</Text>;
   }
 
   return (
@@ -876,7 +876,7 @@ function ItemRows({
           />
         </TableCell>
         <TableCell wrap className="font-medium">
-          <InlineEdit label="Nama Pekerjaan" value={item.name} disabled={!editable} onCommit={commit(updateItemAction, item.id, "name")} />
+          <InlineEdit label="Nama Work Item" value={item.name} disabled={!editable} onCommit={commit(updateItemAction, item.id, "name")} />
           <Text tone="tertiary" size="sm" className="mt-0.5 block font-normal">
             {isMarkerPriceMode(item.priceMode)
               ? "Baris penanda — tidak masuk total"
@@ -888,7 +888,7 @@ function ItemRows({
         <TableCell align="end">
           <InlineEdit label="Jumlah" align="end" inputMode="decimal" value={item.qty} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "qty")} />
         </TableCell>
-        <TableCell>{editable ? <Select aria-label="Satuan Pekerjaan" value={item.unit} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "unit")(event.target.value).catch(() => undefined)}>{units.some((unit) => unit.code === item.unit) ? null : <option value={item.unit} disabled>{item.unit} (inactive snapshot)</option>}{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code}</option>)}</Select> : item.unit}</TableCell>
+        <TableCell>{editable ? <Select aria-label="Satuan Work Item" value={item.unit} disabled={pending} onChange={(event) => void commit(updateItemAction, item.id, "unit")(event.target.value).catch(() => undefined)}>{units.some((unit) => unit.code === item.unit) ? null : <option value={item.unit} disabled>{item.unit} (inactive snapshot)</option>}{units.map((unit) => <option key={unit.id} value={unit.code}>{unit.code}</option>)}</Select> : item.unit}</TableCell>
         {/* Koef. and Markup are two fixed columns rather than one cell that
             switches meaning: an L1 with children takes its cost from them, so
             its own coefficient is dormant (shown "—"); a childless L1 has no
@@ -904,14 +904,14 @@ function ItemRows({
           {hasChildren ? (
             <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={item.markupL1Pct} disabled={!editable} onCommit={commitNum(updateItemAction, item.id, "markupL1Pct")} />
           ) : (
-            <Tooltip content="Markup tidak berlaku untuk Pekerjaan tanpa breakdown — nilainya otomatis 0.">
+            <Tooltip content="Markup tidak berlaku untuk Work Item tanpa breakdown — nilainya otomatis 0.">
               <span className="inline-block"><Text tone="tertiary" size="sm">—</Text></span>
             </Tooltip>
           )}
         </TableCell>
         <TableCell align="end">
           {isMarkerPriceMode(item.priceMode) ? (
-            <Tooltip content="Tidak diberi harga dan tidak masuk total. Ubah di baris pengaturan harga Pekerjaan ini.">
+            <Tooltip content="Tidak diberi harga dan tidak masuk total. Ubah di baris pengaturan harga Work Item ini.">
               <span className="inline-block"><Badge tone="neutral">{PRICE_STATUS_LABEL[item.priceMode]}</Badge></span>
             </Tooltip>
           ) : hasChildren ? (
@@ -1009,11 +1009,11 @@ function ItemRows({
                     disabled={pending}
                     onClick={() => onImport({ itemId: item.id })}
                   >
-                    Rincian biaya
+                    Cost Component
                   </Button>
                   <AddRow
-                    label="Kelompok rincian"
-                    placeholder="Nama kelompok rincian"
+                    label="Component Group"
+                    placeholder="Nama Component Group"
                     disabled={pending}
                     onAdd={(name) => run(addSubObjectAction, { itemId: item.id, name })}
                   />
@@ -1024,7 +1024,7 @@ function ItemRows({
                       disabled={pending}
                       onClick={() => onApplyAssembly(item.id)}
                     >
-                      Terapkan resep
+                      Terapkan Assembly
                     </Button>
                   ) : null}
                   {onSaveAssembly && item.lineItems.length > 0 && item.subObjects.length === 0 ? (
@@ -1034,7 +1034,7 @@ function ItemRows({
                       disabled={pending}
                       onClick={() => onSaveAssembly(item)}
                     >
-                      Simpan sebagai resep
+                      Simpan sebagai Assembly
                     </Button>
                   ) : null}
                   </> : null}
@@ -1086,24 +1086,24 @@ function SubObjectRows({
               onClick={() => toggle(subObject.id)}
             />
             <div className="min-w-0">
-              <InlineEdit label="Nama kelompok rincian" value={subObject.name} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "name")} />
-              {/* A Kelompok is not a plain folder: its multiplier and extra % change the Pekerjaan's price, so both
+              <InlineEdit label="Nama Component Group" value={subObject.name} disabled={!editable} onCommit={commit(updateSubObjectAction, subObject.id, "name")} />
+              {/* A Component Group is not a plain folder: its multiplier and extra % change the Work Item's price, so both
                   stay in view here, never behind a menu. */}
               <Text tone="tertiary" size="sm" className="block">
-                Kelompok rincian · jumlah per Pekerjaan dan markup ikut menghitung harga
+                Component Group · jumlah per Work Item dan markup ikut menghitung harga
               </Text>
             </div>
           </div>
         </TableCell>
         <TableCell align="end">
-          <InlineEdit label="Jumlah per Pekerjaan" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "qtyPerL1")} />
+          <InlineEdit label="Jumlah per Work Item" align="end" inputMode="decimal" value={subObject.qtyPerL1} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "qtyPerL1")} />
         </TableCell>
-        <TableCell><Text tone="tertiary" size="sm">per Pekerjaan</Text></TableCell>
+        <TableCell><Text tone="tertiary" size="sm">per Work Item</Text></TableCell>
         <TableCell align="end">
           <Text tone="tertiary" size="sm">—</Text>
         </TableCell>
         <TableCell align="end">
-          <Tooltip content="Markup kelompok ini (%) — hanya berlaku untuk rincian biaya di dalamnya.">
+          <Tooltip content="Markup Component Group ini (%) — hanya berlaku untuk Cost Component di dalamnya.">
             <span className="inline-block">
               <InlineEdit label="Markup percent" align="end" inputMode="decimal" value={subObject.markupL2Pct} disabled={!editable} onCommit={commitNum(updateSubObjectAction, subObject.id, "markupL2Pct")} />
             </span>
@@ -1139,7 +1139,7 @@ function SubObjectRows({
                     disabled={pending}
                     onClick={() => onImport({ subObjectId: subObject.id })}
                   >
-                    Rincian biaya
+                    Cost Component
                   </Button>
                 </div>
               </TableCell>
@@ -1173,7 +1173,7 @@ function LineItemRow({
       <TableCell />
       <TableCell wrap>
         <div className={depth === 2 ? "pl-10" : "pl-4"}>
-          <InlineEdit label="Nama rincian biaya" value={line.titleSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "titleSnapshot")} />
+          <InlineEdit label="Nama Cost Component" value={line.titleSnapshot} disabled={!editable} onCommit={commit(updateLineItemAction, line.id, "titleSnapshot")} />
           <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
             <Badge tone="neutral">{KATEGORI_LABEL[line.kategori] ?? line.kategori}</Badge>
             {line.sourceType !== "CUSTOM" ? (

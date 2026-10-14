@@ -66,7 +66,7 @@ export function AssemblyPickerDialog({
               onValueChange={setSelectedId}
               placeholder="Pilih assembly…"
               searchPlaceholder="Cari assembly…"
-              emptyLabel="Belum ada resep — simpan dari Pekerjaan yang sudah berisi rincian"
+              emptyLabel="Belum ada Assembly — simpan dari Work Item yang sudah berisi Cost Component"
             />
           </Field>
           <Field label="Quantity per Work Item">
@@ -75,7 +75,7 @@ export function AssemblyPickerDialog({
         </div>
 
         <div className="grid gap-1.5 rounded-control border border-line-subtle bg-surface-muted p-3">
-          <Text tone="tertiary" size="sm" meta>Pratinjau isi resep</Text>
+          <Text tone="tertiary" size="sm" meta>Pratinjau isi Assembly</Text>
           {!selectedId ? (
             <Text tone="tertiary" size="sm">Pilih assembly untuk melihat isinya.</Text>
           ) : loadingPreview || lines === null ? (
