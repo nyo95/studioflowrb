@@ -223,6 +223,41 @@ export async function groupLineItemsAction(
   });
 }
 
+const ReorderSiblingsSchema = z.object({
+  projectId: Id,
+  sectionId: Id.optional(),
+  orderedIds: z.array(Id),
+});
+
+/**
+ * Sections of the project (no `sectionId`) or Subsections of one Section (`sectionId`) in a new order, from Struktur
+ * (owner 2026-10-14). `orderedIds` is a JSON list.
+ */
+export async function reorderSectionsAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    let orderedIds: unknown;
+    try {
+      orderedIds = JSON.parse(String(formData.get("orderedIds") ?? ""));
+    } catch {
+      throw new AppError("VALIDATION", "bq.section.reorder-invalid", "Invalid Section list");
+    }
+    const parsed = ReorderSiblingsSchema.safeParse({
+      projectId: formData.get("projectId"),
+      sectionId: formData.get("sectionId") || undefined,
+      orderedIds,
+    });
+    if (!parsed.success) throw validationError(parsed.error);
+    const { projectId, sectionId, orderedIds: ids } = parsed.data;
+    if (sectionId) await bqService.reorderSubsections({ grants, actor, sectionId, orderedIds: ids });
+    else await bqService.reorderSections({ grants, actor, projectId, orderedIds: ids });
+    return reload(projectId);
+  });
+}
+
 const ReorderItemsSchema = z.object({
   projectId: Id,
   sectionId: Id.optional(),

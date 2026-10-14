@@ -1019,6 +1019,36 @@ describe("BQ R6.1 invariants", () => {
   });
 });
 
+describe("BQ Section and Subsection order (owner 2026-10-14)", () => {
+  it("reorders Sections and Subsections, refuses a stale list, and stays locked with the project", async () => {
+    const { project, section, item } = await projectTree();
+    const second = await service.addSection({ grants: GRANTS, actor: ACTOR, projectId: project.id, name: "MEP" });
+    const third = await service.addSection({ grants: GRANTS, actor: ACTOR, projectId: project.id, name: "Furniture" });
+    await service.reorderSections({ grants: GRANTS, actor: ACTOR, projectId: project.id, orderedIds: [third.id, section.id, second.id] });
+    const read = createBqPublicRead(testDb.prisma);
+    assert.deepEqual((await read.getProjectDetail(project.id))!.sections.map((row) => row.name), ["Furniture", "Interior", "MEP"]);
+
+    const wall = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Wall" });
+    const floor = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Floor" });
+    await service.reorderSubsections({ grants: GRANTS, actor: ACTOR, sectionId: section.id, orderedIds: [floor.id, wall.id] });
+    const interior = (await read.getProjectDetail(project.id))!.sections.find((row) => row.id === section.id)!;
+    assert.deepEqual(interior.subsections.map((row) => row.name), ["Floor", "Wall"]);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: { in: ["bq.sections.reordered", "bq.subsections.reordered"] } } }), 2);
+
+    await assert.rejects(
+      () => service.reorderSections({ grants: GRANTS, actor: ACTOR, projectId: project.id, orderedIds: [section.id, second.id] }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.section.reorder-stale",
+    );
+    await assert.rejects(
+      () => service.reorderSubsections({ grants: GRANTS, actor: ACTOR, sectionId: section.id, orderedIds: [floor.id, second.id] }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.subsection.reorder-stale",
+    );
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: item.id, hargaSnapshot: "1" });
+    await service.lockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+    await assert.rejects(() => service.reorderSections({ grants: GRANTS, actor: ACTOR, projectId: project.id, orderedIds: [section.id, second.id, third.id] }));
+  });
+});
+
 describe("BQ quick entry and specification (owner 2026-10-14)", () => {
   it("creates a Work Item with its specification, direct price or TBC in one step, and edits the specification", async () => {
     const { project, section } = await projectTree();

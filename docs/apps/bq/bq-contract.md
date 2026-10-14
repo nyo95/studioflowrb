@@ -513,7 +513,8 @@ nilainya diubah — tetap tanpa dialog dan tanpa tombol Simpan: Enter atau
 meninggalkan kolom menyimpan, Escape batal, commit yang ditolak mengembalikan
 nilai sebelumnya (`InlineEdit`). **Nama** (uraian) tetap diubah langsung di tabel,
 sedangkan nama Section/Subsection hanya diganti di panel Struktur (klik dua kali;
-owner 2026-10-14).
+owner 2026-10-14). Urutan Section, Subsection (di dalam Section-nya) dan Work Item juga
+diatur di Struktur dengan diseret.
 
 **Tabel seperti lembar Excel (owner 2026-10-14, "sesuai struktur Excel").** Satu
 tabel per Section dengan kolom workbook kontraktor: No (A.1, A.2 … seperti

@@ -289,6 +289,62 @@ async function reorderItems(input: {
   });
 }
 
+/**
+ * The new order of one parent's children, checked against what is stored (a stale list is refused) and written with
+ * the changed rows parked above both ranges first, because siblings have a unique position.
+ */
+async function writeSiblingOrder(
+  children: readonly { id: string; sort_order: number }[],
+  orderedIds: readonly string[],
+  staleCode: string,
+  setOrder: (id: string, sortOrder: number) => Promise<unknown>,
+): Promise<boolean> {
+  const positions = new Map(children.map((child) => [child.id, child.sort_order]));
+  if (orderedIds.length !== children.length
+    || new Set(orderedIds).size !== children.length
+    || orderedIds.some((id) => !positions.has(id))) {
+    throw new AppError("CONFLICT", staleCode, "The list changed. Refresh and try again.");
+  }
+  const changed = orderedIds.flatMap((id, sortOrder) => (positions.get(id) === sortOrder ? [] : [{ id, sortOrder }]));
+  if (changed.length === 0) return false;
+  const offset = children.reduce((max, child) => Math.max(max, child.sort_order + 1), children.length);
+  for (const [index, child] of changed.entries()) await setOrder(child.id, offset + index);
+  for (const child of changed) await setOrder(child.id, child.sortOrder);
+  return true;
+}
+
+/** Sections of one project in a new order (owner 2026-10-14, by dragging in Struktur). */
+async function reorderSections(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  projectId: string;
+  orderedIds: string[];
+}) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  await requireEditableProject(input.projectId);
+  const children = await db.bqSection.findMany({ where: { project_id: input.projectId }, select: { id: true, sort_order: true } });
+  const changed = await writeSiblingOrder(children, input.orderedIds, "bq.section.reorder-stale",
+    (id, sortOrder) => db.bqSection.update({ where: { id }, data: { sort_order: sortOrder } }));
+  if (!changed) return;
+  await auditWriter({ appId: "bq", action: "bq.sections.reordered", entityType: "BqProject", entityId: input.projectId, actor: input.actor, changes: { count: children.length } });
+}
+
+/** Subsections of one Section in a new order (owner 2026-10-14); they stay in their Section. */
+async function reorderSubsections(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  sectionId: string;
+  orderedIds: string[];
+}) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  await requireEditableProjectForSection(input.sectionId);
+  const children = await db.bqSubsection.findMany({ where: { section_id: input.sectionId }, select: { id: true, sort_order: true } });
+  const changed = await writeSiblingOrder(children, input.orderedIds, "bq.subsection.reorder-stale",
+    (id, sortOrder) => db.bqSubsection.update({ where: { id }, data: { sort_order: sortOrder } }));
+  if (!changed) return;
+  await auditWriter({ appId: "bq", action: "bq.subsections.reordered", entityType: "BqSection", entityId: input.sectionId, actor: input.actor, changes: { count: children.length } });
+}
+
 async function updateItem(input: {
   grants: PermissionGrants;
   actor: { kind: string; userId?: string; label: string };
@@ -674,6 +730,8 @@ async function deleteLineItem(input: {
     updateSubsection,
     addItem,
     reorderItems,
+    reorderSections,
+    reorderSubsections,
     updateItem,
     deleteItem,
     addSubObject,

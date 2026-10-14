@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.42 | 2026-10-14 | feat(bq): Drag Sections and Subsections in Struktur; no arrow buttons (Lead)
+
+- **Owner 2026-10-14:** "section bisa di rearrange jg bs?" and "tombol panah jg hapus aja, kan sudah bisa di grab".
+- **Service:** `reorderSections({projectId, orderedIds})` and `reorderSubsections({sectionId, orderedIds})`, sharing `writeSiblingOrder` (the whole list is checked, a stale one is refused with `bq.section.reorder-stale` / `bq.subsection.reorder-stale`, changed rows are parked above both ranges for the unique sibling positions). Editable projects only; audit `bq.sections.reordered` / `bq.subsections.reordered`. Action `reorderSectionsAction` (no `sectionId` = Sections of the project).
+- **Struktur:** Sections drag among Sections and Subsections among the Subsections of their own Section (grip on hover, the target row marked); a Subsection does not move to another Section from here. The up/down arrow buttons beside Work Items are removed; Work Items keep dragging.
+- **Checks:** typecheck, eslint, `npm test` 1105/1105 (new integration test: order, stale lists, locked project), `check:boundaries`, `check:legacy-runtime`, production build PASS. Dragging not walked in the browser. No push.
+
 ## R9.41 | 2026-10-14 | feat(bq): One sheet-like table per Section; entry row inside the table; no paste; names change in Struktur only (Lead)
 
 - **Owner 2026-10-14** (screenshots of R9.40): "rename hanya di struktur kiri aja", "tempel dari excel ga usalah (biar manual di konversi - pastiin aja kalau di pakai tetap sesuai sama struktur excel)", and the two-line quick entry box marked "jelek".

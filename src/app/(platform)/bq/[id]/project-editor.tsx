@@ -3,7 +3,7 @@
 import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 
 import {
   Badge,
@@ -69,6 +69,7 @@ import {
   updateSectionAction,
   updateSubsectionAction,
   reorderItemsAction,
+  reorderSectionsAction,
   previewLineItemMoveAction,
   moveLineItemsAction,
   groupLineItemsAction,
@@ -283,8 +284,8 @@ function workItemCount(section: BqSectionDetail) {
 type ReorderParent = { sectionId: string } | { subsectionId: string };
 
 /**
- * The Work Items of one Section or Subsection as a list that can be re-ordered by dragging (or with the arrow buttons,
- * for keyboard and touch). Only the order within this parent changes; nothing here moves a Work Item elsewhere or
+ * The Work Items of one Section or Subsection as a list that can be re-ordered by dragging (owner 2026-10-14: the
+ * arrow buttons are gone, the grip is enough). Only the order within this parent changes; nothing here moves a Work Item elsewhere or
  * touches a price. The server checks the whole list again (stale lists are refused).
  */
 function OutlineItems({
@@ -347,12 +348,6 @@ function OutlineItems({
         >
           {editable ? <GripVertical aria-hidden="true" className="size-3.5 shrink-0 cursor-grab text-ink-tertiary opacity-0 group-hover/outline:opacity-100" /> : null}
           <a href={`#bq-row-${item.id}`} className="min-w-0 flex-1 truncate py-1" draggable={false}>{item.name}</a>
-          {editable ? (
-            <span className="flex shrink-0 opacity-0 focus-within:opacity-100 group-hover/outline:opacity-100">
-              <IconButton size="sm" variant="ghost" label={`Naikkan ${item.name}`} icon={<ChevronUp aria-hidden="true" />} disabled={pending || index === 0} onClick={() => move(item.id, index - 1)} />
-              <IconButton size="sm" variant="ghost" label={`Turunkan ${item.name}`} icon={<ChevronDown aria-hidden="true" />} disabled={pending || index === items.length - 1} onClick={() => move(item.id, index + 1)} />
-            </span>
-          ) : null}
         </li>
       ))}
     </ul>
@@ -361,7 +356,8 @@ function OutlineItems({
 
 /**
  * The document's structure and the one place that changes it: each Section lists its Subsections and offers
- * "+ Subsection" right under them; "+ Section" closes the list. Shown from 1024 px; narrower screens get the same
+ * "+ Subsection" right under them; "+ Section" closes the list. Names change here (double-click) and Sections,
+ * Subsections and Work Items are re-ordered here by dragging. Shown from 1024 px; narrower screens get the same
  * actions in the work area (see ProjectEditor), so nothing disappears with the panel.
  */
 /** The rename box of the Struktur panel: Enter or leaving it saves, Escape keeps the old name. */
@@ -402,6 +398,7 @@ function SectionOutline({
   onRenameSection,
   onRenameSubsection,
   onReorder,
+  onReorderSections,
 }: {
   projectId: string;
   sections: readonly BqSectionDetail[];
@@ -411,9 +408,34 @@ function SectionOutline({
   onRenameSection: (id: string, name: string) => Promise<void>;
   onRenameSubsection: (id: string, name: string) => Promise<void>;
   onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
+  onReorderSections: (sectionId: string | null, orderedIds: string[]) => Promise<void>;
 }) {
   // Double-click a Section or Subsection name to rename it here (owner 2026-10-14); a single click still jumps to it.
   const [renaming, setRenaming] = useState<string | null>(null);
+  // Drag a Section among Sections, a Subsection among the Subsections of its Section (owner 2026-10-14).
+  const [drag, setDrag] = useState<{ parent: string | null; id: string; over: string | null } | null>(null);
+  const dragProps = (parent: string | null, id: string, siblings: readonly string[]) => editable && !pending ? {
+    draggable: true,
+    onDragStart: (event: ReactDragEvent) => { event.stopPropagation(); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", id); setDrag({ parent, id, over: null }); },
+    onDragOver: (event: ReactDragEvent) => {
+      if (!drag || drag.parent !== parent || drag.id === id) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (drag.over !== id) setDrag({ ...drag, over: id });
+    },
+    onDrop: (event: ReactDragEvent) => {
+      if (!drag || drag.parent !== parent) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const next = siblings.filter((candidate) => candidate !== drag.id);
+      next.splice(siblings.indexOf(id), 0, drag.id);
+      setDrag(null);
+      if (next.some((candidate, at) => candidate !== siblings[at])) void onReorderSections(parent, next).catch(() => undefined);
+    },
+    onDragEnd: () => setDrag(null),
+  } : {};
+  const dropMark = (id: string) => (drag?.over === id ? "bg-surface-muted ring-1 ring-line-focus" : drag?.id === id ? "opacity-50" : "");
+  const sectionIds = sections.map((section) => section.id);
   if (sections.length === 0 && !editable) return null;
   const nameField = (id: string, name: string, onRename: (id: string, name: string) => Promise<void>, className: string) => (
     <OutlineRename
@@ -439,9 +461,13 @@ function SectionOutline({
               href={`#bq-section-${section.id}`}
               title={editable ? "Klik dua kali untuk mengganti nama" : undefined}
               onDoubleClick={editable && !pending ? (event) => { event.preventDefault(); setRenaming(section.id); } : undefined}
-              className="flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
+              {...dragProps(null, section.id, sectionIds)}
+              className={`group/outline flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink ${dropMark(section.id)}`}
             >
-              <span className="truncate">{section.name}</span>
+              <span className="flex min-w-0 items-center gap-1">
+                {editable ? <GripVertical aria-hidden="true" className="-ml-1.5 size-3.5 shrink-0 cursor-grab text-ink-tertiary opacity-0 group-hover/outline:opacity-100" /> : null}
+                <span className="truncate">{section.name}</span>
+              </span>
               {/* A small chip, so the Work Item count never reads as a row number next to the table. */}
               <span className="shrink-0 rounded-pill bg-surface-muted px-1.5 text-[11px] tabular-nums text-ink-tertiary" title={`${count} Work Item`}>{count}</span>
             </a>
@@ -454,9 +480,13 @@ function SectionOutline({
                   href={`#bq-subsection-${subsection.id}`}
                   title={editable ? "Klik dua kali untuk mengganti nama" : undefined}
                   onDoubleClick={editable && !pending ? (event) => { event.preventDefault(); setRenaming(subsection.id); } : undefined}
-                  className="flex items-center justify-between gap-2 rounded-control py-1 pl-4 pr-2.5 text-sm font-medium text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
+                  {...dragProps(section.id, subsection.id, section.subsections.map((row) => row.id))}
+                  className={`group/outline flex items-center justify-between gap-2 rounded-control py-1 pl-4 pr-2.5 text-sm font-medium text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink ${dropMark(subsection.id)}`}
                 >
-                  <span className="truncate">{subsection.name}</span>
+                  <span className="flex min-w-0 items-center gap-1">
+                    {editable ? <GripVertical aria-hidden="true" className="-ml-1.5 size-3.5 shrink-0 cursor-grab text-ink-tertiary opacity-0 group-hover/outline:opacity-100" /> : null}
+                    <span className="truncate">{subsection.name}</span>
+                  </span>
                   <span className="shrink-0 rounded-pill bg-surface-muted px-1.5 text-[11px] tabular-nums" title={`${subsection.items.length} Work Item`}>{subsection.items.length}</span>
                 </a>
                 )}
@@ -859,6 +889,7 @@ export function ProjectEditor({
           onRenameSection={(id, name) => run(updateSectionAction, { id, name })}
           onRenameSubsection={(id, name) => run(updateSubsectionAction, { id, name })}
           onReorder={(parent, orderedIds) => run(reorderItemsAction, { ...parent, orderedIds: JSON.stringify(orderedIds) })}
+          onReorderSections={(sectionId, orderedIds) => run(reorderSectionsAction, { sectionId: sectionId ?? undefined, orderedIds: JSON.stringify(orderedIds) })}
         />
         <div className="grid min-w-0 flex-1 gap-4">
           {/* Below 1024 px the Struktur panel is hidden, so its "+ Section" is offered here. */}
