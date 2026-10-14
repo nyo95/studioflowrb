@@ -99,4 +99,22 @@ describe("Presentation extracted module", () => {
     assert.equal(storage.objects.has(laterKey), false);
     assert.equal(await testDb.prisma.sfPresentationBoard.count({ where: { id: board.boardId } }), 1);
   });
+
+  it("commits a slide delete with its cleanup already queued, so a failed object removal is retried later", async () => {
+    const board = await presentation.createBoard({ ...command(), title: "Queued cleanup" });
+    const { slideIds } = await presentation.addSlides({ ...command(), boardId: board.boardId, files: [png(), png()] });
+    const [first, second] = await Promise.all(slideIds.map((id) => testDb.prisma.sfPresentationSlide.findUniqueOrThrow({ where: { id } })));
+
+    // Each slide owns its object (image_key is unique), so the queue entry is written inside the deleting transaction.
+    const failure = mock.method(storage, "remove", async () => { throw new Error("storage unavailable"); });
+    try { await presentation.deleteSlide({ ...command(), slideId: first!.id }); } finally { failure.mock.restore(); }
+    assert.equal(await testDb.prisma.sfPresentationSlide.count({ where: { id: first!.id } }), 0, "the database delete commits");
+    assert.equal(storage.objects.has(first!.image_key), true, "the failed removal leaves the object for a retry");
+    const queued = await testDb.prisma.presentationAssetCleanupFailure.findUniqueOrThrow({ where: { storage_key: first!.image_key } });
+    assert.deepEqual([queued.resolved_at, queued.attempts], [null, 1], "queued at zero in the transaction, one failed attempt after it");
+
+    await presentation.deleteSlide({ ...command(), slideId: second!.id });
+    assert.equal(storage.objects.has(second!.image_key), false);
+    assert.equal((await testDb.prisma.presentationAssetCleanupFailure.findUniqueOrThrow({ where: { storage_key: second!.image_key } })).resolved_at instanceof Date, true, "a successful removal resolves its entry");
+  });
 });

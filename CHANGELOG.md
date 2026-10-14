@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.32 | 2026-10-14 | fix(studioflow,presentation): Schedule and Presentation image deletes queue their cleanup inside the transaction (Executor, finished by the Lead)
+
+- **BACKLOG [CLEANUP][P3] closed.** Started by Codex (WO-HARDEN-AUDIT-01) and left uncommitted when its usage limit ran out; the Lead reviewed the diff, replaced one test and committed it. Schedule: deleting a template item, an entry, an option, replacing or removing an option photo now calls `_enqueueUnreferencedCleanup` inside the deleting transaction and `_discardObjects` after it (the R8.372 deliverable/MOM pattern), so a crash between commit and removal leaves a ledger entry the sweep retries; a still-referenced object is never queued. Presentation: deleting a slide, a board, or purging an archived project's slides queues each object in `_presentation_asset_cleanup_failure` inside the transaction (Presentation keeps its own copy behind its boundary) before the post-commit removal.
+- **Tests:** Schedule: a storage failure during an entry delete still commits the delete, keeps the object and leaves the queued entry with one attempt; a shared object is not queued. Presentation: Codex's "shared slide object" test could not run, because `_sf_presentation_slide.image_key` is unique (two slides never share an object); replaced by the reachable case: a failed removal after a slide delete leaves the object and an open entry with one attempt, and a successful one resolves its entry.
+- **Migrations/dependencies:** none. **Checks:** Presentation integration 4/4 on `_studioflow_rebuild_test_bq`; typecheck PASS; eslint PASS; full suite with the branch's last commit. No push.
+
 ## R9.31 | 2026-10-14 | fix(presentation): own Workspace image moodboard intake (Executor)
 
 - **Module-independent Workspace path:** Presentation now reads a Workspace image through StudioFlow's public Presentation bridge and exposes its own module-gated Server Action. The bridge enforces `studioflow.presentation.manage`, StudioFlow read access, project/image scope, and an optional phase label before Presentation copies the image into the project's Moodboard board.

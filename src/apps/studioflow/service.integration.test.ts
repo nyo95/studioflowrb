@@ -2046,10 +2046,27 @@ describe("SF-R3 Product Schedule", () => {
 
     await sf.schedule.removeOptionImage({ ...as(designer), projectId, optionId });
     assert.equal(storage.objects.size, 1, "still referenced by the reused option and the template");
+    assert.equal(await testDb.prisma.sfAssetCleanupFailure.count({ where: { storage_key: stored.image_key!, resolved_at: null } }), 0, "a shared object is not queued for deletion");
     await sf.schedule.deleteEntry({ ...as(designer), projectId: other.projectId, entryId: target.entryId });
     assert.equal(storage.objects.size, 1, "still referenced by the template");
     await sf.schedule.deleteTemplateItem({ ...as(designer), templateItemId: template.templateItemId });
     assert.equal(storage.objects.size, 0, "released once nothing points at it");
+  });
+
+  it("commits a Schedule delete with cleanup already queued when storage is unavailable", async () => {
+    const { projectId } = await newProject();
+    const entry = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Primer" } });
+    const optionId = (await sf.schedule.listSchedule({ grants: ALL, projectId }))[0].options[0].id;
+    await sf.schedule.setOptionImage({ ...as(designer), projectId, optionId, file: png() });
+    const key = (await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: optionId } })).image_key!;
+    const failure = mock.method(storage, "remove", async () => { throw new Error("storage unavailable"); });
+    try { await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: entry.entryId }); } finally { failure.mock.restore(); }
+
+    assert.equal(await testDb.prisma.sfScheduleEntry.count({ where: { id: entry.entryId } }), 0, "the database delete commits");
+    assert.equal(storage.objects.has(key), true, "the failed physical delete leaves the object for retry");
+    const queued = await testDb.prisma.sfAssetCleanupFailure.findUniqueOrThrow({ where: { storage_key: key } });
+    assert.equal(queued.resolved_at, null);
+    assert.equal(queued.attempts, 1, "the transaction enqueues at zero and the failed post-commit attempt increments once");
   });
 
   it("edits template items without touching their photo or seeded project rows", async () => {

@@ -107,11 +107,6 @@ Order matters; each item is its own Work Order.
   PC with a local storage root; a serverless host would first need object
   storage off the local disk and then a real scheduled trigger. Parked until a
   hosting change is planned.
-- [ ] [CLEANUP][P3] Schedule and Presentation image deletes still decide and
-  remove after commit (`removeUnreferenced`): a failure is recorded in the
-  cleanup ledger, but a process crash between commit and removal is not
-  pre-enqueued as deliverable and MOM deletes are (R8.372).
-
 - [ ] [PLANNED] Lead verdict on `agent/reports/STORAGE-TUNNEL-DISCUSSION.md`
   (R8.485): storage folder as a setting and remote access; not yet turned
   into a READY plan.
