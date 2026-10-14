@@ -8,7 +8,7 @@ import { PRESENTATION_ROUTES } from "@/apps/presentation/public";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { countProjectBoards } from "@/apps/presentation/public/lifecycle";
-import { Breadcrumb, MetaList, Notice, PageHeader, PageShell } from "@/platform/ui_engine";
+import { Breadcrumb, Notice, PageHeader, PageShell } from "@/platform/ui_engine";
 
 import { ArchivedFilesNote } from "../../_components/archived-files-note";
 import { pageProjectAccess, pageSession } from "../../_components/session";
@@ -34,7 +34,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
   const presentationEnabled = (await enabledModuleIds()).includes("presentation");
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-      <PageShell measure="wide">
+      <PageShell measure="wide" fill>
         <Suspense fallback={<ProjectHeaderSkeleton projectId={projectId} presentationEnabled={presentationEnabled} />}>
           <ProjectHeader grants={grants} userId={userId} projectId={projectId} presentationEnabled={presentationEnabled} />
         </Suspense>
@@ -52,11 +52,6 @@ async function projectOr404(grants: PermissionGrants, projectId: string) {
   });
 }
 
-async function ProjectBreadcrumb({ grants, projectId }: { grants: PermissionGrants; projectId: string }) {
-  const project = await projectOr404(grants, projectId);
-  return <Breadcrumb variant="capsule" appMark="SF" entries={[{ label: "StudioFlow", href: STUDIOFLOW_ROUTES.root }, { label: "Projects", href: STUDIOFLOW_ROUTES.projects }, { label: project.name }]} />;
-}
-
 async function ProjectHeader({ grants, userId, projectId, presentationEnabled }: { grants: PermissionGrants; userId: string; projectId: string; presentationEnabled: boolean }) {
   const project = await projectOr404(grants, projectId);
   // DESIGN v2 §6: the pill tab bar sits below the header (sibling views of the page), not in its action
@@ -64,9 +59,8 @@ async function ProjectHeader({ grants, userId, projectId, presentationEnabled }:
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
     <PageHeader
-      context={<Suspense fallback={<Breadcrumb variant="capsule" appMark="SF" entries={[{ label: "StudioFlow", href: STUDIOFLOW_ROUTES.root }, { label: "Projects", href: STUDIOFLOW_ROUTES.projects }, { label: "Project" }]} />}><ProjectBreadcrumb grants={grants} projectId={projectId} /></Suspense>}
+      context={<Breadcrumb entries={[{ label: "StudioFlow", href: STUDIOFLOW_ROUTES.root }, { label: "Projects", href: STUDIOFLOW_ROUTES.projects }]} />}
       title={project.name}
-      meta={<MetaList items={[project.client?.name ?? "No client", `Designer: ${project.designer.displayName}`, `Drafter: ${project.drafter.displayName}`]} />}
     />
     <Suspense fallback={<ProjectNavLinks items={navigation(projectId, presentationEnabled)} />}><ProjectNavigation grants={grants} userId={userId} projectId={projectId} presentationEnabled={presentationEnabled} /></Suspense>
     </div>

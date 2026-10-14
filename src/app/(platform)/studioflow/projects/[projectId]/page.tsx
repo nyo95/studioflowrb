@@ -61,8 +61,9 @@ export default async function ProjectOverviewPage({
     };
   });
 
+  // Record workspace (DESIGN.md §6.2): the page fills the window below the header and the notes keep their own scroll.
   return (
-    <div className="grid gap-4">
+    <div className="flex min-h-0 flex-1 flex-col gap-4">
       {/* One card: the phase tabs and the selected phase's workflow bar (owner, 2026-10-13). Switching a phase is a
           transition, so the old bar stays until the new one is ready and the canvas below is never reloaded. */}
       <SectionCard padded={false}>

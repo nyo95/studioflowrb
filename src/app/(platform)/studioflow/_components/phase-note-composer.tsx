@@ -21,7 +21,7 @@ export type NoteImage = { id: string; url: string | null; contentType: string; b
  * small. `answeredIterationId` makes them part of that iteration's recorded client answer. Returns the problems and
  * the files that did not get through, so only those are offered again (a retry never repeats a file already added).
  */
-export async function uploadPhaseImages(input: { projectId: string; phaseId: string; clientFeedback: boolean; answeredIterationId?: string }, files: readonly File[]): Promise<{ problems: string[]; failed: File[] }> {
+export async function uploadPhaseImages(input: { projectId: string; phaseId: string; clientFeedback: boolean; answeredIterationId?: string; replyToId?: string; tags?: readonly string[] }, files: readonly File[]): Promise<{ problems: string[]; failed: File[] }> {
   const problems: string[] = [];
   const failed: File[] = [];
   for (const file of files) {
@@ -32,6 +32,8 @@ export async function uploadPhaseImages(input: { projectId: string; phaseId: str
       form.set("phaseId", input.phaseId);
       form.set("clientFeedback", String(input.clientFeedback));
       if (input.answeredIterationId) form.set("answeredIterationId", input.answeredIterationId);
+      if (input.replyToId) form.set("replyToId", input.replyToId);
+      if (input.tags?.length) form.set("tags", JSON.stringify(input.tags));
       form.set("file", prepared);
       const result = await postPhaseImageAction(form);
       if (!result.ok) { problems.push(result.error.safeMessage); failed.push(file); }
@@ -85,7 +87,7 @@ export function useNoteDraft(disabled = false) {
 export type NoteDraft = ReturnType<typeof useNoteDraft>;
 
 /** The editor, the waiting images and "Add images" of one draft. Paste or drop an image anywhere on it. */
-export function NoteDraftFields({ draft, label, placeholder, disabled = false, autoFocus = false, onSubmit, footer }: { draft: NoteDraft; label: string; placeholder?: string; disabled?: boolean; autoFocus?: boolean; onSubmit?: () => void; footer?: ReactNode }) {
+export function NoteDraftFields({ draft, label, placeholder, disabled = false, autoFocus = false, onSubmit, footer, hint = "Or paste (Ctrl+V) or drop them here." }: { draft: NoteDraft; label: string; placeholder?: string; disabled?: boolean; autoFocus?: boolean; onSubmit?: () => void; footer?: ReactNode; hint?: ReactNode }) {
   const pickerRef = useRef<HTMLInputElement>(null);
   return (
     <div className={`grid gap-2 rounded-control ${draft.intake.active ? "outline-2 outline-dashed outline-offset-4 outline-line-focus" : ""}`} {...draft.intake.target}>
@@ -106,7 +108,7 @@ export function NoteDraftFields({ draft, label, placeholder, disabled = false, a
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" variant="ghost" leadingIcon={<ImagePlus className="h-3.5 w-3.5" />} disabled={disabled || draft.attachments.length >= NOTE_IMAGE_LIMIT} onClick={() => pickerRef.current?.click()}>Add images</Button>
           <input ref={pickerRef} type="file" accept={ACCEPTED.join(",")} multiple hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; draft.add(files.filter((file) => ACCEPTED.includes(file.type)), files.filter((file) => !ACCEPTED.includes(file.type))); }} />
-          <Text size="sm" tone="tertiary">Or paste (Ctrl+V) or drop them here.</Text>
+          {hint ? <Text size="sm" tone="tertiary">{hint}</Text> : null}
         </div>
         {footer}
       </div>

@@ -261,13 +261,15 @@ A page where one record is *worked on* all day (StudioFlow project; later BQ
 project, Presentation board) does not scroll as a whole. Its head is fixed and
 its body is split into regions that each scroll on their own, so the record's
 identity, its phase and its primary action never leave the screen. Mockup:
-https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF. Not built yet.
+https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF. Built for the StudioFlow project
+Phases page in R9.61 (notes chat with its own scroll); the phase strip still has
+its second row (iteration bar), merging it is the next slice.
 
 ```text
 AppShell (rail + top bar)                      fixed
 └── RecordWorkspace                            one viewport high, no page scroll
     ├── Head                                   fixed, never scrolls
-    │   ├── Context capsule                    (§10.3)
+    │   ├── Breadcrumb, plain                  (owner 2026-10-14: no capsule here)
     │   ├── Title + one line of context        on one baseline row
     │   └── Pill tab bar                       (§10.3)
     ├── Stage strip?                           fixed (StudioFlow: the phases)
@@ -463,7 +465,9 @@ top bar's right end, because the rail becomes a strip there (§12).
   itself when it cannot fit. It never replaces the rail or the top bar.
 - **Context capsule** — a small rounded capsule above the page title: app · section
   · record (e.g. "StudioFlow · Projects · 2026-536 Sociolla …"), each part a link
-  back. It replaces the separate sticky breadcrumb strip.
+  back. It replaces the separate sticky breadcrumb strip. A record workspace
+  (§6.2) uses the plain breadcrumb instead, without the record name, which is
+  already its title (owner, 2026-10-14).
 
 ## 11. Loading, Empty, Error & Disabled States
 

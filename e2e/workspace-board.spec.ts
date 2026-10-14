@@ -55,19 +55,19 @@ test("without the board module the Phases page is the phase's Notes stream", asy
   await editor.click();
   await expect(editor).toBeFocused();
   await page.keyboard.type("E2E notes mode text");
-  await page.getByRole("checkbox", { name: "Client feedback" }).check();
+  await page.getByRole("button", { name: "+ #feedback" }).click();
   await page.locator('input[type="file"][accept="image/png,image/jpeg,image/webp"]').last().setInputFiles({ name: "notes.png", mimeType: "image/png", buffer: PNG });
   await page.getByRole("button", { name: "Send", exact: true }).click();
   // The text and the image are two messages, both client feedback.
   await expect(log.getByRole("article").filter({ hasText: "E2E notes mode text" })).toBeVisible();
   await expect(log.getByRole("article", { name: /^Image from/ })).toHaveCount(1);
-  await expect(log.getByRole("article").filter({ hasText: "Client feedback" })).toHaveCount(2);
+  await expect(log.getByRole("article").filter({ hasText: "#feedback" })).toHaveCount(2);
 
   // A hand-marked message can be switched back.
   const text = log.getByRole("article").filter({ hasText: "E2E notes mode text" });
   await text.getByRole("button", { name: "Note actions" }).click();
   await page.getByRole("menuitem", { name: "Not client feedback" }).click();
-  await expect(log.getByRole("article").filter({ hasText: "Client feedback" })).toHaveCount(1);
+  await expect(log.getByRole("article").filter({ hasText: "#feedback" })).toHaveCount(1);
 });
 
 test("the Workspace board writes, autosaves in order, takes images, and keeps a recorded answer fixed", async ({ page }) => {

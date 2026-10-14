@@ -24,6 +24,8 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${PORT}`,
     ...devices["Desktop Chrome"],
+    // PLAYWRIGHT_CHANNEL=chrome runs the installed Google Chrome when Playwright's own browser cannot be downloaded.
+    ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}),
     storageState: "e2e/.tmp/state.json",
   },
   webServer: {

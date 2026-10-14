@@ -14,7 +14,7 @@ it("keeps the StudioFlow phase service surface unchanged", () => {
     "latestUndoableEvent", "listDeliverables", "listNavPhases", "listPhaseTemplates", "listStarredPhaseNotes",
     "listProjectPhases", "markProjectCompleted", "overrideRevision", "recordClientAnswer", "postPhaseImage", "postPhaseNote", "editPhaseNote", "deletePhaseNote",
     "renameIteration", "reopenProject", "reorderPhaseDefinitions", "sendIteration", "setDeliverableFinal",
-    "setPhaseNoteFlags", "setPhasePlannedDates", "sweepDeliverableExpiry", "undoPhaseEvent",
+    "setPhaseNoteFlags", "setPhaseNoteTags", "setPhasePlannedDates", "sweepDeliverableExpiry", "undoPhaseEvent",
     "updatePhaseDefinition", "updatePhaseTemplate", "uploadDeliverable", "uploadDeliverableStream",
   ].sort());
 });
