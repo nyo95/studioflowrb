@@ -183,7 +183,8 @@ function BoqItem({ no, item }: { no: number; item: BqItemDetail }) {
 /** One box of Work Items (a Subsection, or the Section's own), its column lines down to the bottom, then its subtotal. */
 function BoqBox({ lead, roman, heading, items, subtotalLabel, subtotal }: { lead?: ReactNode; roman?: string; heading?: string; items: BqItemDetail[]; subtotalLabel?: string; subtotal: string | null }) {
   return (
-    <tbody>
+    // A box, its subtotal and the Section heading before it stay on one page whenever they fit (owner 2026-10-14).
+    <tbody style={{ breakInside: "avoid" }}>
         {lead}
         <tr><td colSpan={7} className="h-[3mm] p-0" /></tr>
         {heading ? (

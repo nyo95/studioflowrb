@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.48 | 2026-10-14 | fix(bq): A Bill of Quantity box is not cut across printed pages (Lead)
+
+- **Owner 2026-10-14** (screenshot of the exported PDF, D. MEP): "potongan pdf nya, harusnya per halaman per A4 rapih semua nya". A Subsection box broke between pages: its bottom line was missing on the first page and "SUBTOTAL D.I" stood alone under the column header of the next.
+- **Fix:** each box (the Section heading before it, its rows, its closing line and its SUBTOTAL) is one `tbody` with `break-inside: avoid`, so it moves whole to the next A4 page whenever it fits on one; only a box longer than a page still breaks.
+- **Checks:** typecheck, eslint, `npx playwright test e2e/bq-boq-walk.spec.ts` 5/5 PASS; the exported PDF checked page by page (no box cut, every SUBTOTAL with its box, the column header at the top of each page). No push.
+
 ## R9.47 | 2026-10-14 | feat(bq): The quotation letter carries addressee, project facts, schedule, payment terms, PPN, rounding and the studio's letterhead (Lead)
 
 - **Owner 2026-10-14:** "ya perbaiki, semua ikut rekomendasi kamu", with "app bq ini independen, hanya mengkonsumsi price dari masterdata - tidak sebaliknya, tidak akses studioflow" and "fokus pada app ini sendiri". Everything below is BQ-owned (bq schema, BQ screens); the logo stays the platform brand mark, the signature image uses the platform's private object storage.
