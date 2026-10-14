@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.46 | 2026-10-14 | feat(bq): The printed quotation follows the studio's own quotation PDF (Lead)
+
+- **Owner 2026-10-14** (on R9.45): "fontnya salah, tulisan dll masih belum mirip. cek pdf di test (BOQ TEST 2 - PDF) ... pelajari footer, header, logo dll nya". Reference: `test/BOQ TEST 2 - PDF.pdf` (owner's local file, not committed), read page by page in Chrome's PDF viewer. This replaces the workbook-print layout of R9.45.
+- **Every page:** the logo at the top right (the organisation's brand mark, or its name in spaced capitals when none is uploaded), repeated through the outer table header; Arial; A4 margins 12/15/14 mm.
+- **Page 1:** QUOTATION; the bordered To / Add | Date / Ref# / Valid box (client, quotation number, date, valid = date + 30 days as the standard terms say); PROJECT INFORMATION (project); the reference sentence; the Description | IDR box with "SUBTOTAL A  <Section>" rows at a fixed box height; TOTAL under the IDR column; the TBC / By Owner note. The DRAFT line stays (smaller) while the project is not locked.
+- **Page 2:** TERMS OF CONDITION (the project's or the standard terms, one line each), the closing paragraph, and the signature box (organisation | "Confirm the above mentioned", client, "Date :").
+- **BILL OF QUANTITY** (new page): thick-bordered header No / Description / Specification / Qty / Unit / Unit Price IDR / Total IDR, repeated on every page; per Section a lettered heading; per Subsection a box with its roman numeral, column lines only, then "SUBTOTAL B.I" under the price columns; "SUBTOTAL B" per Section; "GRAND TOTAL A+B+C". Amounts without "Rp", Qty with two decimals, TBC / By Owner in red italics in Unit Price, 7 pt.
+- **Not in the app yet, so not printed:** client contact and address, Ref# when no number is set, project area and location, the company address and e-mail under the logo, SCHEDULE and PAYMENT TERMS as their own blocks, signer name and signature image, Subtotal / Rounding / PPN rows.
+- **Checks:** typecheck, eslint, `npx playwright test e2e/bq-boq-walk.spec.ts` 5/5 PASS; the exported PDF compared page by page with the reference. Known: a Section heading can be left at the foot of a page. No push.
+
 ## R9.45 | 2026-10-14 | feat(bq): The printed quotation follows the estimator's workbook: summary page, then one bill per Section (Lead)
 
 - **Owner 2026-10-14:** "skrg tinggal quotationnya aja, kalo di print buat seperti excel di print kalau bisa persis". Reference: the print setup and cells of `test/BOQ TEST.xlsx` (A4 portrait, fit to width, print titles, footer "&P / &N", Arial Narrow 10-11 pt, medium header borders, thin grid, accounting Rp formats).
