@@ -144,6 +144,8 @@ export type ButtonMenuItem = {
   description?: string;
   onSelect: () => void;
   disabled?: boolean;
+  /** A divider above this item, as in RowActionMenu. */
+  separatorBefore?: boolean;
 };
 
 /**
@@ -175,9 +177,10 @@ export function ButtonMenu({
           sideOffset={5}
           align={align}
         >
-          {items.map((item) => (
+          {items.map((item, index) => (
+            <Fragment key={`${index}:${item.label}`}>
+            {item.separatorBefore ? <DropdownMenu.Separator className="-mx-px my-1 h-px bg-line" /> : null}
             <DropdownMenu.Item
-              key={item.label}
               className={cx(
                 "grid cursor-pointer rounded-action px-2 py-[7px] text-sm text-ink outline-0",
                 "data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted",
@@ -191,6 +194,7 @@ export function ButtonMenu({
                 <span className="text-xs leading-snug text-ink-tertiary">{item.description}</span>
               ) : null}
             </DropdownMenu.Item>
+            </Fragment>
           ))}
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

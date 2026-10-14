@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { Button, Dialog, Field, FormActions, InlineError, Input, Text } from "@/platform/ui_engine";
 
-/** Names the resep to save from a Pekerjaan. The Pekerjaan itself is not changed. */
+/** Names the Assembly to save from a Work Item. The Work Item itself is not changed. */
 export function SaveAsAssemblyDialog({
   initialName,
   lineCount,
@@ -26,8 +26,8 @@ export function SaveAsAssemblyDialog({
     <Dialog
       open
       onOpenChange={(open) => { if (!open) onClose(); }}
-      title="Simpan sebagai resep"
-      description={`${lineCount} rincian biaya disalin ke resep baru. Pekerjaan ini tidak berubah.`}
+      title="Simpan sebagai Assembly"
+      description={`${lineCount} Cost Component disalin ke Assembly baru. Work Item ini tidak berubah.`}
       size="sm"
     >
       <form
@@ -37,14 +37,14 @@ export function SaveAsAssemblyDialog({
           if (ready && !pending) onSave(name.trim());
         }}
       >
-        <Field label="Nama resep" required>
+        <Field label="Nama Assembly" required>
           <Input autoFocus value={name} maxLength={160} onChange={(event) => setName(event.target.value)} />
         </Field>
-        <Text tone="tertiary" size="sm">Harga, jumlah, dan koefisien yang tersimpan sekarang ikut disalin; resep tidak terhubung lagi dengan Pekerjaan ini.</Text>
+        <Text tone="tertiary" size="sm">Harga, jumlah, dan koefisien yang tersimpan sekarang ikut disalin; Assembly tidak terhubung lagi dengan Work Item ini.</Text>
         {error ? <InlineError>{error}</InlineError> : null}
         <FormActions>
           <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>Batal</Button>
-          <Button type="submit" variant="primary" disabled={!ready || pending} pending={pending}>Simpan resep</Button>
+          <Button type="submit" variant="primary" disabled={!ready || pending} pending={pending}>Simpan Assembly</Button>
         </FormActions>
       </form>
     </Dialog>
