@@ -69,15 +69,15 @@ async function seedUser(name: string, grants: readonly string[]) {
 async function seedDefaultTemplate() {
   const db = testDb.prisma;
   const template = await db.sfPhaseTemplate.create({ data: { name: "Standard", is_default: true, is_active: true } });
-  const defs: Array<{ id: string; name: string; prefix: string; orderIndex: number; allowParallel: boolean; seat: string }> = [
+  const defs: Array<{ id: string; name: string; prefix: string; orderIndex: number; allowParallel: boolean; seat: string; iterationKinds?: Array<{ name: string }> }> = [
     { id: LEGACY.moodboard, name: "Moodboard", prefix: "MB", orderIndex: 1, allowParallel: false, seat: "designer" },
     { id: LEGACY.layout, name: "Layout Plan", prefix: "L", orderIndex: 2, allowParallel: true, seat: "designer" },
     { id: LEGACY.design3d, name: "Design 3D", prefix: "D", orderIndex: 3, allowParallel: true, seat: "designer" },
-    { id: LEGACY.cd, name: "Construction Drawing", prefix: "CD", orderIndex: 4, allowParallel: true, seat: "drafter" },
+    { id: LEGACY.cd, name: "Construction Drawing", prefix: "CD", orderIndex: 4, allowParallel: true, seat: "drafter", iterationKinds: [{ name: "CD Mall" }, { name: "CD Final" }] },
     { id: LEGACY.supervision, name: "Supervision", prefix: "SV", orderIndex: 5, allowParallel: false, seat: "designer" },
   ];
   for (const d of defs) {
-    await db.sfPhaseDefinition.create({ data: { id: d.id, template_id: template.id, name: d.name, prefix: d.prefix, order_index: d.orderIndex, allow_parallel: d.allowParallel, seat: d.seat } });
+    await db.sfPhaseDefinition.create({ data: { id: d.id, template_id: template.id, name: d.name, prefix: d.prefix, order_index: d.orderIndex, allow_parallel: d.allowParallel, seat: d.seat, default_iteration_kinds: d.iterationKinds } });
   }
 }
 
@@ -2046,10 +2046,27 @@ describe("SF-R3 Product Schedule", () => {
 
     await sf.schedule.removeOptionImage({ ...as(designer), projectId, optionId });
     assert.equal(storage.objects.size, 1, "still referenced by the reused option and the template");
+    assert.equal(await testDb.prisma.sfAssetCleanupFailure.count({ where: { storage_key: stored.image_key!, resolved_at: null } }), 0, "a shared object is not queued for deletion");
     await sf.schedule.deleteEntry({ ...as(designer), projectId: other.projectId, entryId: target.entryId });
     assert.equal(storage.objects.size, 1, "still referenced by the template");
     await sf.schedule.deleteTemplateItem({ ...as(designer), templateItemId: template.templateItemId });
     assert.equal(storage.objects.size, 0, "released once nothing points at it");
+  });
+
+  it("commits a Schedule delete with cleanup already queued when storage is unavailable", async () => {
+    const { projectId } = await newProject();
+    const entry = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Primer" } });
+    const optionId = (await sf.schedule.listSchedule({ grants: ALL, projectId }))[0].options[0].id;
+    await sf.schedule.setOptionImage({ ...as(designer), projectId, optionId, file: png() });
+    const key = (await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: optionId } })).image_key!;
+    const failure = mock.method(storage, "remove", async () => { throw new Error("storage unavailable"); });
+    try { await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: entry.entryId }); } finally { failure.mock.restore(); }
+
+    assert.equal(await testDb.prisma.sfScheduleEntry.count({ where: { id: entry.entryId } }), 0, "the database delete commits");
+    assert.equal(storage.objects.has(key), true, "the failed physical delete leaves the object for retry");
+    const queued = await testDb.prisma.sfAssetCleanupFailure.findUniqueOrThrow({ where: { storage_key: key } });
+    assert.equal(queued.resolved_at, null);
+    assert.equal(queued.attempts, 1, "the transaction enqueues at zero and the failed post-commit attempt increments once");
   });
 
   it("edits template items without touching their photo or seeded project rows", async () => {
@@ -2913,9 +2930,9 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
   it("chains CD Mall to CD Final using the migrated data shape and undoes the continuation", async () => {
     const { projectId } = await newProject("CD chain");
     const cd = await phaseOf(projectId, "cd");
-    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "CD Mall" }, { name: "CD Final" }] } });
+    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "Shop Drawing" }, { name: "As Built" }] } });
     const mall = await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
-    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: mall.iterationId } })).name, "CD Mall");
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: mall.iterationId } })).name, "CD Mall", "the existing project keeps its snapshotted step names after the template changes");
     // The step is read from the name, so the step names are locked both ways (a renamed CD Mall could close without CD Final).
     await rejectsWith(sf.phases.renameIteration({ ...as(designer), projectId, phaseId: cd.id, iterationId: mall.iterationId, name: "CD Mall lobby" }), "ITERATION_KIND_NAME_LOCKED");
     const moodboard = await phaseOf(projectId, "moodboard");
@@ -3546,7 +3563,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     await rejectsWith(ideas.saveNoteImageToIdeas({ ...as(designer), projectId: other.projectId, phaseId: phase.id, imageId: image.id }), "NOTE_IMAGE_NOT_FOUND");
   });
 
-  it("adds a card or a note image to the project's Moodboard board, creating it once and copying the image", async () => {
+  it("adds an Ideas card to the project's Moodboard board, creating it once and copying the image", async () => {
     const { projectId } = await newProject("Moodboard project");
     const { cardId } = await ideas.createIdeaCard({ ...as(designer), file: cardImage(7) });
     const cardKey = (await testDb.prisma.sfIdeaCard.findUniqueOrThrow({ where: { id: cardId } })).image_key;
@@ -3559,26 +3576,43 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     assert.ok(slide.image_key !== cardKey && slide.image_key.startsWith(`presentation/${projectId}/`));
     assert.deepEqual(bytesOf(slide.image_key), bytesOf(cardKey));
 
-    // A board the team already named "moodboard" (any letter case) is reused, never duplicated; the slide goes last.
-    await testDb.prisma.sfPresentationBoard.update({ where: { id: board.id }, data: { title: "moodboard" } });
+    // Another person's card is not reachable.
+    const other = await seedUser("Other Mood", ALL);
+    const mine = await ideas.createIdeaCard({ ...as(designer), file: cardImage(8) });
+    await rejectsWith(ideas.readIdeaImageSource({ ...as(other), cardId: mine.cardId }), "IDEA_CARD_NOT_FOUND");
+  });
+
+  it("adds a Workspace image to Moodboard while Ideas is disabled", async () => {
+    await testDb.prisma.moduleState.createMany({ data: [
+      { module_id: "ideas", state: "DISABLED", last_version: "1.0.0", updated_by: "test" },
+      { module_id: "presentation", state: "ENABLED", last_version: "1.0.0", updated_by: "test" },
+    ] });
+    assert.deepEqual(
+      await testDb.prisma.moduleState.findMany({ orderBy: { module_id: "asc" }, select: { module_id: true, state: true } }),
+      [{ module_id: "ideas", state: "DISABLED" }, { module_id: "presentation", state: "ENABLED" }],
+    );
+
+    const { projectId } = await newProject("Moodboard note source");
     const phase = await phaseOf(projectId, "moodboard");
     await openIteration(phase.id);
     const base = { ...as(designer), projectId, phaseId: phase.id };
     const { imageId: noteId } = await sf.phases.postPhaseImage({ ...base, file: png() });
     const image = (await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { id: noteId, kind: "IMAGE" }, select: { id: true, storage_key: true } })) as { id: string; storage_key: string };
-    const second = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await ideas.readNoteImageSource({ ...base, imageId: image.id }) });
-    assert.deepEqual([second.created, second.boardId], [false, board.id]);
-    const slides = await testDb.prisma.sfPresentationSlide.findMany({ where: { board_id: board.id }, orderBy: { sort_order: "asc" } });
+    const bridge = createStudioFlowPresentationBridge(testDb.prisma);
+    const first = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await bridge.readWorkspaceImageSource({ ...base, imageId: image.id }) });
+    assert.equal(first.created, true);
+
+    // A board the team already named "moodboard" (any letter case) is reused, never duplicated; the next slide goes last.
+    await testDb.prisma.sfPresentationBoard.update({ where: { id: first.boardId }, data: { title: "moodboard" } });
+    const second = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await bridge.readWorkspaceImageSource({ ...base, imageId: image.id }) });
+    assert.deepEqual([second.created, second.boardId], [false, first.boardId]);
+    const slides = await testDb.prisma.sfPresentationSlide.findMany({ where: { board_id: first.boardId }, orderBy: { sort_order: "asc" } });
     assert.deepEqual(slides.map((row) => row.id), [first.slideId, second.slideId]);
     assert.equal(await testDb.prisma.sfPresentationBoard.count({ where: { project_id: projectId } }), 1);
 
-    // Deleting the card or the note never touches the slides' own copies.
-    await ideas.deleteIdeaCard({ ...as(designer), cardId });
+    // Deleting the note never touches the slides' own copies.
+    await sf.phases.deletePhaseNote({ ...base, noteId: image.id });
     for (const row of slides) assert.ok(storage.objects.has(row.image_key));
-    // Another person's card is not reachable.
-    const other = await seedUser("Other Mood", ALL);
-    const mine = await ideas.createIdeaCard({ ...as(designer), file: cardImage(8) });
-    await rejectsWith(ideas.readIdeaImageSource({ ...as(other), cardId: mine.cardId }), "IDEA_CARD_NOT_FOUND");
   });
 
   it("shows the current code after a reorder and drops a usage whose option is deleted, keeping the card", async () => {

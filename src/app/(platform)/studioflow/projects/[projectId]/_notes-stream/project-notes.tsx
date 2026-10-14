@@ -47,6 +47,7 @@ export async function ProjectNotes({ projectId, projectName, selectedPhaseId, pe
         phaseName={detail.label}
         canEdit={canEdit}
         canUseIdeas={hasPermission(grants, P.ideasManage)}
+        canUsePresentation={hasPermission(grants, P.presentationManage)}
         notes={detail.notes.map((note) => ({
           id: note.id,
           body: note.body,

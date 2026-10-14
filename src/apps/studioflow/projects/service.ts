@@ -535,6 +535,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
               name_snapshot: def.name,
               prefix_snapshot: def.prefix,
               seat_snapshot: def.seat,
+              iteration_kinds_snapshot: def.default_iteration_kinds ?? Prisma.JsonNull,
               status: isFirst ? "ACTIVE" : "PENDING",
               status_changed_at: isFirst ? now : null,
             },
@@ -735,7 +736,6 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         include: {
           client: { select: { id: true, name: true } },
           phases: { orderBy: { order_index: "asc" }, include: {
-            definition: { select: { default_iteration_kinds: true } },
             revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true } },
             _count: { select: { workspace_cards: { where: { is_pinned: true } } } },
             events: { where: { to_state: "DONE", undone_at: null }, orderBy: { occurred_at: "desc" }, take: 1, select: { auto_created: true } },
@@ -750,7 +750,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           const isSupervision = phase.definition_id === "00000000-0000-4000-8000-000000000105";
           const visits = phase.revisions.filter((iteration) => iteration.visit_date);
           const lastVisit = visits.sort((a, b) => (b.visit_date?.getTime() ?? 0) - (a.visit_date?.getTime() ?? 0))[0]?.visit_date ?? null;
-          const kinds = iterationKinds(phase.definition.default_iteration_kinds);
+          const kinds = iterationKinds(phase.iteration_kinds_snapshot);
           const choices = !current ? (phase.status === "DONE" || (phase.status === "ACTIVE" && !isSupervision) ? ["add_iteration"] : []) : iterationChoices({ state: current.status, phaseStatus: phase.status, iterationName: current.name, kinds, supervision: isSupervision });
           return {
             id: phase.id, name: phase.name_snapshot, order: phase.order_index, status: phase.status as PhaseStatus,

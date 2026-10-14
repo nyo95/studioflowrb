@@ -35,7 +35,6 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 - [ ] [PLANNED] WO-DEVELOPER-02 updates from GitHub releases: the console shows "version X available", **Install** backs up the database, installs, migrates, rebuilds, restarts, and rolls back on failure (owner 2026-10-10, D10). It must refuse an older application over a newer database; rollback restores the pre-upgrade backup together with its code and never trusts the display-only `module_state.last_version`. Needs first: how the office server runs the app (manual `npm run start`, a Windows service, pm2, ...) and the release format.
 - [ ] [BUG] The existing application shell emitted one intermittent React hydration mismatch during the combined Developer/Settings Playwright pass while navigating between StudioFlow settings pages (server transiently rendered no rail; client rendered the collapsed rail). All 14 scenarios still passed and the Developer branch does not change `AppShell`; reproduce and fix as a separate UI Engine slice rather than mixing it into Developer authority. R9.27 (2026-10-14): not reproduced in 3 rounds over the six StudioFlow settings pages, /settings and /account (full loads, in-page link moves, back/forward), zero hydration messages. Reading of the code: `AppShell` is hydration-safe (narrow starts false on both sides); the rail depends only on `usePathname()` via `isRailPath`, there are no rewrites in `src/proxy.ts`, so a "no rail" server render points at a request whose pathname was outside an app root (e.g. a hop through `/system` or `/login` in the Developer spec). Next step only if it recurs: run `developer-console.spec` + `settings.spec` with a console listener for "hydrat" and note the URL.
-- [ ] [UNVERIFIED] Optional module switch, note-image buttons only (R8.498, R8.500): the rest of the switch was walked in the browser. Still to walk once a phase note has an image: with Ideas off, the image viewer shows no "Save to Ideas" / "Use in schedule" / "Add to moodboard" and the viewer still looks right; with only Presentation off, only "Add to moodboard" is gone.
 
 - [ ] [UNVERIFIED] Add item "From a past project" (R8.458): the search box, the empty result and the toggle were walked in the browser on the local database, which has one project, so no hit could be chosen. Still to walk with two projects: pick a hit (section and category switch to the hit's, the product shows as a summary, Remove returns to the normal fields), Save creates the item and copies the product with its photo and notes, and a failure after the item is created leaves the item without the copy.
 
@@ -109,11 +108,6 @@ Order matters; each item is its own Work Order.
   PC with a local storage root; a serverless host would first need object
   storage off the local disk and then a real scheduled trigger. Parked until a
   hosting change is planned.
-- [ ] [CLEANUP][P3] Schedule and Presentation image deletes still decide and
-  remove after commit (`removeUnreferenced`): a failure is recorded in the
-  cleanup ledger, but a process crash between commit and removal is not
-  pre-enqueued as deliverable and MOM deletes are (R8.372).
-
 - [ ] [PLANNED] Lead verdict on `agent/reports/STORAGE-TUNNEL-DISCUSSION.md`
   (R8.485): storage folder as a setting and remote access; not yet turned
   into a READY plan.
@@ -125,11 +119,8 @@ Order matters; each item is its own Work Order.
   and schema, and later M5 customer build profiles, release tags and installer.
   Signed entitlement was dropped on 2026-10-10.
 
-- [ ] [CLEANUP][P3] Schema drift found in the R8.515 review (`prisma migrate diff` from a fresh 105-migration database to `prisma/schema`): `platform.developer_access`, `developer_recovery_code` and `developer_session` timestamps are `timestamptz` in the migration but plain `DateTime` (timestamp(3)) in the schema, and `studioflow.sf_holiday` differs in id type, timestamp precision and the `updated_at` default. No Presentation or Ideas drift. Align the schema annotations (or a corrective migration) so a future `migrate dev` does not generate a surprise migration.
 
 - [ ] [CLEANUP][P3] Archive retention residual window (R8.516, accepted): the eligibility re-check before the Presentation purge hook and the hook's own delete are separate steps, so a restore landing in the few milliseconds between them can still lose that project's Presentation slides. Closing it fully needs a purge-in-progress marker that restore respects; not justified for one office unless restores during the daily sweep become common.
-
-- [ ] [BUG][P3] Phase iteration kinds are read live from the phase definition, not from the project's snapshot (found in the R8.520 review, reproduced by the existing CD chain test, which edits the definition after the project exists): editing a template's iteration kinds changes the two-step workflow (which round must continue, the step names, the rename lock) of projects already running, against contract §5.1 ("later template edits never rewrite existing projects"). Fix: snapshot the kinds on `sf_phase` at project creation (backfilled from the definition) and read the snapshot everywhere `iterationKinds(phase.definition…)` is read today. Lowered to P3 in R8.522: no screen edits iteration kinds today (only the R8.4xx migration set CD Mall / CD Final), so only a direct database edit can trigger it; fix it before any Settings form for iteration kinds is built.
 
 ## UI Engine and Shared Utilities
 
@@ -318,7 +309,6 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
   the 840 px rail (section 10), MOM print formatting, drop and paste of several images in the answer dialog, the Schedule right-click menu
   and New category picker, the Google Sheets re-import, the manager completion override. Entries above for covered screens may be removed
   once the owner agrees the automated result is enough.
-- [ ] [CLEANUP][P3] The unexpected-error branch of the several-suppliers grid (R8.421) has no fault-injection test, as the per-row isolation of R8.419 has none.
 - [ ] [UNVERIFIED] Walk 2026-10-08 did not cover: client-note images (a file upload cannot be driven from the built-in browser), formatted notes, Timeline and Schedule, re-layout on real data, the BQ screens, the sample shelf, Dark mode, the 840 px rail. Run them from `docs/BROWSER-ACCEPTANCE.md` sections 6 to 10 on the owner's own browser.
 - [ ] [UNVERIFIED] BQ walk 2026-10-08 passed (isolated server, seeded project): section, Work Item and Cost Component with a Master Data snapshot; a rate override with the "Harga diubah" badge and revert; the snapshot staying Rp.100.000 after the Master Data price was raised to 150.000; the source picker still listing Master Data prices when the Library holds 90 items (R8.422 fix); the printed quotation carrying the DRAFT box while the project is active and none once it is locked; Lock (type LOCK) giving "Locked — read only" with no edit controls and an Unlock button. Still open: BQ Library and templates screens, assemblies, project deletion approval, the Excel-free import decision, and a real project by the estimator.
 - [ ] [PLANNED][P3] BQ language (found in the 2026-10-08 walk): the screens mix Indonesian and English ("Belum ada section", "dapat diedit", "Nama Work Item", "Tambah", "Terapkan Assembly", "Harga diubah", "Belum ada harga", "X dari Y Cost Component sudah ada harga", "Belum lengkap — ada item tanpa harga", the column "URAIAN" next to "Add section", "Lock project", "Quotation"). Owner decision: one language per screen, or follow the account's guide language.

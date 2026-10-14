@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.31] Workspace image reaches Moodboard without Ideas
+- Surface: project Phases page, Notes stream and optional Workspace board image viewer
+- Fixture: a person with Presentation manage access; one project note/Workspace image; Presentation enabled and Ideas disabled
+- Viewport: desktop (default)
+- Steps: 1. Disable Ideas and keep Presentation enabled. 2. Open a note or Workspace image in the large viewer. 3. Confirm Save to Ideas and Use in schedule are absent, while Add to moodboard remains. 4. Press Add to moodboard and open the project's Presentation tab. 5. Disable Presentation and reopen the image viewer.
+- Acceptance: the image is copied as the last slide of the project's one Moodboard board while Ideas is off; the source image remains; disabling Presentation removes only Add to moodboard and leaves the viewer usable.
+- Status: PENDING
+
 ### [R9.21] Neutral grouping applies without a price dialog
 - Surface: `/bq/[id]` project editor
 - Fixture: estimator with an ACTIVE BQ project, one Work Item, and at least two direct Cost Components

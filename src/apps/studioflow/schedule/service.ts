@@ -1,4 +1,4 @@
-import { discardObjects, removeUnreferenced as removeUnreferencedAssets } from "../asset-cleanup";
+import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
 import { Prisma } from "@/generated/prisma/client";
 
 import { createPrivateObjectKey } from "@platform/core/storage";
@@ -156,15 +156,6 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     } catch {
       return null;
     }
-  }
-
-  /**
-   * Reused and template-seeded options share one stored object, so an object is
-   * removed only after commit and only when no option or template row still
-   * points at it. A failure leaves an orphan object, never a broken row.
-   */
-  async function removeUnreferenced(keys: readonly (string | null | undefined)[]) {
-    await removeUnreferencedAssets(db, storage, keys);
   }
 
   function validateImage(file: ScheduleImageUpload): string {
@@ -584,9 +575,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         if (!item) throw notFound("schedule template");
         await tx.sfScheduleTemplateItem.delete({ where: { id: item.id } });
         await writeAudit(ports, tx, { action: "studioflow.schedule.template-item-deleted", entityType: TEMPLATE_ENTITY, entityId: item.id, actor: input.actor, metadata: { section: item.section, category: item.category, productName: item.product_name, detachedRows: item._count.entries } });
-        return { templateItemId: item.id, imageKey: item.image_key };
+        return { templateItemId: item.id, cleanupKeys: await enqueueUnreferencedCleanup(tx, [item.image_key]) };
       });
-      await removeUnreferenced([result.imageKey]);
+      await discardObjects(db, storage, result.cleanupKeys);
       return { templateItemId: result.templateItemId };
     },
 
@@ -675,9 +666,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         // Later codes keep their number: the deleted code is left empty, never shifted into.
         await tx.sfScheduleEntry.delete({ where: { id: entry.id } });
         await writeAudit(ports, tx, { action: "studioflow.schedule.entry-deleted", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) } });
-        return { entryId: entry.id, optionIds: images.map((row) => row.id), imageKeys: images.map((row) => row.image_key) };
+        return { entryId: entry.id, optionIds: images.map((row) => row.id), cleanupKeys: await enqueueUnreferencedCleanup(tx, images.map((row) => row.image_key)) };
       });
-      await removeUnreferenced(result.imageKeys);
+      await discardObjects(db, storage, result.cleanupKeys);
       return { entryId: result.entryId, optionIds: result.optionIds };
     },
 
@@ -813,9 +804,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         if (wasFinal) await clearDecision(tx, option.entry_id);
         else await syncActiveIndex(tx, option.entry_id);
         await writeAudit(ports, tx, { action: "studioflow.schedule.option-deleted", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id, wasFinal } });
-        return { optionId: option.id, imageKey: option.image_key };
+        return { optionId: option.id, cleanupKeys: await enqueueUnreferencedCleanup(tx, [option.image_key]) };
       });
-      await removeUnreferenced([result.imageKey]);
+      await discardObjects(db, storage, result.cleanupKeys);
       return { optionId: result.optionId };
     },
 
@@ -838,9 +829,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
             entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor,
             metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label, bytes: input.file.body.byteLength },
           });
-          return { optionId: option.id, previousKey: option.image_key };
+          return { optionId: option.id, cleanupKeys: await enqueueUnreferencedCleanup(tx, [option.image_key]) };
         });
-        await removeUnreferenced([result.previousKey]);
+        await discardObjects(db, storage, result.cleanupKeys);
         return { optionId: result.optionId };
       } catch (error) {
         await discardObjects(db, storage, [key]);
@@ -852,12 +843,12 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       await requireScheduleCommand(input);
       const result = await runTransaction(async (tx) => {
         const option = await loadOption(tx, input.projectId, input.optionId, true);
-        if (!option.image_key) return { optionId: option.id, previousKey: null };
+        if (!option.image_key) return { optionId: option.id, cleanupKeys: [] };
         await tx.sfScheduleOption.update({ where: { id: option.id }, data: { image_key: null } });
         await writeAudit(ports, tx, { action: "studioflow.schedule.option-image-removed", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label } });
-        return { optionId: option.id, previousKey: option.image_key };
+        return { optionId: option.id, cleanupKeys: await enqueueUnreferencedCleanup(tx, [option.image_key]) };
       });
-      await removeUnreferenced([result.previousKey]);
+      await discardObjects(db, storage, result.cleanupKeys);
       return { optionId: result.optionId };
     },
 

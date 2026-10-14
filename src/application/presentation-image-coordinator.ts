@@ -8,8 +8,3 @@ export async function addIdeaImageToMoodboard(input: IdeasContext & { cardId: st
   const source = await ideas.readIdeaImageSource(input);
   return addStoredImageToMoodboard({ ...input, source });
 }
-
-export async function addNoteImageToPresentationMoodboard(input: IdeasContext & { projectId: string; phaseId?: string | null; imageId: string }) {
-  const source = await ideas.readNoteImageSource(input);
-  return addStoredImageToMoodboard({ ...input, source });
-}

@@ -37,8 +37,8 @@ model DeveloperAccess {
   totp_secret_enc String
   last_step       BigInt?
   failed_count    Int       @default(0)
-  locked_until    DateTime?
-  enrolled_at     DateTime  @default(now())
+  locked_until    DateTime? @db.Timestamptz(3)
+  enrolled_at     DateTime  @default(now()) @db.Timestamptz(3)
 
   @@map("developer_access")
   @@schema("platform")
@@ -48,7 +48,7 @@ model DeveloperAccess {
 /// are persisted; the printable values exist only during enrolment.
 model DeveloperRecoveryCode {
   code_hash String    @id
-  used_at   DateTime?
+  used_at   DateTime? @db.Timestamptz(3)
 
   @@map("developer_recovery_code")
   @@schema("platform")
@@ -58,9 +58,9 @@ model DeveloperRecoveryCode {
 /// only in the Path=/system cookie and never reaches persistence.
 model DeveloperSession {
   token_hash String   @id
-  created_at DateTime @default(now())
-  last_seen_at DateTime
-  expires_at DateTime
+  created_at DateTime @default(now()) @db.Timestamptz(3)
+  last_seen_at DateTime @db.Timestamptz(3)
+  expires_at DateTime @db.Timestamptz(3)
   ip          String?
   user_agent  String?
 

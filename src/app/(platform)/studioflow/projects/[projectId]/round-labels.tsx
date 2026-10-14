@@ -4,7 +4,8 @@ import { useState } from "react";
 
 import { Button, InlineError } from "@/platform/ui_engine";
 
-import { addNoteImageToMoodboardAction, saveNoteImageToIdeasAction, applyNoteImageToScheduleAction } from "@/apps/ideas/public/image-actions";
+import { saveNoteImageToIdeasAction, applyNoteImageToScheduleAction } from "@/apps/ideas/public/image-actions";
+import { addWorkspaceImageToMoodboardAction } from "@/apps/presentation/public/image-actions";
 import { UseInScheduleDialog } from "@/apps/ideas/public/use-in-schedule-dialog";
 import type { IterationView } from "../../_components/phase-commands";
 import { useStudioFlowModuleEnabled } from "../../module-state";
@@ -18,9 +19,9 @@ export const ITERATION_STATE_TONE: Record<IterationView["state"], "neutral" | "w
  * Under a note image in the large viewer: keep a copy on the person's Ideas board, or put it in this project's schedule.
  * Both copy; the note is never changed. The Workspace uses it too, where a card may have no phase label.
  */
-export function NoteImageActions({ image, projectId, projectName, phaseId, canUseIdeas }: { image: { id: string }; projectId: string; projectName: string; phaseId: string | null; canUseIdeas: boolean }) {
+export function NoteImageActions({ image, projectId, projectName, phaseId, canUseIdeas, canUsePresentation }: { image: { id: string }; projectId: string; projectName: string; phaseId: string | null; canUseIdeas: boolean; canUsePresentation: boolean }) {
   const ideasEnabled = useStudioFlowModuleEnabled("ideas") && canUseIdeas;
-  const presentationEnabled = useStudioFlowModuleEnabled("presentation");
+  const presentationEnabled = useStudioFlowModuleEnabled("presentation") && canUsePresentation;
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +30,7 @@ export function NoteImageActions({ image, projectId, projectName, phaseId, canUs
   const addToMoodboard = async () => {
     setMoodboard("pending"); setError(null);
     try {
-      const result = await addNoteImageToMoodboardAction({ projectId, phaseId, imageId: image.id });
+      const result = await addWorkspaceImageToMoodboardAction({ projectId, phaseId, imageId: image.id });
       if (result.ok) setMoodboard("done"); else { setMoodboard("idle"); setError(result.error.safeMessage); }
     } catch {
       setMoodboard("idle");
@@ -51,7 +52,7 @@ export function NoteImageActions({ image, projectId, projectName, phaseId, canUs
     <>
       {ideasEnabled ? <Button size="sm" variant="secondary" pending={pending} disabled={saved} onClick={() => void save()}>{saved ? "Saved to Ideas" : "Save to Ideas"}</Button> : null}
       {ideasEnabled ? <Button size="sm" variant="secondary" onClick={() => setUsing(true)}>Use in schedule</Button> : null}
-      {ideasEnabled && presentationEnabled ? <Button size="sm" variant="secondary" pending={moodboard === "pending"} disabled={moodboard === "done"} onClick={() => void addToMoodboard()}>{moodboard === "done" ? "Added to moodboard" : "Add to moodboard"}</Button> : null}
+      {presentationEnabled ? <Button size="sm" variant="secondary" pending={moodboard === "pending"} disabled={moodboard === "done"} onClick={() => void addToMoodboard()}>{moodboard === "done" ? "Added to moodboard" : "Add to moodboard"}</Button> : null}
       {error ? <InlineError>{error}</InlineError> : null}
       {ideasEnabled && using ? (
         <UseInScheduleDialog

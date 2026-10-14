@@ -94,8 +94,14 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
     return (await ports.studioFlow.requireProjectDocumentWrite(input)).actorId;
   }
 
-  async function queueCleanup(tx: PresentationTx, key: string) {
-    await tx.presentationAssetCleanupFailure.upsert({ where: { storage_key: key }, create: { storage_key: key }, update: { resolved_at: null } });
+  async function enqueueUnreferencedCleanup(tx: PresentationTx, keys: readonly string[]): Promise<string[]> {
+    const orphaned: string[] = [];
+    for (const key of [...new Set(keys)]) {
+      if (await tx.sfPresentationSlide.count({ where: { image_key: key } })) continue;
+      await tx.presentationAssetCleanupFailure.upsert({ where: { storage_key: key }, create: { storage_key: key, attempts: 0 }, update: { resolved_at: null } });
+      orphaned.push(key);
+    }
+    return orphaned;
   }
 
   async function removeQueued(keys: readonly string[]) {
@@ -213,7 +219,7 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
 
     async deleteBoard(input: PresentationCommandContext & { projectId: string; boardId: string }) {
       await requireProjectWrite(input);
-      const result = await runTransaction(async (tx) => { const board = await loadBoard(tx, input.projectId, input.boardId); const slides = await tx.sfPresentationSlide.findMany({ where: { board_id: board.id }, select: { image_key: true } }); for (const slide of slides) await queueCleanup(tx, slide.image_key); await tx.sfPresentationBoard.delete({ where: { id: board.id } }); await writePresentationAudit(ports, tx, { action: "presentation.board.deleted", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, slideCount: slides.length } }); return { imageKeys: slides.map((slide) => slide.image_key) }; });
+      const result = await runTransaction(async (tx) => { const board = await loadBoard(tx, input.projectId, input.boardId); const slides = await tx.sfPresentationSlide.findMany({ where: { board_id: board.id }, select: { image_key: true } }); await tx.sfPresentationBoard.delete({ where: { id: board.id } }); await writePresentationAudit(ports, tx, { action: "presentation.board.deleted", entityType: BOARD_ENTITY, entityId: board.id, actor: input.actor, metadata: { projectId: input.projectId, slideCount: slides.length } }); return { imageKeys: await enqueueUnreferencedCleanup(tx, slides.map((slide) => slide.image_key)) }; });
       await removeQueued(result.imageKeys);
     },
 
@@ -255,8 +261,8 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
 
     async deleteSlide(input: PresentationCommandContext & { projectId: string; slideId: string }) {
       await requireProjectWrite(input);
-      const result = await runTransaction(async (tx) => { const slide = await loadSlide(tx, input.projectId, input.slideId); await queueCleanup(tx, slide.image_key); await tx.sfPresentationSlide.delete({ where: { id: slide.id } }); await writePresentationAudit(ports, tx, { action: "presentation.slide.deleted", entityType: SLIDE_ENTITY, entityId: slide.id, actor: input.actor, metadata: { projectId: input.projectId, boardId: slide.board_id } }); return { imageKey: slide.image_key }; });
-      await removeQueued([result.imageKey]);
+      const result = await runTransaction(async (tx) => { const slide = await loadSlide(tx, input.projectId, input.slideId); await tx.sfPresentationSlide.delete({ where: { id: slide.id } }); await writePresentationAudit(ports, tx, { action: "presentation.slide.deleted", entityType: SLIDE_ENTITY, entityId: slide.id, actor: input.actor, metadata: { projectId: input.projectId, boardId: slide.board_id } }); return { imageKeys: await enqueueUnreferencedCleanup(tx, [slide.image_key]) }; });
+      await removeQueued(result.imageKeys);
     },
 
     async addAnnotation(input: PresentationCommandContext & { projectId: string; slideId: string; pinX: number; pinY: number; scheduleEntryId?: string | null; labelSide?: string; note?: string | null }) {
@@ -283,7 +289,7 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
 
     async purgeArchivedProjectAssets(projectId: string) {
       const actor = { kind: "SYSTEM" as const, label: "Presentation asset retention" };
-      const result = await runTransaction(async (tx) => { const slides = await tx.sfPresentationSlide.findMany({ where: { board: { project_id: projectId } }, select: { id: true, image_key: true } }); for (const slide of slides) await queueCleanup(tx, slide.image_key); await tx.sfPresentationSlide.deleteMany({ where: { board: { project_id: projectId } } }); await writePresentationAudit(ports, tx, { action: "presentation.project.assets-purged", entityType: "project", entityId: projectId, actor, metadata: { projectId, presentationSlides: slides.length } }); return { presentationSlides: slides.length, imageKeys: slides.map((slide) => slide.image_key) }; });
+      const result = await runTransaction(async (tx) => { const slides = await tx.sfPresentationSlide.findMany({ where: { board: { project_id: projectId } }, select: { id: true, image_key: true } }); await tx.sfPresentationSlide.deleteMany({ where: { board: { project_id: projectId } } }); await writePresentationAudit(ports, tx, { action: "presentation.project.assets-purged", entityType: "project", entityId: projectId, actor, metadata: { projectId, presentationSlides: slides.length } }); return { presentationSlides: slides.length, imageKeys: await enqueueUnreferencedCleanup(tx, slides.map((slide) => slide.image_key)) }; });
       await removeQueued(result.imageKeys);
       return { presentationSlides: result.presentationSlides };
     },
