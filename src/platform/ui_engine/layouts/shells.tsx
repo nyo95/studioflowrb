@@ -444,8 +444,11 @@ export function PageShell({
 }: HTMLAttributes<HTMLDivElement> & {
   /** @deprecated Use `measure` instead. */
   size?: "default" | "wide";
-  /** Page measure: narrow (720px forms/settings) · default (1100px main content) · wide (1440px schedule/timeline) */
-  measure?: "narrow" | "default" | "wide";
+  /**
+   * Page measure: narrow (720px forms/settings) · default (1100px main content) · wide (1440px schedule/timeline) ·
+   * full (the whole window, for dense work tables such as a Bill of Quantity)
+   */
+  measure?: "narrow" | "default" | "wide" | "full";
   fill?: boolean;
 }) {
   // measure takes precedence; size is a legacy alias for backward compat
@@ -455,6 +458,7 @@ export function PageShell({
   const maxW =
     resolvedMeasure === "narrow" ? "max-w-(--ui-page-narrow)" :
     resolvedMeasure === "wide"   ? "max-w-(--ui-page-max)" :
+    resolvedMeasure === "full"   ? "max-w-none" :
                                    "max-w-(--ui-page-content)";
   return (
     <div

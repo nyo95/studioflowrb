@@ -14,7 +14,8 @@ export default async function BqLayout({ children }: { children: ReactNode }) {
   if (!hasAnyPermission(principalGrants.grants, [BQ_PERMISSIONS.access, BQ_PERMISSIONS.projectDeleteApprove])) redirect("/");
 
   return (
-    <PageShell size="wide" fill>
+    // Owner 2026-10-14: the BQ work tables use the whole window ("lebih wide ... app bq").
+    <PageShell measure="full" fill>
       {children}
     </PageShell>
   );

@@ -354,7 +354,7 @@ function SectionOutline({
   return (
     <nav
       aria-label="Struktur dokumen"
-      className="sticky top-0 hidden w-[200px] shrink-0 flex-col gap-0.5 self-start py-1 lg:flex xl:w-[232px]"
+      className="sticky top-0 hidden w-[220px] shrink-0 flex-col gap-0.5 self-start py-1 lg:flex xl:w-[260px]"
     >
       <Text tone="tertiary" size="sm" meta className="px-2.5 pb-1">Struktur</Text>
       {sections.map((section) => {
@@ -366,7 +366,8 @@ function SectionOutline({
               className="flex items-center justify-between gap-2 rounded-control px-2.5 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-surface-muted hover:text-ink"
             >
               <span className="truncate">{section.name}</span>
-              <span className="shrink-0 text-xs tabular-nums text-ink-tertiary">{count}</span>
+              {/* A small chip, so the Work Item count never reads as a row number next to the table. */}
+              <span className="shrink-0 rounded-pill bg-surface-muted px-1.5 text-[11px] tabular-nums text-ink-tertiary" title={`${count} Work Item`}>{count}</span>
             </a>
             <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-4" editable={editable} pending={pending} onReorder={onReorder} />
             {section.subsections.map((subsection) => (
@@ -376,7 +377,7 @@ function SectionOutline({
                   className="flex items-center justify-between gap-2 rounded-control py-1 pl-4 pr-2.5 text-sm font-medium text-ink-tertiary transition-colors hover:bg-surface-muted hover:text-ink"
                 >
                   <span className="truncate">{subsection.name}</span>
-                  <span className="shrink-0 text-xs tabular-nums">{subsection.items.length}</span>
+                  <span className="shrink-0 rounded-pill bg-surface-muted px-1.5 text-[11px] tabular-nums" title={`${subsection.items.length} Work Item`}>{subsection.items.length}</span>
                 </a>
                 <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-7" editable={editable} pending={pending} onReorder={onReorder} />
               </div>

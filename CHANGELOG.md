@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.36 | 2026-10-14 | fix(bq,ui-engine): B` uses the whole window; Struktur counts read as counts (Lead)
+
+- **Owner 2026-10-14** (screenshot of the B` project screen, "ui nya error - coba buat lebih wide aja ... app bq maksudnya"): the numbers 4 / 3 / 1 at the left edge of the work table were the Struktur panel's Work Item counts, right-aligned in a 232 px panel so they sat against the table and read as stray row numbers.
+- **UI Engine EXTEND:** `_PageShell` gains `_measure="full"` (no maximum width) for dense work tables, next to narrow / default / wide. **B`:** the B` layout uses it, so every B` page uses the whole window (before: at most 1440 px). The Struktur panel is a little wider (220 px, 260 px from the xl breakpoint) and each count is a small muted chip with a "N Work Item" tooltip.
+- **Checks:** typecheck PASS; eslint PASS; UI Engine tests PASS; checked in the browser at 1708 px (page width 1644 px, counts inside the panel). No push.
+
 ## R9.35 | 2026-10-14 | merge: WO-HARDEN-AUDIT-01 branch into main (Lead)
 
 - Owner pre-approved the merge after a review PASS (plan approval, 2026-10-14). `_codex/harden-audit-01` (R9.30-R9.34) merged into `_main`; CHANGELOG.md conflict resolved by keeping both sides (branch entries above R9.28); BACKLOG.md kept the R9.27 hydration evidence and took the branch's removal of the R8.498 Ideas-off note-image line (R9.31 changed that behavior; its new check is in `_docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md`). Migration `_20261014150000_studioflow_phase_iteration_kinds_snapshot` applied to the kantor dev and test databases after the merge. No push.
