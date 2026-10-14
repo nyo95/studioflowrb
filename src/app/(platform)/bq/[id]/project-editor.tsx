@@ -416,6 +416,10 @@ export function ProjectEditor({
   units: UnitRead[];
 }) {
   const [project, setProject] = useState(initialProject);
+  // A refresh (for example after a stale move was refused) brings the server's project; show it. A Cost Component move
+  // does not change the project's updatedAt, so the page's key alone would keep the old list on screen.
+  const [received, setReceived] = useState(initialProject);
+  if (received !== initialProject) { setReceived(initialProject); setProject(initialProject); }
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
@@ -513,7 +517,8 @@ export function ProjectEditor({
       const stale = result.error.code === "bq.line-item.move-stale";
       const message = stale ? "Daftar berubah. Muat ulang untuk melihat yang terbaru." : result.error.safeMessage;
       setError(message);
-      if (stale) router.refresh();
+      // The selection was made on the old list: drop it with the dialogs, then show the server's list.
+      if (stale) { setSelection(null); setGroupItemId(null); setMoveConfirmation(null); router.refresh(); }
       throw Object.assign(new Error(message), { code: result.error.code });
     }
     setError(null);
@@ -1102,13 +1107,13 @@ function ItemRows({
   const allLineIds = lineItemIds(item);
   const selected = new Set(selectedLineIds);
   const allSelected = allLineIds.length > 0 && allLineIds.every((id) => selected.has(id));
-  const moveMenuItems: Array<{ label: string; description?: string; disabled?: boolean; onSelect: () => void }> = [];
+  const moveMenuItems: Array<{ label: string; description?: string; disabled?: boolean; separatorBefore?: boolean; onSelect: () => void }> = [];
   lineItemTargetOptions(item).forEach((option) => {
-    if (option.key === "new") moveMenuItems.push({ label: "────────────", disabled: true, onSelect: () => undefined });
     moveMenuItems.push({
       label: option.label,
       description: option.description,
       disabled: pending,
+      separatorBefore: option.key === "new",
       onSelect: () => "newGroup" in option.target
         ? onGroup(item.id)
         : onMove(item, "direct" in option.target ? option.label : `Component Group ${option.label}`, option.target),

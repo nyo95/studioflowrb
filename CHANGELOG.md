@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.22 | 2026-10-14 | fix(bq,ui-engine): Lead review of R9.20/R9.21 and two small repairs (Lead)
+
+- **Review of R9.20 (`d46b050`) and R9.21 (`45df558`): PASS after this repair.** Read every changed BQ file and the new `line-item-move-ui` helper: scope stayed inside BQ (no service, schema, permission or dependency change); every move and group asks the server preview first, applies at once when nothing changes and confirms only when the price changes; Batal changes nothing; the returned tree replaces the screen, the selection clears and moved rows are highlighted; locked/archived projects get no checkboxes or selection bar; the same-place move calls nothing; empty groups read "Component Group kosong". The nouns follow bq-contract §3.
+- **Repair 1, stale list:** after `bq.line-item.move-stale` the screen called `router.refresh()` but kept its own copy of the project, and the page key (`updatedAt` + section count) does not change on a Cost Component move, so the old list stayed on screen. The editor now takes the server's project whenever a refresh brings a new one, and a stale refusal also drops the selection and any open move dialog.
+- **Repair 2, menu divider (UI Engine EXTEND):** `ButtonMenuItem.separatorBefore` draws a real menu separator, as `RowActionMenu` already does; the "Pindahkan ke" menu uses it instead of a disabled row of dashes (which a screen reader read out). Menu item keys now include the position, so two Component Groups with the same name no longer share a key.
+- **Migrations/dependencies:** none. **Checks:** full `npm test` **1,091/1,091 PASS** on `studioflow_rebuild_test_bq`; typecheck, eslint (BQ + UI Engine actions), boundaries, legacy-runtime PASS; production build PASS (separate folder, removed). Browser journeys stay queued in BROWSER-ACCEPTANCE-BACKLOG (owner walks them). No push, no merge yet.
+
 ## R9.21 | 2026-10-14 | feat(bq): Select, group, and move Cost Components on the project screen (Executor)
 
 - **Slice 3 UI:** each editable Work Item can select its direct and grouped Cost Components, select all, clear selection, create a Component Group, or move the selection to the Work Item or an existing group. Selecting another Work Item clears the previous selection; locked and archived projects expose no selection controls.
