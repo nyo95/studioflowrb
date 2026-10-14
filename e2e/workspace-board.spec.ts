@@ -1,11 +1,14 @@
 import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
+import { Client } from "pg";
 
 /**
- * R9.07 Workspace board regression (owner 2026-10-14: harden the board before adding features). One seeded project;
- * the steps build on each other in order.
+ * R9.07 Workspace board regression (owner 2026-10-14: harden the board before adding features), and R9.09: the board
+ * is a Developer-switched module that starts off, so the Phases page shows the Notes stream until it is switched on.
+ * The tests run in file order and each works in its own seeded project.
  */
+test.describe.configure({ mode: "serial" });
 const { sf } = JSON.parse(readFileSync("e2e/.tmp/owner.json", "utf8")) as { sf: Record<string, string> };
 
 /** A 1x1 PNG, built in code so no binary fixture is committed. */
@@ -24,7 +27,60 @@ async function openBoard(page: Page) {
 
 const element = (page: Page, text: string) => page.getByRole("article").filter({ hasText: text });
 
+/** The Developer switch, set directly in the disposable test database (the console has its own spec). */
+async function setBoard(state: "ENABLED" | "DISABLED") {
+  const connectionString = process.env.PLATFORM_TEST_DATABASE_URL;
+  if (!connectionString) throw new Error("PLATFORM_TEST_DATABASE_URL is required.");
+  const client = new Client({ connectionString });
+  await client.connect();
+  try {
+    await client.query(`INSERT INTO platform.module_state (module_id, state, last_version, updated_by) VALUES ('workspace-board', $1, '1.0.0', 'e2e')
+      ON CONFLICT (module_id) DO UPDATE SET state = EXCLUDED.state, updated_by = EXCLUDED.updated_by`, [state]);
+  } finally {
+    await client.end();
+  }
+}
+
+test("without the board module the Phases page is the phase's Notes stream", async ({ page }) => {
+  await setBoard("DISABLED");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/studioflow/projects/${sf.notesMode}`);
+  await page.locator("main").first().waitFor();
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByLabel("Workspace board")).toHaveCount(0);
+  const log = page.getByRole("log", { name: "Notes" });
+  await expect(log).toBeVisible();
+
+  const editor = page.getByRole("textbox", { name: "New note" });
+  await editor.click();
+  await expect(editor).toBeFocused();
+  await page.keyboard.type("E2E notes mode text");
+  await page.getByRole("checkbox", { name: "Client feedback" }).check();
+  await page.locator('input[type="file"][accept="image/png,image/jpeg,image/webp"]').last().setInputFiles({ name: "notes.png", mimeType: "image/png", buffer: PNG });
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  // The text and the image are two messages, both client feedback.
+  await expect(log.getByRole("article").filter({ hasText: "E2E notes mode text" })).toBeVisible();
+  await expect(log.getByRole("article", { name: /^Image from/ })).toHaveCount(1);
+  await expect(log.getByRole("article").filter({ hasText: "Client feedback" })).toHaveCount(2);
+
+  // A hand-marked message can be switched back.
+  const text = log.getByRole("article").filter({ hasText: "E2E notes mode text" });
+  await text.getByRole("button", { name: "Note actions" }).click();
+  await page.getByRole("menuitem", { name: "Not client feedback" }).click();
+  await expect(log.getByRole("article").filter({ hasText: "Client feedback" })).toHaveCount(1);
+});
+
 test("the Workspace board writes, autosaves in order, takes images, and keeps a recorded answer fixed", async ({ page }) => {
+  await setBoard("ENABLED");
+  test.info().annotations.push({ type: "cleanup", description: "the board module is switched off again at the end" });
+  try {
+    await boardJourney(page);
+  } finally {
+    await setBoard("DISABLED");
+  }
+});
+
+async function boardJourney(page: Page) {
   const board = await openBoard(page);
 
   // 1. Double-click empty board to write a text there; leaving it creates the element.
@@ -92,4 +148,4 @@ test("the Workspace board writes, autosaves in order, takes images, and keeps a 
   await manual.getByRole("button", { name: "Element actions" }).click();
   await expect(page.getByRole("menuitem", { name: "Not client feedback" })).toBeVisible();
   await page.keyboard.press("Escape");
-});
+}

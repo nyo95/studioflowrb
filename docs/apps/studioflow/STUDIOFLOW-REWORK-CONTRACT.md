@@ -363,6 +363,18 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   double-click write at a spot; plain text pasted on the board becomes a text
   element; Delete removes the selection after a confirmation; the overview
   map jumps anywhere; zoom stays 100–200 %.
+- **Board or Notes** (owner 2026-10-14, R9.09, MODULES-DECISION D11): the
+  board is the optional feature module `workspace-board`, off until the
+  Developer switches it on in the console. Off, the Phases page shows the
+  selected phase's **Notes stream** (the R8.446 chat, back with one message per
+  text, image or file: filters All · Starred · Client feedback · each round by
+  id; star, edit text, mark as client feedback unless recorded by a phase step,
+  delete; the composer posts the text and each image as separate messages) and,
+  on a drafter phase, its Drawing list above the stream. The board's commands
+  (`workspaceAction`, `createWorkspaceImageAction`, `createWorkspaceFileAction`)
+  refuse with `MODULE_DISABLED` while it is off; the phase note actions stay
+  on. Unlabelled (General) elements are visible only on the board. Switching
+  either way loses nothing: both read the same elements.
 - **Where it lives** (Lead UI R8.532, owner board-first 2026-10-13): one
   canvas on the project Phases page, under the phase strip and the selected
   phase's workflow card. There is no separate Workspace tab or route and no

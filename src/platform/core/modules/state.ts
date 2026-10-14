@@ -41,10 +41,16 @@ function manifestOf(id: string): ModuleManifest {
   return manifest;
 }
 
+/** The module's own switch: the stored one, else the state it starts with. */
+function switchOf(manifest: ModuleManifest, states: StoredStates): "ENABLED" | "DISABLED" {
+  if (manifest.kind === "core") return "ENABLED";
+  return states.get(manifest.id) ?? manifest.initialState ?? "ENABLED";
+}
+
 function enabled(manifest: ModuleManifest, states: StoredStates, seen: Set<string>): boolean {
   if (manifest.kind === "core") return true;
   if (seen.has(manifest.id)) throw new AppError("INVARIANT", "MODULE_DEPENDENCY_CYCLE", "The module dependency graph contains a cycle.");
-  if (states.get(manifest.id) === "DISABLED") return false;
+  if (switchOf(manifest, states) === "DISABLED") return false;
   seen.add(manifest.id);
   const result = [...manifest.requires, ...(manifest.parent ? [manifest.parent] : [])]
     .every((dependencyId) => enabled(manifestOf(dependencyId), states, seen));
@@ -95,7 +101,7 @@ export async function listModuleOverview(db?: ModuleStateReader): Promise<readon
     version: moduleManifest.version,
     kind: moduleManifest.kind,
     parent: moduleManifest.parent ?? null,
-    state: moduleManifest.kind === "core" ? "ENABLED" : states.get(moduleManifest.id) ?? "ENABLED",
+    state: switchOf(moduleManifest, states),
     enabled: enabled(moduleManifest, states, new Set()),
   }));
 }
@@ -109,7 +115,7 @@ export async function synchronizeModuleVersions(db: ModuleStateReader = prisma):
     if (!row) {
       await db.moduleState.upsert({
         where: { module_id: moduleManifest.id },
-        create: { module_id: moduleManifest.id, state: "ENABLED", last_version: moduleManifest.version, updated_by: "system-boot" },
+        create: { module_id: moduleManifest.id, state: moduleManifest.initialState ?? "ENABLED", last_version: moduleManifest.version, updated_by: "system-boot" },
         update: { last_version: moduleManifest.version },
       });
     } else if (row.last_version !== moduleManifest.version) {

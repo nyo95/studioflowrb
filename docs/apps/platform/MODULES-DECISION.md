@@ -149,6 +149,23 @@ Nothing installs by itself. The exact mechanism depends on how the office
 server runs the app and is planned
 in WO-DEVELOPER-02.
 
+**D11. Feature modules of a core app (owner, 2026-10-14).** The owner wants the
+Workspace board on the Phases page to be switchable ("A - agar saya bisa
+aktifin lewat developer mode"; the office should see the simpler Notes stream
+unless he turns the board on). The board is a capability, but it is a second
+view over StudioFlow's own notes and is drawn inside a StudioFlow page, so it
+cannot have its own route, schema or data without a page-slot mechanism that
+does not exist. It is therefore a **feature module**: a real optional manifest
+(`workspace-board`, parent `studioflow`, exported from StudioFlow's `public/`)
+whose code and data stay in StudioFlow. StudioFlow reads its state with
+`isModuleEnabled` to choose the view, and the board's own server actions refuse
+with `MODULE_DISABLED` while it is off; nothing is deleted when it is switched
+off. A manifest may declare `initialState: "DISABLED"` (optional modules only):
+a server that never stored a switch for it starts with it off, and the
+Developer's stored choice always wins afterwards. Use a feature module only for
+a switchable view of a core app's own data; anything with its own data is a
+normal module (D8).
+
 ## Phases
 
 | Phase | What | Lane |

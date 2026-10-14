@@ -640,6 +640,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       starred: row.is_pinned,
       clientFeedback: row.origin === "CLIENT_ANSWER",
       origin: row.origin,
+      workflowRecord: row.workflow_record,
       authorId: row.author_id,
       authorName: row.author_name,
       createdAt: row.created_at,

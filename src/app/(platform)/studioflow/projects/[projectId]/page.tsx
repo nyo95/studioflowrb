@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
+import { isModuleEnabled } from "@platform/core/modules";
 import { LEGACY_PHASE_DEFINITION_IDS } from "@/apps/studioflow/domain/phase";
 import { phaseStepPresentation } from "@/apps/studioflow/domain/phase-display";
 import { studioFlow } from "@/apps/studioflow/runtime";
@@ -10,6 +11,7 @@ import { SectionCard, Text } from "@/platform/ui_engine";
 
 import { PhaseCanvas } from "../../_components/phase-canvas";
 import { pageSession } from "../../_components/session";
+import { ProjectNotes } from "./_notes-stream/project-notes";
 import { ProjectWorkspace } from "./_workspace-canvas/project-workspace";
 import { PhaseTabs } from "./phase-tabs";
 
@@ -27,13 +29,14 @@ export default async function ProjectOverviewPage({
   const [{ projectId }, sp] = await Promise.all([params, searchParams]);
   const { grants } = await pageSession();
 
-  const [project, phases, people] = await Promise.all([
+  const [project, phases, people, boardEnabled] = await Promise.all([
     studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
       if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
       throw error;
     }),
     studioFlow.phases.listProjectPhases({ grants, projectId }),
     studioFlow.projects.listAssignablePeople({ grants }),
+    isModuleEnabled("workspace-board"),
   ]);
 
   const archived = project.archivedAt !== null;
@@ -75,9 +78,12 @@ export default async function ProjectOverviewPage({
         </div>
       </SectionCard>
 
-      {/* One Workspace canvas for the whole project (board-first, owner 2026-10-13); the phase only sets context. */}
+      {/* With the Workspace board module on (Developer, owner 2026-10-14): one canvas for the whole project, the phase
+          only sets context. Off: the selected phase's Notes stream. Both read the same notes. */}
       <Suspense fallback={<SectionCard padded><SkeletonBlock className="h-[420px] w-full" /></SectionCard>}>
-        <ProjectWorkspace projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />
+        {boardEnabled
+          ? <ProjectWorkspace projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />
+          : <ProjectNotes projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />}
       </Suspense>
     </div>
   );

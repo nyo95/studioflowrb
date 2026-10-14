@@ -8,3 +8,4 @@ export * from "./nav";
 export { createStudioFlowSampleRequestRead } from "./sample-request-read";
 export type { SampleRequestRead, StudioFlowSampleRequestRead } from "./sample-request-read";
 export { STUDIOFLOW_TOUR } from "./tour";
+export { WORKSPACE_BOARD_MODULE_MANIFEST } from "./workspace-board-manifest";

@@ -8,6 +8,7 @@ import { initializeModuleRegistry, resetModuleRegistryForTests, type ModuleManif
 import PresentationPrintPage from "./(document)/studioflow/print/projects/[projectId]/presentation/[boardId]/page";
 import { createPresentationBoardAction } from "@/apps/presentation/public/actions";
 import { listIdeaCardsAction } from "@/apps/ideas/public/actions";
+import { createWorkspaceFileAction, createWorkspaceImageAction, workspaceAction } from "./(platform)/studioflow/actions";
 import IdeasPage from "./(platform)/studioflow/ideas/page";
 import PresentationPage from "./(platform)/studioflow/projects/[projectId]/presentation/page";
 import PresentationBoardPage from "./(platform)/studioflow/projects/[projectId]/presentation/[boardId]/page";
@@ -17,6 +18,8 @@ const MANIFESTS: readonly ModuleManifest[] = [
   { id: "studioflow", name: "StudioFlow", version: "1.0.0", kind: "core", requires: ["masterdata"] },
   { id: "ideas", name: "Ideas Board", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"] },
   { id: "presentation", name: "Presentation", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"] },
+  // No stored row: it starts off on its own (owner 2026-10-14).
+  { id: "workspace-board", name: "Workspace board", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"], initialState: "DISABLED" },
 ];
 
 let db: TestDb;
@@ -51,6 +54,18 @@ describe("disabled StudioFlow module gates", () => {
     const presentation = await createPresentationBoardAction({ projectId: "not-a-uuid", title: "Ignored" });
     assert.equal(presentation.ok, false);
     if (!presentation.ok) assert.equal(presentation.error.code, "MODULE_DISABLED");
+  });
+
+  it("refuses every Workspace board command while the board module has never been switched on", async () => {
+    const results = [
+      await workspaceAction({ command: "placeItems", projectId: "not-a-uuid", cards: [] }),
+      await createWorkspaceImageAction(new FormData()),
+      await createWorkspaceFileAction(new FormData()),
+    ];
+    for (const result of results) {
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.error.code, "MODULE_DISABLED");
+    }
   });
 
   it("returns not-found from Ideas, Presentation, board, and print routes before loading app data", async () => {

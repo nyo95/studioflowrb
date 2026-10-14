@@ -9,6 +9,7 @@ import { enabledModuleIds, enabledPermissionIds, isModuleEnabled, listModuleOver
 const manifests = [
   { id: "studioflow", name: "StudioFlow", version: "1.0.0", kind: "core" as const, requires: [] },
   { id: "ideas", name: "Ideas", version: "1.1.0", kind: "optional" as const, parent: "studioflow", requires: ["studioflow"], permissionIds: ["studioflow.ideas.manage"] },
+  { id: "board", name: "Board", version: "1.0.0", kind: "optional" as const, parent: "studioflow", requires: ["studioflow"], initialState: "DISABLED" as const },
 ];
 
 describe("module runtime state", () => {
@@ -19,6 +20,14 @@ describe("module runtime state", () => {
     const db = { moduleState: { findMany: async () => [] } } as never;
     assert.equal(await isModuleEnabled("ideas", db), true);
     assert.deepEqual(await enabledModuleIds(db), ["platform", "studioflow", "ideas"]);
+  });
+
+  it("starts a module declared initially off as disabled until the Developer switches it on", async () => {
+    const fresh = { moduleState: { findMany: async () => [] } } as never;
+    assert.equal(await isModuleEnabled("board", fresh), false);
+    await assert.rejects(() => requireModuleEnabled("board", fresh), (error: unknown) => isAppError(error) && error.code === "MODULE_DISABLED");
+    const switchedOn = { moduleState: { findMany: async () => [{ module_id: "board", state: "ENABLED" }] } } as never;
+    assert.equal(await isModuleEnabled("board", switchedOn), true);
   });
 
   it("refuses a disabled module with MODULE_DISABLED", async () => {
@@ -41,6 +50,7 @@ describe("module runtime state", () => {
       { id: "platform", name: "Platform", version: "1.0.0", kind: "core", parent: null, state: "ENABLED", enabled: true },
       { id: "studioflow", name: "StudioFlow", version: "1.0.0", kind: "core", parent: null, state: "ENABLED", enabled: true },
       { id: "ideas", name: "Ideas", version: "1.1.0", kind: "optional", parent: "studioflow", state: "DISABLED", enabled: false },
+      { id: "board", name: "Board", version: "1.0.0", kind: "optional", parent: "studioflow", state: "DISABLED", enabled: false },
     ]);
   });
 
@@ -52,11 +62,16 @@ describe("module runtime state", () => {
       update: async (input: unknown) => { calls.push(input); return {}; },
     } } as never;
     await synchronizeModuleVersions(db);
-    assert.equal(calls.length, 1);
+    assert.equal(calls.length, 2);
     assert.deepEqual(calls[0], {
       where: { module_id: "ideas" },
       create: { module_id: "ideas", state: "ENABLED", last_version: "1.1.0", updated_by: "system-boot" },
       update: { last_version: "1.1.0" },
     });
+    assert.deepEqual(calls[1], {
+      where: { module_id: "board" },
+      create: { module_id: "board", state: "DISABLED", last_version: "1.0.0", updated_by: "system-boot" },
+      update: { last_version: "1.0.0" },
+    }, "a module that starts off is stored off");
   });
 });

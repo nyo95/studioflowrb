@@ -12,6 +12,11 @@ export type ModuleManifest = {
   requires: readonly string[];
   /** RBAC permissions owned by this optional module. Core-app permissions are always available. */
   permissionIds?: readonly string[];
+  /**
+   * The switch an optional module starts with on a server that has never stored one (default ENABLED). A module the
+   * Developer turns on deliberately starts DISABLED; once stored, the Developer's choice always wins.
+   */
+  initialState?: "ENABLED" | "DISABLED";
 };
 
 export type ModuleRegistry = {
@@ -50,6 +55,9 @@ export function composeModuleRegistry(
     if (!SEMVER_PATTERN.test(moduleManifest.version)) throw new AppError("INVARIANT", "MODULE_INVALID_VERSION", "A module manifest has an invalid version.");
     if (moduleManifest.kind !== "core" && moduleManifest.kind !== "optional") throw new AppError("INVARIANT", "MODULE_INVALID_KIND", "A module manifest has an invalid kind.");
     if (moduleManifest.kind === "core" && moduleManifest.parent !== undefined) throw new AppError("INVARIANT", "MODULE_CORE_PARENT", "A core module cannot have a parent.");
+    if (moduleManifest.initialState !== undefined && (moduleManifest.kind === "core" || (moduleManifest.initialState !== "ENABLED" && moduleManifest.initialState !== "DISABLED"))) {
+      throw new AppError("INVARIANT", "MODULE_INVALID_INITIAL_STATE", "Only an optional module can start switched off.");
+    }
     if (new Set(moduleManifest.requires).size !== moduleManifest.requires.length || moduleManifest.requires.some((id) => !MODULE_ID_PATTERN.test(id))) {
       throw new AppError("INVARIANT", "MODULE_INVALID_REQUIRES", "A module manifest has invalid requirements.");
     }

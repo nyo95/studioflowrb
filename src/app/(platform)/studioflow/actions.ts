@@ -6,6 +6,7 @@ import { z } from "zod";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { AppError } from "@platform/core/errors";
+import { requireModuleEnabled } from "@platform/core/modules";
 import { validationError } from "@platform/core/validation";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { clearScheduleEntryLink, purgeArchivedProjectAssets, retryPresentationAssetCleanup } from "@/apps/presentation/public/lifecycle";
@@ -398,7 +399,10 @@ export async function phaseNoteAction(input: PhaseNoteCommandInput): Promise<Act
 
 // ── Project Workspace (WO-SF-WORKSPACE-01) ─────────────────────────────────
 // Minimal transport for the Workspace backend; every write that changes an element names the version it read.
+// These are the board's commands: they refuse while the Developer has the Workspace board module off (owner
+// 2026-10-14). The Notes stream writes through the phase note actions above, which stay on.
 
+const WORKSPACE_BOARD = "workspace-board";
 const Version = z.number().int().min(1);
 const CanvasCoordinate = z.number().int().min(0).max(100_000);
 const CardCanvasWidth = z.number().int().min(120).max(100_000);
@@ -417,6 +421,7 @@ export type WorkspaceCommandInput = z.infer<typeof WorkspaceCommand>;
 
 export async function workspaceAction(input: WorkspaceCommandInput): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled(WORKSPACE_BOARD);
     const ctx = await context();
     const data = parse(WorkspaceCommand, input);
     const base = { ...ctx, projectId: data.projectId };
@@ -454,6 +459,7 @@ function newElementFields(formData: FormData) {
 /** One image element on the Workspace board (pasted or dropped, or beside the text being written), in one request. */
 export async function createWorkspaceImageAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled(WORKSPACE_BOARD);
     const ctx = await context();
     const data = newElementFields(formData);
     const file = formData.get("file");
@@ -467,6 +473,7 @@ export async function createWorkspaceImageAction(formData: FormData): Promise<Ac
 /** One file element on the Workspace board (25 MB at most, within the Server Action body limit). */
 export async function createWorkspaceFileAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
   return runSafeAction(async () => {
+    await requireModuleEnabled(WORKSPACE_BOARD);
     const ctx = await context();
     const data = newElementFields(formData);
     const file = formData.get("file");
