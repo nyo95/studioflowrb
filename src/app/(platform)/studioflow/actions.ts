@@ -371,11 +371,10 @@ export async function phaseCommandAction(input: PhaseCommandInput): Promise<Acti
 
 const NoteBody = z.string().max(4000).nullable();
 const PhaseNoteCommand = z.discriminatedUnion("command", [
-  z.strictObject({ command: z.literal("post"), projectId: Id, phaseId: Id, body: NoteBody, clientFeedback: z.boolean().optional(), withImages: z.boolean().optional() }),
+  z.strictObject({ command: z.literal("post"), projectId: Id, phaseId: Id, body: NoteBody, clientFeedback: z.boolean().optional(), answeredIterationId: Id.optional() }),
   z.strictObject({ command: z.literal("edit"), projectId: Id, phaseId: Id, noteId: Id, body: NoteBody }),
   z.strictObject({ command: z.literal("flags"), projectId: Id, phaseId: Id, noteId: Id, starred: z.boolean().optional(), clientFeedback: z.boolean().optional() }),
   z.strictObject({ command: z.literal("delete"), projectId: Id, phaseId: Id, noteId: Id }),
-  z.strictObject({ command: z.literal("removeImage"), projectId: Id, phaseId: Id, imageId: Id }),
 ]);
 export type PhaseNoteCommandInput = z.infer<typeof PhaseNoteCommand>;
 
@@ -387,11 +386,10 @@ export async function phaseNoteAction(input: PhaseNoteCommandInput): Promise<Act
     const phases = studioFlow.phases;
     let noteId: string;
     switch (data.command) {
-      case "post": noteId = (await phases.postPhaseNote({ ...base, body: data.body, clientFeedback: data.clientFeedback, withImages: data.withImages })).noteId; break;
+      case "post": noteId = (await phases.postPhaseNote({ ...base, body: data.body, clientFeedback: data.clientFeedback, answeredIterationId: data.answeredIterationId })).noteId; break;
       case "edit": noteId = (await phases.editPhaseNote({ ...base, noteId: data.noteId, body: data.body })).noteId; break;
       case "flags": noteId = (await phases.setPhaseNoteFlags({ ...base, noteId: data.noteId, starred: data.starred, clientFeedback: data.clientFeedback })).noteId; break;
       case "delete": noteId = (await phases.deletePhaseNote({ ...base, noteId: data.noteId })).noteId; break;
-      case "removeImage": noteId = (await phases.removePhaseNoteImage({ ...base, imageId: data.imageId })).noteId; break;
     }
     refresh(data.projectId);
     return { noteId };
@@ -399,14 +397,14 @@ export async function phaseNoteAction(input: PhaseNoteCommandInput): Promise<Act
 }
 
 // ── Project Workspace (WO-SF-WORKSPACE-01) ─────────────────────────────────
-// Minimal transport for the Workspace backend; every write that changes a card or section names the version it read.
+// Minimal transport for the Workspace backend; every write that changes an element names the version it read.
 
 const Version = z.number().int().min(1);
 const CanvasCoordinate = z.number().int().min(0).max(100_000);
 const CardCanvasWidth = z.number().int().min(120).max(100_000);
 const TextStyle = z.enum(["PLAIN", "HEADING", "STICKY"]);
 const WorkspaceCommand = z.discriminatedUnion("command", [
-  z.strictObject({ command: z.literal("createCard"), projectId: Id, phaseId: Id.nullable().optional(), body: NoteBody, clientAnswer: z.boolean().optional(), withImages: z.boolean().optional(), textStyle: TextStyle.optional(), x: CanvasCoordinate.optional(), y: CanvasCoordinate.optional(), w: CardCanvasWidth.optional() }),
+  z.strictObject({ command: z.literal("createCard"), projectId: Id, phaseId: Id.nullable().optional(), body: NoteBody, clientAnswer: z.boolean().optional(), textStyle: TextStyle.optional(), x: CanvasCoordinate.optional(), y: CanvasCoordinate.optional(), w: CardCanvasWidth.optional() }),
   z.strictObject({ command: z.literal("placeItems"), projectId: Id, cards: z.array(z.strictObject({ id: Id, x: CanvasCoordinate, y: CanvasCoordinate, w: CardCanvasWidth })).max(500) }),
   z.strictObject({ command: z.literal("updateCard"), projectId: Id, cardId: Id, body: NoteBody, version: Version }),
   z.strictObject({ command: z.literal("setTextStyle"), projectId: Id, cardId: Id, textStyle: TextStyle, version: Version }),
@@ -425,7 +423,7 @@ export async function workspaceAction(input: WorkspaceCommandInput): Promise<Act
     const workspace = studioFlow.workspace;
     let result: unknown;
     switch (data.command) {
-      case "createCard": result = await workspace.createWorkspaceCard({ ...base, phaseId: data.phaseId ?? null, body: data.body, clientAnswer: data.clientAnswer, withImages: data.withImages, textStyle: data.textStyle, x: data.x, y: data.y, w: data.w }); break;
+      case "createCard": result = await workspace.createWorkspaceCard({ ...base, phaseId: data.phaseId ?? null, body: data.body, clientAnswer: data.clientAnswer, textStyle: data.textStyle, x: data.x, y: data.y, w: data.w }); break;
       case "placeItems": result = await workspace.placeWorkspaceItems({ ...base, cards: data.cards }); break;
       case "updateCard": result = await workspace.updateWorkspaceCardText({ ...base, cardId: data.cardId, body: data.body, version: data.version }); break;
       case "setTextStyle": result = await workspace.setWorkspaceTextStyle({ ...base, cardId: data.cardId, textStyle: data.textStyle, version: data.version }); break;
@@ -439,34 +437,21 @@ export async function workspaceAction(input: WorkspaceCommandInput): Promise<Act
   });
 }
 
-const CardImageForm = z.strictObject({ projectId: Id, cardId: Id });
-/** One image onto a Workspace card; images go one request at a time so their order holds. */
-export async function addWorkspaceCardImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(CardImageForm, { projectId: formData.get("projectId"), cardId: formData.get("cardId") });
-    const file = formData.get("file");
-    if (!(file instanceof File)) throw new AppError("VALIDATION", "NOTE_IMAGE_REQUIRED", "Choose an image.");
-    const result = await studioFlow.workspace.addWorkspaceCardImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
-    refresh(data.projectId);
-    return { imageId: result.imageId };
-  });
-}
-
 const FormNumber = z.preprocess((value) => (value === null || value === "" ? undefined : Number(value)), z.number().int().optional());
+const OptionalFormId = z.preprocess((value) => value || undefined, Id.optional());
 const NewElementForm = z.strictObject({
   projectId: Id,
-  sectionId: z.preprocess((value) => value || undefined, Id.optional()),
   phaseId: z.preprocess((value) => value || null, Id.nullable()),
   clientAnswer: z.preprocess((value) => value === "true", z.boolean()),
+  besideId: OptionalFormId,
   x: FormNumber, y: FormNumber, w: FormNumber,
 });
 function newElementFields(formData: FormData) {
   const field = (name: string) => formData.get(name);
-  return parse(NewElementForm, { projectId: field("projectId"), sectionId: field("sectionId"), phaseId: field("phaseId"), clientAnswer: field("clientAnswer"), x: field("x"), y: field("y"), w: field("w") });
+  return parse(NewElementForm, { projectId: field("projectId"), phaseId: field("phaseId"), clientAnswer: field("clientAnswer"), besideId: field("besideId"), x: field("x"), y: field("y"), w: field("w") });
 }
 
-/** One image element on the Workspace board (pasted or dropped), in one request. */
+/** One image element on the Workspace board (pasted or dropped, or beside the text being written), in one request. */
 export async function createWorkspaceImageAction(formData: FormData): Promise<ActionResult<{ cardId: string }>> {
   return runSafeAction(async () => {
     const ctx = await context();
@@ -492,14 +477,16 @@ export async function createWorkspaceFileAction(formData: FormData): Promise<Act
   });
 }
 
-const NoteImageForm = z.strictObject({ projectId: Id, phaseId: Id, noteId: Id });
-export async function addPhaseNoteImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
+const PhaseImageForm = z.strictObject({ projectId: Id, phaseId: Id, clientFeedback: z.preprocess((value) => value === "true", z.boolean()), answeredIterationId: OptionalFormId });
+/** One image posted to a phase's notes as its own element; images go one request at a time so their order holds. */
+export async function postPhaseImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
   return runSafeAction(async () => {
     const ctx = await context();
-    const data = parse(NoteImageForm, { projectId: formData.get("projectId"), phaseId: formData.get("phaseId"), noteId: formData.get("noteId") });
+    const field = (name: string) => formData.get(name);
+    const data = parse(PhaseImageForm, { projectId: field("projectId"), phaseId: field("phaseId"), clientFeedback: field("clientFeedback"), answeredIterationId: field("answeredIterationId") });
     const file = formData.get("file");
     if (!(file instanceof File)) throw new AppError("VALIDATION", "NOTE_IMAGE_REQUIRED", "Choose an image.");
-    const result = await studioFlow.phases.addPhaseNoteImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
+    const result = await studioFlow.phases.postPhaseImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
     refresh(data.projectId);
     return { imageId: result.imageId };
   });

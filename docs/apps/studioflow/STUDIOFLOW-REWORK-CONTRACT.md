@@ -296,7 +296,13 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   `CLIENT_ANSWER` (what the client said; switchable with `NOTE` by hand) or
   `SITE_VISIT` (written by a supervision visit). "Client answered" and a
   visit's note create their card in the project's default section in the same
-  transaction as the phase step. Writes on a phase-labelled card follow that
+  transaction as the phase step. Those cards, and the text and screenshots the
+  answer dialog adds to that answer (`answeredIterationId`, refused before the
+  answer is recorded), are **workflow records** (`workflow_record`, R9.07):
+  their origin and phase/round labels never change (`WORKSPACE_RECORD_LOCKED`);
+  their text can still be corrected, starred or deleted. The R9.07 migration
+  marked every site-visit card and each client-answer card written within two
+  minutes of its iteration's recorded answer. Writes on a phase-labelled card follow that
   phase's rule (`phaseWork` + `transition` access); unlabelled cards and
   sections need `phaseWork` + `document` access; all need an open, active
   project. Every card and section change names the `version` it read; a
@@ -337,7 +343,9 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   and a file element as a signed link plus its name (the UI downloads it with
   the anchor `download` attribute; PDF opens inline). An image added to an
   element (pasted while writing, sent with a note) lands beside it as its own
-  element with the same labels; an empty note becomes its first image. The
+  element with the same labels, in one step (`besideId`); a note sent with
+  images posts the text and each image as separate elements, and there is no
+  empty note or two-step image path (R9.07). The
   R8.540 migration folded every frame into the project's DEFAULT section at
   the place it was drawn (frame titles became `HEADING` elements, the DEFAULT
   frame sits at the origin) and turned each card image into an image element
@@ -345,9 +353,11 @@ assignee, grouped by hundreds series; it never blocks a step. Content gate as
   first image). Archived-asset purge removes image and file elements with
   their objects and keeps text. Since R8.541 the screen has no frames: the
   board draws every element at its own place (unplaced ones stack under the
-  lowest placed one), and the action layer no longer offers section create,
-  rename, delete, reorder or card move/reorder (the service functions remain
-  until their purge, BACKLOG `[CLEANUP]`). Board use: click selects, Shift
+  lowest placed one); since R9.07 the section commands (create, rename,
+  delete, reorder, card move/reorder, frame placement) are gone from the
+  service too. The DEFAULT section stays as the hidden holder of every element
+  and the board read is one flat list in stored order. The round filter tells
+  rounds apart by iteration id, not by label. Board use: click selects, Shift
   adds, press-and-drag moves the whole selection (snapping to neighbours when
   one moves), click a text again to write; Text / Sticky tools or a
   double-click write at a spot; plain text pasted on the board becomes a text

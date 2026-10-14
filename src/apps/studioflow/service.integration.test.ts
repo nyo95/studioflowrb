@@ -3237,7 +3237,7 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
     const phase = await phaseOf(projectId, "moodboard");
     const iteration = await openIteration(phase.id);
     const base = { ...as(designer), projectId, phaseId: phase.id };
-    const { noteId } = await sf.phases.postPhaseNote({ ...base, body: null, withImages: true });
+    const { noteId } = await sf.phases.postPhaseNote({ ...base, body: "Client wants it warmer" });
     return { projectId, phase, iteration, base, noteId };
   }
   const jpeg = () => ({ body: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3, 4]), contentType: "image/jpeg" });
@@ -3260,95 +3260,72 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
     assert.deepEqual(actions, ["studioflow.workspace-card.created", "studioflow.workspace-card.edited", "studioflow.workspace-card.flags-changed"]);
   });
 
-  it("turns an empty note into its first image and lays later images beside it as their own elements", async () => {
-    const { projectId, iteration, base, noteId } = await setup();
-    const first = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
-    const second = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: jpeg() });
-    assert.equal(first.imageId, noteId, "the empty note became the image");
-    assert.notEqual(second.imageId, noteId);
-    // Both were written at the same test clock instant: put the converted note first.
-    const rows = (await imageElements(projectId)).sort((x, y) => Number(x.id !== noteId) - Number(y.id !== noteId));
-    assert.deepEqual(rows.map((row) => [row.id, row.kind, row.body, row.content_type, row.phase_id, row.iteration_id, row.uploaded_by_id, row.uploaded_by_name]), [
-      [noteId, "IMAGE", "", "image/png", base.phaseId, iteration.id, designer.id, "Dina Designer"],
-      [second.imageId, "IMAGE", "", "image/jpeg", base.phaseId, iteration.id, designer.id, "Dina Designer"],
+  it("posts each image as its own element with the phase and round labels, in one step", async () => {
+    const { projectId, iteration, base } = await setup();
+    const first = await sf.phases.postPhaseImage({ ...base, file: png() });
+    const second = await sf.phases.postPhaseImage({ ...base, file: jpeg(), clientFeedback: true });
+    const rows = await imageElements(projectId);
+    assert.deepEqual(rows.map((row) => [row.id, row.kind, row.body, row.content_type, row.phase_id, row.iteration_id, row.origin, row.workflow_record, row.uploaded_by_name]).sort((x, y) => String(x[3]).localeCompare(String(y[3]))), [
+      [second.imageId, "IMAGE", "", "image/jpeg", base.phaseId, iteration.id, "CLIENT_ANSWER", false, "Dina Designer"],
+      [first.imageId, "IMAGE", "", "image/png", base.phaseId, iteration.id, "NOTE", false, "Dina Designer"],
     ]);
     for (const row of rows) {
       assert.ok(row.storage_key!.startsWith(`studioflow/notes/${projectId}/`));
       assert.ok(storage.objects.has(row.storage_key!));
     }
-    assert.equal((await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.workspace-card.image-added" } })).length, 2);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.workspace-card.created", entity_id: { in: [first.imageId, second.imageId] } } }), 2);
+    await rejectsWith(sf.phases.postPhaseNote({ ...base, body: " " }), "PHASE_NOTE_EMPTY");
   });
 
   it("refuses a bad type, a fake image and an oversize file, leaving no stored object behind", async () => {
-    const { projectId, base, noteId } = await setup();
-    await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: { body: new Uint8Array([0x25, 0x50, 0x44, 0x46, 1, 2, 3, 4, 5]), contentType: "application/pdf" } }), "NOTE_IMAGE_TYPE");
-    await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: { body: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), contentType: "image/png" } }), "NOTE_IMAGE_TYPE");
-    await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: { body: new Uint8Array(0), contentType: "image/png" } }), "NOTE_IMAGE_SIZE");
+    const { projectId, base } = await setup();
+    await rejectsWith(sf.phases.postPhaseImage({ ...base, file: { body: new Uint8Array([0x25, 0x50, 0x44, 0x46, 1, 2, 3, 4, 5]), contentType: "application/pdf" } }), "NOTE_IMAGE_TYPE");
+    await rejectsWith(sf.phases.postPhaseImage({ ...base, file: { body: new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), contentType: "image/png" } }), "NOTE_IMAGE_TYPE");
+    await rejectsWith(sf.phases.postPhaseImage({ ...base, file: { body: new Uint8Array(0), contentType: "image/png" } }), "NOTE_IMAGE_SIZE");
     const big = new Uint8Array(3 * 1024 * 1024 + 1); big.set(PNG);
-    await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: { body: big, contentType: "image/png" } }), "NOTE_IMAGE_SIZE");
+    await rejectsWith(sf.phases.postPhaseImage({ ...base, file: { body: big, contentType: "image/png" } }), "NOTE_IMAGE_SIZE");
     assert.equal(storage.objects.size, 0);
     assert.equal((await imageElements(projectId)).length, 0);
   });
 
-  it("turns an empty note into an image only once under concurrent adds", async () => {
-    const { projectId, base, noteId } = await setup();
-    const results = await Promise.all(Array.from({ length: 4 }, () => sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() })));
-    assert.equal(results.filter((result) => result.imageId === noteId).length, 1);
-    const rows = await imageElements(projectId);
-    assert.equal(rows.length, 4);
-    assert.equal(storage.objects.size, 4);
-    assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { project_id: projectId, kind: "TEXT" } }), 0, "no empty note is left behind");
-  });
-
-  it("removes an image element and releases its object, keeping one something else references", async () => {
-    const { projectId, base, noteId } = await setup();
-    const a = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
-    const b = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
+  it("deletes an image element and releases its object, keeping one something else references", async () => {
+    const { projectId, base } = await setup();
+    const a = await sf.phases.postPhaseImage({ ...base, file: png() });
+    const b = await sf.phases.postPhaseImage({ ...base, file: png() });
     const rows = await imageElements(projectId);
     const keyA = rows.find((row) => row.id === a.imageId)!.storage_key;
     const keyB = rows.find((row) => row.id === b.imageId)!.storage_key;
-    assert.equal((await sf.phases.removePhaseNoteImage({ ...base, imageId: a.imageId })).noteRemoved, true);
+    await sf.phases.deletePhaseNote({ ...base, noteId: a.imageId });
     assert.equal(storage.objects.has(keyA!), false);
-    assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { id: noteId } }), 0);
+    assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { id: a.imageId } }), 0);
     // Another row points at the same object: it must survive the removal.
     const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: base.projectId, section: "MATERIAL", category: "Floor", category_key: "floor", prefix: "FL", increment: 1, sort_order: 0 } });
     await testDb.prisma.sfScheduleOption.create({ data: { entry_id: entry.id, label: "A", product_name: "Floor", search_key: "floor", image_key: keyB! } });
-    await sf.phases.removePhaseNoteImage({ ...base, imageId: b.imageId });
+    await sf.phases.deletePhaseNote({ ...base, noteId: b.imageId });
     assert.ok(storage.objects.has(keyB!));
-    await rejectsWith(sf.phases.removePhaseNoteImage({ ...base, imageId: b.imageId }), "NOTE_IMAGE_NOT_FOUND");
-  });
-
-  it("deletes an image element and releases its object; the image beside it stays", async () => {
-    const { projectId, base, noteId } = await setup();
-    await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
-    await sf.phases.addPhaseNoteImage({ ...base, noteId, file: jpeg() });
-    assert.equal(storage.objects.size, 2);
-    await sf.phases.deletePhaseNote({ ...base, noteId });
-    assert.equal(storage.objects.size, 1);
-    assert.equal((await imageElements(projectId)).length, 1);
-    await rejectsWith(sf.phases.deletePhaseNote({ ...base, noteId }), "PHASE_NOTE_NOT_FOUND");
+    await rejectsWith(sf.phases.deletePhaseNote({ ...base, noteId: b.imageId }), "PHASE_NOTE_NOT_FOUND");
   });
 
   it("follows the phase-work rules: viewer, other seat, archived project and another project's message", async () => {
     const { projectId, phase, base, noteId } = await setup();
-    const added = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
+    await sf.phases.postPhaseImage({ ...base, file: png() });
     const viewer = await seedUser("Vera Viewer", [P.access, P.projectRead]);
     const asViewer = { ...as(viewer, [P.access, P.projectRead]), projectId, phaseId: phase.id };
     await rejectsWith(sf.phases.postPhaseNote({ ...asViewer, body: "x" }), "PERMISSION_DENIED");
-    await rejectsWith(sf.phases.addPhaseNoteImage({ ...asViewer, noteId, file: png() }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.postPhaseImage({ ...asViewer, file: png() }), "PERMISSION_DENIED");
     await rejectsWith(sf.phases.setPhaseNoteFlags({ ...asViewer, noteId, starred: true }), "PERMISSION_DENIED");
-    await rejectsWith(sf.phases.removePhaseNoteImage({ ...asViewer, imageId: added.imageId }), "PERMISSION_DENIED");
     // The drafter has no seat on the Moodboard phase.
     await rejectsWith(sf.phases.deletePhaseNote({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: phase.id, noteId }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.postPhaseImage({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: phase.id, file: png() }), "PERMISSION_DENIED");
     const other = await newProject("Other project");
     const otherPhase = await phaseOf(other.projectId, "moodboard");
     const otherBase = { ...as(designer), projectId: other.projectId, phaseId: otherPhase.id };
     await rejectsWith(sf.phases.editPhaseNote({ ...otherBase, noteId, body: "Hijack" }), "PHASE_NOTE_NOT_FOUND");
-    await rejectsWith(sf.phases.addPhaseNoteImage({ ...otherBase, noteId, file: png() }), "PHASE_NOTE_NOT_FOUND");
-    await rejectsWith(sf.phases.removePhaseNoteImage({ ...otherBase, imageId: added.imageId }), "NOTE_IMAGE_NOT_FOUND");
+    // Another project's phase is not reachable through this project.
+    await rejectsWith(sf.phases.postPhaseImage({ ...base, phaseId: otherPhase.id, file: png() }), "PHASE_NOT_FOUND");
     assert.equal(storage.objects.size, 1, "a refused add stored nothing");
     await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Paused" });
-    await rejectsWith(sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() }), "PROJECT_ARCHIVED");
+    await rejectsWith(sf.phases.postPhaseImage({ ...base, file: png() }), "PROJECT_ARCHIVED");
     await rejectsWith(sf.phases.deletePhaseNote({ ...base, noteId }), "PROJECT_ARCHIVED");
     assert.equal(storage.objects.size, 1);
   });
@@ -3365,9 +3342,10 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
   });
 
   it("reads messages with their images as signed links, and the card counts starred ones, never exposing a storage key", async () => {
-    const { projectId, phase, base, noteId } = await setup();
-    const one = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
-    const two = await sf.phases.addPhaseNoteImage({ ...base, noteId, file: jpeg() });
+    const { projectId, phase, base } = await setup();
+    const one = await sf.phases.postPhaseImage({ ...base, file: png() });
+    const two = await sf.phases.postPhaseImage({ ...base, file: jpeg() });
+    const noteId = one.imageId;
     await sf.phases.setPhaseNoteFlags({ ...base, noteId, starred: true });
     const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
     const shape = (images: ReadonlyArray<{ id: string; url: string | null; contentType: string; bytes: number }>) => images.map((image) => [image.id, image.contentType, image.bytes, image.url?.startsWith("https://storage.invalid/")]);
@@ -3393,7 +3371,7 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
 
   it("keeps messages and their images when an admin resets the phase's iterations", async () => {
     const { phase, base, noteId } = await setup();
-    await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
+    await sf.phases.postPhaseImage({ ...base, file: png() });
     await sf.phases.overrideRevision({ ...base, mode: "HARD_RESET_ACTIVE", major: 3, note: "Align with client numbering" });
     assert.equal(storage.objects.size, 1);
     assert.equal((await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: noteId } })).iteration_id, null);
@@ -3542,8 +3520,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     const phase = await phaseOf(projectId, "moodboard");
     await openIteration(phase.id);
     const base = { ...as(designer), projectId, phaseId: phase.id };
-    const { noteId } = await sf.phases.postPhaseNote({ ...base, body: null, withImages: true });
-    await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
+    const { imageId: noteId } = await sf.phases.postPhaseImage({ ...base, file: png() });
     const image = (await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { id: noteId, kind: "IMAGE" }, select: { id: true, storage_key: true } })) as { id: string; storage_key: string };
 
     const saved = await ideas.saveNoteImageToIdeas({ ...base, imageId: image.id });
@@ -3587,8 +3564,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     const phase = await phaseOf(projectId, "moodboard");
     await openIteration(phase.id);
     const base = { ...as(designer), projectId, phaseId: phase.id };
-    const { noteId } = await sf.phases.postPhaseNote({ ...base, body: null, withImages: true });
-    await sf.phases.addPhaseNoteImage({ ...base, noteId, file: png() });
+    const { imageId: noteId } = await sf.phases.postPhaseImage({ ...base, file: png() });
     const image = (await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { id: noteId, kind: "IMAGE" }, select: { id: true, storage_key: true } })) as { id: string; storage_key: string };
     const second = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await ideas.readNoteImageSource({ ...base, imageId: image.id }) });
     assert.deepEqual([second.created, second.boardId], [false, board.id]);
@@ -3678,89 +3654,36 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     return { projectId, moodboard, cd, base: { ...as(designer), projectId } };
   }
 
-  it("creates the fixed default section on the first loose card and keeps using it after sections are reordered", async () => {
+  it("holds every element in the project's one default section, created once even for concurrent first elements", async () => {
     const { projectId, moodboard, base } = await setup();
-    const general = await sf.workspace.createWorkspaceCard({ ...base, body: "Client prefers warm wood" });
-    let workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    assert.deepEqual(workspace.map((section) => [section.title, section.isDefault]), [["Workspace", true]]);
-    assert.deepEqual(workspace[0]!.cards.map((card) => [card.id, card.phaseId, card.origin]), [[general.cardId, null, "NOTE"]]);
-
-    const materials = await sf.workspace.createWorkspaceSection({ ...base, title: "Materials" });
-    assert.equal((await testDb.prisma.sfWorkspaceSection.findUniqueOrThrow({ where: { id: materials.sectionId } })).system_key, null, "a person never creates the default section");
-    const labelled = await sf.workspace.createWorkspaceCard({ ...base, sectionId: materials.sectionId, phaseId: moodboard.id, body: "Terrazzo sample" });
-    const labelledRow = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: labelled.cardId } });
-    assert.equal(labelledRow.iteration_id, (await openIteration(moodboard.id)).id, "a phase-labelled card takes the phase's latest round as its round label");
-
-    const defaultWorkspace = workspace[0]!;
-    await sf.workspace.reorderWorkspaceSections({ ...base, orderedIds: [materials.sectionId, defaultWorkspace.id] });
-    workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    assert.deepEqual(workspace.map((section) => [section.title, section.isDefault]), [["Materials", false], ["Workspace", true]]);
-    await rejectsWith(sf.workspace.reorderWorkspaceSections({ ...base, orderedIds: [materials.sectionId] }), "WORKSPACE_ORDER_INVALID");
-
-    const loose = await sf.workspace.createWorkspaceCard({ ...base, body: "Still goes to Workspace" });
-    assert.equal((await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: loose.cardId } })).section_id, defaultWorkspace.id);
-
-    const materialsSection = workspace[0]!;
-    await rejectsWith(sf.workspace.deleteWorkspaceSection({ ...base, sectionId: materialsSection.id, version: materialsSection.version }), "WORKSPACE_SECTION_NOT_EMPTY");
-    const card = materialsSection.cards[0]!;
-    await sf.workspace.moveWorkspaceCard({ ...base, cardId: card.id, sectionId: defaultWorkspace.id, position: 0, version: card.version });
-    workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    assert.deepEqual(workspace[1]!.cards.map((row) => [row.id, row.sortOrder]), [[labelled.cardId, 0], [general.cardId, 1], [loose.cardId, 2]]);
-    await rejectsWith(sf.workspace.deleteWorkspaceSection({ ...base, sectionId: materialsSection.id, version: materialsSection.version - 1 }), "WORKSPACE_SECTION_STALE");
-    await sf.workspace.deleteWorkspaceSection({ ...base, sectionId: materialsSection.id, version: workspace[0]!.version });
-    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId })).map((section) => section.title), ["Workspace"]);
-
-    await sf.workspace.reorderWorkspaceCards({ ...base, sectionId: defaultWorkspace.id, orderedIds: [general.cardId, loose.cardId, labelled.cardId] });
-    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards.map((row) => row.id), [general.cardId, loose.cardId, labelled.cardId]);
-    const events = await testDb.prisma.auditEvent.findMany({ where: { action: { startsWith: "studioflow.workspace-" } } });
-    const actions = events.map((event) => event.action);
-    for (const action of ["studioflow.workspace-card.created", "studioflow.workspace-section.created", "studioflow.workspace-section.reordered", "studioflow.workspace-card.moved", "studioflow.workspace-section.deleted", "studioflow.workspace-section.cards-reordered"]) assert.ok(actions.includes(action), action);
-    assert.ok(events.some((event) => {
-      const metadata = event.metadata as { projectId?: string; isDefault?: boolean; bySystem?: boolean };
-      return event.action === "studioflow.workspace-section.created" && event.entity_id === defaultWorkspace.id && metadata.projectId === projectId && metadata.isDefault === true && metadata.bySystem === true;
-    }));
-    assert.ok(events.some((event) => {
-      const metadata = event.metadata as { projectId?: string; isDefault?: boolean };
-      return event.action === "studioflow.workspace-section.created" && event.entity_id === materials.sectionId && metadata.projectId === projectId && metadata.isDefault === false;
-    }));
-    assert.ok(events.some((event) => event.action === "studioflow.workspace-section.cards-reordered" && event.entity_id === defaultWorkspace.id && (event.metadata as { isDefault?: boolean }).isDefault === true));
-    assert.ok(events.some((event) => event.action === "studioflow.workspace-section.deleted" && event.entity_id === materials.sectionId && (event.metadata as { isDefault?: boolean }).isDefault === false));
-    for (const event of events) assert.doesNotMatch(JSON.stringify(event.metadata), /warm wood|Terrazzo/, "audit never carries card text");
-  });
-
-  it("creates exactly one default section for concurrent first cards and never lets that section be deleted", async () => {
-    const { projectId, base } = await setup();
-    const ordinary = await sf.workspace.createWorkspaceSection({ ...base, title: "Ordinary" });
     const [first, second] = await Promise.all([
-      sf.workspace.createWorkspaceCard({ ...base, body: "First concurrent card" }),
+      sf.workspace.createWorkspaceCard({ ...base, body: "Client prefers warm wood" }),
       sf.workspace.createWorkspaceCard({ ...base, body: "Second concurrent card" }),
     ]);
-    let workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    assert.equal(workspace.length, 2);
-    assert.deepEqual(workspace.map((section) => [section.title, section.isDefault]), [["Workspace", true], ["Ordinary", false]], "the lazily created default goes in front of existing ordinary sections");
-    assert.deepEqual(workspace[0]!.cards.map((card) => card.id).sort(), [first.cardId, second.cardId].sort());
-    assert.equal(await testDb.prisma.sfWorkspaceSection.count({ where: { project_id: projectId, system_key: "DEFAULT" } }), 1);
+    const sections = await testDb.prisma.sfWorkspaceSection.findMany({ where: { project_id: projectId } });
+    assert.deepEqual(sections.map((section) => section.system_key), ["DEFAULT"], "a project has exactly one, system-made section");
+    const labelled = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Terrazzo sample" });
+    const labelledRow = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: labelled.cardId } });
+    assert.equal(labelledRow.section_id, sections[0]!.id);
+    assert.equal(labelledRow.iteration_id, (await openIteration(moodboard.id)).id, "a phase-labelled card takes the phase's latest round as its round label");
 
-    for (const card of workspace[0]!.cards) {
-      await sf.workspace.moveWorkspaceCard({ ...base, cardId: card.id, sectionId: ordinary.sectionId, position: 0, version: card.version });
-    }
-    workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    const defaultSection = workspace.find((section) => section.isDefault)!;
-    assert.equal(defaultSection.cards.length, 0);
-    await rejectsWith(sf.workspace.deleteWorkspaceSection({ ...base, sectionId: defaultSection.id, version: defaultSection.version }), "WORKSPACE_SECTION_DEFAULT");
-    const renamed = await sf.workspace.renameWorkspaceSection({ ...base, sectionId: defaultSection.id, title: "Inbox", version: defaultSection.version });
-    await sf.workspace.reorderWorkspaceSections({ ...base, orderedIds: [ordinary.sectionId, defaultSection.id] });
-    workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    assert.deepEqual(workspace.map((section) => [section.title, section.isDefault]), [["Ordinary", false], ["Inbox", true]]);
-    assert.ok((await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.workspace-section.renamed", entity_id: defaultSection.id } })).some((event) => (event.metadata as { isDefault?: boolean }).isDefault === true));
-    assert.equal(renamed.version, defaultSection.version + 1);
+    const board = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    assert.deepEqual(board.map((card) => card.id).sort(), [first.cardId, second.cardId, labelled.cardId].sort());
+    assert.deepEqual(board.map((card) => card.sortOrder).sort(), [0, 1, 2]);
+    assert.ok(!("sectionId" in board[0]!), "the board read has no sections");
+    const events = await testDb.prisma.auditEvent.findMany({ where: { action: { startsWith: "studioflow.workspace-" } } });
+    assert.ok(events.some((event) => {
+      const metadata = event.metadata as { projectId?: string; isDefault?: boolean; bySystem?: boolean };
+      return event.action === "studioflow.workspace-section.created" && event.entity_id === sections[0]!.id && metadata.projectId === projectId && metadata.isDefault === true && metadata.bySystem === true;
+    }));
+    for (const event of events) assert.doesNotMatch(JSON.stringify(event.metadata), /warm wood|Terrazzo/, "audit never carries card text");
   });
 
   it("filters by phase label, sets and clears the label (clearing the round too), and refuses another project's phase", async () => {
     const { projectId, moodboard, cd, base } = await setup();
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Palette" });
     await sf.workspace.createWorkspaceCard({ ...base, body: "General" });
-    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId, phaseId: moodboard.id }))[0]!.cards.map((card) => card.id), [cardId]);
+    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId, phaseId: moodboard.id })).map((card) => card.id), [cardId]);
     assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: moodboard.id })).notes.length, 1, "the phase notes feed shows only its own cards");
 
     let version = (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } })).version;
@@ -3775,35 +3698,31 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     const foreignPhase = await phaseOf(other.projectId, "moodboard");
     await rejectsWith(sf.workspace.setWorkspaceCardPhase({ ...base, cardId, phaseId: foreignPhase.id, version }), "WORKSPACE_PHASE_INVALID");
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: foreignPhase.id, body: "x" }), "WORKSPACE_PHASE_INVALID");
-    const foreignSection = await sf.workspace.createWorkspaceSection({ ...as(designer), projectId: other.projectId, title: "Theirs" });
-    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, sectionId: foreignSection.sectionId, body: "x" }), "WORKSPACE_SECTION_NOT_FOUND");
-    await rejectsWith(sf.workspace.moveWorkspaceCard({ ...base, cardId, sectionId: foreignSection.sectionId, position: 0, version }), "WORKSPACE_SECTION_NOT_FOUND");
+    await rejectsWith(sf.workspace.createWorkspaceImage({ ...base, phaseId: foreignPhase.id, file: png() }), "WORKSPACE_PHASE_INVALID");
+    assert.equal(storage.objects.size, 0, "a refused label stores nothing");
   });
 
   it("refuses a write naming an older version and changes nothing", async () => {
     const { projectId, base } = await setup();
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, body: "First" });
-    const read = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards[0]!;
+    const read = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
     const saved = await sf.workspace.updateWorkspaceCardText({ ...base, cardId, body: "Second", version: read.version });
     assert.equal(saved.version, read.version + 1);
     await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...base, cardId, body: "Stale edit", version: read.version }), "WORKSPACE_CARD_STALE");
     await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...base, cardId, pinned: true, version: read.version }), "WORKSPACE_CARD_STALE");
     await rejectsWith(sf.workspace.deleteWorkspaceCard({ ...base, cardId, version: read.version }), "WORKSPACE_CARD_STALE");
-    const section = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
-    await rejectsWith(sf.workspace.renameWorkspaceSection({ ...base, sectionId: section.id, title: "Renamed", version: section.version + 1 }), "WORKSPACE_SECTION_STALE");
     const row = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
     assert.deepEqual([row.body, row.is_pinned], ["Second", false]);
     await sf.workspace.deleteWorkspaceCard({ ...base, cardId, version: saved.version });
     assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { id: cardId } }), 0);
   });
 
-  it("gates unlabelled cards and sections on the project's document people and labelled cards on the phase rule", async () => {
+  it("gates unlabelled cards on the project's document people and labelled cards on the phase rule", async () => {
     const { projectId, moodboard, cd, base } = await setup();
     const unassignedGrants = ALL.filter((grant) => grant !== P.projectOverride);
     const outsider = await seedUser("Workspace outsider", unassignedGrants);
     const viewer = await seedUser("Workspace viewer", [P.access, P.projectRead]);
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...as(outsider, unassignedGrants), projectId, body: "x" }), "PERMISSION_DENIED");
-    await rejectsWith(sf.workspace.createWorkspaceSection({ ...as(outsider, unassignedGrants), projectId, title: "x" }), "PERMISSION_DENIED");
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...as(viewer, [P.access, P.projectRead]), projectId, body: "x" }), "PERMISSION_DENIED");
     // The drafter may write a general card and a card on the drafter's phase, but not on the designer's Moodboard.
     await sf.workspace.createWorkspaceCard({ ...as(drafter, DRAFTER_GRANTS), projectId, body: "Drafter general" });
@@ -3812,24 +3731,21 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     const general = await sf.workspace.createWorkspaceCard({ ...base, body: "Designer general" });
     const version = (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: general.cardId } })).version;
     await rejectsWith(sf.workspace.setWorkspaceCardPhase({ ...as(drafter, DRAFTER_GRANTS), projectId, cardId: general.cardId, phaseId: moodboard.id, version }), "PERMISSION_DENIED");
-    assert.equal((await sf.workspace.readWorkspace({ grants: [P.access, P.projectRead], projectId }))[0]!.cards.length, 3, "readers see every card");
+    assert.equal((await sf.workspace.readWorkspace({ grants: [P.access, P.projectRead], projectId })).length, 3, "readers see every card");
     await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: clock } });
     await assert.rejects(sf.workspace.createWorkspaceCard({ ...base, body: "after archive" }));
   });
 
-  it("puts a client answer and a site visit into the default section with their labels, atomically", async () => {
+  it("puts a client answer and a site visit on the board with their labels, atomically, as the step's record", async () => {
     const { projectId, moodboard, base } = await setup();
     await sf.workspace.createWorkspaceCard({ ...base, body: "Creates the default" });
-    let workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    const defaultSection = workspace.find((section) => section.isDefault)!;
-    const materials = await sf.workspace.createWorkspaceSection({ ...base, title: "Materials" });
-    await sf.workspace.reorderWorkspaceSections({ ...base, orderedIds: [materials.sectionId, defaultSection.id] });
+    const defaultSection = await testDb.prisma.sfWorkspaceSection.findFirstOrThrow({ where: { project_id: projectId } });
     const iteration = await openIteration(moodboard.id);
     const phaseBase = { ...base, phaseId: moodboard.id };
     await sf.phases.sendIteration({ ...phaseBase, iterationId: iteration.id });
     const answered = await sf.phases.recordClientAnswer({ ...phaseBase, iterationId: iteration.id, note: "Warmer, please" });
     const card = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: answered.noteId! } });
-    assert.deepEqual([card.section_id, card.phase_id, card.iteration_id, card.origin, card.canvas_x, card.canvas_y, card.canvas_w], [defaultSection.id, moodboard.id, iteration.id, "CLIENT_ANSWER", null, null, null], "the project's default section takes an unplaced card even when another section is first");
+    assert.deepEqual([card.section_id, card.phase_id, card.iteration_id, card.origin, card.workflow_record, card.canvas_x, card.canvas_y, card.canvas_w], [defaultSection.id, moodboard.id, iteration.id, "CLIENT_ANSWER", true, null, null, null]);
 
     const failingAudit = createStudioFlowService(testDb.prisma, {
       runTransaction: (work) => testDb.prisma.$transaction((tx) => work(tx)), auditWriter: { write: async () => { throw new Error("audit down"); } },
@@ -3842,68 +3758,83 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     assert.equal(await testDb.prisma.sfWorkspaceCard.count(), before, "a failed visit leaves no card behind");
     const visit = await sf.phases.createSupervisionVisit({ ...base, phaseId: supervision.id, visitDate: "2026-09-20", note: "Ceiling checked" });
     const visitCard = await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { iteration_id: visit.iterationId } });
-    assert.deepEqual([visitCard.section_id, visitCard.phase_id, visitCard.origin, visitCard.body, visitCard.canvas_x, visitCard.canvas_y, visitCard.canvas_w], [defaultSection.id, supervision.id, "SITE_VISIT", "Ceiling checked", null, null, null]);
+    assert.deepEqual([visitCard.section_id, visitCard.phase_id, visitCard.origin, visitCard.workflow_record, visitCard.body, visitCard.canvas_x, visitCard.canvas_y, visitCard.canvas_w], [defaultSection.id, supervision.id, "SITE_VISIT", true, "Ceiling checked", null, null, null]);
+  });
+
+  it("keeps a recorded answer's origin and labels fixed, and lets the answer dialog add text and screenshots to it", async () => {
+    const { projectId, moodboard, cd, base } = await setup();
+    const iteration = await openIteration(moodboard.id);
+    const phaseBase = { ...base, phaseId: moodboard.id };
+    // Before the answer is recorded, nothing can be filed as part of it.
+    await sf.phases.sendIteration({ ...phaseBase, iterationId: iteration.id });
+    await rejectsWith(sf.phases.postPhaseNote({ ...phaseBase, body: "Too early", answeredIterationId: iteration.id }), "ITERATION_NOT_ANSWERED");
+    await rejectsWith(sf.phases.postPhaseImage({ ...phaseBase, file: png(), answeredIterationId: iteration.id }), "ITERATION_NOT_ANSWERED");
+    assert.equal(storage.objects.size, 0, "a refused answer image stores nothing");
+
+    const answered = await sf.phases.recordClientAnswer({ ...phaseBase, iterationId: iteration.id, note: "Warmer, please" });
+    const more = await sf.phases.postPhaseNote({ ...phaseBase, body: "Also a lighter floor", answeredIterationId: iteration.id });
+    const shot = await sf.phases.postPhaseImage({ ...phaseBase, file: png(), answeredIterationId: iteration.id });
+    const rows = await testDb.prisma.sfWorkspaceCard.findMany({ where: { id: { in: [answered.noteId!, more.noteId, shot.imageId] } } });
+    for (const row of rows) assert.deepEqual([row.origin, row.workflow_record, row.phase_id, row.iteration_id], ["CLIENT_ANSWER", true, moodboard.id, iteration.id], row.kind);
+
+    const read = (await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((item) => item.id === answered.noteId)!;
+    assert.equal(read.workflowRecord, true);
+    await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...base, cardId: read.id, clientAnswer: false, version: read.version }), "WORKSPACE_RECORD_LOCKED");
+    await rejectsWith(sf.phases.setPhaseNoteFlags({ ...phaseBase, noteId: read.id, clientFeedback: false }), "WORKSPACE_RECORD_LOCKED");
+    await rejectsWith(sf.workspace.setWorkspaceCardPhase({ ...base, cardId: read.id, phaseId: cd.id, version: read.version }), "WORKSPACE_RECORD_LOCKED");
+    await rejectsWith(sf.workspace.setWorkspaceCardPhase({ ...base, cardId: read.id, phaseId: null, version: read.version }), "WORKSPACE_RECORD_LOCKED");
+    // Its text can still be corrected and it can be starred; the record is its origin and labels.
+    const starred = await sf.workspace.setWorkspaceCardFlags({ ...base, cardId: read.id, pinned: true, version: read.version });
+    await sf.workspace.updateWorkspaceCardText({ ...base, cardId: read.id, body: "Warmer, please (soft beige)", version: starred.version });
+    const after = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: read.id } });
+    assert.deepEqual([after.origin, after.phase_id, after.iteration_id, after.is_pinned, after.body], ["CLIENT_ANSWER", moodboard.id, iteration.id, true, "Warmer, please (soft beige)"]);
+
+    // A note marked by hand stays switchable.
+    const manual = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Heard on the phone", clientAnswer: true });
+    const manualRow = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: manual.cardId } });
+    assert.equal(manualRow.workflow_record, false);
+    await sf.workspace.setWorkspaceCardFlags({ ...base, cardId: manual.cardId, clientAnswer: false, version: manualRow.version });
+    assert.equal((await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: manual.cardId } })).origin, "NOTE");
   });
 
   it("stores optional geometry, places a last-write-wins batch without bumping versions, and orders the phone document by canvas", async () => {
     const { projectId, base } = await setup();
     const unplaced = await sf.workspace.createWorkspaceCard({ ...base, body: "Unplaced first" });
-    const defaultFrame = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
-    const materials = await sf.workspace.createWorkspaceSection({ ...base, title: "Materials", x: 640, y: 40, w: 400, h: 240 });
-    const placed = await sf.workspace.createWorkspaceCard({ ...base, sectionId: defaultFrame.id, body: "Placed", x: 80, y: 240, w: 256 });
-    const moving = await sf.workspace.createWorkspaceCard({ ...base, sectionId: defaultFrame.id, body: "Move me", x: 240, y: 80, w: 256 });
+    const placed = await sf.workspace.createWorkspaceCard({ ...base, body: "Placed", x: 80, y: 240, w: 256 });
+    const moving = await sf.workspace.createWorkspaceCard({ ...base, body: "Move me", x: 240, y: 80, w: 256 });
     const beforeVersion = (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: moving.cardId } })).version;
-    const auditsBefore = await testDb.prisma.auditEvent.count({ where: { action: "studioflow.workspace-card.moved" } });
+    const auditsBefore = await testDb.prisma.auditEvent.count({ where: { action: { startsWith: "studioflow.workspace-card." } } });
 
-    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((section) => section.id === materials.sectionId)?.canvas, { x: 640, y: 40, w: 400, h: 240 });
-    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((section) => section.id === defaultFrame.id)?.canvas, null);
     await sf.workspace.placeWorkspaceItems({
       ...base,
-      sections: [
-        { id: defaultFrame.id, x: 500, y: 40, w: 384, h: 300 },
-        { id: materials.sectionId, x: 20, y: 40, w: 400, h: 300 },
-      ],
       cards: [
         { id: moving.cardId, x: 300, y: 300, w: 256 },
-        { id: moving.cardId, x: 40, y: 40, w: 288, sectionId: materials.sectionId },
+        { id: moving.cardId, x: 40, y: 400, w: 288 },
         { id: placed.cardId, x: 80, y: 120, w: 256 },
       ],
     });
 
-    const workspace = await sf.workspace.readWorkspace({ grants: ALL, projectId });
-    assert.deepEqual(workspace.map((section) => section.id), [materials.sectionId, defaultFrame.id], "frames follow canvas x");
-    assert.deepEqual(workspace[0]!.cards.map((card) => [card.id, card.sortOrder, card.canvas]), [[moving.cardId, 0, { x: 40, y: 40, w: 288 }]]);
-    assert.deepEqual(workspace[1]!.cards.map((card) => [card.id, card.sortOrder]), [[placed.cardId, 0], [unplaced.cardId, 1]], "placed cards lead and unplaced cards retain their order after them");
-    assert.equal(workspace[0]!.cards[0]!.version, beforeVersion, "layout never bumps the card version");
-    assert.equal((await testDb.prisma.sfWorkspaceSection.findUniqueOrThrow({ where: { id: defaultFrame.id } })).version, defaultFrame.version, "layout never bumps the frame version");
+    const board = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    assert.deepEqual(board.map((card) => [card.id, card.sortOrder, card.canvas]), [
+      [placed.cardId, 0, { x: 80, y: 120, w: 256 }],
+      [moving.cardId, 1, { x: 40, y: 400, w: 288 }],
+      [unplaced.cardId, 2, null],
+    ], "the last value in a batch wins; placed elements lead top to bottom and unplaced ones keep their order after them");
+    assert.equal(board[1]!.version, beforeVersion, "layout never bumps the element version");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: { startsWith: "studioflow.workspace-card." } } }), auditsBefore, "pure geometry is not audited");
     const saved = await sf.workspace.updateWorkspaceCardText({ ...base, cardId: moving.cardId, body: "Edited after move", version: beforeVersion });
     assert.equal(saved.version, beforeVersion + 1, "a version read before the move is still valid for text");
-    const movedAudits = await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.workspace-card.moved", entity_id: moving.cardId } });
-    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.workspace-card.moved" } }), auditsBefore + 1);
-    assert.ok(movedAudits.some((event) => {
-      const metadata = event.metadata as { fromSectionId?: string; toSectionId?: string };
-      return metadata.fromSectionId === defaultFrame.id && metadata.toSectionId === materials.sectionId;
-    }));
-
-    await sf.workspace.moveWorkspaceCard({ ...base, cardId: placed.cardId, sectionId: materials.sectionId, position: 0, version: workspace[1]!.cards[0]!.version });
-    const movedByMenu = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: placed.cardId } });
-    assert.deepEqual([movedByMenu.canvas_x, movedByMenu.canvas_y, movedByMenu.canvas_w], [null, null, 256], "the menu move clears position but keeps width");
   });
 
   it("refuses invalid, foreign, unauthorized, oversized, archived, and completed canvas batches atomically", async () => {
     const { projectId, moodboard, base } = await setup();
     const defaultCard = await sf.workspace.createWorkspaceCard({ ...base, body: "General" });
     const labelled = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Designer phase" });
-    const defaultFrame = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
     const other = await setup("Other canvas project");
     const foreignCard = await sf.workspace.createWorkspaceCard({ ...other.base, body: "Foreign" });
-    const foreignFrame = (await sf.workspace.readWorkspace({ grants: ALL, projectId: other.projectId }))[0]!;
 
     await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: foreignCard.cardId, x: 0, y: 0, w: 180 }] }), "PHASE_NOTE_NOT_FOUND");
-    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, sections: [{ id: foreignFrame.id, x: 0, y: 0, w: 260, h: 120 }] }), "WORKSPACE_SECTION_NOT_FOUND");
-    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: defaultCard.cardId, x: 0, y: 0, w: 180, sectionId: foreignFrame.id }] }), "WORKSPACE_SECTION_NOT_FOUND");
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, body: "Partial", x: 1 }), "WORKSPACE_CANVAS_INVALID");
-    await rejectsWith(sf.workspace.createWorkspaceSection({ ...base, title: "Too small", x: 0, y: 0, w: 259, h: 120 }), "WORKSPACE_CANVAS_INVALID");
     await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: defaultCard.cardId, x: 100_001, y: 0, w: 180 }] }), "WORKSPACE_CANVAS_INVALID");
 
     const before = await testDb.prisma.sfWorkspaceCard.findMany({ where: { id: { in: [defaultCard.cardId, labelled.cardId] } }, orderBy: { id: "asc" } });
@@ -3914,7 +3845,6 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     assert.deepEqual(await testDb.prisma.sfWorkspaceCard.findMany({ where: { id: { in: [defaultCard.cardId, labelled.cardId] } }, orderBy: { id: "asc" } }), before, "one refused item rolls the whole batch back");
     await rejectsWith(sf.workspace.placeWorkspaceItems({ ...as(designer, [P.access, P.projectRead]), projectId, cards: [{ id: defaultCard.cardId, x: 0, y: 0, w: 180 }] }), "PERMISSION_DENIED");
     await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: Array.from({ length: 501 }, () => ({ id: defaultCard.cardId, x: 0, y: 0, w: 180 })) }), "WORKSPACE_CANVAS_LIMIT");
-    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, sections: Array.from({ length: 201 }, () => ({ id: defaultFrame.id, x: 0, y: 0, w: 260, h: 120 })) }), "WORKSPACE_CANVAS_LIMIT");
 
     await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: clock } });
     await assert.rejects(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: defaultCard.cardId, x: 0, y: 0, w: 180 }] }));
@@ -3941,7 +3871,7 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     const row = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
     assert.deepEqual([row.kind, row.body, row.origin, row.phase_id, row.canvas_x, row.canvas_y, row.canvas_w, row.content_type, row.uploaded_by_name], ["IMAGE", "", "CLIENT_ANSWER", moodboard.id, 40, 80, 120, "image/png", "Dina Designer"]);
     assert.ok(row.storage_key!.startsWith(`studioflow/notes/${projectId}/`) && storage.objects.has(row.storage_key!));
-    const view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards.find((card) => card.id === cardId)!;
+    const view = (await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((card) => card.id === cardId)!;
     assert.deepEqual([view.kind, view.file, view.images.map((image) => [image.id, image.contentType, image.url?.startsWith("https://storage.invalid/")])], ["IMAGE", null, [[cardId, "image/png", true]]]);
     await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...base, cardId, body: "Caption", version: row.version }), "WORKSPACE_ELEMENT_NOT_TEXT");
     await rejectsWith(sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "HEADING", version: row.version }), "WORKSPACE_ELEMENT_NOT_TEXT");
@@ -3956,7 +3886,7 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     const row = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
     assert.deepEqual([row.kind, row.file_name, row.content_type, row.bytes, row.body], ["FILE", "DED Dapur R2.pdf", "application/pdf", PDF().byteLength, ""]);
     assert.ok(row.storage_key!.startsWith(`studioflow/workspace-files/${projectId}/`) && row.storage_key!.endsWith(".pdf"));
-    const view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards.find((card) => card.id === cardId)!;
+    const view = (await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((card) => card.id === cardId)!;
     assert.deepEqual([view.kind, view.images, view.file?.name, view.file?.contentType, view.file?.url?.startsWith("https://storage.invalid/")], ["FILE", [], "DED Dapur R2.pdf", "application/pdf", true]);
     assert.equal(JSON.stringify(view).includes(row.storage_key!), false, "the storage key never leaks into a read");
 
@@ -3984,29 +3914,34 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
   it("keeps a text element's style and lets it be as narrow as an image", async () => {
     const { projectId, base } = await setup();
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, body: "Dapur dan ruang makan", textStyle: "HEADING", x: 0, y: 0, w: 120 });
-    let view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards[0]!;
+    let view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
     assert.deepEqual([view.kind, view.textStyle, view.canvas?.w], ["TEXT", "HEADING", 120]);
     const changed = await sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "STICKY", version: view.version });
     assert.equal(changed.version, view.version + 1);
-    view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards[0]!;
+    view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
     assert.equal(view.textStyle, "STICKY");
     await rejectsWith(sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "HEADING", version: view.version - 1 }), "WORKSPACE_CARD_STALE");
     await rejectsWith(sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "LOUD", version: view.version }), "WORKSPACE_TEXT_STYLE_INVALID");
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, body: "Too narrow", x: 0, y: 0, w: 119 }), "WORKSPACE_CANVAS_INVALID");
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, body: "   " }), "PHASE_NOTE_EMPTY");
   });
 
   it("lays an image pasted into a placed text element beside it, with the text's labels", async () => {
     const { projectId, moodboard, base } = await setup();
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, clientAnswer: true, body: "Backsplash too busy", x: 100, y: 200, w: 300 });
-    const first = await sf.workspace.addWorkspaceCardImage({ ...base, cardId, file: png() });
-    const second = await sf.workspace.addWorkspaceCardImage({ ...base, cardId, file: png() });
-    const rows = await testDb.prisma.sfWorkspaceCard.findMany({ where: { id: { in: [first.imageId, second.imageId] } }, orderBy: { canvas_y: "asc" } });
+    // Labels and place come from the text; what the caller sends for them is not used.
+    const first = await sf.workspace.createWorkspaceImage({ ...base, besideId: cardId, phaseId: null, x: 0, y: 0, w: 120, file: png() });
+    const second = await sf.workspace.createWorkspaceImage({ ...base, besideId: cardId, file: png() });
+    const rows = await testDb.prisma.sfWorkspaceCard.findMany({ where: { id: { in: [first.cardId, second.cardId] } }, orderBy: { canvas_y: "asc" } });
     assert.deepEqual(rows.map((row) => [row.id, row.kind, row.canvas_x, row.canvas_y, row.canvas_w, row.phase_id, row.origin]), [
-      [first.imageId, "IMAGE", 416, 200, 240, moodboard.id, "CLIENT_ANSWER"],
-      [second.imageId, "IMAGE", 416, 224, 240, moodboard.id, "CLIENT_ANSWER"],
+      [first.cardId, "IMAGE", 416, 200, 240, moodboard.id, "CLIENT_ANSWER"],
+      [second.cardId, "IMAGE", 416, 224, 240, moodboard.id, "CLIENT_ANSWER"],
     ]);
     const text = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
     assert.deepEqual([text.kind, text.body], ["TEXT", "Backsplash too busy"], "the text stays text");
-    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!.cards.length, 3);
+    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, projectId })).length, 3);
+    // Beside an element of another project: not reachable.
+    const other = await setup("Other board project");
+    await rejectsWith(sf.workspace.createWorkspaceImage({ ...other.base, besideId: cardId, file: png() }), "PHASE_NOTE_NOT_FOUND");
   });
 });

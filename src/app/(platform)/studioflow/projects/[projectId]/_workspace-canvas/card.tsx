@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as R
 
 import { Button, Checkbox, FormattedText, ImageGallery, InlineError, RichTextEditor, RowActionMenu, Select, Text, shrinkImageFile, toggleCheckItem, useFileIntake, type RowActionItem } from "@/platform/ui_engine";
 
-import { addWorkspaceCardImageAction, createWorkspaceFileAction, createWorkspaceImageAction, workspaceAction, type WorkspaceCommandInput } from "../../../actions";
+import { createWorkspaceFileAction, createWorkspaceImageAction, workspaceAction, type WorkspaceCommandInput } from "../../../actions";
 import { NOTE_MAX, NoteDraftFields, useNoteDraft, type NoteImage } from "../../../_components/phase-note-composer";
 import { NoteImageActions } from "../round-labels";
 
@@ -15,8 +15,11 @@ export type WorkspaceCardView = {
   body: string;
   pinned: boolean;
   origin: "NOTE" | "CLIENT_ANSWER" | "SITE_VISIT";
+  /** Recorded by a phase step (the client answer, a site visit): its origin and phase/round labels cannot change. */
+  workflowRecord: boolean;
   phaseId: string | null;
   phaseName: string | null;
+  iterationId: string | null;
   iterationLabel: string | null;
   authorName: string | null;
   createdAt: Date;
@@ -45,14 +48,16 @@ export const WORKSPACE_FILE_ACCEPT = ".pdf,.dwg,.dxf,.skp,.xlsx,.xls,.docx,.doc,
  * Drops each file on the board as its own element: images as image elements, other files as file elements. Later
  * ones cascade a little below the first so none hides another. Returns what did not get through.
  */
-export async function uploadBoardFiles(input: { projectId: string; phaseId: string | null; place?: { x: number; y: number; w: number }; files: readonly File[] }): Promise<{ problems: string[] }> {
+export async function uploadBoardFiles(input: { projectId: string; phaseId: string | null; clientAnswer?: boolean; place?: { x: number; y: number; w: number }; files: readonly File[] }): Promise<{ problems: string[]; failed: File[] }> {
   const problems: string[] = [];
+  const failed: File[] = [];
   for (const [index, file] of input.files.entries()) {
     try {
       const isImage = IMAGE_TYPES.includes(file.type);
       const form = new FormData();
       form.set("projectId", input.projectId);
       if (input.phaseId) form.set("phaseId", input.phaseId);
+      if (input.clientAnswer) form.set("clientAnswer", "true");
       if (input.place) {
         form.set("x", String(input.place.x + index * 24));
         form.set("y", String(input.place.y + index * 24));
@@ -60,25 +65,26 @@ export async function uploadBoardFiles(input: { projectId: string; phaseId: stri
       }
       form.set("file", isImage ? await shrinkImageFile(file, { maxBytes: NOTE_IMAGE_BYTES }) : file);
       const result = isImage ? await createWorkspaceImageAction(form) : await createWorkspaceFileAction(form);
-      if (!result.ok) problems.push(result.error.safeMessage);
+      if (!result.ok) { problems.push(result.error.safeMessage); failed.push(file); }
     } catch {
       problems.push(`${file.name || "A file"} could not be added.`);
+      failed.push(file);
     }
   }
-  return { problems };
+  return { problems, failed };
 }
 
-/** Adds images that belong with one element (each lands beside it as its own element); returns what did not get through. */
-export async function uploadCardImages(projectId: string, cardId: string, files: readonly File[]): Promise<{ problems: string[]; failed: File[] }> {
+/** Adds images that belong with one element: each lands beside it as its own element with its labels. Returns what did not get through. */
+export async function uploadCardImages(projectId: string, besideId: string, files: readonly File[]): Promise<{ problems: string[]; failed: File[] }> {
   const problems: string[] = [];
   const failed: File[] = [];
   for (const file of files) {
     try {
       const form = new FormData();
       form.set("projectId", projectId);
-      form.set("cardId", cardId);
+      form.set("besideId", besideId);
       form.set("file", await shrinkImageFile(file, { maxBytes: NOTE_IMAGE_BYTES }));
-      const result = await addWorkspaceCardImageAction(form);
+      const result = await createWorkspaceImageAction(form);
       if (!result.ok) { problems.push(result.error.safeMessage); failed.push(file); }
     } catch {
       problems.push(`${file.name || "An image"} could not be added.`);
@@ -101,7 +107,7 @@ export async function runWorkspaceCommand(input: WorkspaceCommandInput): Promise
   try {
     const result = await workspaceAction(input);
     if (result.ok) return { ok: true, data: result.data };
-    const stale = result.error.code === "WORKSPACE_CARD_STALE" || result.error.code === "WORKSPACE_SECTION_STALE";
+    const stale = result.error.code === "WORKSPACE_CARD_STALE";
     return { ok: false, stale, message: stale ? "Someone else changed this a moment ago. The board now shows the latest; please try again." : result.error.safeMessage };
   } catch {
     return { ok: false, stale: false, message: "The change could not be saved. Please try again." };
@@ -118,9 +124,10 @@ const TEXT_STYLES: { value: WorkspaceCardView["textStyle"]; label: string }[] = 
  * One element on the Workspace board (WO-SF-WORKSPACE-04): a text (plain, heading or sticky note), one image, or one
  * file. It reads as plain content; its labels, star and menu appear on hover, focus or selection. Press and drag it to
  * move it (with everything selected); click a text to write straight into it — the text saves itself shortly after
- * typing stops and when it is left. An image pasted while writing lands beside the text as its own element. A
- * checklist ticks in place. If someone else changed the text first, both texts are shown and the person chooses, so
- * nothing is overwritten silently; a move or a star by someone else is absorbed.
+ * typing stops and when it is left, one save after another (a save never overtakes the one before it). An image pasted
+ * while writing lands beside the text as its own element. A checklist ticks in place. If someone else changed the text
+ * first, both texts are shown and the person chooses, so nothing is overwritten silently; a move or a star by someone
+ * else is absorbed.
  */
 export function WorkspaceCard({ card, projectId, projectName, canWrite, labelChoices, canUseIdeas, dimmed, selected = false, style, measureRef, menuExtra, run, onDelete, onPress, ignoreClick, onWidthDown }: {
   card: WorkspaceCardView;
@@ -146,40 +153,41 @@ export function WorkspaceCard({ card, projectId, projectName, canWrite, labelCho
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(card.body);
   // The text and version the block last saved (or opened with). A star or a move by someone else bumps the version but
-  // keeps the text, so only a different text is a conflict.
-  const [baseBody, setBaseBody] = useState(card.body);
+  // keeps the text, so only a different text is a conflict, and only from a version newer than ours: right after our
+  // own save the board can still show the text from before it.
+  const [baseText, setBaseText] = useState({ body: card.body, version: card.version });
   const base = useRef({ body: card.body, version: card.version });
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "conflict">("idle");
   const [problems, setProblems] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [labelOpen, setLabelOpen] = useState(false);
   const timer = useRef<number | null>(null);
+  // The save on its way to the server; the next one waits for it, so it names the version that save produced.
+  const saving = useRef<Promise<boolean> | null>(null);
   const latest = useRef(card);
   const draftRef = useRef(draft);
-  useEffect(() => { latest.current = card; draftRef.current = draft; });
+  useEffect(() => { latest.current = card; });
 
-  const changedMeanwhile = editing && card.body !== baseBody;
+  const changedMeanwhile = editing && card.body !== baseText.body && card.version > baseText.version;
 
-  const adopt = (body: string, version: number) => { base.current = { body, version }; setBaseBody(body); };
+  const adopt = (body: string, version: number) => { base.current = { body, version }; setBaseText({ body, version }); };
 
   const isText = card.kind === "TEXT";
   const startEdit = () => {
     if (!canWrite || editing || !isText) return;
-    setDraft(card.body); adopt(card.body, card.version); setProblems([]); setStatus("idle");
+    setDraft(card.body); draftRef.current = card.body; adopt(card.body, card.version); setProblems([]); setStatus("idle");
     // After a menu closes and hands focus back to its button, so the editor keeps the caret.
     window.setTimeout(() => setEditing(true), 0);
   };
 
-  /** Saves the text unless it is unchanged, empty with no image (the old text stays), or waiting on a conflict. */
-  const saveNow = async (text: string) => {
-    if (timer.current) { window.clearTimeout(timer.current); timer.current = null; }
-    const body = text.trim();
+  /** Saves the latest text unless it is unchanged, empty (the old text stays), or waiting on a conflict. */
+  const saveOnce = async () => {
+    const body = draftRef.current.trim();
     const now = latest.current;
-    if (body === base.current.body.trim()) return true;
-    if (!body && now.images.length === 0) return true;
-    if (now.body !== base.current.body) { setStatus("conflict"); return false; }
+    if (body === base.current.body.trim() || !body) return true;
+    if (now.body !== base.current.body && now.version > base.current.version) { setStatus("conflict"); return false; }
     setStatus("saving");
-    const result = await run({ command: "updateCard", projectId, cardId: card.id, body: body || null, version: Math.max(now.version, base.current.version) });
+    const result = await run({ command: "updateCard", projectId, cardId: card.id, body, version: Math.max(now.version, base.current.version) });
     if (!result.ok) {
       setStatus(result.stale ? "conflict" : "idle");
       if (!result.stale) setProblems([result.message]);
@@ -189,16 +197,26 @@ export function WorkspaceCard({ card, projectId, projectName, canWrite, labelCho
     setStatus("saved");
     return true;
   };
+  /** Queues a save behind the one in flight, so saves reach the server one at a time and in order. */
+  const saveNow = (): Promise<boolean> => {
+    if (timer.current) { window.clearTimeout(timer.current); timer.current = null; }
+    const previous = saving.current;
+    const next = previous ? previous.then(saveOnce, saveOnce) : saveOnce();
+    saving.current = next;
+    void next.finally(() => { if (saving.current === next) saving.current = null; });
+    return next;
+  };
 
   const onType = (text: string) => {
     setDraft(text);
+    draftRef.current = text;
     if (timer.current) window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => void saveNow(text), 700);
+    timer.current = window.setTimeout(() => void saveNow(), 700);
   };
 
   const leave = async () => {
     if (status === "conflict" || changedMeanwhile) return;
-    if (await saveNow(draftRef.current)) setEditing(false);
+    if (await saveNow()) setEditing(false);
   };
   useEffect(() => () => { if (timer.current) window.clearTimeout(timer.current); }, []);
 
@@ -226,7 +244,9 @@ export function WorkspaceCard({ card, projectId, projectName, canWrite, labelCho
   const toggleCheck = (index: number) => void command({ command: "updateCard", projectId, cardId: card.id, body: toggleCheckItem(card.body, index), version: card.version });
 
   const feedback = card.origin === "CLIENT_ANSWER";
-  const canLabel = canWrite && (labelChoices.allowNone || labelChoices.phases.length > 0);
+  // What a phase step recorded keeps its origin and phase: those menu items are not offered on it.
+  const record = card.workflowRecord;
+  const canLabel = canWrite && !record && (labelChoices.allowNone || labelChoices.phases.length > 0);
   const styleItems: RowActionItem[] = isText ? TEXT_STYLES.map((option, index) => ({
     label: option.value === card.textStyle ? `${option.label} (current)` : `Make ${option.label.toLowerCase()}`,
     disabled: option.value === card.textStyle,
@@ -235,14 +255,14 @@ export function WorkspaceCard({ card, projectId, projectName, canWrite, labelCho
   })) : [];
   const menu: RowActionItem[] = canWrite ? [
     { label: "Edit", onSelect: startEdit, disabled: !isText },
-    { label: feedback ? "Not client feedback" : "Mark as client feedback", onSelect: () => void command({ command: "setClientAnswer", projectId, cardId: card.id, clientAnswer: !feedback, version: card.version }) },
+    ...(record ? [] : [{ label: feedback ? "Not client feedback" : "Mark as client feedback", onSelect: () => void command({ command: "setClientAnswer", projectId, cardId: card.id, clientAnswer: !feedback, version: card.version }) }]),
     ...(canLabel ? [{ label: card.phaseId ? "Change phase label" : "Add phase label", onSelect: () => setLabelOpen(true) }] : []),
     ...styleItems,
     ...menuExtra,
     { label: "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(card) },
   ] : [];
   const label = card.phaseName ? `${card.phaseName}${card.iterationLabel ? ` · ${card.iterationLabel}` : ""}` : "General";
-  const byline = [feedback && !card.authorName ? "Client" : card.authorName, card.editedAt ? "edited" : null].filter(Boolean).join(" · ");
+  const byline = [feedback && !card.authorName ? "Client" : card.authorName, record ? "recorded by the phase step" : null, card.editedAt ? "edited" : null].filter(Boolean).join(" · ");
   const tools = editing || labelOpen || problems.length > 0;
 
   const heading = isText && card.textStyle === "HEADING";
@@ -303,8 +323,8 @@ export function WorkspaceCard({ card, projectId, projectName, canWrite, labelCho
               <Text size="sm" weight="semibold">Someone else changed this text. Their text:</Text>
               {card.body ? <FormattedText text={card.body} className="text-sm" /> : <Text size="sm" tone="tertiary">(no text)</Text>}
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" variant="secondary" onClick={() => { setDraft(card.body); adopt(card.body, card.version); setStatus("idle"); setProblems([]); }}>Use theirs</Button>
-                <Button size="sm" variant="secondary" onClick={() => { adopt(card.body, card.version); setStatus("idle"); setProblems([]); void saveNow(draftRef.current); }}>Keep mine</Button>
+                <Button size="sm" variant="secondary" onClick={() => { setDraft(card.body); draftRef.current = card.body; adopt(card.body, card.version); setStatus("idle"); setProblems([]); }}>Use theirs</Button>
+                <Button size="sm" variant="secondary" onClick={() => { adopt(card.body, card.version); setStatus("idle"); setProblems([]); void saveNow(); }}>Keep mine</Button>
               </div>
             </div>
           ) : null}
@@ -395,7 +415,7 @@ export function CardComposer({ projectId, place, labelChoices, defaultPhaseId, r
   const [clientAnswer, setClientAnswer] = useState(false);
   const [sending, setSending] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
-  // A card whose images did not all get through: sending again retries them on that card, so one card stays one card.
+  // The text whose images did not all get through: sending again retries them beside it.
   const pending = useRef<string | null>(null);
   useEffect(() => { if (draft.attachments.length === 0) pending.current = null; }, [draft.attachments.length]);
   const spot = useRef(place);
@@ -406,16 +426,20 @@ export function CardComposer({ projectId, place, labelChoices, defaultPhaseId, r
     const files = draft.files;
     setSending(true); setErrors([]);
     try {
-      let target = pending.current;
-      if (!target || body) {
-        const created = await run({ command: "createCard", projectId, phaseId: phaseId || null, body: body || null, clientAnswer, withImages: !target && files.length > 0, ...(spot.current ?? {}) });
+      let beside = pending.current;
+      if (body) {
+        const created = await run({ command: "createCard", projectId, phaseId: phaseId || null, body, clientAnswer, ...(spot.current ?? {}) });
         if (!created.ok) { setErrors([created.message]); return; }
         spot.current = undefined;
-        target = (created.data as { cardId: string }).cardId;
+        beside = (created.data as { cardId: string }).cardId;
       }
-      const { problems, failed } = await uploadCardImages(projectId, target, files);
-      if (failed.length > 0) { pending.current = target; draft.keepOnly(failed); setErrors(problems); return; }
+      // Images sent with a text land beside it with its labels; images alone go where the note would have.
+      const { problems, failed } = beside
+        ? await uploadCardImages(projectId, beside, files)
+        : await uploadBoardFiles({ projectId, phaseId: phaseId || null, clientAnswer, place: spot.current, files });
+      if (failed.length > 0) { pending.current = beside; draft.keepOnly(failed); setErrors(problems); return; }
       pending.current = null;
+      spot.current = undefined;
       draft.clear();
       setClientAnswer(false);
     } finally {

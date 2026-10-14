@@ -11,15 +11,6 @@ import { NOTE_MAX } from "../../../_components/phase-note-composer";
 import { CardComposer, WORKSPACE_FILE_ACCEPT, WorkspaceCard, runWorkspaceCommand, uploadBoardFiles, type LabelChoices, type PhaseOption, type RunCommand, type WorkspaceCardView } from "./card";
 import { DEFAULT_CARD_W, ESTIMATED_CARD_H, MIN_CARD_W, boardExtent, layoutElements, snapMove, snapToGrid, type CardSlot, type Rect } from "./geometry";
 
-export type WorkspaceSectionView = {
-  id: string;
-  title: string;
-  version: number;
-  isDefault: boolean;
-  canvas: Rect | null;
-  cards: WorkspaceCardView[];
-};
-
 type Filter = "all" | "general" | "phase" | "starred" | "feedback";
 type View = { x: number; y: number; zoom: number };
 type Tool = "select" | "text" | "sticky";
@@ -46,10 +37,10 @@ const isEditable = (target: EventTarget | null) => target instanceof HTMLElement
  * (or middle-click, or Space + drag) to move around; zoom only enlarges, and the overview map jumps anywhere.
  * Layout is last-write-wins and never makes someone's text edit stale. Below 768 px the elements read top to bottom.
  */
-export function WorkspaceCanvas({ projectId, projectName, sections, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, drawingList }: {
+export function WorkspaceCanvas({ projectId, projectName, elements: board, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, drawingList }: {
   projectId: string;
   projectName: string;
-  sections: WorkspaceSectionView[];
+  elements: WorkspaceCardView[];
   phases: readonly PhaseOption[];
   selectedPhase: { id: string; name: string } | null;
   readOnlyReason: "archived" | "inactive" | "permission" | null;
@@ -65,10 +56,10 @@ export function WorkspaceCanvas({ projectId, projectName, sections, phases, sele
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Optimistic places and removals, dropped whenever the server sends the board again.
-  const [received, setReceived] = useState(sections);
+  const [received, setReceived] = useState(board);
   const [overrides, setOverrides] = useState<Record<string, CardSlot>>({});
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-  if (received !== sections) { setReceived(sections); setOverrides({}); setHidden(new Set()); }
+  if (received !== board) { setReceived(board); setOverrides({}); setHidden(new Set()); }
 
   const [heights, setHeights] = useState<ReadonlyMap<string, number>>(new Map());
   const [view, setView] = useState<View>(DEFAULT_VIEW);
@@ -128,9 +119,9 @@ export function WorkspaceCanvas({ projectId, projectName, sections, phases, sele
   }, [view, viewKey]);
 
   // ── Board model: server data + optimistic places, laid out ──────────
-  const elements = useMemo(() => sections.flatMap((section) => section.cards)
+  const elements = useMemo(() => board
     .filter((card) => !hidden.has(card.id))
-    .map((card) => (overrides[card.id] ? { ...card, canvas: overrides[card.id]! } : card)), [sections, overrides, hidden]);
+    .map((card) => (overrides[card.id] ? { ...card, canvas: overrides[card.id]! } : card)), [board, overrides, hidden]);
   const byId = useMemo(() => new Map(elements.map((card) => [card.id, card])), [elements]);
   const layout = useMemo(() => layoutElements(elements, heights), [elements, heights]);
   const heightOf = useCallback((id: string) => heights.get(id) ?? ESTIMATED_CARD_H, [heights]);
@@ -452,7 +443,7 @@ export function WorkspaceCanvas({ projectId, projectName, sections, phases, sele
     for (const card of targets) await act({ command: "deleteCard", projectId, cardId: card.id, version: card.version });
   };
   const markFeedback = async (cards: WorkspaceCardView[]) => {
-    for (const card of cards.filter((item) => canWriteCard(item) && !isFeedback(item))) await act({ command: "setClientAnswer", projectId, cardId: card.id, clientAnswer: true, version: card.version });
+    for (const card of cards.filter((item) => canWriteCard(item) && !isFeedback(item) && !item.workflowRecord)) await act({ command: "setClientAnswer", projectId, cardId: card.id, clientAnswer: true, version: card.version });
   };
 
   // ── Keyboard: tools, Escape, Delete (never while writing) ───────────
@@ -477,17 +468,18 @@ export function WorkspaceCanvas({ projectId, projectName, sections, phases, sele
   }, []);
 
   // ── Filters ─────────────────────────────────────────────────────────
+  // Rounds are told apart by id: two rounds may show the same label, and a renamed round is still the same round.
   const phaseRounds = useMemo(() => {
     if (!selectedPhase) return [];
-    const labels = new Set<string>();
-    for (const card of elements) if (card.phaseId === selectedPhase.id && card.iterationLabel) labels.add(card.iterationLabel);
-    return [...labels];
+    const rounds = new Map<string, string>();
+    for (const card of elements) if (card.phaseId === selectedPhase.id && card.iterationId && card.iterationLabel) rounds.set(card.iterationId, card.iterationLabel);
+    return [...rounds].map(([id, label]) => ({ id, label }));
   }, [elements, selectedPhase]);
   // A round only filters while the phase filter is on and the round still exists.
-  const activeRound = filter === "phase" && round && phaseRounds.includes(round) ? round : null;
+  const activeRound = filter === "phase" && round && phaseRounds.some((item) => item.id === round) ? round : null;
   const matches = (card: WorkspaceCardView) => {
     if (filter === "general") return !card.phaseId;
-    if (filter === "phase") return card.phaseId === selectedPhase?.id && (!activeRound || card.iterationLabel === activeRound);
+    if (filter === "phase") return card.phaseId === selectedPhase?.id && (!activeRound || card.iterationId === activeRound);
     if (filter === "starred") return card.pinned;
     if (filter === "feedback") return isFeedback(card);
     return true;
@@ -545,7 +537,7 @@ export function WorkspaceCanvas({ projectId, projectName, sections, phases, sele
           {filter === "phase" && phaseRounds.length > 1 ? (
             <div className={segmented} role="group" aria-label="Round">
               <button type="button" aria-pressed={activeRound === null} className={segment(activeRound === null)} onClick={() => setRound(null)}>Every round</button>
-              {phaseRounds.map((label) => <button key={label} type="button" aria-pressed={activeRound === label} className={segment(activeRound === label)} onClick={() => setRound(label)}>{label}</button>)}
+              {phaseRounds.map((item) => <button key={item.id} type="button" aria-pressed={activeRound === item.id} className={segment(activeRound === item.id)} onClick={() => setRound(item.id)}>{item.label}</button>)}
             </div>
           ) : null}
           <span className="flex-1" />

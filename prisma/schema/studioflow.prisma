@@ -317,6 +317,8 @@ model SfWorkspaceCard {
   body         String                @default("")
   is_pinned    Boolean               @default(false)
   origin       SfWorkspaceCardOrigin @default(NOTE)
+  /// Written by a phase step (the client answer, a site visit): its origin and phase/round labels are the record and never change.
+  workflow_record Boolean            @default(false)
   author_id    String?
   /// Snapshot, so the name survives the person being renamed or removed. Null on notes converted from the old fields.
   author_name  String?

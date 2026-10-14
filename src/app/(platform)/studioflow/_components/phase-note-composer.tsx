@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button, Checkbox, IconButton, InlineError, RichTextEditor, Text, shrinkImageFile, useFileIntake } from "@/platform/ui_engine";
 
-import { addPhaseNoteImageAction, phaseNoteAction } from "../actions";
+import { phaseNoteAction, postPhaseImageAction } from "../actions";
 
 /** Mirrors the server limits (WO-SF-NOTEFEED-01); the server stays the authority. */
 export const NOTE_MAX = 4000;
@@ -17,22 +17,23 @@ const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
 export type NoteImage = { id: string; url: string | null; contentType: string; bytes: number };
 
 /**
- * Uploads images onto one message, one at a time so the order holds and each request stays small. Returns the
- * problems and the files that did not get through, so only those are offered again (a retry never repeats a
- * file that was already added).
+ * Posts images to a phase's notes, each as its own element, one at a time so the order holds and each request stays
+ * small. `answeredIterationId` makes them part of that iteration's recorded client answer. Returns the problems and
+ * the files that did not get through, so only those are offered again (a retry never repeats a file already added).
  */
-export async function uploadNoteImages(projectId: string, phaseId: string, noteId: string, files: readonly File[]): Promise<{ problems: string[]; failed: File[] }> {
+export async function uploadPhaseImages(input: { projectId: string; phaseId: string; clientFeedback: boolean; answeredIterationId?: string }, files: readonly File[]): Promise<{ problems: string[]; failed: File[] }> {
   const problems: string[] = [];
   const failed: File[] = [];
   for (const file of files) {
     try {
       const prepared = await shrinkImageFile(file, { maxBytes: NOTE_IMAGE_BYTES });
       const form = new FormData();
-      form.set("projectId", projectId);
-      form.set("phaseId", phaseId);
-      form.set("noteId", noteId);
+      form.set("projectId", input.projectId);
+      form.set("phaseId", input.phaseId);
+      form.set("clientFeedback", String(input.clientFeedback));
+      if (input.answeredIterationId) form.set("answeredIterationId", input.answeredIterationId);
       form.set("file", prepared);
-      const result = await addPhaseNoteImageAction(form);
+      const result = await postPhaseImageAction(form);
       if (!result.ok) { problems.push(result.error.safeMessage); failed.push(file); }
     } catch {
       problems.push(`${file.name || "An image"} could not be added.`);
@@ -125,34 +126,18 @@ export function NoteComposer({ projectId, phaseId, autoFocus = false, onSent }: 
   const [sending, setSending] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
 
-  // A sent message whose images did not all get through: Send retries those images on it, so one message stays
-  // one message. It is forgotten once nothing waits to be retried.
-  const pending = useRef<string | null>(null);
-  useEffect(() => { if (draft.attachments.length === 0) pending.current = null; }, [draft.attachments.length]);
-
   const send = async () => {
     if (sending || draft.empty) return;
     const body = draft.text.trim();
     const files = draft.files;
     setSending(true); setErrors([]);
     try {
-      let target = pending.current;
-      let created: string | null = null;
-      // New text is always its own message; images being retried still go to the message they were sent with.
-      if (!target || body) {
-        const posted = await phaseNoteAction({ command: "post", projectId, phaseId, body: body || null, clientFeedback, withImages: !target && files.length > 0 });
+      // The text is its own element, each image another one with the same labels.
+      if (body) {
+        const posted = await phaseNoteAction({ command: "post", projectId, phaseId, body, clientFeedback });
         if (!posted.ok) { setErrors([posted.error.safeMessage]); return; }
-        created = posted.data.noteId;
-        target ??= created;
       }
-      const { problems, failed } = await uploadNoteImages(projectId, phaseId, target, files);
-      if (target === created && !body && files.length > 0 && failed.length === files.length) {
-        // An image-only message whose images all failed would be an empty bubble.
-        await phaseNoteAction({ command: "delete", projectId, phaseId, noteId: created });
-        pending.current = null;
-      } else {
-        pending.current = failed.length > 0 ? target : null;
-      }
+      const { problems, failed } = await uploadPhaseImages({ projectId, phaseId, clientFeedback }, files);
       // Images that did not get through stay in the draft, so Send tries them again instead of losing them.
       draft.keepOnly(failed);
       if (failed.length === 0) setClientFeedback(false);

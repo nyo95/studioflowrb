@@ -158,7 +158,11 @@ async function main() {
       reuse: (await sfProject("ZZ-Test SF Reuse")).projectId,
       codes: (await sfProject("ZZ-Test SF Codes")).projectId,
       round: (await sfProject("ZZ-Test SF Round")).projectId,
+      workspace: (await sfProject("ZZ-Test SF Workspace")).projectId,
     };
+    // A Workspace element recorded by a phase step (the client answer): its origin and phase stay as recorded.
+    const recorded = await sf.workspace.createWorkspaceCard({ ...sfGrants, projectId: sfFixtures.workspace, body: "ZZ-Test recorded client answer", x: 40, y: 360, w: 280 });
+    await db.sfWorkspaceCard.update({ where: { id: recorded.cardId }, data: { origin: "CLIENT_ANSWER", workflow_record: true } });
     await sf.schedule.createEntry({ ...sfGrants, projectId: sfFixtures.past, section: "MATERIAL", category: "Stone", snapshot: { productName: "ZZ-Test Past Marble" } });
     await sf.schedule.createEntry({ ...sfGrants, projectId: sfFixtures.codes, section: "MATERIAL", category: "Stone", snapshot: { productName: "ZZ-Test Code One" } });
     await sf.schedule.createEntry({ ...sfGrants, projectId: sfFixtures.codes, section: "MATERIAL", category: "Stone", snapshot: { productName: "ZZ-Test Code Two" } });

@@ -24,7 +24,7 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
   status: string;
 }) {
   const { grants } = await pageSession();
-  const [sections, phases, access, phaseList] = await Promise.all([
+  const [elements, phases, access, phaseList] = await Promise.all([
     studioFlow.workspace.readWorkspace({ grants, projectId }),
     studioFlow.workspace.listWorkspacePhaseLabels({ grants, projectId }),
     pageProjectAccess(projectId),
@@ -59,30 +59,25 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
       writablePhaseIds={writable ? access.phases.filter((item) => item.canTransition).map((item) => item.phaseId) : []}
       canUseIdeas={hasPermission(grants, P.ideasManage)}
       drawingList={drawingList}
-      sections={sections.map((section) => ({
-        id: section.id,
-        title: section.title,
-        version: section.version,
-        isDefault: section.isDefault,
-        canvas: section.canvas,
-        cards: section.cards.map((card) => ({
-          id: card.id,
-          version: card.version,
-          body: card.body,
-          pinned: card.pinned,
-          origin: card.origin,
-          phaseId: card.phaseId,
-          phaseName: card.phaseName,
-          iterationLabel: card.iterationLabel,
-          authorName: card.authorName,
-          createdAt: card.createdAt,
-          editedAt: card.editedAt,
-          images: card.images,
-          kind: card.kind,
-          textStyle: card.textStyle,
-          file: card.file,
-          canvas: card.canvas,
-        })),
+      elements={elements.map((card) => ({
+        id: card.id,
+        version: card.version,
+        body: card.body,
+        pinned: card.pinned,
+        origin: card.origin,
+        workflowRecord: card.workflowRecord,
+        phaseId: card.phaseId,
+        phaseName: card.phaseName,
+        iterationId: card.iterationId,
+        iterationLabel: card.iterationLabel,
+        authorName: card.authorName,
+        createdAt: card.createdAt,
+        editedAt: card.editedAt,
+        images: card.images,
+        kind: card.kind,
+        textStyle: card.textStyle,
+        file: card.file,
+        canvas: card.canvas,
       }))}
     />
   );

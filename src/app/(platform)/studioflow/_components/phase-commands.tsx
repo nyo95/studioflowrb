@@ -7,7 +7,7 @@ import { useDisplaySettings } from "@/platform/authenticated-shell/display-setti
 import { Button, Dialog, Field, FormActions, InlineError, Input, SimpleTextEditor } from "@/platform/ui_engine";
 
 import { phaseCommandAction, phaseNoteAction, undoPhaseEventAction, type PhaseCommandInput, type PhaseCommandOutcome } from "../actions";
-import { NoteDraftFields, uploadNoteImages, useNoteDraft } from "./phase-note-composer";
+import { NoteDraftFields, uploadPhaseImages, useNoteDraft } from "./phase-note-composer";
 import { useCommand } from "./use-command";
 
 /** The commands a person can give a phase from a card or from the phase page (everything except `projectId`). */
@@ -168,17 +168,9 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
   const choices = (iteration.answerChoices ?? ["revision", "done"]).filter((choice) => OUTCOME[choice]);
   const it = { phaseId: phase.id, iterationId: iteration.id };
   // Once the answer is recorded it is never recorded again: a retry after an image failed only finishes what did
-  // not get through (the remaining images, then the outcome). `empty` marks a screenshots-only message that has
-  // no image yet, which must not be left behind as an empty bubble.
-  const saved = useRef<{ noteId: string | null; empty: boolean } | null>(null);
-  const dropEmptyNote = async () => {
-    const note = saved.current;
-    if (note?.noteId && note.empty) {
-      await phaseNoteAction({ command: "delete", projectId: commands.projectId, phaseId: phase.id, noteId: note.noteId });
-      saved.current = { noteId: null, empty: false };
-    }
-  };
-  const close = () => { void dropEmptyNote().finally(onClose); };
+  // not get through (the remaining images, then the outcome). Everything added here is part of the recorded answer.
+  const saved = useRef(false);
+  const close = () => onClose();
   const answer = async (choice: string | null) => {
     setBusyKey(choice ?? "later");
     setProblems([]);
@@ -186,27 +178,19 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
       const text = draft.text.trim();
       const files = draft.files;
       if (!saved.current) {
-        let noteId: string | null = null;
-        const answered = await commands.exec(`${phase.id}:answer`, { ...it, command: "recordClientAnswer", note: text || null }, `${iteration.name}: client answered`, (result) => { noteId = (result as { noteId?: string | null } | null)?.noteId ?? null; });
+        const answered = await commands.exec(`${phase.id}:answer`, { ...it, command: "recordClientAnswer", note: text || null }, `${iteration.name}: client answered`);
         if (!answered) return;
-        saved.current = { noteId, empty: false };
+        saved.current = true;
         draft.keepOnly(files);
       } else if (text) {
-        // Written after the answer was saved: its own client-feedback message, so nothing typed is lost.
-        const posted = await phaseNoteAction({ command: "post", projectId: commands.projectId, phaseId: phase.id, body: text, clientFeedback: true });
+        // Written after the answer was saved: more of that answer, so nothing typed is lost.
+        const posted = await phaseNoteAction({ command: "post", projectId: commands.projectId, phaseId: phase.id, body: text, answeredIterationId: iteration.id });
         if (!posted.ok) { setProblems([posted.error.safeMessage]); return; }
         draft.keepOnly(files);
       }
-      const note = saved.current;
       if (files.length > 0) {
-        // Screenshots only: they still need a client-feedback message to sit on.
-        if (!note.noteId) {
-          const posted = await phaseNoteAction({ command: "post", projectId: commands.projectId, phaseId: phase.id, body: null, clientFeedback: true, withImages: true });
-          if (!posted.ok) { setProblems([posted.error.safeMessage, RETRY]); return; }
-          note.noteId = posted.data.noteId; note.empty = true;
-        }
-        const { problems: failed, failed: left } = await uploadNoteImages(commands.projectId, phase.id, note.noteId, files);
-        if (left.length < files.length) note.empty = false;
+        // Each screenshot is its own element, labelled with this answer.
+        const { problems: failed, failed: left } = await uploadPhaseImages({ projectId: commands.projectId, phaseId: phase.id, clientFeedback: true, answeredIterationId: iteration.id }, files);
         if (left.length > 0) {
           // Keep the dialog open with only the images that failed, so they are not lost and none is added twice.
           draft.keepOnly(left);
@@ -214,7 +198,6 @@ export function ClientAnswerDialog({ phase, iteration, commands, onClose }: { ph
           return;
         }
       }
-      await dropEmptyNote();
       draft.clear();
       if (choice) {
         const picked = OUTCOME[choice]!;
