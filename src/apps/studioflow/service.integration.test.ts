@@ -69,15 +69,15 @@ async function seedUser(name: string, grants: readonly string[]) {
 async function seedDefaultTemplate() {
   const db = testDb.prisma;
   const template = await db.sfPhaseTemplate.create({ data: { name: "Standard", is_default: true, is_active: true } });
-  const defs: Array<{ id: string; name: string; prefix: string; orderIndex: number; allowParallel: boolean; seat: string }> = [
+  const defs: Array<{ id: string; name: string; prefix: string; orderIndex: number; allowParallel: boolean; seat: string; iterationKinds?: Array<{ name: string }> }> = [
     { id: LEGACY.moodboard, name: "Moodboard", prefix: "MB", orderIndex: 1, allowParallel: false, seat: "designer" },
     { id: LEGACY.layout, name: "Layout Plan", prefix: "L", orderIndex: 2, allowParallel: true, seat: "designer" },
     { id: LEGACY.design3d, name: "Design 3D", prefix: "D", orderIndex: 3, allowParallel: true, seat: "designer" },
-    { id: LEGACY.cd, name: "Construction Drawing", prefix: "CD", orderIndex: 4, allowParallel: true, seat: "drafter" },
+    { id: LEGACY.cd, name: "Construction Drawing", prefix: "CD", orderIndex: 4, allowParallel: true, seat: "drafter", iterationKinds: [{ name: "CD Mall" }, { name: "CD Final" }] },
     { id: LEGACY.supervision, name: "Supervision", prefix: "SV", orderIndex: 5, allowParallel: false, seat: "designer" },
   ];
   for (const d of defs) {
-    await db.sfPhaseDefinition.create({ data: { id: d.id, template_id: template.id, name: d.name, prefix: d.prefix, order_index: d.orderIndex, allow_parallel: d.allowParallel, seat: d.seat } });
+    await db.sfPhaseDefinition.create({ data: { id: d.id, template_id: template.id, name: d.name, prefix: d.prefix, order_index: d.orderIndex, allow_parallel: d.allowParallel, seat: d.seat, default_iteration_kinds: d.iterationKinds } });
   }
 }
 
@@ -2913,9 +2913,9 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
   it("chains CD Mall to CD Final using the migrated data shape and undoes the continuation", async () => {
     const { projectId } = await newProject("CD chain");
     const cd = await phaseOf(projectId, "cd");
-    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "CD Mall" }, { name: "CD Final" }] } });
+    await testDb.prisma.sfPhaseDefinition.update({ where: { id: LEGACY.cd }, data: { default_iteration_kinds: [{ name: "Shop Drawing" }, { name: "As Built" }] } });
     const mall = await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
-    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: mall.iterationId } })).name, "CD Mall");
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: mall.iterationId } })).name, "CD Mall", "the existing project keeps its snapshotted step names after the template changes");
     // The step is read from the name, so the step names are locked both ways (a renamed CD Mall could close without CD Final).
     await rejectsWith(sf.phases.renameIteration({ ...as(designer), projectId, phaseId: cd.id, iterationId: mall.iterationId, name: "CD Mall lobby" }), "ITERATION_KIND_NAME_LOCKED");
     const moodboard = await phaseOf(projectId, "moodboard");

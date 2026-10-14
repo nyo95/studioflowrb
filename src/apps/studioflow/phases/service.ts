@@ -265,8 +265,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     return { id: row.id, phaseId: row.phase_id, major: row.major, name: row.name, status: row.status, sentAt: row.sent_at?.toISOString() ?? null, answeredAt: row.answered_at?.toISOString() ?? null, doneAt: row.done_at?.toISOString() ?? null, visitDate: row.visit_date?.toISOString() ?? null };
   }
   async function defaultFirstKind(tx: TxClient, phase: PhaseRow) {
-    const definition = await tx.sfPhaseDefinition.findUnique({ where: { id: phase.definition_id }, select: { default_iteration_kinds: true } });
-    return iterationKinds(definition?.default_iteration_kinds)[0];
+    return iterationKinds(phase.iteration_kinds_snapshot)[0];
   }
   async function autoAdvance(tx: TxClient, input: PhaseCommandInput, completed: PhaseRow) {
     const candidates = await tx.sfPhase.findMany({ where: { project_id: completed.project_id, status: "PENDING" }, orderBy: { order_index: "asc" } });
@@ -345,8 +344,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         const { phase, project } = await writableIteration(tx, input);
         const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } });
         if (!iteration || iteration.status !== "ANSWERED") throw invalidState("Choose an outcome only after the client answer is recorded.");
-        const definition = await tx.sfPhaseDefinition.findUniqueOrThrow({ where: { id: phase.definition_id }, select: { default_iteration_kinds: true } });
-        const kinds = iterationKinds(definition.default_iteration_kinds);
+        const kinds = iterationKinds(phase.iteration_kinds_snapshot);
         const isMall = isCdMall(kinds, iteration.name);
         if (input.outcome === "REVISION") {
           // What the client said stays in this iteration's notes; the next iteration shows them as its brief.
@@ -377,8 +375,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         if (iteration.name === name) return { iterationId: iteration.id };
         // A two-step phase knows its step by the iteration name (`isCdMall`): renaming "CD Mall" would let OK close the
         // phase without CD Final, and naming another iteration "CD Mall" would fake the step. Those names stay put.
-        const definition = await tx.sfPhaseDefinition.findUnique({ where: { id: phase.definition_id }, select: { default_iteration_kinds: true } });
-        const kinds = iterationKinds(definition?.default_iteration_kinds);
+        const kinds = iterationKinds(phase.iteration_kinds_snapshot);
         if (kinds.length >= 2 && (kinds.includes(iteration.name) || kinds.includes(name))) throw conflict("ITERATION_KIND_NAME_LOCKED", `${kinds.join(" and ")} keep their names: the phase uses them to know which step it is in.`);
         await tx.sfRevision.update({ where: { id: iteration.id }, data: { name } }); await recordEvent(tx, input, phase, iteration.id, iteration.name, name, { beforeIteration: iterationUndo(iteration) }); await audit(tx, input.actor, "iteration-renamed", phase, phase.status as PhaseStatus, phase.status as PhaseStatus, { iterationId: iteration.id }); return { iterationId: iteration.id }; });
     },
@@ -578,7 +575,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
           id: true, project_id: true, definition_id: true, order_index: true, status: true, is_locked: true,
           allow_parallel: true, name_snapshot: true, prefix_snapshot: true, seat_snapshot: true,
           status_changed_at: true,
-          definition: { select: { default_iteration_kinds: true } },
+          iteration_kinds_snapshot: true,
           project: { select: { id: true, name: true, archived_at: true, status: true, pic_designer_id: true, pic_drafter_id: true } },
           revisions: {
             orderBy: { major: "desc" },
@@ -597,7 +594,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const active = phase.revisions.find((rev) => OPEN_ITERATION_STATES.includes(rev.status as "NOT_SENT" | "SENT" | "ANSWERED")) ?? null;
       const archived = phase.project.archived_at !== null;
       const snap = phaseSnapshot(phase);
-      const kindNames = iterationKinds(phase.definition.default_iteration_kinds);
+      const kindNames = iterationKinds(phase.iteration_kinds_snapshot);
       const isSupervision = isLegacySupervisionDefinition(phase.definition_id);
       const phaseNotes = await readPhaseNotes(phase.id, snap.prefixSnapshot, kindNames);
       const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
@@ -635,11 +632,11 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         currentIteration: active ? {
           id: active.id, name: active.name, shortName: iterationShortName(active.name, snap.prefixSnapshot, active, kindNames.includes(active.name)), state: active.status, sentAt: active.sent_at, visitDate: dateToDateOnly(active.visit_date),
           waitingDays: active.status === "SENT" ? waitingDays(active.sent_at, nowOf(ports)) : null,
-          choices: iterationChoices({ state: active.status, phaseStatus: status, iterationName: active.name, kinds: iterationKinds(phase.definition.default_iteration_kinds), supervision: isSupervision }),
+          choices: iterationChoices({ state: active.status, phaseStatus: status, iterationName: active.name, kinds: kindNames, supervision: isSupervision }),
           /** The outcomes offered once the client has answered (Revision / Done, or Continue to CD Final on CD Mall). */
-          answerChoices: iterationChoices({ state: "ANSWERED", phaseStatus: status, iterationName: active.name, kinds: iterationKinds(phase.definition.default_iteration_kinds), supervision: isSupervision }),
+          answerChoices: iterationChoices({ state: "ANSWERED", phaseStatus: status, iterationName: active.name, kinds: kindNames, supervision: isSupervision }),
           /** The step "Continue to …" opens on a two-step phase's first step (e.g. CD Final), else null. */
-          nextStepName: nextIterationKind(iterationKinds(phase.definition.default_iteration_kinds), active.name),
+          nextStepName: nextIterationKind(kindNames, active.name),
         } : null,
         iterations: phase.revisions.map((rev) => ({
           id: rev.id, name: rev.name, shortName: iterationShortName(rev.name, snap.prefixSnapshot, rev, kindNames.includes(rev.name)), state: rev.status, createdAt: rev.created_at, sentAt: rev.sent_at, answeredAt: rev.answered_at, doneAt: rev.done_at,

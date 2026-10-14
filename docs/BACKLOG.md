@@ -129,8 +129,6 @@ Order matters; each item is its own Work Order.
 
 - [ ] [CLEANUP][P3] Archive retention residual window (R8.516, accepted): the eligibility re-check before the Presentation purge hook and the hook's own delete are separate steps, so a restore landing in the few milliseconds between them can still lose that project's Presentation slides. Closing it fully needs a purge-in-progress marker that restore respects; not justified for one office unless restores during the daily sweep become common.
 
-- [ ] [BUG][P3] Phase iteration kinds are read live from the phase definition, not from the project's snapshot (found in the R8.520 review, reproduced by the existing CD chain test, which edits the definition after the project exists): editing a template's iteration kinds changes the two-step workflow (which round must continue, the step names, the rename lock) of projects already running, against contract §5.1 ("later template edits never rewrite existing projects"). Fix: snapshot the kinds on `sf_phase` at project creation (backfilled from the definition) and read the snapshot everywhere `iterationKinds(phase.definition…)` is read today. Lowered to P3 in R8.522: no screen edits iteration kinds today (only the R8.4xx migration set CD Mall / CD Final), so only a direct database edit can trigger it; fix it before any Settings form for iteration kinds is built.
-
 ## UI Engine and Shared Utilities
 
 

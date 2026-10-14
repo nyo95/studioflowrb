@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.30 | 2026-10-14 | fix(studioflow): snapshot project iteration kinds (Executor)
+
+- **Project workflow snapshot:** `sf_phase.iteration_kinds_snapshot` now captures each definition's ordered iteration kinds when the project is created. Every phase command and read model uses that snapshot, so later template edits cannot change an existing project's step names, continuation rule, or rename lock.
+- **Migration and regression evidence:** migration `20261014150000_studioflow_phase_iteration_kinds_snapshot` backfills every existing phase from its definition and makes the JSON column required. The migration integration test covers named and ordinary phases; the CD-chain integration test changes the live definition after project creation and proves the existing project still follows CD Mall → CD Final.
+- **Dependencies:** none. **Checks:** migration deploy to disposable `studioflow_rebuild_test_bq` on `localhost:5433`; Prisma generate; focused migration and StudioFlow integration tests 197/197 PASS; full `npm test` 1,094/1,094 PASS; typecheck PASS; eslint PASS with one existing Presentation `<img>` warning; boundaries PASS; legacy-runtime PASS; production build PASS in `.next-verify`; staged and unstaged whitespace PASS. **Limitations:** browser acceptance is not applicable; no user-facing workflow changed.
+
 ## R9.24 | 2026-10-14 | docs(plan): WO-HARDEN-AUDIT-01 for Codex; Lead lane R9.25-R9.29 in parallel (Lead)
 
 - **Owner 2026-10-14:** "planning pekerjaan2 dan penyelesaian KB / error dari audit - bagi yg mana codex kerjakan ... kerjakan sekaligus"; plan approved, including the merge of the Codex branch after a review PASS (no push).

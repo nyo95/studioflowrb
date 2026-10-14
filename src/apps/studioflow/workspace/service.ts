@@ -485,16 +485,16 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     sort_order: number; phase_id: string | null; iteration_id: string | null; canvas_x: number | null; canvas_y: number | null; canvas_w: number | null;
     kind: WorkspaceElementKind; text_style: WorkspaceTextStyle; storage_key: string | null; content_type: string | null; bytes: number | null; file_name: string | null;
     iteration: { id: string; major: number; name: string } | null;
-    phase: { id: string; name_snapshot: string; prefix_snapshot: string; definition: { default_iteration_kinds: unknown } } | null;
+    phase: { id: string; name_snapshot: string; prefix_snapshot: string; iteration_kinds_snapshot: unknown } | null;
   };
   const CARD_INCLUDE = {
     iteration: { select: { id: true, major: true, name: true } },
-    phase: { select: { id: true, name_snapshot: true, prefix_snapshot: true, definition: { select: { default_iteration_kinds: true } } } },
+    phase: { select: { id: true, name_snapshot: true, prefix_snapshot: true, iteration_kinds_snapshot: true } },
   } as const;
 
   function roundLabel(row: Pick<CardReadRow, "iteration" | "phase">) {
     if (!row.iteration || !row.phase) return null;
-    const kinds = iterationKinds(row.phase.definition.default_iteration_kinds);
+    const kinds = iterationKinds(row.phase.iteration_kinds_snapshot);
     return iterationShortName(row.iteration.name, row.phase.prefix_snapshot, row.iteration, kinds.includes(row.iteration.name));
   }
 
@@ -608,12 +608,12 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         orderBy: { order_index: "asc" },
         select: {
           id: true, name_snapshot: true, prefix_snapshot: true,
-          definition: { select: { default_iteration_kinds: true } },
+          iteration_kinds_snapshot: true,
           workspace_cards: { where: { is_pinned: true }, orderBy: [{ created_at: "asc" }, { id: "asc" }], select: { id: true, body: true, kind: true, file_name: true, created_at: true, author_name: true, iteration: { select: { major: true, name: true } } } },
         },
       });
       return phases.map((phase) => {
-        const kinds = iterationKinds(phase.definition.default_iteration_kinds);
+        const kinds = iterationKinds(phase.iteration_kinds_snapshot);
         return {
           phaseId: phase.id,
           phaseName: phase.name_snapshot,
