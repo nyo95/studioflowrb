@@ -6,7 +6,7 @@ import { fullBlockers, todoBlockers } from "./blockers";
 import { iterationChoices, nextIterationKind } from "./iteration-kinds";
 import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot } from "./mom";
 import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
-import { DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, compareOptionLabels, fallbackPrefix, lowestFreeNumber, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
+import { DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, compareOptionLabels, fallbackPrefix, lowestFreeNumber, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, parseTypedScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
   buildTree,
   canTickChecklistItem,
@@ -234,6 +234,10 @@ describe("schedule labels and legacy sheet", () => {
     assert.deepEqual(parseScheduleCode(" FL - 12 "), { prefix: "FL", increment: 12 });
     assert.equal(parseScheduleCode("PT"), null);
     assert.equal(parseScheduleCode("PT-00"), null);
+    assert.deepEqual(parseTypedScheduleCode("HT1"), { prefix: "HT", increment: 1 });
+    assert.deepEqual(parseTypedScheduleCode("@HT01"), { prefix: "HT", increment: 1 });
+    assert.deepEqual(parseTypedScheduleCode(" @ht-01 "), { prefix: "HT", increment: 1 });
+    assert.equal(parseTypedScheduleCode("HT"), null);
   });
 
   it("finds the Google Sheets header below title rows", () => {

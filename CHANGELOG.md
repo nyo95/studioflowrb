@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.57 | 2026-10-14 | feat(studioflow): Make project notes one linked chat (Executor)
+
+- **Notes chat:** Workspace cards now support an in-project reply target, topic tags and Product Schedule item links. Reads expose the project-wide newest-first stream with cursor/filtering, tag suggestions, Schedule-item search, and notes for one item; phase-scoped notes keep working.
+- **Integrity:** reply and Schedule targets must belong to the same project; tags are normalized case-insensitively, capped at five and remove unused records; item links are capped at ten, snapshot their current code and cascade with deleted cards/items. Existing phase write access and optimistic card versions remain the gate.
+- **Migration:** `20261014230000_studioflow_note_chat` applied to the isolated rumah dev and test rebuild databases. No dependency or permission changes.
+- **Checks:** Prisma generate, typecheck, touched-file ESLint, full `npm test`, boundary and legacy-runtime checks, production build, and whitespace check passed. Browser acceptance remains with the Reviewer.
+
 ## R9.56 | 2026-10-14 | docs(plan): WO-SF-NOTES-CHAT-01 for Codex (Lead)
 
 - **Owner 2026-10-14:** approved the Notes chat mockup (https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF): one WhatsApp-like note stream per project, albums, replies; only the PIC writes so no @person; `#` for phase (auto) and topic tags; `@` for Product Schedule codes ("@HT1"); Workspace keeps the same notes behind the Developer switch.

@@ -152,6 +152,7 @@ model SfProject {
   external_schedule_placements SfExternalSchedulePlacement[]
   workspace_sections SfWorkspaceSection[]
   workspace_cards    SfWorkspaceCard[]
+  note_tags          SfNoteTag[]
 
   @@index([status, archived_at])
   @@index([pic_designer_id])
@@ -342,17 +343,65 @@ model SfWorkspaceCard {
   uploaded_by_id   String?
   /// Snapshot, so the name survives the person being renamed or removed.
   uploaded_by_name String?
+  reply_to_id      String?
 
   project   SfProject              @relation(fields: [project_id], references: [id], onDelete: Cascade)
   section   SfWorkspaceSection     @relation(fields: [section_id], references: [id], onDelete: Restrict)
   phase     SfPhase?               @relation(fields: [phase_id], references: [id], onDelete: SetNull)
   iteration SfRevision?            @relation(fields: [iteration_id], references: [id], onDelete: SetNull)
+  reply_to  SfWorkspaceCard?       @relation("SfWorkspaceCardReplies", fields: [reply_to_id], references: [id], onDelete: SetNull)
+  replies   SfWorkspaceCard[]      @relation("SfWorkspaceCardReplies")
+  note_tag_links SfNoteTagLink[]
+  note_item_links SfNoteItemLink[]
 
   @@index([section_id, sort_order])
   @@index([project_id, created_at])
   @@index([phase_id, created_at])
   @@index([iteration_id])
+  @@index([reply_to_id])
   @@map("sf_workspace_card")
+  @@schema("studioflow")
+}
+
+model SfNoteTag {
+  id         String          @id @default(uuid())
+  project_id String
+  name       String          @db.VarChar(32)
+  key        String          @db.VarChar(32)
+  created_at DateTime        @default(now())
+
+  project SfProject      @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  links   SfNoteTagLink[]
+
+  @@unique([project_id, key])
+  @@map("sf_note_tag")
+  @@schema("studioflow")
+}
+
+model SfNoteTagLink {
+  card_id String
+  tag_id  String
+
+  card SfWorkspaceCard @relation(fields: [card_id], references: [id], onDelete: Cascade)
+  tag  SfNoteTag       @relation(fields: [tag_id], references: [id], onDelete: Cascade)
+
+  @@id([card_id, tag_id])
+  @@index([tag_id])
+  @@map("sf_note_tag_link")
+  @@schema("studioflow")
+}
+
+model SfNoteItemLink {
+  card_id       String
+  entry_id      String
+  code_snapshot String
+
+  card  SfWorkspaceCard @relation(fields: [card_id], references: [id], onDelete: Cascade)
+  entry SfScheduleEntry @relation(fields: [entry_id], references: [id], onDelete: Cascade)
+
+  @@id([card_id, entry_id])
+  @@index([entry_id])
+  @@map("sf_note_item_link")
   @@schema("studioflow")
 }
 
@@ -745,6 +794,7 @@ model SfScheduleEntry {
   template_item SfScheduleTemplateItem? @relation(fields: [template_item_id], references: [id], onDelete: SetNull)
   options       SfScheduleOption[]
   external_schedule_placements SfExternalSchedulePlacement[]
+  note_item_links SfNoteItemLink[]
 
   @@unique([project_id, section, prefix, increment], map: "sf_schedule_entry_code_key")
   @@index([project_id, section, category_key, sort_order])

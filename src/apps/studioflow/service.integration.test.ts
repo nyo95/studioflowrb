@@ -3978,4 +3978,23 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     const other = await setup("Other board project");
     await rejectsWith(sf.workspace.createWorkspaceImage({ ...other.base, besideId: cardId, file: png() }), "PHASE_NOTE_NOT_FOUND");
   });
+
+  it("keeps project-chat replies, topic tags and schedule links on one note stream", async () => {
+    const { projectId, moodboard, base } = await setup();
+    const layout = await phaseOf(projectId, "layout");
+    const entry = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Homogeneous Tile", snapshot: { productName: "Ivory Tile" } });
+    const root = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Root message", tags: ["#lampu"] });
+    const reply = await sf.workspace.createWorkspaceCard({ ...base, phaseId: layout.id, body: "Reply message", replyToId: root.cardId, tags: ["Lampu"], itemEntryIds: [entry.entryId] });
+    const stream = await sf.workspace.listProjectNotes({ grants: ALL, projectId });
+    const note = stream.notes.find((item) => item.id === reply.cardId)!;
+    assert.deepEqual(note.replyTo, { id: root.cardId, kind: "TEXT", excerpt: "Root message", authorName: "Dina Designer", clientFeedback: false });
+    assert.deepEqual(note.tags, ["Lampu"]);
+    assert.deepEqual(note.items.map((item) => [item.code, item.name]), [["HT-01", "Ivory Tile"]]);
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, tag: "#lampu" })).notes.map((item) => item.id), [reply.cardId, root.cardId]);
+    assert.deepEqual((await sf.workspace.listNotesForItem({ grants: ALL, projectId, entryId: entry.entryId })).map((item) => item.id), [reply.cardId]);
+    assert.deepEqual((await sf.workspace.searchNoteItems({ grants: ALL, projectId, query: "ht1" })).map((item) => item.entryId), [entry.entryId]);
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Bad", tags: ["feedback"] }), "NOTE_TAG_RESERVED");
+    await sf.workspace.deleteWorkspaceCard({ ...base, cardId: root.cardId, version: (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: root.cardId } })).version });
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId })).notes.find((item) => item.id === reply.cardId)!.replyTo, null);
+  });
 });

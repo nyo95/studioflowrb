@@ -8,6 +8,7 @@ import { WORKSPACE_FILE_BYTES, WORKSPACE_FILE_NAME_MAX, WORKSPACE_FILE_TYPES, fi
 import { NOTE_IMAGE_BYTES, STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import { iterationKinds } from "../domain/iteration-kinds";
 import { iterationShortName } from "../domain/phase";
+import { parseTypedScheduleCode, scheduleCode } from "../domain/schedule";
 import {
   P,
   assertProjectWritable,
@@ -236,7 +237,52 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   }
 
   /** A text element; it always has text (an image or a file is its own element). */
-  async function createCard(input: ProjectInput & { phaseId?: string | null; body: string | null; origin?: "NOTE" | "CLIENT_ANSWER"; textStyle?: string; x?: number; y?: number; w?: number }) {
+  type NoteTagInput = string;
+
+  function normaliseTags(tags: readonly NoteTagInput[] | undefined) {
+    const unique = new Map<string, string>();
+    for (const raw of tags ?? []) {
+      const match = /^#?([A-Za-z0-9_-]{1,32})$/.exec(raw.trim());
+      if (!match) throw invalid("NOTE_TAG_INVALID", "A topic tag uses 1–32 letters, numbers, hyphens or underscores.");
+      const name = match[1];
+      const key = name.toLocaleLowerCase("id-ID");
+      if (key === "feedback") throw invalid("NOTE_TAG_RESERVED", "#feedback is reserved for client feedback.");
+      unique.set(key, name);
+    }
+    if (unique.size > 5) throw invalid("NOTE_TAG_LIMIT", "Choose at most 5 topic tags.");
+    return [...unique].map(([key, name]) => ({ key, name }));
+  }
+
+  async function syncTags(tx: TxClient, cardId: string, projectId: string, tags: readonly NoteTagInput[] | undefined) {
+    const values = normaliseTags(tags);
+    const tagIds: string[] = [];
+    for (const tag of values) {
+      const row = await tx.sfNoteTag.upsert({ where: { project_id_key: { project_id: projectId, key: tag.key } }, create: { id: randomUUID(), project_id: projectId, name: tag.name, key: tag.key }, update: {}, select: { id: true } });
+      tagIds.push(row.id);
+    }
+    await tx.sfNoteTagLink.deleteMany({ where: { card_id: cardId } });
+    if (tagIds.length) await tx.sfNoteTagLink.createMany({ data: tagIds.map((tag_id) => ({ card_id: cardId, tag_id })) });
+    await tx.sfNoteTag.deleteMany({ where: { links: { none: {} } } });
+  }
+
+  async function syncItemLinks(tx: TxClient, cardId: string, projectId: string, entryIds: readonly string[] | undefined) {
+    if (entryIds === undefined) return;
+    const ids = [...new Set(entryIds)];
+    if (ids.length > 10) throw invalid("NOTE_ITEM_LIMIT", "Choose at most 10 schedule items.");
+    const entries = ids.length ? await tx.sfScheduleEntry.findMany({ where: { id: { in: ids }, project_id: projectId }, select: { id: true, prefix: true, increment: true } }) : [];
+    if (entries.length !== ids.length) throw invalid("NOTE_ITEM_INVALID", "Choose schedule items from this project.");
+    await tx.sfNoteItemLink.deleteMany({ where: { card_id: cardId } });
+    if (entries.length) await tx.sfNoteItemLink.createMany({ data: entries.map((entry) => ({ card_id: cardId, entry_id: entry.id, code_snapshot: scheduleCode(entry.prefix, entry.increment) })) });
+  }
+
+  async function validateReply(tx: TxClient, projectId: string, replyToId: string | undefined) {
+    if (!replyToId) return null;
+    const target = await tx.sfWorkspaceCard.findFirst({ where: { id: replyToId, project_id: projectId }, select: { id: true } });
+    if (!target) throw invalid("NOTE_REPLY_INVALID", "Reply to a note in this project.");
+    return target.id;
+  }
+
+  async function createCard(input: ProjectInput & { phaseId?: string | null; body: string | null; origin?: "NOTE" | "CLIENT_ANSWER"; textStyle?: string; x?: number; y?: number; w?: number; replyToId?: string; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }) {
     const body = optionalText(input.body, PHASE_NOTE_MAX) ?? "";
     if (!body) throw invalid("PHASE_NOTE_EMPTY", "Write something.");
     const canvas = cardGeometry(input);
@@ -245,23 +291,30 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       const phaseId = input.phaseId ?? null;
       await validatePhaseLabel(tx, input.projectId, phaseId);
       await writableScope(tx, input, phaseId);
+      const replyToId = await validateReply(tx, input.projectId, input.replyToId);
       const card = await insertWorkspaceCard(tx, ports, { projectId: input.projectId, phaseId, body, origin: input.origin ?? "NOTE", textStyle, actor: input.actor, at: nowOf(ports), ...canvas });
+      if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: card.id }, data: { reply_to_id: replyToId } });
+      await syncTags(tx, card.id, input.projectId, input.tags);
+      await syncItemLinks(tx, card.id, input.projectId, input.itemEntryIds);
       await audit(tx, input.actor, "workspace-card", "created", card.id, { projectId: input.projectId, phaseId });
       return { cardId: card.id };
     });
   }
 
-  async function updateCardText(input: ProjectInput & { cardId: string; body: string | null; version?: number }, phaseId?: string) {
+  async function updateCardText(input: ProjectInput & { cardId: string; body: string | null; version?: number; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }, phaseId?: string) {
     const body = optionalText(input.body, PHASE_NOTE_MAX) ?? "";
     return runTransaction(async (tx) => {
       const card = await writableCard(tx, input, phaseId);
       if (card.kind !== "TEXT") throw notText();
-      if (card.body === body) return { cardId: card.id, version: card.version };
+      if (card.body === body && input.tags === undefined && input.itemEntryIds === undefined) return { cardId: card.id, version: card.version };
       if (!body) throw invalid("PHASE_NOTE_EMPTY", "A note needs text. Delete it instead.");
-      const updated = await tx.sfWorkspaceCard.updateMany({ where: { id: card.id, version: card.version }, data: { body, edited_at: nowOf(ports), version: { increment: 1 } } });
+      const changed = card.body !== body || input.tags !== undefined || input.itemEntryIds !== undefined;
+      const updated = await tx.sfWorkspaceCard.updateMany({ where: { id: card.id, version: card.version }, data: changed ? { ...(card.body === body ? {} : { body, edited_at: nowOf(ports) }), version: { increment: 1 } } : {} });
       if (updated.count === 0) throw staleCard();
+      if (input.tags !== undefined) await syncTags(tx, card.id, input.projectId, input.tags);
+      await syncItemLinks(tx, card.id, input.projectId, input.itemEntryIds);
       await audit(tx, input.actor, "workspace-card", "edited", card.id, { projectId: input.projectId, phaseId: card.phase_id });
-      return { cardId: card.id, version: card.version + 1 };
+      return { cardId: card.id, version: changed ? card.version + 1 : card.version };
     });
   }
 
@@ -343,7 +396,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     }
   }
 
-  type NewElementInput = ProjectInput & { phaseId?: string | null; clientAnswer?: boolean; x?: number; y?: number; w?: number };
+  type NewElementInput = ProjectInput & { phaseId?: string | null; clientAnswer?: boolean; x?: number; y?: number; w?: number; replyToId?: string; tags?: readonly NoteTagInput[] };
   /** The labels and place a new image element gets. */
   type ElementLabels = { phaseId: string | null; iterationId?: string | null; origin: WorkspaceCardOrigin; workflowRecord?: boolean; place?: CardGeometry };
 
@@ -387,6 +440,9 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         actor: input.actor, at: nowOf(ports), ...resolved.place,
         kind: "IMAGE", asset: { storage_key: key, content_type: input.file.contentType, bytes, uploaded_by_id: input.actor.userId ?? null, uploaded_by_name: input.actor.label },
       });
+      const replyToId = await validateReply(tx, input.projectId, input.replyToId);
+      if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: element.id }, data: { reply_to_id: replyToId } });
+      await syncTags(tx, element.id, input.projectId, input.tags);
       await audit(tx, input.actor, "workspace-card", "created", element.id, { projectId: input.projectId, phaseId: resolved.phaseId, kind: "IMAGE", bytes });
       return { cardId: element.id };
     }));
@@ -406,15 +462,28 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         projectId: input.projectId, phaseId, body: "", origin: input.clientAnswer ? "CLIENT_ANSWER" : "NOTE", actor: input.actor, at: nowOf(ports), ...canvas,
         kind: "FILE", asset: { storage_key: key, content_type: file.contentType, bytes: file.bytes, file_name: file.name, uploaded_by_id: input.actor.userId ?? null, uploaded_by_name: input.actor.label },
       });
+      const replyToId = await validateReply(tx, input.projectId, input.replyToId);
+      if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: element.id }, data: { reply_to_id: replyToId } });
+      await syncTags(tx, element.id, input.projectId, input.tags);
       await audit(tx, input.actor, "workspace-card", "created", element.id, { projectId: input.projectId, phaseId, kind: "FILE", bytes: file.bytes });
       return { cardId: element.id };
     }));
   }
 
   const cards = {
-    createWorkspaceCard: (input: ProjectInput & { phaseId?: string | null; body: string | null; clientAnswer?: boolean; textStyle?: string; x?: number; y?: number; w?: number }) =>
+    createWorkspaceCard: (input: ProjectInput & { phaseId?: string | null; body: string | null; clientAnswer?: boolean; textStyle?: string; x?: number; y?: number; w?: number; replyToId?: string; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }) =>
       createCard({ ...input, origin: input.clientAnswer ? "CLIENT_ANSWER" : "NOTE" }),
-    updateWorkspaceCardText: (input: ProjectInput & { cardId: string; body: string | null; version: number }) => updateCardText(input),
+    updateWorkspaceCardText: (input: ProjectInput & { cardId: string; body: string | null; version: number; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }) => updateCardText(input),
+    async setNoteTags(input: ProjectInput & { cardId: string; tags: readonly NoteTagInput[]; version: number }) {
+      return runTransaction(async (tx) => {
+        const card = await writableCard(tx, input);
+        await syncTags(tx, card.id, input.projectId, input.tags);
+        const updated = await tx.sfWorkspaceCard.updateMany({ where: { id: card.id, version: card.version }, data: { version: { increment: 1 } } });
+        if (!updated.count) throw staleCard();
+        await audit(tx, input.actor, "workspace-card", "tags-changed", card.id, { projectId: input.projectId });
+        return { cardId: card.id, version: card.version + 1 };
+      });
+    },
     setWorkspaceCardFlags: (input: ProjectInput & { cardId: string; pinned?: boolean; clientAnswer?: boolean; version: number }) => setCardFlags(input),
     deleteWorkspaceCard: (input: ProjectInput & { cardId: string; version: number }) => deleteCard(input),
     setWorkspaceTextStyle: (input: ProjectInput & { cardId: string; textStyle: string; version: number }) => setTextStyle(input),
@@ -486,10 +555,16 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     kind: WorkspaceElementKind; text_style: WorkspaceTextStyle; storage_key: string | null; content_type: string | null; bytes: number | null; file_name: string | null;
     iteration: { id: string; major: number; name: string } | null;
     phase: { id: string; name_snapshot: string; prefix_snapshot: string; iteration_kinds_snapshot: unknown } | null;
+    reply_to?: { id: string; kind: WorkspaceElementKind; body: string; file_name: string | null; author_name: string | null; origin: WorkspaceCardOrigin } | null;
+    note_tag_links?: Array<{ tag: { name: string } }>;
+    note_item_links?: Array<{ code_snapshot: string; entry: { prefix: string; increment: number; section: string; location: string | null; active_index: number; options: Array<{ product_name: string }> } }>;
   };
   const CARD_INCLUDE = {
     iteration: { select: { id: true, major: true, name: true } },
     phase: { select: { id: true, name_snapshot: true, prefix_snapshot: true, iteration_kinds_snapshot: true } },
+    reply_to: { select: { id: true, kind: true, body: true, file_name: true, author_name: true, origin: true } },
+    note_tag_links: { include: { tag: { select: { name: true } } } },
+    note_item_links: { include: { entry: { select: { prefix: true, increment: true, section: true, location: true, active_index: true, options: { orderBy: { label: "asc" }, select: { product_name: true } } } } } },
   } as const;
 
   function roundLabel(row: Pick<CardReadRow, "iteration" | "phase">) {
@@ -521,6 +596,9 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       textStyle: row.text_style,
       images: await elementImages(row),
       file: await elementFile(row),
+      replyTo: row.reply_to ? { id: row.reply_to.id, kind: row.reply_to.kind, excerpt: row.reply_to.kind === "FILE" ? row.reply_to.file_name ?? "" : row.reply_to.kind === "IMAGE" ? "" : row.reply_to.body.slice(0, 120), authorName: row.reply_to.author_name, clientFeedback: row.reply_to.origin === "CLIENT_ANSWER" } : null,
+      tags: row.note_tag_links?.map((link) => link.tag.name) ?? [],
+      items: row.note_item_links?.map((link) => ({ code: scheduleCode(link.entry.prefix, link.entry.increment) || link.code_snapshot, section: link.entry.section, name: link.entry.options[link.entry.active_index]?.product_name ?? null, location: link.entry.location, codeSnapshot: link.code_snapshot })) ?? [],
     };
   }
 
@@ -544,6 +622,38 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       return (await db.sfPhase.findMany({ where: { project_id: input.projectId }, orderBy: { order_index: "asc" }, select: { id: true, name_snapshot: true } }))
         .map((phase) => ({ id: phase.id, name: phase.name_snapshot }));
     },
+
+    async listProjectNotes(input: ReadContext & { projectId: string; phaseId?: string; clientFeedback?: boolean; starred?: boolean; tag?: string; entryId?: string; cursor?: string; limit?: number }) {
+      requireRead(input.grants);
+      const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true } });
+      if (!project) throw notFound("project");
+      const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
+      const cursor = input.cursor ? (() => { try { return JSON.parse(Buffer.from(input.cursor, "base64url").toString("utf8")) as { createdAt: string; id: string }; } catch { throw invalid("NOTE_CURSOR_INVALID", "The notes cursor is invalid."); } })() : null;
+      const rows = await db.sfWorkspaceCard.findMany({
+        where: { project_id: input.projectId, ...(input.phaseId ? { phase_id: input.phaseId } : {}), ...(input.clientFeedback === undefined ? {} : { origin: input.clientFeedback ? "CLIENT_ANSWER" : { not: "CLIENT_ANSWER" } }), ...(input.starred === undefined ? {} : { is_pinned: input.starred }), ...(input.tag ? { note_tag_links: { some: { tag: { key: input.tag.replace(/^#/, "").toLocaleLowerCase("id-ID") } } } } : {}), ...(input.entryId ? { note_item_links: { some: { entry_id: input.entryId } } } : {}), ...(cursor ? { OR: [{ created_at: { lt: new Date(cursor.createdAt) } }, { created_at: new Date(cursor.createdAt), id: { lt: cursor.id } }] } : {}) },
+        orderBy: [{ created_at: "desc" }, { id: "desc" }], take: limit + 1, include: CARD_INCLUDE,
+      });
+      const page = rows.slice(0, limit);
+      const next = rows.length > limit && page.length ? Buffer.from(JSON.stringify({ createdAt: page[page.length - 1].created_at.toISOString(), id: page[page.length - 1].id })).toString("base64url") : null;
+      return { notes: await Promise.all(page.map((row) => cardView(row as CardReadRow))), cursor: next };
+    },
+
+    async searchNoteItems(input: ReadContext & { projectId: string; query: string }) {
+      requireRead(input.grants);
+      const parsed = parseTypedScheduleCode(input.query);
+      const rows = await db.sfScheduleEntry.findMany({ where: { project_id: input.projectId, ...(parsed ? { prefix: parsed.prefix, increment: parsed.increment } : { options: { some: { product_name: { contains: input.query.trim(), mode: "insensitive" } } } }) }, take: 10, orderBy: [{ section: "asc" }, { sort_order: "asc" }], include: { options: { orderBy: { label: "asc" }, select: { product_name: true } } } });
+      return rows.map((entry) => ({ entryId: entry.id, code: scheduleCode(entry.prefix, entry.increment), section: entry.section, name: entry.options[entry.active_index]?.product_name ?? null, location: entry.location }));
+    },
+
+    async listNoteTags(input: ReadContext & { projectId: string; query?: string }) {
+      requireRead(input.grants);
+      const tags = await db.sfNoteTag.findMany({ where: { project_id: input.projectId, ...(input.query ? { key: { contains: input.query.replace(/^#/, "").toLocaleLowerCase("id-ID"), mode: "insensitive" } } : {}) }, include: { _count: { select: { links: true } } } });
+      return tags.sort((a, b) => b._count.links - a._count.links || a.name.localeCompare(b.name)).slice(0, 20).map((tag) => ({ name: tag.name, count: tag._count.links }));
+    },
+
+    async listNotesForItem(input: ReadContext & { projectId: string; entryId: string }) {
+      return (await reads.listProjectNotes({ ...input, entryId: input.entryId, limit: 100 })).notes;
+    },
   };
 
   // ── The phase notes feed (today's notes screen keeps working on cards labelled with the phase) ─────────────
@@ -566,7 +676,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
      * Posts a message labelled with the phase (and its latest round). With `answeredIterationId` it is part of that
      * iteration's recorded client answer instead.
      */
-    async postPhaseNote(input: NoteInput & { body: string | null; clientFeedback?: boolean; answeredIterationId?: string }) {
+    async postPhaseNote(input: NoteInput & { body: string | null; clientFeedback?: boolean; answeredIterationId?: string; replyToId?: string; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }) {
       const body = optionalText(input.body, PHASE_NOTE_MAX) ?? "";
       if (!body) throw invalid("PHASE_NOTE_EMPTY", "Write something.");
       return runTransaction(async (tx) => {
@@ -576,12 +686,16 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
           projectId: phase.project_id, phaseId: phase.id, ...(answer ? { iterationId: answer.iterationId, workflowRecord: true } : {}),
           body, origin: answer || input.clientFeedback ? "CLIENT_ANSWER" : "NOTE", actor: input.actor, at: nowOf(ports),
         });
+        const replyToId = await validateReply(tx, phase.project_id, input.replyToId);
+        if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: card.id }, data: { reply_to_id: replyToId } });
+        await syncTags(tx, card.id, phase.project_id, input.tags);
+        await syncItemLinks(tx, card.id, phase.project_id, input.itemEntryIds);
         await audit(tx, input.actor, "workspace-card", "created", card.id, { projectId: phase.project_id, phaseId: phase.id });
         return { noteId: card.id };
       });
     },
     /** One image posted to a phase's notes as its own element; with `answeredIterationId`, part of that recorded answer. */
-    async postPhaseImage(input: NoteInput & { file: NoteImageUpload; clientFeedback?: boolean; answeredIterationId?: string }) {
+    async postPhaseImage(input: NoteInput & { file: NoteImageUpload; clientFeedback?: boolean; answeredIterationId?: string; replyToId?: string; tags?: readonly NoteTagInput[] }) {
       const answeredIterationId = input.answeredIterationId;
       const result = await createImage(
         { ...input, clientAnswer: input.clientFeedback },
@@ -589,8 +703,11 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       );
       return { imageId: result.cardId };
     },
-    async editPhaseNote(input: NoteInput & { noteId: string; body: string | null; version?: number }) {
+    async editPhaseNote(input: NoteInput & { noteId: string; body: string | null; version?: number; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }) {
       return { noteId: (await updateCardText({ ...input, cardId: input.noteId }, input.phaseId)).cardId };
+    },
+    async setPhaseNoteTags(input: NoteInput & { noteId: string; tags: readonly NoteTagInput[]; version: number }) {
+      return { noteId: (await cards.setNoteTags({ ...input, cardId: input.noteId, tags: input.tags, version: input.version })).cardId };
     },
     /** Star (pin) a message, or mark it as what the client said. */
     async setPhaseNoteFlags(input: NoteInput & { noteId: string; starred?: boolean; clientFeedback?: boolean; version?: number }) {

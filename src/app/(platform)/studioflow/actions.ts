@@ -371,9 +371,11 @@ export async function phaseCommandAction(input: PhaseCommandInput): Promise<Acti
 // Notes are not phase steps: these actions return no undo outcome, so posting never shows the Undo bar.
 
 const NoteBody = z.string().max(4000).nullable();
+const NoteTags = z.array(z.string().max(33)).max(5);
+const NoteItemEntryIds = z.array(Id).max(10);
 const PhaseNoteCommand = z.discriminatedUnion("command", [
-  z.strictObject({ command: z.literal("post"), projectId: Id, phaseId: Id, body: NoteBody, clientFeedback: z.boolean().optional(), answeredIterationId: Id.optional() }),
-  z.strictObject({ command: z.literal("edit"), projectId: Id, phaseId: Id, noteId: Id, body: NoteBody }),
+  z.strictObject({ command: z.literal("post"), projectId: Id, phaseId: Id, body: NoteBody, clientFeedback: z.boolean().optional(), answeredIterationId: Id.optional(), replyToId: Id.optional(), tags: NoteTags.optional(), itemEntryIds: NoteItemEntryIds.optional() }),
+  z.strictObject({ command: z.literal("edit"), projectId: Id, phaseId: Id, noteId: Id, body: NoteBody, tags: NoteTags.optional(), itemEntryIds: NoteItemEntryIds.optional() }),
   z.strictObject({ command: z.literal("flags"), projectId: Id, phaseId: Id, noteId: Id, starred: z.boolean().optional(), clientFeedback: z.boolean().optional() }),
   z.strictObject({ command: z.literal("delete"), projectId: Id, phaseId: Id, noteId: Id }),
 ]);
@@ -387,14 +389,39 @@ export async function phaseNoteAction(input: PhaseNoteCommandInput): Promise<Act
     const phases = studioFlow.phases;
     let noteId: string;
     switch (data.command) {
-      case "post": noteId = (await phases.postPhaseNote({ ...base, body: data.body, clientFeedback: data.clientFeedback, answeredIterationId: data.answeredIterationId })).noteId; break;
-      case "edit": noteId = (await phases.editPhaseNote({ ...base, noteId: data.noteId, body: data.body })).noteId; break;
+      case "post": noteId = (await phases.postPhaseNote({ ...base, body: data.body, clientFeedback: data.clientFeedback, answeredIterationId: data.answeredIterationId, replyToId: data.replyToId, tags: data.tags, itemEntryIds: data.itemEntryIds })).noteId; break;
+      case "edit": noteId = (await phases.editPhaseNote({ ...base, noteId: data.noteId, body: data.body, tags: data.tags, itemEntryIds: data.itemEntryIds })).noteId; break;
       case "flags": noteId = (await phases.setPhaseNoteFlags({ ...base, noteId: data.noteId, starred: data.starred, clientFeedback: data.clientFeedback })).noteId; break;
       case "delete": noteId = (await phases.deletePhaseNote({ ...base, noteId: data.noteId })).noteId; break;
     }
     refresh(data.projectId);
     return { noteId };
   });
+}
+
+const NoteTagsInput = z.strictObject({ projectId: Id, phaseId: Id, noteId: Id, tags: NoteTags, version: z.number().int().min(1) });
+export async function setPhaseNoteTagsAction(input: z.infer<typeof NoteTagsInput>): Promise<ActionResult<{ noteId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(NoteTagsInput, input);
+    const result = await studioFlow.phases.setPhaseNoteTags({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+const ProjectNotesQuery = z.strictObject({ projectId: Id, phaseId: Id.optional(), clientFeedback: z.boolean().optional(), starred: z.boolean().optional(), tag: z.string().max(32).optional(), entryId: Id.optional(), cursor: z.string().max(500).optional(), limit: z.number().int().min(1).max(100).optional() });
+export async function listProjectNotesAction(input: z.infer<typeof ProjectNotesQuery>) {
+  return runSafeAction(async () => studioFlow.workspace.listProjectNotes({ grants: (await context()).grants, ...parse(ProjectNotesQuery, input) }));
+}
+export async function searchNoteItemsAction(projectId: string, query: string) {
+  return runSafeAction(async () => studioFlow.workspace.searchNoteItems({ grants: (await context()).grants, projectId: parse(Id, projectId), query: parse(z.string().max(200), query) }));
+}
+export async function listNoteTagsAction(projectId: string, query?: string) {
+  return runSafeAction(async () => studioFlow.workspace.listNoteTags({ grants: (await context()).grants, projectId: parse(Id, projectId), query: parse(z.string().max(32).optional(), query) }));
+}
+export async function listNotesForItemAction(projectId: string, entryId: string) {
+  return runSafeAction(async () => studioFlow.workspace.listNotesForItem({ grants: (await context()).grants, projectId: parse(Id, projectId), entryId: parse(Id, entryId) }));
 }
 
 // ── Project Workspace (WO-SF-WORKSPACE-01) ─────────────────────────────────
@@ -408,9 +435,10 @@ const CanvasCoordinate = z.number().int().min(0).max(100_000);
 const CardCanvasWidth = z.number().int().min(120).max(100_000);
 const TextStyle = z.enum(["PLAIN", "HEADING", "STICKY"]);
 const WorkspaceCommand = z.discriminatedUnion("command", [
-  z.strictObject({ command: z.literal("createCard"), projectId: Id, phaseId: Id.nullable().optional(), body: NoteBody, clientAnswer: z.boolean().optional(), textStyle: TextStyle.optional(), x: CanvasCoordinate.optional(), y: CanvasCoordinate.optional(), w: CardCanvasWidth.optional() }),
+  z.strictObject({ command: z.literal("createCard"), projectId: Id, phaseId: Id.nullable().optional(), body: NoteBody, clientAnswer: z.boolean().optional(), textStyle: TextStyle.optional(), x: CanvasCoordinate.optional(), y: CanvasCoordinate.optional(), w: CardCanvasWidth.optional(), replyToId: Id.optional(), tags: NoteTags.optional(), itemEntryIds: NoteItemEntryIds.optional() }),
   z.strictObject({ command: z.literal("placeItems"), projectId: Id, cards: z.array(z.strictObject({ id: Id, x: CanvasCoordinate, y: CanvasCoordinate, w: CardCanvasWidth })).max(500) }),
-  z.strictObject({ command: z.literal("updateCard"), projectId: Id, cardId: Id, body: NoteBody, version: Version }),
+  z.strictObject({ command: z.literal("updateCard"), projectId: Id, cardId: Id, body: NoteBody, version: Version, tags: NoteTags.optional(), itemEntryIds: NoteItemEntryIds.optional() }),
+  z.strictObject({ command: z.literal("setTags"), projectId: Id, cardId: Id, tags: NoteTags, version: Version }),
   z.strictObject({ command: z.literal("setTextStyle"), projectId: Id, cardId: Id, textStyle: TextStyle, version: Version }),
   z.strictObject({ command: z.literal("pinCard"), projectId: Id, cardId: Id, pinned: z.boolean(), version: Version }),
   z.strictObject({ command: z.literal("setClientAnswer"), projectId: Id, cardId: Id, clientAnswer: z.boolean(), version: Version }),
@@ -428,9 +456,10 @@ export async function workspaceAction(input: WorkspaceCommandInput): Promise<Act
     const workspace = studioFlow.workspace;
     let result: unknown;
     switch (data.command) {
-      case "createCard": result = await workspace.createWorkspaceCard({ ...base, phaseId: data.phaseId ?? null, body: data.body, clientAnswer: data.clientAnswer, textStyle: data.textStyle, x: data.x, y: data.y, w: data.w }); break;
+      case "createCard": result = await workspace.createWorkspaceCard({ ...base, phaseId: data.phaseId ?? null, body: data.body, clientAnswer: data.clientAnswer, textStyle: data.textStyle, x: data.x, y: data.y, w: data.w, replyToId: data.replyToId, tags: data.tags, itemEntryIds: data.itemEntryIds }); break;
       case "placeItems": result = await workspace.placeWorkspaceItems({ ...base, cards: data.cards }); break;
-      case "updateCard": result = await workspace.updateWorkspaceCardText({ ...base, cardId: data.cardId, body: data.body, version: data.version }); break;
+      case "updateCard": result = await workspace.updateWorkspaceCardText({ ...base, cardId: data.cardId, body: data.body, version: data.version, tags: data.tags, itemEntryIds: data.itemEntryIds }); break;
+      case "setTags": result = await workspace.setNoteTags({ ...base, cardId: data.cardId, tags: data.tags, version: data.version }); break;
       case "setTextStyle": result = await workspace.setWorkspaceTextStyle({ ...base, cardId: data.cardId, textStyle: data.textStyle, version: data.version }); break;
       case "pinCard": result = await workspace.setWorkspaceCardFlags({ ...base, cardId: data.cardId, pinned: data.pinned, version: data.version }); break;
       case "setClientAnswer": result = await workspace.setWorkspaceCardFlags({ ...base, cardId: data.cardId, clientAnswer: data.clientAnswer, version: data.version }); break;
@@ -444,16 +473,28 @@ export async function workspaceAction(input: WorkspaceCommandInput): Promise<Act
 
 const FormNumber = z.preprocess((value) => (value === null || value === "" ? undefined : Number(value)), z.number().int().optional());
 const OptionalFormId = z.preprocess((value) => value || undefined, Id.optional());
+function noteTagsFromForm(formData: FormData): string[] | undefined {
+  const value = formData.get("tags");
+  if (value === null || value === "") return undefined;
+  if (typeof value !== "string") throw new AppError("VALIDATION", "NOTE_TAG_INVALID", "Tags must be text.");
+  try {
+    return parse(NoteTags, JSON.parse(value));
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    throw new AppError("VALIDATION", "NOTE_TAG_INVALID", "Tags must be a JSON list.");
+  }
+}
 const NewElementForm = z.strictObject({
   projectId: Id,
   phaseId: z.preprocess((value) => value || null, Id.nullable()),
   clientAnswer: z.preprocess((value) => value === "true", z.boolean()),
   besideId: OptionalFormId,
+  replyToId: OptionalFormId,
   x: FormNumber, y: FormNumber, w: FormNumber,
 });
 function newElementFields(formData: FormData) {
   const field = (name: string) => formData.get(name);
-  return parse(NewElementForm, { projectId: field("projectId"), phaseId: field("phaseId"), clientAnswer: field("clientAnswer"), besideId: field("besideId"), x: field("x"), y: field("y"), w: field("w") });
+  return { ...parse(NewElementForm, { projectId: field("projectId"), phaseId: field("phaseId"), clientAnswer: field("clientAnswer"), besideId: field("besideId"), replyToId: field("replyToId"), x: field("x"), y: field("y"), w: field("w") }), tags: noteTagsFromForm(formData) };
 }
 
 /** One image element on the Workspace board (pasted or dropped, or beside the text being written), in one request. */
@@ -484,13 +525,13 @@ export async function createWorkspaceFileAction(formData: FormData): Promise<Act
   });
 }
 
-const PhaseImageForm = z.strictObject({ projectId: Id, phaseId: Id, clientFeedback: z.preprocess((value) => value === "true", z.boolean()), answeredIterationId: OptionalFormId });
+const PhaseImageForm = z.strictObject({ projectId: Id, phaseId: Id, clientFeedback: z.preprocess((value) => value === "true", z.boolean()), answeredIterationId: OptionalFormId, replyToId: OptionalFormId });
 /** One image posted to a phase's notes as its own element; images go one request at a time so their order holds. */
 export async function postPhaseImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
   return runSafeAction(async () => {
     const ctx = await context();
     const field = (name: string) => formData.get(name);
-    const data = parse(PhaseImageForm, { projectId: field("projectId"), phaseId: field("phaseId"), clientFeedback: field("clientFeedback"), answeredIterationId: field("answeredIterationId") });
+    const data = { ...parse(PhaseImageForm, { projectId: field("projectId"), phaseId: field("phaseId"), clientFeedback: field("clientFeedback"), answeredIterationId: field("answeredIterationId"), replyToId: field("replyToId") }), tags: noteTagsFromForm(formData) };
     const file = formData.get("file");
     if (!(file instanceof File)) throw new AppError("VALIDATION", "NOTE_IMAGE_REQUIRED", "Choose an image.");
     const result = await studioFlow.phases.postPhaseImage({ ...ctx, ...data, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
