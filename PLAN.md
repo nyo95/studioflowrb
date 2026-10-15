@@ -1,13 +1,13 @@
 # Active Plan
 
 Plan ID: WO-SF-NOTES-PRESENTATION-IMAGE-01
-Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66/R9.67); slice C **PASS** (R9.68/R9.69); **slice D READY**; B waits for the Lead's G2 editor revision
+Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66/R9.67); slice C **PASS** (R9.68/R9.69); slice D **PASS** (R9.70/R9.71); remaining: Lead G2 shared-editor revision, then slice B
 Module(s): studioflow (Notes and Schedule reads), presentation, shared platform UI Engine image patterns; workspace-board is an unchanged optional view of the same StudioFlow records
-Target revision: slice D = **R9.70** (next unused after Lead review R9.69); G2 + B allocated later from CHANGELOG.md
-Status: READY (slice D only); A and C PASS; B DRAFT (after Lead G2)
+Target revision: Lead G2 and slice B allocated from CHANGELOG.md when started (next unused after R9.71)
+Status: A, C, D PASS (code + automated checks; browser pending). No Executor slice READY: next is the Lead-owned G2 revision, then B.
 Priority: P1 recommended for A; P2 for B/C/D, subject to owner priorities
 Owner: Product Owner; Lead approves and locks each READY slice
-Last updated: 2026-10-15 (Lead review R9.69)
+Last updated: 2026-10-15 (Lead review R9.71)
 
 ## Outcome
 
@@ -234,7 +234,7 @@ One coherent revision. Module: presentation. Files: PE `src/apps/presentation/ui
 
 **Executor verification:** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Kantor env as before; no migration expected. Browser acceptance: Reviewer, group [R9.64] C.
 
-### Ordered slice D — shared image geometry and gestures (READY, R9.70)
+### Ordered slice D — shared image geometry and gestures (PASS: R9.70 `fb253cb`, Lead review R9.71)
 
 One coherent revision. Area: shared UI Engine image patterns (owner's expanded UI lane covers them). Files: IW `src/platform/ui_engine/patterns/image-workspace.tsx`, a new pure helper beside it (e.g. `patterns/image-crop.ts`, not exported from the public index unless a test needs it), existing tests `ui-engine.test.ts`, `patterns/image-adjust.test.ts`, `patterns/image-prepare.test.ts`, `src/apps/studioflow/mom.contract.test.ts`. IG/IA/IP only for the local hit-area/contrast fixes named below. No public prop change on `ImageWorkspace`; all four consumers (Schedule photo `schedule-board.tsx:163`, option photo `:974`, new option photo `:1270`, MOM `mom-editor.tsx:159`) must work unchanged. No dependency, no schema, no app change.
 
@@ -305,21 +305,4 @@ A, B, C and D are independently useful acceptance/revert boundaries; no preparat
 
 ## Executor Prompt
 
-```text
-ROLE: BACKEND EXECUTOR with the owner's expanded UI lane for shared image
-patterns. Location: kantor (load .env.kantor, set STUDIOFLOW_LOCATION=kantor).
-Read AGENTS.md, docs/agent/EXECUTOR.md and PLAN.md
-WO-SF-NOTES-PRESENTATION-IMAGE-01. Implement ONLY "Ordered slice D - shared
-image geometry and gestures (READY, R9.70)": one pure crop geometry used by
-both preview and export (preview shows exactly what is saved, omitted aspect
-previews the source aspect), 1:1 drag-pan through real overflow, cursor-anchored
-wheel zoom, two-pointer pinch that never draws, Reset crop, Pan as the default
-tool, Undo last stroke beside Clear annotations, local 44px/contrast fixes.
-No public ImageWorkspace prop change; all four consumers (Schedule x3, MOM)
-unchanged; export identical for the same zoom/pan; compression/format/intake
-contracts preserved. No dependency, schema, app or legacy change; no remote
-operations. Preserve untracked owner files under test/. Finish with the listed
-tests and all checks, CHANGELOG R9.70, one local commit. Return only the
-Planner/Reviewer prompt: outcome, commit, checks, limitations, remaining dirty
-files. Stop with BLOCKED / CONFLICT if the plan contradicts the repository.
-```
+No Executor slice is READY. The next step is the Lead-owned G2 revision (shared RichTextEditor caret/token-range/decoration hooks, FormattedText inline tokens, interactive item card, with a full consumer matrix). After the Lead commits it, slice B gets its own READY section and prompt here.
