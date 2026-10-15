@@ -49,11 +49,11 @@ export function ImageGallery({ images, onRemove, removingId, viewerActions, labe
               {image.url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={image.url} alt="" className={fill ? "block h-auto w-full" : "h-full w-full object-cover"} draggable={false} />
-              ) : <span className={cx("grid place-items-center text-xs text-ink-tertiary", fill ? "h-24" : "h-full")}>Unavailable</span>}
+              ) : <span className={cx("grid place-items-center text-xs text-ink-secondary", fill ? "h-24" : "h-full")}>Unavailable</span>}
               {more > 0 && index === shown.length - 1 ? <span aria-hidden="true" className="absolute inset-0 grid place-items-center bg-ink/55 text-2xl font-semibold text-ink-inverse">+{more}</span> : null}
             </button>
             {onRemove ? (
-              <IconButton size="sm" variant="secondary" label={`Remove image ${index + 1}`} icon={<X aria-hidden="true" />} pending={removingId === image.id} onClick={() => onRemove(image)} className="!absolute -right-1.5 -top-1.5 !h-6 !min-h-6 !w-6 rounded-full !p-0" />
+              <IconButton size="sm" variant="ghost" label={`Remove image ${index + 1}`} icon={<X aria-hidden="true" />} pending={removingId === image.id} onClick={() => onRemove(image)} className="!absolute -right-4 -top-4 !h-11 !min-h-11 !w-11 rounded-full !p-0 !bg-transparent before:absolute before:size-6 before:rounded-full before:border before:border-line before:bg-surface enabled:hover:before:bg-surface-muted [&>span]:relative [&>svg]:relative" />
             ) : null}
           </li>
         ))}
@@ -64,7 +64,7 @@ export function ImageGallery({ images, onRemove, removingId, viewerActions, labe
             {open.url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={open.url} alt={`Image ${openIndex! + 1}`} className="max-h-[70vh] w-full rounded-control object-contain" />
-            ) : <Text tone="tertiary">This image could not be loaded.</Text>}
+            ) : <Text tone="secondary">This image could not be loaded.</Text>}
             {viewerActions && open.url ? <div className="flex flex-wrap gap-2">{viewerActions(open)}</div> : null}
             {images.length > 1 ? (
               <div className="flex justify-between">

@@ -899,6 +899,32 @@ describe("UI Engine foundation", () => {
     assert.match(source, /label=\{label\}/);
   });
 
+  it("renders a loaded image workspace through the existing Image API with Pan as its default", () => {
+    const image = new File(["fixture"], "fixture.png", { type: "image/png" });
+    const html = renderToStaticMarkup(createElement(ui.ImageWorkspace, { label: "Image", initialFile: image, aspect: 4 / 3, onPrepared() {} }));
+    assert.match(html, /alt="Image preview"/);
+    assert.doesNotMatch(html, /object-cover|aspect-video|transform-origin/);
+    assert.match(html, /aria-pressed="true"[^>]*>[\s\S]*?>Pan<\/span>/);
+    assert.match(html, /Reset crop/);
+    assert.match(html, /Undo last stroke/);
+  });
+
+  it("keeps all gallery sizes and album indices with a 44 px removal target around the small visible control", () => {
+    const images = Array.from({ length: 5 }, (_, index) => ({ id: String(index), url: null }));
+    for (const size of ["sm", "md", "fill", "album"] as const) {
+      const html = renderToStaticMarkup(createElement(ui.ImageGallery, { images, size, onRemove() {}, className: "consumer-override" }));
+      assert.match(html, /consumer-override/);
+      assert.match(html, /text-ink-secondary/);
+      assert.match(html, /!h-11 !min-h-11 !w-11/);
+      assert.match(html, /before:size-6/);
+      if (size === "sm") assert.match(html, /h-14 w-14/);
+      if (size === "md") assert.match(html, /h-20 w-20/);
+      if (size === "fill") assert.match(html, /grid gap-2/);
+      if (size === "album") { assert.match(html, /Open image 4, 1 more/); assert.doesNotMatch(html, /Remove image 5/); }
+      else assert.match(html, /Remove image 5/);
+    }
+  });
+
   it("keeps app internals and domain vocabulary out of shared UI sources", () => {
     const root = fileURLToPath(new URL("./", import.meta.url));
     const sourceFiles = readdirSync(root, { recursive: true, withFileTypes: true })
