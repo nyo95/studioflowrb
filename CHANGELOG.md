@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.79 | 2026-10-15 | docs(plan): WO-SF-SUPERVISION-HANDOVER-01 — Done (handover) without an open visit, READY (Lead)
+
+- **Owner 2026-10-15:** "kalau ga ada "visit" gmn?" then "Ya, tambahkan tombol Done (handover) saat fase pengawasan aktif tanpa kunjungan terbuka (kalau sudah pernah ada kunjungan)."
+- **Finding:** Supervision closes only on an open visit; after "Next visit" + Cancel the phase is stuck with "New visit" only (invent a visit, Undo, or Skip — which records "skipped" although visits happened). "Skip this phase…" stays the path for projects with no supervision at all.
+- **PLAN.md:** replaced the completed WO-SF-BOARD-THREADS-01 (history `5bca20f:PLAN.md`; browser group [R9.78] pending) with WO-SF-SUPERVISION-HANDOVER-01: `finishSupervision` (active Supervision, no open visit, ≥1 DONE visit; closes like the visit close, undoable), `canFinishSupervision` on the phase view, one button beside New visit. Executor READY as R9.80. Docs-only; whitespace check.
+
 ## R9.78 | 2026-10-15 | feat(studioflow): Workspace board note threads — markers, note window, All notes (Lead)
 
 - **WO-SF-BOARD-THREADS-01 UI (Lead lane), on the R9.76 backend.** Double-click empty board opens a "Board note" window at that spot (a dot marks the spot until the first message); double-click an image or file opens a note attached to it. A text element is written in on click, so double-click there keeps writing; its element menu offers **Add a note** instead (deviation from the mockup, reported to the owner). The first message (text or photo) creates the thread; later messages and the photos of the same send join it. Each thread leaves a speech-bubble marker with its count, amber with client feedback, outlined while open; attached markers follow their element (also while it is dragged); free markers can be dragged by people with project document rights and save once on release (versioned, reverted with the error on refusal). Toolbar **All notes · N** opens a drawer with every board note as one stream; **Show on board** pans to the thread and opens it. Delete confirmations (board and Notes stream) name the attached board notes that go with an element. The Text tool (T) remains the way to write text on the board; hints and empty state updated.
