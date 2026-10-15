@@ -80,7 +80,16 @@ async function saveDeliverable(
       await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: phase.id, kind: "content" });
       const revision = await activeRevision(tx, phase.id);
       if (!revision) throw invalid("ACTIVE_REVISION_REQUIRED", "Open an iteration (or a new site visit) in this phase before uploading deliverables.");
-      const created = await tx.sfDeliverable.create({ data: { project_id: input.projectId, phase_id: input.phaseId, revision_id: revision.id, name, slot_key: slotKey(name), storage_key: key, file_size_bytes: stored.bytes, content_type: contentType, created_by_id: input.actor.userId, expires_at: expiryFrom(nowOf(ports)) } });
+      const normalizedSlot = slotKey(name);
+      const [allocated] = await tx.$queryRaw<Array<{ last_version: number }>>`
+        INSERT INTO "studioflow"."sf_deliverable_slot" ("phase_id", "slot_key", "last_version")
+        VALUES (${input.phaseId}, ${normalizedSlot}, 1)
+        ON CONFLICT ("phase_id", "slot_key")
+        DO UPDATE SET "last_version" = "sf_deliverable_slot"."last_version" + 1
+        RETURNING "last_version"
+      `;
+      if (!allocated) throw new Error("Deliverable version allocation failed.");
+      const created = await tx.sfDeliverable.create({ data: { project_id: input.projectId, phase_id: input.phaseId, revision_id: revision.id, name, slot_key: normalizedSlot, version_number: allocated.last_version, storage_key: key, file_size_bytes: stored.bytes, content_type: contentType, created_by_id: input.actor.userId, expires_at: expiryFrom(nowOf(ports)) } });
       const older = await tx.sfDeliverable.findMany({ where: { phase_id: input.phaseId, slot_key: created.slot_key, is_final: false }, orderBy: [{ created_at: "desc" }, { id: "desc" }], skip: 2, select: { id: true, storage_key: true } });
       if (older.length) await tx.sfDeliverable.deleteMany({ where: { id: { in: older.map((row) => row.id) } } });
       await writeAudit(ports, tx, { action: "studioflow.deliverable.uploaded", entityType: "deliverable", entityId: created.id, actor: input.actor, metadata: { projectId: input.projectId, phaseId: input.phaseId, name, bytes: stored.bytes, declaredBytes, pruned: older.length } });
@@ -119,12 +128,11 @@ const deliverables = {
     });
     const refId = await referenceRevisionId(db, input.phaseId);
     const status = computeDeliverableStatus(rows, refId);
-    const slotVersions = new Map<string, number>();
+    const newestVersionBySlot = new Map<string, number>();
+    for (const row of rows) newestVersionBySlot.set(row.slot_key, Math.max(newestVersionBySlot.get(row.slot_key) ?? 0, row.version_number));
     const now = nowOf(ports);
     const items = await Promise.all(
       rows.map(async (d) => {
-        const versionNumber = (slotVersions.get(d.slot_key) ?? 0) + 1;
-        slotVersions.set(d.slot_key, versionNumber);
         return {
         id: d.id,
         name: d.name,
@@ -135,7 +143,8 @@ const deliverables = {
         isFinal: d.is_final,
         expiresAt: d.expires_at,
         daysLeft: d.expires_at ? Math.max(0, Math.ceil((d.expires_at.getTime() - now.getTime()) / 86_400_000)) : null,
-        versionNumber,
+        versionNumber: d.version_number,
+        isNewest: d.version_number === newestVersionBySlot.get(d.slot_key),
         url: await ports.storage.createSignedReadUrl(d.storage_key, DELIVERABLE_SIGNED_URL_SECONDS),
       }; }),
     );

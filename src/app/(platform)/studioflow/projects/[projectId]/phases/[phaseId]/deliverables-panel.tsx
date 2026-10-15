@@ -17,6 +17,7 @@ type Deliverable = {
   expiresAt: Date | null;
   daysLeft: number | null;
   versionNumber: number;
+  isNewest: boolean;
   url: string;
 };
 
@@ -148,7 +149,7 @@ export function DeliverablesPanel({
                       {(d.daysLeft ?? 0) === 0 ? "Deleted soon" : `Deleted in ${d.daysLeft} day${d.daysLeft === 1 ? "" : "s"}`}
                     </Badge>
                   )}
-                  <span>Version {d.versionNumber}{d.versionNumber === 1 ? " (newest)" : ""}</span>
+                  <span>Version {d.versionNumber}{d.isNewest ? " (newest)" : ""}</span>
                 </p>
               </div>
               <a

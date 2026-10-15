@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.91] Deliverable version numbers stay attached to uploads
+- Surface: StudioFlow project → Phases → a phase's deliverables
+- Fixture: disposable rebuild-only project with an active phase; one PDF name uploaded repeatedly
+- Viewport: desktop (default)
+- Steps: 1. Upload the same named file three times and mark the earliest surviving file Final. 2. Upload again to prune an older working file. 3. Reload and inspect every visible version number and the newest badge. 4. Delete the latest, reload, upload again and inspect the numbers. 5. Upload a different name and inspect its first number.
+- Acceptance: Final and surviving working files retain their upload-order numbers (gaps are allowed); only the highest surviving number per name says newest; after deletion, the next upload uses a higher number rather than restarting; a different name starts at Version 1.
+- Status: PENDING
+
 ### Lead walk 2026-10-15 (R9.87) — what the remaining items still need
 Ran on a disposable "ZZ QA" project, BQ project and Master Data records (all archived afterwards). Items marked PASS above are closed; for the rest:
 - **Needs the Developer switch (separate /system sign-in):** [R9.78], [R9.31] enable/disable flow, [R8.498] toggles, [R8.542], [R8.544], [R8.532], [R8.519] — the Workspace board is Off and Ideas is Off on this database.

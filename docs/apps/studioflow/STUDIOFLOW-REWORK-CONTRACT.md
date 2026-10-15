@@ -257,6 +257,13 @@ is kept, plus the two newest working versions; working files expire after
 sweep removes expired rows before object cleanup. Status per phase: no files
 / current / outdated.
 
+Each successful upload receives a stable, increasing version number within
+its phase and normalized file-name slot. Removing or expiring older files
+never renumbers surviving versions; the highest surviving number is marked
+newest. Existing retained files were numbered once by upload order when
+this rule was introduced; already-pruned historical versions cannot be
+reconstructed from the retained rows.
+
 ### 5.5 Drawing list (CD list)
 
 On a drafter-seat phase only: drawings with code, name, status and optional

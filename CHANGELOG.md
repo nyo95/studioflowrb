@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.91 | 2026-10-15 | fix(studioflow): Keep deliverable versions stable across uploads and pruning (Executor)
+
+- **Scope:** WO-SF-DELIVERABLE-VERSION-01. Each phase/file-name slot now assigns a durable, increasing version in the existing upload transaction. A slot counter survives file deletion and expiry; a unique index and atomic allocation prevent duplicate numbers under concurrent uploads. Listings show the stored number and mark only the highest surviving version in each slot newest. Existing Final and two-working-file lifecycle, permissions, storage cleanup and audit are unchanged.
+- **Migration:** added `version_number` to StudioFlow deliverables and a StudioFlow-owned slot-counter table. Surviving files were numbered once in chronological order and counters seeded from their maximum; already-deleted historical versions cannot be reconstructed. The migration was applied to the verified local office rebuild database and the isolated rebuild test database. Prisma client regenerated. No dependency.
+- **Verification:** new integration coverage proves stable numbers after pruning/deletion, separate slots/phases, a refused upload, rollback after audit failure, removal of every file, and concurrent same-slot uploads. `npm test` 1204/1204 PASS; typecheck, full lint, boundary and legacy-runtime checks PASS; production build PASS; both rebuild-only migrations PASS. Staged/unstaged whitespace checks pass before commit.
+- **Acceptance:** the original `[BUG]` remains labelled code-fixed pending Reviewer browser check [R9.91], queued in the browser-acceptance ledger. This follows the repository acceptance rule even though the READY plan's implementation bullet abbreviated the closure gate to automated checks. No push; no root `test/` changes.
+
 ## R9.90 | 2026-10-15 | docs(studioflow): Plan stable deliverable version numbers (Lead)
 
 - **Scope:** replaced the completed brand Work Order with READY WO-SF-DELIVERABLE-VERSION-01 targeting R9.91. The owner-requested newest-highest numbering requires persisted per-file numbers and a durable per-phase/slot counter because older working files are pruned or expired; a display-only reversal would renumber survivors again.

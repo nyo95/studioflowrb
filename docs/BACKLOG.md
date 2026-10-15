@@ -188,7 +188,7 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
 
 ## StudioFlow
 
-- [ ] [BUG][P3] Deliverable versions are numbered from the newest ("Version 1 (newest)"), so every upload renumbers older files and the first upload marked Final ends up "Version 3" (browser walk R9.87, Construction phase). Number by upload order instead, newest highest.
+- [ ] [BUG][P3] Deliverable versions were numbered from the newest ("Version 1 (newest)"), so every upload renumbered older files and the first upload marked Final became "Version 3" (browser walk R9.87, Construction phase). Code-fixed R9.91 with persistent upload-order numbers; close after Reviewer browser check [R9.91].
 - [ ] [CLEANUP][P3] Copy drift seen in the R9.87 walk: the phase More menu still says "Round history (N)" beside "iteration" everywhere else; the Notes stale-edit refusal says "Someone changed this **card**" for a note; a Supervision phase with no open visit shows "Current iteration · Prepare this iteration, then send it to the client."; after the last phase is closed the phase bar falls back to Moodboard's state.
 - [ ] [PLANNED] Owner decision: R8.249 built a per-person **start page** preference and a **Storage usage** report (backend `storageUsage` in `@platform/runtime`), but neither has a screen (the Storage action was removed as unused). Decide whether to add them to My preferences / Platform settings or remove the backend.
 
