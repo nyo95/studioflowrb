@@ -119,6 +119,46 @@ test("the project notes chat tags, links, replies and groups an album", async ({
   await expect(page.getByRole("heading", { name: "Product Schedule", exact: true })).toBeVisible();
 });
 
+test("removing a Schedule mention from an edited note removes its link after reload", async ({ page }) => {
+  await page.goto(`/studioflow/projects/${sf.notesChat}`);
+  const log = page.getByRole("log", { name: "Notes" });
+  const composer = page.getByRole("textbox", { name: "New note" });
+  await composer.fill("Mention removal check @HT-01");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+
+  const note = log.getByRole("article").filter({ hasText: "Mention removal check" });
+  await expect(note.getByRole("button", { name: "@HT-01" })).toBeVisible();
+  await note.getByRole("button", { name: "Note actions" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await page.getByRole("textbox", { name: "Edit note" }).fill("Mention removal check without a linked item");
+  await note.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Edit note" })).toHaveCount(0);
+  await expect(note).toContainText("Mention removal check without a linked item");
+  await expect(note.getByRole("button", { name: "@HT-01" })).toHaveCount(0);
+  await expect(note.getByRole("list", { name: "Linked schedule items" })).toHaveCount(0);
+
+  await page.reload();
+  await expect(note).toContainText("Mention removal check without a linked item");
+  await expect(note.getByRole("button", { name: "@HT-01" })).toHaveCount(0);
+  await expect(note.getByRole("list", { name: "Linked schedule items" })).toHaveCount(0);
+});
+
+test("an existing General note stays editable when the board is off", async ({ page }) => {
+  await page.goto(`/studioflow/projects/${sf.notesChat}`);
+  await page.waitForLoadState("networkidle");
+  const note = page.getByRole("log", { name: "Notes" }).getByRole("article").filter({ hasText: "ZZ-Test General note" });
+  await expect(note).toBeVisible();
+  await note.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  await note.getByRole("button", { name: "Note actions" }).click();
+  await page.getByRole("menuitem", { name: "Edit" }).click();
+  await page.getByRole("textbox", { name: "Edit note" }).fill("ZZ-Test General note edited with board off");
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Edit note" })).toHaveCount(0);
+  await expect(note).toContainText("ZZ-Test General note edited with board off");
+  await page.reload();
+  await expect(note).toContainText("ZZ-Test General note edited with board off");
+});
+
 test("an image opens zoomable and a marked-up copy is sent as a reply, leaving the original as it was", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(`/studioflow/projects/${sf.notesChat}`);

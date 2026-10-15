@@ -167,6 +167,7 @@ async function main() {
     // The Notes suggestion slice exercises a partial HT code against a known Schedule entry.
     await db.sfSchedulePrefix.create({ data: { section: "MATERIAL", category: "Homogeneous Tile", category_key: "HOMOGENEOUS TILE", prefix: "HT" } });
     await sf.schedule.createEntry({ ...sfGrants, projectId: sfFixtures.notesChat, section: "MATERIAL", category: "Homogeneous Tile", snapshot: { productName: "ZZ-Test Teraso abu" } });
+    await sf.workspace.createWorkspaceCard({ ...sfGrants, projectId: sfFixtures.notesChat, body: "ZZ-Test General note edit check", x: 40, y: 360, w: 280 });
     // A Workspace element recorded by a phase step (the client answer): its origin and phase stay as recorded.
     const recorded = await sf.workspace.createWorkspaceCard({ ...sfGrants, projectId: sfFixtures.workspace, body: "ZZ-Test recorded client answer", x: 40, y: 360, w: 280 });
     await db.sfWorkspaceCard.update({ where: { id: recorded.cardId }, data: { origin: "CLIENT_ANSWER", workflow_record: true } });

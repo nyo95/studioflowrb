@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.93 | 2026-10-15 | test(studioflow): Verify Notes mention removal and General editing in the browser (Reviewer partial)
+
+- **Scope:** added two isolated browser regressions and a disposable General-note fixture. Removing `@HT-01` from a saved note now has direct browser evidence that both the displayed chip and retained item link are absent after reload; the fixed R9.66 mention-removal `[BUG]` is closed. An existing General note can be edited with Workspace Board off and persists after reload.
+- **Verdict:** PASS for the mention-removal defect; PARTIAL for the wider R9.66 Notes acceptance. Filter/reading-position refresh, stale concurrent edits, failure recovery, permission variants and narrow viewport remain pending, so the combined Notes-context `[BUG]` stays open. An intermediate test clicked Save before completion; waiting for edit mode to close proved persistence. Another menu placement failure occurred only before the new page finished settling; waiting for network idle restored the full-suite result. No production code, migration, dependency, database schema change, or push.
+- **Checks:** isolated Notes browser suite 4/4 PASS on the verified disposable office rebuild test database; `npm run check`, targeted lint and whitespace check PASS. The test server still logged intermittent aborted-request/ECONNRESET messages while the passing run exited 0. Root `test/` stayed untouched.
+
 ## R9.92 | 2026-10-15 | test(studioflow): Accept stable deliverable versions in the browser (Reviewer PASS)
 
 - **Verdict:** PASS for WO-SF-DELIVERABLE-VERSION-01/R9.91. Independently inspected its database migration, atomic version allocation, list projection, UI badge, and tests; no new ownership, lifecycle, permission, or storage boundary issue found in scope.
