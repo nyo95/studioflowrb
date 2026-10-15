@@ -30,6 +30,12 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.82] Presentation editor feels instant
+- Surface: a Presentation board with several slides and large renders
+- Steps: 1. Click through layouts quickly, toggle Crop to fill / Show whole, drag the crop sliders, move and nudge pins, edit pin details, reorder slides, swap images between boxes, delete a pin/image/slide. 2. Watch that nothing flickers or reloads and the pictures do not load again; the line under the board title says "Saving…" then "All changes saved". 3. Reload: every last choice is kept. 4. Try to close the tab right after a change: the browser asks first. 5. Cause a refusal (e.g. shrink a layout while its extra boxes still hold images): an error shows and the board returns to what was saved.
+- Acceptance: every change shows at once, saves quietly in order, repeated changes save once, pictures are not re-downloaded, and failures show and resync.
+- Status: PENDING
+
 ### [R9.81] Zoom a note image and send a marked-up copy as a reply
 - Surface: Notes stream image viewer; the same viewer inside a board note window; Ideas/Workspace image viewers (zoom only)
 - Fixture: a large drawing (e.g. a floor plan) posted as a note image, a board note image, an album

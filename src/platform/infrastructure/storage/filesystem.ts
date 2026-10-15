@@ -45,6 +45,16 @@ async function canonicalizePath(target: string): Promise<string> {
   }
 }
 
+/**
+ * The expiry rounded up to a window (a third of the lifetime, at least a minute), so the same object gets the same
+ * link for a while: re-rendering a page no longer makes the browser download every picture again. A link stays valid
+ * for at least the asked lifetime and at most that plus one window. Stored objects never change under their key.
+ */
+export function stableExpiry(nowSeconds: number, expiresInSeconds: number): number {
+  const window = Math.max(60, Math.floor(expiresInSeconds / 3));
+  return Math.ceil((nowSeconds + expiresInSeconds) / window) * window;
+}
+
 export async function resolveSafePath(rootDir: string, key: string): Promise<string> {
   if (!key || key.includes("..") || key.startsWith("/") || key.endsWith("/")) {
     throw new AppError("VALIDATION", "storage.invalid-key", "The storage object reference is invalid.");
@@ -166,7 +176,7 @@ export function createLocalFilesystemStorage(rootDir: string, options: LocalFile
       } catch {
         throw new AppError("NOT_FOUND", "storage.object-not-found", "The image is unavailable.");
       }
-      const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
+      const expiresAt = stableExpiry(Math.floor(Date.now() / 1000), expiresInSeconds);
       const token = signAssetRead(key, expiresAt);
       return `/api/platform/assets/private?key=${encodeURIComponent(key)}&expires=${expiresAt}&token=${token}`;
     },

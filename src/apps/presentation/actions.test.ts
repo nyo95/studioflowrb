@@ -74,7 +74,8 @@ it("pin action accepts inclusive bounds and leaves omitted metadata undefined", 
     assert.deepEqual([call.pinX, call.pinY], [position.pinX, position.pinY]);
     for (const field of ["note", "labelSide", "scheduleEntryId", "sortOrder"]) assert.equal(call[field], undefined);
   }
-  assert.equal(test.refreshed.length, 3);
+  // R9.82: an editor-only change is applied on screen by the editor; saving it never re-renders the project pages.
+  assert.equal(test.refreshed.length, 0);
 });
 
 it("pin action preserves safe service refusals and authenticates without refreshing failures", async () => {

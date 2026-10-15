@@ -188,3 +188,40 @@ test("P.8 a slide in a layout holds several images, on screen and on its printed
   await expect(sheet.getByText("Area Display")).toBeVisible();
   await sheet.screenshot({ path: `${SHOTS}/page-grid-4.png` });
 });
+
+test("P.9 editing a slide changes the screen at once, re-downloads no picture and is kept after a reload", async ({ page }) => {
+  await page.setViewportSize({ width: 1500, height: 1000 });
+  await page.goto(`/studioflow/projects/${sf.reuse}/presentation`);
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("New board").fill("Smooth board");
+  await page.getByRole("button", { name: "Create board" }).click();
+  await page.getByLabel("Board title").waitFor();
+  await page.getByRole("button", { name: "New slide", exact: true }).click();
+  await page.getByRole("button", { name: "Slide 1" }).waitFor();
+  await page.getByRole("button", { name: "Add an image or drop one here" }).first().click();
+  await page.locator('input[type="file"]:not([multiple])').setInputFiles({ name: "room.jpg", mimeType: "image/jpeg", buffer: await room(page) });
+  await expect(page.locator('section[aria-label="Slide"] img')).toHaveCount(1, { timeout: 30_000 });
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  await page.waitForLoadState("networkidle");
+
+  // From here on no picture is fetched again and no page refresh is requested.
+  const pictures: string[] = [];
+  page.on("request", (request) => { if (request.url().includes("/api/platform/assets/private")) pictures.push(request.url()); });
+  for (const name of ["2 side by side", "Grid 4", "1 image"]) {
+    await page.getByRole("button", { name, exact: true }).click();
+    // The screen follows the click before any save answers.
+    await expect(page.getByRole("button", { name, exact: true })).toHaveAttribute("aria-pressed", "true", { timeout: 1_000 });
+  }
+  await page.locator('section[aria-label="Slide"] img').first().click();
+  await page.getByRole("button", { name: "Show whole" }).click();
+  await expect(page.getByRole("button", { name: "Show whole" })).toHaveAttribute("aria-pressed", "true", { timeout: 1_000 });
+  await expect(page.getByText("All changes saved")).toBeVisible();
+  expect(pictures).toEqual([]);
+
+  // Rapid layout changes were saved once each thing settled; a reload shows the last choice.
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("button", { name: "1 image", exact: true })).toHaveAttribute("aria-pressed", "true");
+  await page.locator('section[aria-label="Slide"] img').first().click();
+  await expect(page.getByRole("button", { name: "Show whole" })).toHaveAttribute("aria-pressed", "true");
+});

@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.82 | 2026-10-15 | perf(presentation,storage): Presentation editor changes show at once and save quietly; stable picture links (Lead)
+
+- **Owner 2026-10-15:** "knp dia sepertinya tiap action lgsg update database? itu boros banget? … jadi smooth kayak deck google" → "Ya, kerjakan: tetap simpan otomatis tapi layar langsung berubah, tidak muat ulang seluruh papan, link gambar tidak berganti-ganti, dan perubahan beruntun digabung jadi satu simpan."
+- **Finding:** each editor action waited for the server, then `revalidatePath` + `router.refresh()` re-read the whole board; every read signed new picture links (the expiry changes every second) served with `no-cache`, so the browser downloaded every picture again on every click.
+- **Stable links (all apps):** `stableExpiry` rounds a signed link's expiry up to a window of a third of its lifetime (≥ 60 s), so one object keeps the same link for minutes; the private asset route now sends `Cache-Control: private, max-age=<until expiry>, immutable` (stored objects never change under their key). Unit-tested.
+- **Editor:** the board lives in local state; layout, title, caption, fill, crop sliders (now live), pin move/nudge/details, slide order, image swap, and confirmed deletions of a pin/image/slide apply on screen at once and save through a new serial `save-queue` (coalesces repeated changes of one thing — layout/order/fill 300 ms, crop 400 ms — keeps their order before any later upload, reports a refusal once and reloads the server's copy). Uploads, new slides and new pins still go to the server first (they need its data) without locking the rest of the editor. "Saving… / All changes saved" under the title; leaving with unsaved changes asks first; pending saves start when the editor closes.
+- **Actions:** editor-only actions (reorder, slide update, image move/update/remove, pin add/update/delete) no longer `revalidatePath` the project; board create/rename/delete, new slides, uploads and slide deletion still do (other screens show them).
+- **Tests:** save-queue unit tests 5/5; stableExpiry test; pin action test now expects no page refresh; new e2e P.9 (three layout clicks and a fill toggle show within 1 s, zero picture requests afterwards, choices kept after reload) plus P.1/P.2/P.6–P.8 — all PASS. `npm test` **1195/1195**, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build PASS. Browser group [R9.82] added. No push.
+
 ## R9.81 | 2026-10-15 | feat(ui-engine,studioflow): Zoom note images and send a marked-up copy as a reply (Lead)
 
 - **Owner 2026-10-15:** "gambar ini tolong bisa di zoom in dan di anotate. tapi yg udah di coret jadi reply baru - bukan ngubah gambar awal"; chose "Gambar utuh + coretan" (zoom is for seeing; the whole picture is sent with every mark).

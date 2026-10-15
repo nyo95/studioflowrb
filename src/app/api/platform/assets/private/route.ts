@@ -43,7 +43,8 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         "Content-Type": contentTypeFromKey(key),
-        "Cache-Control": "private, no-cache",
+        // A key never changes its object and the link expires: the browser may keep it until then.
+        "Cache-Control": `private, max-age=${Math.max(0, Math.floor(expiresTime - Date.now() / 1000))}, immutable`,
         "X-Content-Type-Options": "nosniff",
       },
     });

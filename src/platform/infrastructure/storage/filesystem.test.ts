@@ -120,3 +120,17 @@ describe("LocalFilesystemStorage adapter", () => {
     } finally { await fs.rm(tmpDir, { recursive: true, force: true }); }
   });
 });
+
+describe("stableExpiry", () => {
+  it("gives the same expiry within a window, never less than the asked lifetime and at most one window more", async () => {
+    const { stableExpiry } = await import("./filesystem");
+    const life = 15 * 60;
+    const a = stableExpiry(1_000_000, life);
+    assert.equal(stableExpiry(1_000_000 + 30, life), a);
+    for (const now of [1_000_000, 1_000_123, 1_000_299, 1_000_300]) {
+      const at = stableExpiry(now, life);
+      assert.ok(at >= now + life && at <= now + life + life / 3, `${now} -> ${at}`);
+    }
+    assert.ok(stableExpiry(10, 30) >= 40);
+  });
+});

@@ -31,6 +31,11 @@ function ratioOf(value: FormDataEntryValue | null): number | null {
   return Number.isFinite(ratio) && ratio > 0.05 && ratio < 20 ? ratio : null;
 }
 
+/**
+ * Re-renders the project pages. Only changes that alter what other screens show (boards, slide counts, new uploads)
+ * use it; editor-only changes (layout, captions, crop, pins, order) are applied on screen by the editor and saved
+ * quietly, so a click never reloads the whole board.
+ */
 function refresh(projectId: string) { revalidatePath(`/studioflow/projects/${projectId}`, "layout"); }
 
 const BoardInput = z.strictObject({ projectId: Id, boardId: Id.optional(), title: z.string().min(1).max(200) });
@@ -46,7 +51,7 @@ export async function deletePresentationBoardAction(input: z.infer<typeof BoardR
 }
 const SlidesOrder = z.strictObject({ projectId: Id, boardId: Id, orderedIds: z.array(Id).min(1).max(500) });
 export async function reorderPresentationSlidesAction(input: z.infer<typeof SlidesOrder>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(SlidesOrder, input); await presentation.reorderSlides({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(SlidesOrder, input); await presentation.reorderSlides({ ...(await context()), ...data }); return {}; });
 }
 export async function addPresentationSlidesAction(formData: FormData): Promise<ActionResult<{ slideIds: string[] }>> {
   return runSafeAction(async () => { await requireModuleEnabled("presentation"); const projectId = parse(Id, formData.get("projectId")); const boardId = parse(Id, formData.get("boardId")); const files = formData.getAll("files").filter((value): value is File => value instanceof File); const ratios = formData.getAll("ratios"); const result = await presentation.addSlides({ ...(await context()), projectId, boardId, files: await Promise.all(files.map(async (file, index) => ({ body: new Uint8Array(await file.arrayBuffer()), contentType: file.type, imageRatio: ratioOf(ratios[index] ?? null) }))) }); refresh(projectId); return result; });
@@ -75,7 +80,7 @@ export async function addPresentationSlideAction(input: z.infer<typeof NewSlide>
 }
 const SlideUpdate = z.strictObject({ projectId: Id, slideId: Id, layout: z.enum(PRESENTATION_LAYOUTS).optional(), title: z.string().max(200).nullish(), caption: z.string().max(1000).nullish() });
 export async function updatePresentationSlideAction(input: z.infer<typeof SlideUpdate>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(SlideUpdate, input); await presentation.updateSlide({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(SlideUpdate, input); await presentation.updateSlide({ ...(await context()), ...data }); return {}; });
 }
 /** An image put in one box of a slide (form data: projectId, slideId, slot, file). */
 export async function placePresentationImageAction(formData: FormData): Promise<ActionResult<{ imageId: string }>> {
@@ -89,24 +94,24 @@ export async function placePresentationImageAction(formData: FormData): Promise<
 }
 const ImageMove = z.strictObject({ projectId: Id, imageId: Id, slot: z.number().int().min(0).max(3) });
 export async function movePresentationImageAction(input: z.infer<typeof ImageMove>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(ImageMove, input); await presentation.moveImage({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(ImageMove, input); await presentation.moveImage({ ...(await context()), ...data }); return {}; });
 }
 const ImageUpdate = z.strictObject({ projectId: Id, imageId: Id, fit: z.enum(["cover", "contain"]).optional(), focusX: z.number().min(0).max(100).optional(), focusY: z.number().min(0).max(100).optional() });
 export async function updatePresentationImageAction(input: z.infer<typeof ImageUpdate>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(ImageUpdate, input); await presentation.updateImage({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(ImageUpdate, input); await presentation.updateImage({ ...(await context()), ...data }); return {}; });
 }
 const ImageRef = z.strictObject({ projectId: Id, imageId: Id });
 export async function removePresentationImageAction(input: z.infer<typeof ImageRef>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(ImageRef, input); await presentation.removeImage({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(ImageRef, input); await presentation.removeImage({ ...(await context()), ...data }); return {}; });
 }
 const AnnotationInput = z.strictObject({ projectId: Id, imageId: Id.optional(), annotationId: Id.optional(), pinX: z.number().min(0).max(100).optional(), pinY: z.number().min(0).max(100).optional(), scheduleEntryId: Id.nullish(), labelSide: z.enum(["auto", "left", "right"]).optional(), note: OptionalText });
 export async function addPresentationAnnotationAction(input: z.infer<typeof AnnotationInput>): Promise<ActionResult<{ annotationId: string }>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(AnnotationInput, input); if (!data.imageId || data.pinX === undefined || data.pinY === undefined) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose an image and pin position."); const result = await presentation.addAnnotation({ ...(await context()), projectId: data.projectId, imageId: data.imageId, pinX: data.pinX, pinY: data.pinY, scheduleEntryId: data.scheduleEntryId, labelSide: data.labelSide, note: data.note }); refresh(data.projectId); return result; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(AnnotationInput, input); if (!data.imageId || data.pinX === undefined || data.pinY === undefined) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose an image and pin position."); const result = await presentation.addAnnotation({ ...(await context()), projectId: data.projectId, imageId: data.imageId, pinX: data.pinX, pinY: data.pinY, scheduleEntryId: data.scheduleEntryId, labelSide: data.labelSide, note: data.note }); return result; });
 }
 export async function updatePresentationAnnotationAction(input: z.infer<typeof AnnotationInput>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(AnnotationInput, input); if (!data.annotationId) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose a pin."); await presentation.updateAnnotation({ ...(await context()), projectId: data.projectId, annotationId: data.annotationId, pinX: data.pinX, pinY: data.pinY, scheduleEntryId: data.scheduleEntryId, labelSide: data.labelSide, note: data.note }); refresh(data.projectId); return {}; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(AnnotationInput, input); if (!data.annotationId) throw new AppError("VALIDATION", "PRESENTATION_PIN_REQUIRED", "Choose a pin."); await presentation.updateAnnotation({ ...(await context()), projectId: data.projectId, annotationId: data.annotationId, pinX: data.pinX, pinY: data.pinY, scheduleEntryId: data.scheduleEntryId, labelSide: data.labelSide, note: data.note }); return {}; });
 }
 const AnnotationRef = z.strictObject({ projectId: Id, annotationId: Id });
 export async function deletePresentationAnnotationAction(input: z.infer<typeof AnnotationRef>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(AnnotationRef, input); await presentation.deleteAnnotation({ ...(await context()), ...data }); refresh(data.projectId); return {}; });
+  return runSafeAction(async () => { await requireModuleEnabled("presentation"); const data = parse(AnnotationRef, input); await presentation.deleteAnnotation({ ...(await context()), ...data }); return {}; });
 }
