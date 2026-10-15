@@ -3,7 +3,7 @@ import { it } from "node:test";
 
 import { createStudioFlowService } from "../service";
 
-it("keeps the StudioFlow phase service surface unchanged", () => {
+it("keeps the phase service surface explicit, with existing-note mutations on the versioned workspace door", () => {
   const studioFlow = createStudioFlowService({} as never, {} as never);
 
   assert.deepEqual(Object.keys(studioFlow.phases).sort(), [
@@ -12,9 +12,9 @@ it("keeps the StudioFlow phase service surface unchanged", () => {
     "deleteDeliverable", "deleteNeverSentIteration", "deletePhaseDefinition", "deletePhaseTemplate",
     "dismissRequirement", "extendDeliverableExpiry", "getPhaseDetail", "getProjectCompletionReadiness",
     "latestUndoableEvent", "listDeliverables", "listNavPhases", "listPhaseTemplates", "listStarredPhaseNotes",
-    "listProjectPhases", "markProjectCompleted", "overrideRevision", "recordClientAnswer", "postPhaseImage", "postPhaseNote", "editPhaseNote", "deletePhaseNote",
+    "listProjectPhases", "markProjectCompleted", "overrideRevision", "recordClientAnswer", "postPhaseImage", "postPhaseNote",
     "renameIteration", "reopenProject", "reorderPhaseDefinitions", "sendIteration", "setDeliverableFinal",
-    "setPhaseNoteFlags", "setPhaseNoteTags", "setPhasePlannedDates", "sweepDeliverableExpiry", "undoPhaseEvent",
+    "setPhaseNoteTags", "setPhasePlannedDates", "sweepDeliverableExpiry", "undoPhaseEvent",
     "updatePhaseDefinition", "updatePhaseTemplate", "uploadDeliverable", "uploadDeliverableStream",
   ].sort());
 });

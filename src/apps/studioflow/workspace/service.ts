@@ -706,18 +706,8 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       );
       return { imageId: result.cardId };
     },
-    async editPhaseNote(input: NoteInput & { noteId: string; body: string | null; version?: number; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }) {
-      return { noteId: (await updateCardText({ ...input, cardId: input.noteId }, input.phaseId)).cardId };
-    },
     async setPhaseNoteTags(input: NoteInput & { noteId: string; tags: readonly NoteTagInput[]; version: number }) {
       return { noteId: (await cards.setNoteTags({ ...input, cardId: input.noteId, tags: input.tags, version: input.version })).cardId };
-    },
-    /** Star (pin) a message, or mark it as what the client said. */
-    async setPhaseNoteFlags(input: NoteInput & { noteId: string; starred?: boolean; clientFeedback?: boolean; version?: number }) {
-      return { noteId: (await setCardFlags({ ...input, cardId: input.noteId, pinned: input.starred, clientAnswer: input.clientFeedback }, input.phaseId)).cardId };
-    },
-    async deletePhaseNote(input: NoteInput & { noteId: string; version?: number }) {
-      return { noteId: (await deleteCard({ ...input, cardId: input.noteId }, input.phaseId)).cardId };
     },
 
     /** Every phase's pinned cards, for the project card's pinned-notes dialog. Text only; images open on the phase page. */

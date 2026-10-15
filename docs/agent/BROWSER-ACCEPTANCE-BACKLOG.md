@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.66] Notes conflict recovery, full mention edits and refresh ordering
+- Surface: StudioFlow project Notes, supplementing the existing [R9.64] A group
+- Fixture: WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A; Board disabled; authorized project PIC and unassigned phase-work grant holder; phase-labelled and General notes; more than 100 notes; two Schedule entries; two sessions; controlled lookup/page-read failure
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Begin an edit in both sessions, save the first, then save the stale second draft; press Reload and inspect the latest saved note beside the retained draft, then cancel/reopen to edit its current version. 2. Star/delete stale rendered notes and verify refusal remains visible after the view reloads. 3. Remove, replace and repeat @CODE mentions on edit; fail an item lookup and retry without losing the draft. 4. Edit/star/delete an existing General note with Board off, repeat without document assignment and attempt a designer-phase note as its drafter. 5. Load older notes, stop reading away from the bottom and refresh through a phase step; repeat for phase/tag/feedback/starred filters, quickly switching filters while reads are in flight. 6. Fail Show older notes and retry. 7. Send a note and confirm the view moves to its newest matching message; switch project and verify its default All view. 8. Confirm official text stays correctable/deletable and origin/phase labels stay locked.
+- Acceptance: captured edit version is never advanced under the old draft; explicit reload retains the draft and exposes the latest saved body; every mutation uses the rendered version with clear stale refusals; full mention set stays consistent and lookup failure never saves a partial set; existing General/document and phase-specific gates remain; filtered refresh never shows unfiltered initial data, reading anchor/loaded depth survive, obsolete results cannot win and errors are handled. Canonical policy currently gives a phase PIC document access too; test unassigned phase-work permission separately rather than inventing a phase-only PIC role. No phase × or new General creation.
+- Status: PENDING
+
 ### [R9.64] A — Notes integrity, reader context and existing General edits
 - Surface: StudioFlow project Notes with workspace-board off; same records on Board when enabled
 - Fixture: WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A (R9.66) implemented; ACTIVE project, designer, drafter with only a different phase's rights, outsider; official text/image/file records, manual feedback, General text, linked Schedule item; two sessions

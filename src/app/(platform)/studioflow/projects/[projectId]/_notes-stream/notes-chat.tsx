@@ -2,19 +2,22 @@
 
 import { FileText, Send, Star, X } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { currentDateOnly, formatInstant } from "@platform/utilities/date";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { Button, FormattedInstant, FormattedText, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, Select, Text, useConfirm } from "@/platform/ui_engine";
 
-import { listNoteTagsAction, listProjectNotesAction, phaseNoteAction, searchNoteItemsAction, type PhaseNoteCommandInput } from "../../../actions";
+import { listNoteTagsAction, listProjectNotesAction, noteAction, phaseNoteAction, searchNoteItemsAction, type NoteCommandInput } from "../../../actions";
 import { NOTE_MAX, NoteDraftFields, uploadPhaseImages, useNoteDraft, type NoteImage } from "../../../_components/phase-note-composer";
 import { NoteImageActions } from "../round-labels";
+import { plainNoteText as plain, noteCodeKey as codeKey, resolveNoteItemIds } from "./note-mentions";
+import { createNoteReadSequence } from "./note-read-sequence";
 
 export type ChatNote = {
   id: string;
+  version: number;
   body: string;
   pinned: boolean;
   origin: "NOTE" | "CLIENT_ANSWER" | "SITE_VISIT";
@@ -36,8 +39,9 @@ export type ChatNote = {
 export type ChatPhase = { id: string; label: string; iteration: string | null };
 
 type Filter = { kind: "all" } | { kind: "phase"; id: string } | { kind: "feedback" } | { kind: "starred" } | { kind: "tag"; name: string };
-type NoteCommand = DistributiveOmit<PhaseNoteCommandInput, "projectId" | "phaseId">;
+type NoteCommand = DistributiveOmit<NoteCommandInput, "projectId">;
 type DistributiveOmit<T, K extends keyof never> = T extends unknown ? Omit<T, K> : never;
+type NoteChange = { ok: true } | { ok: false; code?: string };
 
 /** Consecutive images from one person, sent within this window and labelled alike, read as one album (like WhatsApp). */
 const ALBUM_WINDOW_MS = 60_000;
@@ -66,14 +70,8 @@ function formatBytes(bytes: number): string {
   return bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
-/** The editor may escape `#`, `@` or `_` when it stores Markdown; tags and codes are read from the plain text. */
-function plain(text: string) {
-  return text.replace(/\\([#@_*[\]-])/g, "$1");
-}
 const TAG = /(?:^|\s)#([A-Za-z0-9_-]{1,32})(?=$|[\s.,!?;:)])/g;
-const CODE = /(?:^|\s)@([A-Za-z]{1,4}-?\d{1,3})(?=$|[\s.,!?;:)])/g;
 const TRAILING = /(?:^|\s)([#@])([A-Za-z0-9_-]{0,32})$/;
-const codeKey = (code: string) => code.replace(/^@/, "").replace(/-/g, "").replace(/^([A-Za-z]+)0*(\d+)$/, "$1$2").toUpperCase();
 
 /**
  * The project's notes as one chat to yourself (owner 2026-10-14, mockup "Notes — gaya chat"): every phase in one
@@ -81,11 +79,12 @@ const codeKey = (code: string) => code.replace(/^@/, "").replace(/-/g, "").repla
  * topic (the phase tag comes from the composer), `@HT1` links a Product Schedule item. Writing follows each phase's
  * rule, so the composer offers only the phases this person may write.
  */
-export function NotesChat({ projectId, projectName, phases, writablePhaseIds, defaultPhaseId, initial, canUseIdeas, canUsePresentation }: {
+export function NotesChat({ projectId, projectName, phases, writablePhaseIds, canEditGeneral, defaultPhaseId, initial, canUseIdeas, canUsePresentation }: {
   projectId: string;
   projectName: string;
   phases: readonly ChatPhase[];
   writablePhaseIds: readonly string[];
+  canEditGeneral: boolean;
   defaultPhaseId: string | null;
   initial: { notes: readonly ChatNote[]; cursor: string | null };
   canUseIdeas: boolean;
@@ -102,81 +101,140 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, de
   const [replyTo, setReplyTo] = useState<ChatNote | null>(null);
   const streamRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
+  const readSequence = useRef(createNoteReadSequence());
+  const view = useRef({ filter: { kind: "all" } as Filter, count: initial.notes.length });
+  const position = useRef<{ top: number; anchorId?: string; offset?: number } | null>(null);
   const writable = useMemo(() => new Set(writablePhaseIds), [writablePhaseIds]);
 
-  // A phase step elsewhere on the page (client answered, site visit) writes notes and refreshes the page: take the
-  // fresh first page and show everything again.
-  const [served, setServed] = useState(initial);
-  if (served !== initial) {
-    setServed(initial);
-    setNotes(initial.notes); setCursor(initial.cursor); setFilter({ kind: "all" });
-  }
-
-  const query = (target: Filter) => ({
+  const query = useCallback((target: Filter) => ({
     projectId,
     ...(target.kind === "phase" ? { phaseId: target.id } : {}),
     ...(target.kind === "feedback" ? { clientFeedback: true } : {}),
     ...(target.kind === "starred" ? { starred: true } : {}),
     ...(target.kind === "tag" ? { tag: target.name } : {}),
-  });
+  }), [projectId]);
 
-  const reload = async (target: Filter = filter) => {
+  const rememberPosition = useCallback(() => {
+    const stream = streamRef.current;
+    if (!stream || stickToBottom.current) { position.current = null; return; }
+    const top = stream.getBoundingClientRect().top;
+    const anchor = [...stream.querySelectorAll<HTMLElement>("article[id]")].find((item) => item.getBoundingClientRect().bottom > top);
+    position.current = { top: stream.scrollTop, anchorId: anchor?.id, offset: anchor ? anchor.getBoundingClientRect().top - top : undefined };
+  }, []);
+
+  const replacePage = useCallback((page: { notes: readonly ChatNote[]; cursor: string | null }) => {
+    rememberPosition();
+    view.current.count = page.notes.length;
+    setNotes(page.notes); setCursor(page.cursor);
+  }, [rememberPosition]);
+
+  const reload = useCallback(async (target: Filter = view.current.filter, options: { keepError?: boolean; newest?: boolean; firstPage?: boolean } = {}) => {
+    const current = readSequence.current.begin();
     setLoading(true);
     try {
-      const result = await listProjectNotesAction({ ...query(target), limit: PAGE });
-      if (!result.ok) { setError(result.error.safeMessage); return; }
-      stickToBottom.current = true;
-      setNotes(result.data.notes as ChatNote[]); setCursor(result.data.cursor); setError(null);
+      // Keep enough authoritative pages for a reader who has already loaded older notes.
+      const count = options.firstPage ? PAGE : Math.max(PAGE, view.current.count);
+      const fetched: ChatNote[] = [];
+      let next: string | null = null;
+      do {
+        const result = await listProjectNotesAction({ ...query(target), limit: PAGE, ...(next ? { cursor: next } : {}) });
+        if (!current()) return false;
+        if (!result.ok) { setError(result.error.safeMessage); return false; }
+        fetched.push(...result.data.notes as ChatNote[]); next = result.data.cursor;
+      } while (next && fetched.length < count);
+      if (options.newest) stickToBottom.current = true;
+      replacePage({ notes: fetched, cursor: next });
+      if (!options.keepError) setError(null);
+      return true;
     } catch {
-      setError("The notes could not be loaded. Please try again.");
+      if (current()) setError("The notes could not be loaded. Please try again.");
+      return false;
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
-  };
+  }, [query, replacePage]);
+
+  useEffect(() => {
+    const sequence = readSequence.current;
+    sequence.resume();
+    return () => sequence.dispose();
+  }, []);
+
+  const served = useRef(initial);
+  useEffect(() => {
+    if (served.current === initial) return;
+    served.current = initial;
+    const current = readSequence.current.begin();
+    // Defer state updates to the refresh task; do not reset the reader's filter or edit components.
+    const timer = setTimeout(() => {
+      if (!current()) return;
+      if (view.current.filter.kind === "all" && view.current.count <= PAGE) {
+        replacePage(initial); setLoading(false);
+      } else void reload();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [initial, reload, replacePage]);
+
   const olderPage = async () => {
-    if (!cursor) return;
+    if (!cursor || loading) return;
+    const current = readSequence.current.begin();
     setLoading(true);
     try {
       const result = await listProjectNotesAction({ ...query(filter), limit: PAGE, cursor });
+      if (!current()) return;
       if (!result.ok) { setError(result.error.safeMessage); return; }
       stickToBottom.current = false;
-      setNotes((current) => [...current, ...(result.data.notes as ChatNote[])]); setCursor(result.data.cursor);
+      replacePage({ notes: [...new Map([...notes, ...result.data.notes as ChatNote[]].map((note) => [note.id, note])).values()], cursor: result.data.cursor });
+    } catch {
+      if (current()) setError("The notes could not be loaded. Please try again.");
     } finally {
-      setLoading(false);
+      if (current()) setLoading(false);
     }
   };
-  const choose = (target: Filter) => { setFilter(target); void reload(target); };
+  const choose = (target: Filter) => {
+    view.current.filter = target;
+    setFilter(target);
+    void reload(target, { newest: true, firstPage: true });
+  };
 
   // The server sends newest first; the chat reads oldest to newest with the newest next to the composer.
   const ordered = useMemo(() => [...notes].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()), [notes]);
   const entries = useMemo(() => groupAlbums(ordered), [ordered]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const stream = streamRef.current;
-    if (stream && stickToBottom.current) stream.scrollTop = stream.scrollHeight;
+    if (!stream) return;
+    if (stickToBottom.current) stream.scrollTop = stream.scrollHeight;
+    else if (position.current) {
+      const saved = position.current;
+      const anchor = [...stream.querySelectorAll<HTMLElement>("article[id]")].find((item) => item.id === saved.anchorId);
+      stream.scrollTop = anchor && saved.offset !== undefined
+        ? stream.scrollTop + anchor.getBoundingClientRect().top - stream.getBoundingClientRect().top - saved.offset
+        : saved.top;
+    }
+    position.current = null;
   }, [entries]);
 
-  const run = async (key: string, note: ChatNote, command: NoteCommand) => {
-    if (!note.phaseId) return false;
+  const run = async (key: string, command: NoteCommand): Promise<NoteChange> => {
     setBusy(key); setError(null);
     try {
-      const result = await phaseNoteAction({ ...command, projectId, phaseId: note.phaseId } as PhaseNoteCommandInput);
-      if (!result.ok) { setError(result.error.safeMessage); return false; }
-      return true;
+      const result = await noteAction({ ...command, projectId });
+      if (!result.ok) { setError(result.error.safeMessage); return { ok: false, code: result.error.code }; }
+      return { ok: true };
     } catch {
       setError("The change could not be saved. Please try again.");
-      return false;
+      return { ok: false };
     } finally {
       setBusy(null);
     }
   };
   const runAll = async (key: string, group: readonly ChatNote[], command: (note: ChatNote) => NoteCommand) => {
-    for (const note of group) if (!(await run(key, note, command(note)))) break;
-    await reload();
+    for (const note of group) if (!(await run(key, command(note))).ok) break;
+    await reload(undefined, { keepError: true });
   };
   const remove = async (group: readonly ChatNote[]) => {
     const what = group.length > 1 ? `these ${group.length} images` : group[0]!.kind === "IMAGE" ? "this image" : group[0]!.kind === "FILE" ? "this file" : "this note";
     const ok = await confirm.confirm({ title: `Delete ${what}?`, description: "This cannot be undone.", confirmLabel: "Delete", tone: "danger" });
-    if (ok) await runAll(`delete:${group[0]!.id}`, group, (note) => ({ command: "delete", noteId: note.id }));
+    if (ok) await runAll(`delete:${group[0]!.id}`, group, (note) => ({ command: "delete", noteId: note.id, version: note.version }));
   };
 
   const today = currentDateOnly({ timeZone: timezone });
@@ -200,7 +258,7 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, de
         />
       </div>
 
-      <div ref={streamRef} role="log" aria-label="Notes" aria-busy={loading} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-surface-raised px-4 py-3 sm:px-6">
+      <div ref={streamRef} role="log" aria-label="Notes" aria-busy={loading} onScroll={(event) => { const stream = event.currentTarget; stickToBottom.current = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 32; }} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-surface-raised px-4 py-3 sm:px-6">
         {cursor ? <Button size="sm" variant="ghost" className="self-center" pending={loading} onClick={() => void olderPage()}>Show older notes</Button> : null}
         {entries.length === 0 ? (
           <Text as="p" size="sm" tone="tertiary" className="m-auto text-center">{filter.kind === "all" ? "Nothing here yet. Write what you learn about this project below: info, client feedback, photos." : "No notes match this view."}</Text>
@@ -209,7 +267,7 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, de
           const day = currentDateOnly({ now: new Date(first.createdAt), timeZone: timezone });
           const header = day !== lastDay ? (day === today ? "Today" : formatInstant(new Date(first.createdAt), { locale, timeZone: timezone, style: "date" })) : null;
           lastDay = day;
-          const canEdit = first.phaseId !== null && writable.has(first.phaseId);
+          const canEdit = first.phaseId ? writable.has(first.phaseId) : canEditGeneral;
           return (
             <div key={entry.key} className="flex flex-col gap-2">
               {header ? <div className="self-center rounded-pill bg-surface-muted px-2.5 py-0.5 text-xs text-ink-secondary">{header}</div> : null}
@@ -225,9 +283,17 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, de
                 busy={busy}
                 onReply={(note) => setReplyTo(note)}
                 onTag={(name) => choose({ kind: "tag", name })}
-                onStar={(note) => void runAll(`star:${note.id}`, [note], () => ({ command: "flags", noteId: note.id, starred: !note.pinned }))}
-                onFeedback={(group) => void runAll(`client:${group[0]!.id}`, group, (note) => ({ command: "flags", noteId: note.id, clientFeedback: note.origin !== "CLIENT_ANSWER" }))}
-                onEdit={async (note, body) => { const ok = await run(`edit:${note.id}`, note, { command: "edit", noteId: note.id, body, tags: tagsOf(body ?? "") }); if (ok) await reload(); return ok; }}
+                onStar={(note) => void runAll(`star:${note.id}`, [note], () => ({ command: "flags", noteId: note.id, version: note.version, starred: !note.pinned }))}
+                onFeedback={(group) => void runAll(`client:${group[0]!.id}`, group, (note) => ({ command: "flags", noteId: note.id, version: note.version, clientFeedback: note.origin !== "CLIENT_ANSWER" }))}
+                onEdit={async (note, body, version) => {
+                  let itemEntryIds: string[];
+                  try { itemEntryIds = await resolveNoteItemIds(body ?? "", (query) => searchNoteItemsAction(projectId, query)); }
+                  catch (cause) { setError(cause instanceof Error ? cause.message : "Schedule items could not be loaded. Please try again."); return { ok: false }; }
+                  const result = await run(`edit:${note.id}`, { command: "edit", noteId: note.id, version, body, tags: tagsOf(body ?? ""), itemEntryIds });
+                  if (result.ok) await reload();
+                  return result;
+                }}
+                onReload={() => reload(undefined, { keepError: true })}
                 onDelete={(group) => void remove(group)}
               />
             </div>
@@ -243,7 +309,7 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, de
           defaultPhaseId={defaultPhaseId && writable.has(defaultPhaseId) ? defaultPhaseId : writablePhaseIds[0]!}
           replyTo={replyTo}
           onCancelReply={() => setReplyTo(null)}
-          onSent={() => { setReplyTo(null); void reload(); }}
+          onSent={() => { setReplyTo(null); stickToBottom.current = true; void reload(undefined, { newest: true }); }}
         />
       ) : (
         <Text as="p" size="sm" tone="secondary" className="shrink-0 border-t border-line-subtle px-4 py-3">You can read these notes. Only a phase&apos;s designer or drafter can write them.</Text>
@@ -257,7 +323,7 @@ function tagsOf(text: string) {
   return [...new Set([...plain(text).matchAll(TAG)].map((match) => match[1]!).filter((name) => name.toLowerCase() !== "feedback"))].slice(0, 5);
 }
 
-function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onDelete }: {
+function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onReload, onDelete }: {
   group: readonly ChatNote[];
   projectId: string;
   projectName: string;
@@ -271,7 +337,8 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
   onTag: (name: string) => void;
   onStar: (note: ChatNote) => void;
   onFeedback: (group: readonly ChatNote[]) => void;
-  onEdit: (note: ChatNote, body: string | null) => Promise<boolean>;
+  onEdit: (note: ChatNote, body: string | null, version: number) => Promise<NoteChange>;
+  onReload: () => Promise<boolean>;
   onDelete: (group: readonly ChatNote[]) => void;
 }) {
   const note = group[0]!;
@@ -280,12 +347,14 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.body);
   const [saving, setSaving] = useState(false);
+  const [editVersion, setEditVersion] = useState(note.version);
+  const [stale, setStale] = useState(false);
   const images = group.flatMap((item) => item.images);
   const last = group.at(-1)!;
 
   const items = [
     { label: "Reply", onSelect: () => onReply(note) },
-    ...(note.kind === "TEXT" && !album ? [{ label: "Edit", onSelect: () => { setDraft(note.body); setEditing(true); } }] : []),
+    ...(note.kind === "TEXT" && !album ? [{ label: "Edit", onSelect: () => { setDraft(note.body); setEditVersion(note.version); setStale(false); setEditing(true); } }] : []),
     ...(note.workflowRecord ? [] : [{ label: feedback ? "Not client feedback" : "Mark as client feedback", onSelect: () => onFeedback(group) }]),
     { label: album ? `Delete ${group.length} images` : "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(group) },
   ];
@@ -307,9 +376,12 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
         <div className="grid min-w-[18rem] gap-2">
           <RichTextEditor aria-label="Edit note" maxLength={NOTE_MAX} value={draft} autoFocus onChange={setDraft} />
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="primary" pending={saving} disabled={!draft.trim()} onClick={async () => { setSaving(true); try { if (await onEdit(note, draft.trim() || null)) setEditing(false); } finally { setSaving(false); } }}>Save</Button>
+            <Button size="sm" variant="primary" pending={saving} disabled={!draft.trim()} onClick={async () => { setSaving(true); try { const result = await onEdit(note, draft.trim() || null, editVersion); if (result.ok) setEditing(false); else setStale(result.code === "WORKSPACE_CARD_STALE"); } finally { setSaving(false); } }}>Save</Button>
             <Button size="sm" variant="ghost" disabled={saving} onClick={() => setEditing(false)}>Cancel</Button>
+            {stale ? <Button size="sm" variant="secondary" disabled={saving} onClick={() => void onReload()}>Reload</Button> : null}
           </div>
+          {stale ? <Text size="sm" tone="secondary">Your draft is kept. Reload to see the latest note; cancel and edit again to use its latest version.</Text> : null}
+          {stale && note.version !== editVersion ? <div className="grid gap-1"><Text size="sm" weight="semibold">Latest saved note</Text><FormattedText text={note.body} className="text-sm" /></div> : null}
         </div>
       ) : (
         <>
@@ -443,18 +515,9 @@ function ChatComposer({ projectId, phases, defaultPhaseId, replyTo, onCancelRepl
     const clientFeedback = feedback || /(?:^|\s)#feedback\b/i.test(text);
     setSending(true); setErrors([]);
     try {
-      // Codes typed without the list are linked when exactly one item has that code.
-      const entryIds: string[] = [];
-      for (const match of text.matchAll(CODE)) {
-        const key = codeKey(match[1]!);
-        const known = picked.get(key);
-        if (known) { entryIds.push(known); continue; }
-        const found = await searchNoteItemsAction(projectId, match[1]!);
-        const exact = found.ok ? found.data.filter((item) => codeKey(item.code) === key) : [];
-        if (exact.length === 1) entryIds.push(exact[0]!.entryId);
-      }
+      const entryIds = await resolveNoteItemIds(body, (query) => searchNoteItemsAction(projectId, query), picked);
       if (body) {
-        const posted = await phaseNoteAction({ command: "post", projectId, phaseId: phase.id, body, clientFeedback, replyToId: replyTo?.id, tags, itemEntryIds: [...new Set(entryIds)].slice(0, 10) });
+        const posted = await phaseNoteAction({ command: "post", projectId, phaseId: phase.id, body, clientFeedback, replyToId: replyTo?.id, tags, itemEntryIds: entryIds });
         if (!posted.ok) { setErrors([posted.error.safeMessage]); return; }
       }
       const { problems, failed } = await uploadPhaseImages({ projectId, phaseId: phase.id, clientFeedback, replyToId: body ? undefined : replyTo?.id, tags }, draft.files);

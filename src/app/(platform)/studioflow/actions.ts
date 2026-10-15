@@ -373,11 +373,9 @@ export async function phaseCommandAction(input: PhaseCommandInput): Promise<Acti
 const NoteBody = z.string().max(4000).nullable();
 const NoteTags = z.array(z.string().max(33)).max(5);
 const NoteItemEntryIds = z.array(Id).max(10);
+const Version = z.number().int().min(1);
 const PhaseNoteCommand = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("post"), projectId: Id, phaseId: Id, body: NoteBody, clientFeedback: z.boolean().optional(), answeredIterationId: Id.optional(), replyToId: Id.optional(), tags: NoteTags.optional(), itemEntryIds: NoteItemEntryIds.optional() }),
-  z.strictObject({ command: z.literal("edit"), projectId: Id, phaseId: Id, noteId: Id, body: NoteBody, tags: NoteTags.optional(), itemEntryIds: NoteItemEntryIds.optional() }),
-  z.strictObject({ command: z.literal("flags"), projectId: Id, phaseId: Id, noteId: Id, starred: z.boolean().optional(), clientFeedback: z.boolean().optional() }),
-  z.strictObject({ command: z.literal("delete"), projectId: Id, phaseId: Id, noteId: Id }),
 ]);
 export type PhaseNoteCommandInput = z.infer<typeof PhaseNoteCommand>;
 
@@ -387,15 +385,33 @@ export async function phaseNoteAction(input: PhaseNoteCommandInput): Promise<Act
     const data = parse(PhaseNoteCommand, input);
     const base = { ...ctx, projectId: data.projectId, phaseId: data.phaseId };
     const phases = studioFlow.phases;
-    let noteId: string;
-    switch (data.command) {
-      case "post": noteId = (await phases.postPhaseNote({ ...base, body: data.body, clientFeedback: data.clientFeedback, answeredIterationId: data.answeredIterationId, replyToId: data.replyToId, tags: data.tags, itemEntryIds: data.itemEntryIds })).noteId; break;
-      case "edit": noteId = (await phases.editPhaseNote({ ...base, noteId: data.noteId, body: data.body, tags: data.tags, itemEntryIds: data.itemEntryIds })).noteId; break;
-      case "flags": noteId = (await phases.setPhaseNoteFlags({ ...base, noteId: data.noteId, starred: data.starred, clientFeedback: data.clientFeedback })).noteId; break;
-      case "delete": noteId = (await phases.deletePhaseNote({ ...base, noteId: data.noteId })).noteId; break;
-    }
+    const { noteId } = await phases.postPhaseNote({ ...base, body: data.body, clientFeedback: data.clientFeedback, answeredIterationId: data.answeredIterationId, replyToId: data.replyToId, tags: data.tags, itemEntryIds: data.itemEntryIds });
     refresh(data.projectId);
     return { noteId };
+  });
+}
+
+// Notes remain available with Board off. The stored card label selects the existing phase/project write gate.
+const NoteCommand = z.discriminatedUnion("command", [
+  z.strictObject({ command: z.literal("edit"), projectId: Id, noteId: Id, version: Version, body: NoteBody, tags: NoteTags.optional(), itemEntryIds: NoteItemEntryIds }),
+  z.strictObject({ command: z.literal("flags"), projectId: Id, noteId: Id, version: Version, starred: z.boolean().optional(), clientFeedback: z.boolean().optional() }),
+  z.strictObject({ command: z.literal("delete"), projectId: Id, noteId: Id, version: Version }),
+]);
+export type NoteCommandInput = z.infer<typeof NoteCommand>;
+
+export async function noteAction(input: NoteCommandInput): Promise<ActionResult<{ noteId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(NoteCommand, input);
+    const base = { ...ctx, projectId: data.projectId, cardId: data.noteId, version: data.version };
+    const workspace = studioFlow.workspace;
+    switch (data.command) {
+      case "edit": await workspace.updateWorkspaceCardText({ ...base, body: data.body, tags: data.tags, itemEntryIds: data.itemEntryIds }); break;
+      case "flags": await workspace.setWorkspaceCardFlags({ ...base, pinned: data.starred, clientAnswer: data.clientFeedback }); break;
+      case "delete": await workspace.deleteWorkspaceCard(base); break;
+    }
+    refresh(data.projectId);
+    return { noteId: data.noteId };
   });
 }
 
@@ -427,10 +443,9 @@ export async function listNotesForItemAction(projectId: string, entryId: string)
 // ── Project Workspace (WO-SF-WORKSPACE-01) ─────────────────────────────────
 // Minimal transport for the Workspace backend; every write that changes an element names the version it read.
 // These are the board's commands: they refuse while the Developer has the Workspace board module off (owner
-// 2026-10-14). The Notes stream writes through the phase note actions above, which stay on.
+// 2026-10-14). Notes post through phaseNoteAction and mutate through noteAction above, which stay on.
 
 const WORKSPACE_BOARD = "workspace-board";
-const Version = z.number().int().min(1);
 const CanvasCoordinate = z.number().int().min(0).max(100_000);
 const CardCanvasWidth = z.number().int().min(120).max(100_000);
 const TextStyle = z.enum(["PLAIN", "HEADING", "STICKY"]);

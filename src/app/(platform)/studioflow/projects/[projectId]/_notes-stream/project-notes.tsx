@@ -43,10 +43,12 @@ export async function ProjectNotes({ projectId, projectName, selectedPhaseId, pe
       {/* The chat keeps its own scroll: the newest message and the composer stay in view (DESIGN.md §6.2). */}
       <div className="flex min-h-[28rem] flex-1 flex-col">
         <NotesChat
+          key={projectId}
           projectId={projectId}
           projectName={projectName}
           phases={phaseList.map((phase) => ({ id: phase.id, label: phase.label, iteration: phase.iterationShortName ?? null }))}
           writablePhaseIds={writablePhaseIds}
+          canEditGeneral={open && access.canEditDocuments}
           defaultPhaseId={selectedPhaseId}
           initial={initial}
           canUseIdeas={hasPermission(grants, P.ideasManage)}
