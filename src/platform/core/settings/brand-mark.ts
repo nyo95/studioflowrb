@@ -22,11 +22,16 @@ function isPng(bytes: Uint8Array): boolean {
 }
 
 /** Platform General Settings' server-side PNG policy and upload boundary. */
-export async function uploadBrandMarkPng(file: File, storage: ObjectStorage): Promise<string> {
+export async function uploadPngWithBrandMarkPolicy(file: File, storage: ObjectStorage, folder: string): Promise<string> {
   if (file.size === 0 || file.size > MAX_BRAND_MARK_BYTES) throw new AppError("VALIDATION", "platform.brand-mark.size", "Brand mark must be a PNG up to 2 MB");
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (!isPng(bytes)) throw new AppError("VALIDATION", "platform.brand-mark.format", "Brand mark must be a valid PNG file");
-  const key = createPrivateObjectKey("brand-marks", "png");
+  const key = createPrivateObjectKey(folder, "png");
   await storage.put({ key, body: bytes, bytes: bytes.length, contentType: "image/png" });
   return key;
+}
+
+/** Platform General Settings' managed Brand mark upload. */
+export async function uploadBrandMarkPng(file: File, storage: ObjectStorage): Promise<string> {
+  return uploadPngWithBrandMarkPolicy(file, storage, "brand-marks");
 }

@@ -69,6 +69,11 @@ enum SfCdItemStatus {
 /// Singleton StudioFlow workflow settings (id = "studio").
 model SfSettings {
   id                  String   @id @default("studio")
+  /// Consultant document letterhead. Null values fall back to the platform identity.
+  company_name        String?
+  logo_key            String?
+  company_address     String?
+  company_email       String?
   archive_retention_days Int   @default(90)
   cd_mall_days        Int      @default(5)
   cd_final_days       Int      @default(5)

@@ -10,6 +10,12 @@ export function studioFlowSettingsGroups(grants: PermissionGrants): SettingsSect
   const settings = hasPermission(grants, P.settingsManage);
   return [
     {
+      heading: "Documents",
+      items: [
+        { key: "document-letterhead", href: "/studioflow/settings/document-letterhead", label: "Document letterhead", visible: settings },
+      ],
+    },
+    {
       heading: "Templates for new projects",
       items: [
         { key: "phases", href: "/studioflow/settings/phases", label: "Phase templates", visible: settings },

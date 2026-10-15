@@ -101,6 +101,8 @@ owns grant mechanics.
 | `studioflow.phase.override` | Admin reset of a phase's rounds (audited snapshot) |
 | `studioflow.task.manage` | Rename requirements, add subtasks |
 | `studioflow.settings.manage` | Archive retention, checklist templates, phase templates, schedule templates and prefixes |
+
+**Document letterhead (R9.85).** StudioFlow owns one optional consultant document identity on its settings singleton: company name, private PNG logo key, address and e-mail. It is edited at `/studioflow/settings/document-letterhead` with `studioflow.settings.manage`; empty values fall back to the Platform organisation identity. The public fact read exposes only those four fields for composition and carries no permission context.
 | `studioflow.mom.manage` | Create/edit/delete MOM documents and content |
 | `studioflow.schedule.manage` | Schedule entries, options, photos, card fields, sample requests |
 | `studioflow.presentation.manage` | Presentation boards, slides and pins |

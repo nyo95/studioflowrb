@@ -8,6 +8,7 @@ import { createScheduleService } from "./schedule/service";
 import type { Db, StudioFlowPorts } from "./shared";
 import { createTaskService } from "./tasks/service";
 import { createWorkspaceService } from "./workspace/service";
+import { createDocumentIdentityService } from "./document-identity";
 
 /** Composed StudioFlow application service (one module per capability). */
 export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
@@ -21,6 +22,7 @@ export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
     mom: createMomService(db, ports),
     schedule,
     library: createLibraryService(ports),
+    documentIdentity: createDocumentIdentityService(db, ports),
   };
 }
 

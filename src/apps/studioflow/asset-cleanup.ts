@@ -40,6 +40,7 @@ async function isReferenced(db: Db | TxClient, key: string): Promise<boolean> {
     db.sfScheduleOption.count({ where: { image_key: key } }),
     db.sfScheduleTemplateItem.count({ where: { image_key: key } }),
     db.sfClient.count({ where: { logo_storage_key: key } }),
+    db.sfSettings.count({ where: { logo_key: key } }),
   ]);
   return references.some((count) => count > 0);
 }

@@ -2,11 +2,14 @@ import { BQ_PERMISSIONS } from "../service";
 import { calculateItem, calculateProject, type ItemInput } from "../lib/calculation-engine";
 import { isMarkerPriceMode, type BqPriceMode } from "../lib/quotation";
 import { toDecimalString } from "@platform/utilities/decimal";
+import { readBqIssuerIdentity } from "./issuer-identity";
 
 export * from "./nav";
 export { BQ_DEFAULT_QUOTATION_TERMS, BQ_PRICE_MODE_LABEL, BQ_PRICE_MODES, QUOTATION_TERMS_MAX, isMarkerPriceMode, type BqPriceMode } from "../lib/quotation";
 
 export { BQ_PERMISSIONS };
+export type { BqQuotationSettingsRead } from "../services/quotation-settings";
+export { readBqIssuerIdentity } from "./issuer-identity";
 
 export type BqLibItemRead = {
   id: string;
@@ -215,6 +218,7 @@ const PROJECT_ITEM_INCLUDE = {
 
 export function createBqPublicRead(db: PrismaClient) {
   return {
+    readBqIssuerIdentity: () => readBqIssuerIdentity(db),
     async listAssemblyTemplates(): Promise<BqAssemblyTemplateRead[]> {
       const assemblies = await db.bqAssemblyTemplate.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { lines: true } } } });
       return assemblies.map((assembly) => ({ id: assembly.id, name: assembly.name, description: assembly.description, lineCount: assembly._count.lines }));

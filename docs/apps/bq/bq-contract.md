@@ -413,6 +413,8 @@ Project hanya boleh dikunci bila memiliki sedikitnya satu Work Item. Baris denga
 
 **Quotation settings (owner 2026-10-14).** Satu baris milik BQ (`bq.bq_quotation_settings`, layar `/bq/settings`, `bq.project.manage`): nama dan logo penerbit penawaran (bisa kontraktor, bukan studio; kosong = nama organisasi dan brand mark Platform), alamat dan e-mail, nama penanda tangan, gambar tanda tangan (PNG ≤ 1 MB di object storage privat Platform), termin pembayaran bawaan, PPN bawaan (11). BQ tetap mandiri: data surat dan kop ini milik BQ, tidak dibaca dari atau ditulis ke app lain; logo tetap brand mark Platform. Klien hanya melihat rate dan total (§6.4) — tanpa markup, koefisien, atau breakdown. Nomor, tanggal, dan T&C menjelaskan surat, bukan isi harga, sehingga tetap bisa diubah saat project `LOCKED` (`updateQuotation`, `bq.project.manage`); project `ARCHIVED` menolaknya.
 
+**Issuer identity public read (R9.85).** `readBqIssuerIdentity` returns only the quotation issuer's name, logo key, address and e-mail for composition. It does not expose signature, PPN or payment terms, and does not change BQ ownership or quotation output.
+
 **Price mode (R8.328; owner 2026-09-23).** Setiap Work Item punya `price_mode`: `PRICED` (default), `TBC`, atau `BY_OWNER`. TBC dan By Owner adalah baris penanda: tidak ada rate/total yang ditampilkan atau dihitung (walau harga tersimpan), baris itu tidak masuk subtotal/grand total, tidak membuat grand total "belum lengkap", dan tidak dihitung sebagai baris Rp0 saat lock.
 
 **Service-layer enforcement:** setiap mutation terhadap content BQ wajib melewati guard `requireEditableProject` yang reject bila status `LOCKED` atau `ARCHIVED`. Tidak cukup hanya disable tombol di UI.

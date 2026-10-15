@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.85 | 2026-10-15 | feat(studioflow,bq): Add role-owned document identity backend (Executor)
+
+- **WO-BRAND-BY-ROLE-01, Executor scope only:** StudioFlow now owns nullable consultant letterhead fields (company name, private PNG key, address and e-mail) on its singleton settings row. The additive migration `20261015130000_studioflow_document_identity` was applied to the verified kantor rebuild-only dev and test databases; no backfill or workflow-setting change.
+- **Service and storage:** `getDocumentIdentity` / `updateDocumentIdentity` enforce `studioflow.settings.manage`, BQ-style trimming, letter-text/e-mail limits and audit `studioflow.document-identity.updated`; a logo replacement/removal is queued inside the same transaction and discarded after commit. The upload action reuses the canonical 2 MB valid-PNG policy under the `studioflow/document-letterhead` private prefix.
+- **Contracts and wiring:** public StudioFlow and BQ issuer reads expose only name, logo key, address and e-mail; the new plain `/studioflow/settings/document-letterhead` page is permission-gated and uses the existing settings navigation. BQ quotation output, all print pages and the authenticated shell are unchanged for the Lead's next slice.
+- **Tests and checks:** focused identity tests (6/6); full `npm test`; typecheck; full lint; `check:boundaries`; `check:legacy-runtime`; production build; staged/unstaged whitespace check. No dependency, legacy or remote operation; no browser acceptance claimed.
+
 ## R9.84 | 2026-10-15 | fix(studioflow): Project tabs scroll again; only Phases fills the window (Lead)
 
 - **Owner 2026-10-15** (screenshot of Product Schedule): "halaman ini fixed, ga bisa di scroll".
