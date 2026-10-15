@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.90 | 2026-10-15 | docs(studioflow): Plan stable deliverable version numbers (Lead)
+
+- **Scope:** replaced the completed brand Work Order with READY WO-SF-DELIVERABLE-VERSION-01 targeting R9.91. The owner-requested newest-highest numbering requires persisted per-file numbers and a durable per-phase/slot counter because older working files are pruned or expired; a display-only reversal would renumber survivors again.
+- **Decisions:** assign numbers atomically in the existing upload transaction; backfill surviving files once in chronological order and seed counters. Deleted historical versions cannot be reconstructed from surviving rows. The existing lifecycle, permissions, storage and audit stay unchanged; Reviewer browser acceptance follows the Executor commit.
+- **Checks:** plan reviewed against the current deliverable schema, upload/pruning service, integration tests, and StudioFlow contract. Documentation only; no database command, migration, dependency, or push.
+
 ## R9.89 | 2026-10-15 | fix(ui): Keep pricing entry, plan controls, pin creation, and dark text usable (Lead)
 
 - **Scope:** closed four verified browser defects in the Master Data Labor entry, StudioFlow dates dialog, Presentation editor, and dark-theme Notes/gallery surfaces. Enter in a non-last Labor amount advances to the next amount instead of submitting; Enter in the last amount still adds a row. Per the owner's choice, Save and apply plan stays disabled until Fit Out Start is filled, with a nearby explanation; plain Save remains available.
