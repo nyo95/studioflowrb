@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.94 | 2026-10-15 | test(presentation): Accept destructive-action confirmations in the browser (Reviewer partial)
+
+- **Scope:** added an isolated Presentation browser journey for an occupied image with a pin. Picker and file-drop replacement, pin/image/slide/board deletion each show a specific confirmation with the affected counts. Cancel leaves the image, pin, slide and board intact through reload; confirming each action subsequently completes and board deletion returns to the list. The fixed R9.68 destructive-confirmation `[BUG]` is closed.
+- **Verdict:** PASS for R9.64 C2 confirmation behavior; PARTIAL for wider R9.68 Presentation acceptance. Pin movement, refused actions/retry, pending-repeat, permission and viewport/print cases remain pending. No production code, migration, dependency, or push; root `test/` untouched.
+- **Checks:** focused browser test 1/1 PASS on the verified disposable office rebuild test database; `npm run check`, targeted lint and whitespace check PASS. The test server's intermittent aborted-request/ECONNRESET messages did not fail the assertions or process exit.
+
 ## R9.93 | 2026-10-15 | test(studioflow): Verify Notes mention removal and General editing in the browser (Reviewer partial)
 
 - **Scope:** added two isolated browser regressions and a disposable General-note fixture. Removing `@HT-01` from a saved note now has direct browser evidence that both the displayed chip and retained item link are absent after reload; the fixed R9.66 mention-removal `[BUG]` is closed. An existing General note can be edited with Workspace Board off and persists after reload.
