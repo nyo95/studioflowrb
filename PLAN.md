@@ -3,7 +3,7 @@
 Plan ID: WO-BRAND-BY-ROLE-01
 Scope: Two brands fixed by role — contractor brand (A) for BQ and Master Data, consultant brand (B) for StudioFlow — on every printable document and in the app's top-left mark per area
 Module(s): studioflow (settings: document identity), bq (public read of its existing issuer identity), platform authenticated shell (Lead, per-area mark)
-Target revision: **R9.84** Executor backend (Lead plan R9.83); Lead UI and integration follow as R9.85
+Target revision: **R9.85** Executor backend (Lead plan R9.83; R9.84 was a Lead layout fix); Lead UI and integration follow as R9.86
 Status: READY
 Priority: P2
 Owner: Product Owner; Lead locks and reviews
@@ -16,7 +16,7 @@ The company appears under two brandings, each locked to one role:
 - **A = contractor** — the BQ and Master Data areas. Its identity already exists as BQ's quotation letterhead (`BqQuotationSettings`: company name, logo, address, e-mail, signer, signature).
 - **B = consultant** — StudioFlow (including Ideas and Presentation, which live under `/studioflow`). It has **no** identity today.
 
-After this Work Order (R9.84 + R9.85):
+After this Work Order (R9.85 + R9.86):
 
 1. StudioFlow has its own **document letterhead** setting (company name, logo, address, e-mail), edited in StudioFlow Settings.
 2. Every printable StudioFlow document carries B: Minutes of meeting, Product schedule, Presentation. The BQ quotation keeps carrying A exactly as today.
@@ -43,7 +43,7 @@ Previous Work Order WO-SF-SUPERVISION-HANDOVER-01 is complete in code (R9.80; hi
 6. **Documents render the current identity** (as BQ does today). No historical snapshot of the letterhead per document in this Work Order.
 7. English UI copy. No new dependency. No change to BQ's schema or quotation output.
 
-## Backend Contract (Executor, R9.84)
+## Backend Contract (Executor, R9.85)
 
 - **StudioFlow document identity service:** `getDocumentIdentity()` → `{ companyName, logoKey, companyAddress, companyEmail }` (nulls when unset; no row = all null) and `updateDocumentIdentity({ grants, actor, companyName, companyAddress, companyEmail, logo: ImageChange })` → `{ replacedLogoKey }`, validating as BQ's letterhead fields, requiring `studioflow.settings.manage`, auditing `studioflow.document-identity.updated`. Writing must not reset the workflow numbers in `SfSettings` (upsert only these columns).
 - **Logo upload:** a server action that accepts a PNG (reuse the platform PNG policy used for brand marks/BQ logo — no private copy of the PNG check), stores it under a StudioFlow key prefix, calls the service, and enqueues the replaced key for cleanup after commit.
@@ -55,9 +55,9 @@ Previous Work Order WO-SF-SUPERVISION-HANDOVER-01 is complete in code (R9.80; hi
 
 ## UI Contract
 
-**Executor minimal wiring (R9.84):** a StudioFlow Settings page **Document letterhead** (new group "Documents" in `studioflow/settings/sections.ts`, visible with `studioflow.settings.manage`) with the four fields and logo set/replace/remove, mirroring the BQ quotation settings form. Plain and functional; no print or shell changes.
+**Executor minimal wiring (R9.85):** a StudioFlow Settings page **Document letterhead** (new group "Documents" in `studioflow/settings/sections.ts`, visible with `studioflow.settings.manage`) with the four fields and logo set/replace/remove, mirroring the BQ quotation settings form. Plain and functional; no print or shell changes.
 
-**Lead (R9.85), not delegated:** letterhead block on MOM, Product schedule and Presentation prints (Presentation: logo in the running header of every page, kept small so slides stay clean); `AuthenticatedShell` extended with a domain-neutral per-area mark (root path → name + logo link), composed in `(platform)/layout.tsx` from the two public reads (long-lived signed links), falling back to the platform mark; settings page polish.
+**Lead (R9.86), not delegated:** letterhead block on MOM, Product schedule and Presentation prints (Presentation: logo in the running header of every page, kept small so slides stay clean); `AuthenticatedShell` extended with a domain-neutral per-area mark (root path → name + logo link), composed in `(platform)/layout.tsx` from the two public reads (long-lived signed links), falling back to the platform mark; settings page polish.
 
 ## Boundaries and Non-goals
 
@@ -72,15 +72,15 @@ Previous Work Order WO-SF-SUPERVISION-HANDOVER-01 is complete in code (R9.80; hi
 - Saving B in StudioFlow Settings persists the four values and logo; replacing/removing the logo discards the old object after commit; workflow numbers in `SfSettings` are untouched.
 - A user without `studioflow.settings.manage` cannot see the page or call the action.
 - Both public reads return the stored identity, and all-null when nothing is set.
-- (R9.85) Each StudioFlow print shows B's logo and name (or the platform fallback); the BQ quotation is unchanged; the shell mark shows B in `/studioflow…`, A in `/bq…` and `/masterdata…`, the platform mark elsewhere.
+- (R9.86) Each StudioFlow print shows B's logo and name (or the platform fallback); the BQ quotation is unchanged; the shell mark shows B in `/studioflow…`, A in `/bq…` and `/masterdata…`, the platform mark elsewhere.
 
 ## Verification
 
-Executor (R9.84): integration tests for get (no row / row), update (values, trimming, validation refusals for long name/bad e-mail/long text, permission refusal, logo set/replace/remove returns the replaced key, workflow numbers preserved, audit row) and both public reads. Then `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, `git diff --cached --check`. Apply the migration to both dev and test databases (rebuild-only targets).
+Executor (R9.85): integration tests for get (no row / row), update (values, trimming, validation refusals for long name/bad e-mail/long text, permission refusal, logo set/replace/remove returns the replaced key, workflow numbers preserved, audit row) and both public reads. Then `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, `git diff --cached --check`. Apply the migration to both dev and test databases (rebuild-only targets).
 
 ## Reviewer Acceptance
 
-After R9.85 (owner browser group): set B's logo and name in StudioFlow Settings; print a MOM, a schedule and a presentation and see B; print a BQ quotation and see A; move between StudioFlow, BQ, Master Data and Settings and watch the top-left mark change; clear B's logo and see the platform mark come back.
+After R9.86 (owner browser group): set B's logo and name in StudioFlow Settings; print a MOM, a schedule and a presentation and see B; print a BQ quotation and see A; move between StudioFlow, BQ, Master Data and Settings and watch the top-left mark change; clear B's logo and see the platform mark come back.
 
 ## Regression Risks and Recovery
 
@@ -94,7 +94,7 @@ After R9.85 (owner browser group): set B's logo and name in StudioFlow Settings;
 ROLE: BACKEND EXECUTOR. Location: kantor (load .env.kantor, set
 STUDIOFLOW_LOCATION=kantor, verify rebuild-only dev/test targets). Read
 AGENTS.md, docs/agent/EXECUTOR.md and PLAN.md WO-BRAND-BY-ROLE-01.
-Build R9.84 only: StudioFlow document identity (four nullable columns on
+Build R9.85 only: StudioFlow document identity (four nullable columns on
 SfSettings via an additive migration applied to dev and test; get/update
 service with BQ-style validation, studioflow.settings.manage, audit, logo
 ImageChange with replaced-key cleanup; PNG upload action reusing the platform
@@ -102,7 +102,7 @@ PNG policy), public reads readStudioFlowDocumentIdentity and
 readBqIssuerIdentity, the plain "Document letterhead" settings page, contract
 doc paragraphs, and the listed tests. Do not touch prints, the shell or the
 BQ quotation output. No new dependency, legacy or remote operation. Preserve
-untracked owner files under test/. Finish with all checks, CHANGELOG R9.84,
+untracked owner files under test/. Finish with all checks, CHANGELOG R9.85,
 one local commit. Return only the Planner/Reviewer prompt: outcome, commit,
 checks, limitations, remaining dirty files, request for verdict.
 ```

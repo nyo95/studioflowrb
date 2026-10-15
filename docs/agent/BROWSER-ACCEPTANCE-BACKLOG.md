@@ -30,6 +30,12 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.84] Project tabs scroll again; Phases stays fixed
+- Surface: a project with many Schedule entries, a long MOM list and Timeline
+- Steps: 1. Open Schedule (Board and List), MOM, Presentation, Timeline and History: scroll to the bottom of each with the mouse wheel. 2. Open Phases at ≥ 1280 px: the page stays put and only the notes/board scroll inside; below 1280 px it scrolls as a page.
+- Acceptance: no project tab is cut off at the window bottom; Phases keeps its fixed layout.
+- Status: PENDING
+
 ### [R9.82] Presentation editor feels instant
 - Surface: a Presentation board with several slides and large renders
 - Steps: 1. Click through layouts quickly, toggle Crop to fill / Show whole, drag the crop sliders, move and nudge pins, edit pin details, reorder slides, swap images between boxes, delete a pin/image/slide. 2. Watch that nothing flickers or reloads and the pictures do not load again; the line under the board title says "Saving…" then "All changes saved". 3. Reload: every last choice is kept. 4. Try to close the tab right after a change: the browser asks first. 5. Cause a refusal (e.g. shrink a layout while its extra boxes still hold images): an error shows and the board returns to what was saved.

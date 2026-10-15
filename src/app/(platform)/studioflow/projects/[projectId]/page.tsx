@@ -64,7 +64,7 @@ export default async function ProjectOverviewPage({
 
   // Record workspace (DESIGN.md §6.2): the page fills the window below the header and the notes keep their own scroll.
   return (
-    <div className="flex flex-1 flex-col gap-4 xl:min-h-0">
+    <div data-fill-page className="flex flex-1 flex-col gap-4 xl:min-h-0">
       {/* One row (owner 2026-10-14, DESIGN.md §6.2): the phase strip, and at its right end the selected phase's round,
           state and primary step. Below 1280px the workflow wraps under the strip. Switching a phase is a transition,
           so the old bar stays until the new one is ready and the notes below are never reloaded. */}

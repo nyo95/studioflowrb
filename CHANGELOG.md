@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.84 | 2026-10-15 | fix(studioflow): Project tabs scroll again; only Phases fills the window (Lead)
+
+- **Owner 2026-10-15** (screenshot of Product Schedule): "halaman ini fixed, ga bisa di scroll".
+- **Cause:** R9.61 made the project layout's `PageShell` a fill shell (flex column bound to the window) for the fixed Phases page, but the layout wraps every tab; a tab's `SectionCard` (overflow hidden, so min-height 0) shrank to the window and clipped, leaving the scroll wrapper nothing to scroll.
+- **Fix:** the shell is a normal page again and switches to the fill layout only when it contains `[data-fill-page]` (CSS `:has`), which only the Phases page root carries. No UI Engine change.
+- **Checks:** typecheck, lint of the two files. Not checked in a browser (the pane needs the owner's sign-in); browser group [R9.84] added.
+- **PLAN.md:** WO-BRAND-BY-ROLE-01 shifted to Executor R9.85 and Lead R9.86. No push.
+
 ## R9.83 | 2026-10-15 | docs(plan): WO-BRAND-BY-ROLE-01 — contractor and consultant brands by area, READY (Lead)
 
 - **Owner 2026-10-15:** two brandings, each locked to one role: "kontraktor=A; konsultan=B … BQ, Masterdata -> A; studioflow -> B"; branding only (legal split unknown), no data separation; the top-left mark switches per area ("gonta ganti better"); every printable document whose template needs a logo carries its brand.
