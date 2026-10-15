@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.92 | 2026-10-15 | test(studioflow): Accept stable deliverable versions in the browser (Reviewer PASS)
+
+- **Verdict:** PASS for WO-SF-DELIVERABLE-VERSION-01/R9.91. Independently inspected its database migration, atomic version allocation, list projection, UI badge, and tests; no new ownership, lifecycle, permission, or storage boundary issue found in scope.
+- **Browser evidence:** added an isolated Playwright workflow that uploads four same-named PDFs, marks Version 1 Final, observes Version 2 pruned while Versions 1/3/4 keep their numbers, deletes Version 4 so Version 3 becomes newest, uploads again to reach Version 5, and confirms a different file name starts at Version 1. It passed 1/1 with page reloads. The test server printed intermittent aborted-request/ECONNRESET messages, but assertions and process exit passed.
+- **Ledgers:** marked [R9.91] browser acceptance PASS and removed the fixed deliverable-version `[BUG]` from BACKLOG. `PLAN.md` is COMPLETE. No migration, dependency, or push in this review revision; the root `test/` directory remains untouched. Other pending browser groups and the intermittent hydration report remain outside this verdict.
+
 ## R9.91 | 2026-10-15 | fix(studioflow): Keep deliverable versions stable across uploads and pruning (Executor)
 
 - **Scope:** WO-SF-DELIVERABLE-VERSION-01. Each phase/file-name slot now assigns a durable, increasing version in the existing upload transaction. A slot counter survives file deletion and expiry; a unique index and atomic allocation prevent duplicate numbers under concurrent uploads. Listings show the stored number and mark only the highest surviving version in each slot newest. Existing Final and two-working-file lifecycle, permissions, storage cleanup and audit are unchanged.

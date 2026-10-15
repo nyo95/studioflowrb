@@ -4,7 +4,7 @@ Plan ID: WO-SF-DELIVERABLE-VERSION-01
 Scope: Stable upload-order version numbers for StudioFlow phase deliverables
 Module(s): studioflow
 Target revision: **R9.91** Executor backend, after Lead plan R9.90; Reviewer acceptance afterward
-Status: BUILT in R9.91; Reviewer browser acceptance pending
+Status: COMPLETE — R9.91 built; R9.92 Reviewer PASS
 Priority: P3
 Owner: Product Owner; Lead locks and reviews
 Last updated: 2026-10-15
@@ -40,7 +40,7 @@ This corrects the verified R9.87 browser defect in `docs/BACKLOG.md`. The curren
 
 After the Executor commit, inspect the schema/service/migration and test evidence, then use the browser on a disposable rebuild-only project: upload the same named deliverable three times, mark an older one Final, upload again so a working version is pruned, and confirm stable displayed numbers and the single newest badge after reload. Browser acceptance belongs to the Reviewer and does not block an otherwise valid Executor commit; queue it in the browser ledger if deferred. Only Reviewer records PASS.
 
-The implementation keeps the original `[BUG]` row marked code-fixed until this browser check, following the bootstrap acceptance rule over the shorter close-after-automated-check instruction above.
+The original `[BUG]` row remained open until the R9.92 browser check passed, following the bootstrap acceptance rule over the shorter close-after-automated-check instruction above.
 
 ## Copy-ready Executor prompt
 

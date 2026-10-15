@@ -36,7 +36,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Upload the same named file three times and mark the earliest surviving file Final. 2. Upload again to prune an older working file. 3. Reload and inspect every visible version number and the newest badge. 4. Delete the latest, reload, upload again and inspect the numbers. 5. Upload a different name and inspect its first number.
 - Acceptance: Final and surviving working files retain their upload-order numbers (gaps are allowed); only the highest surviving number per name says newest; after deletion, the next upload uses a higher number rather than restarting; a different name starts at Version 1.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Reviewer, R9.92) — browser regression on an isolated rebuild-only project showed Final Version 1, surviving working Versions 3 and 4 after pruning, Version 3 newest after deleting 4, new upload Version 5, and another file name beginning at Version 1; persisted through page reloads.
 
 ### Lead walk 2026-10-15 (R9.87) — what the remaining items still need
 Ran on a disposable "ZZ QA" project, BQ project and Master Data records (all archived afterwards). Items marked PASS above are closed; for the rest:
