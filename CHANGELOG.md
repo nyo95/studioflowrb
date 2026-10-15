@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.69 | 2026-10-15 | review(presentation): WO-SF-NOTES-PRESENTATION-IMAGE-01 slice C PASS; slice D READY (Lead)
+
+- **Verdict R9.68 (`0907c7d`): PASS (code review + automated checks).** `getBoard` no longer writes; dangling links project as `scheduleEntryId: null`/`scheduleEntry: null`, proven by an integration test whose annotation write delegates throw over two reads, with the stored row unchanged and explicit `clearScheduleEntryLink` still clearing. Pin drag: pointer capture on a 44 px button around the unchanged 28 px dot, 3 px click threshold, preview in full-frame percentages, one coordinate-only save on release, revert on cancel/lost capture/Escape/failure; image-box HTML drag and the trailing click are suppressed; keyboard 1%/Shift 5% with one debounced save. Partial update keeps item/note/side/order (integration test incl. bounds, archived/completed/foreign/read-only refusal). Every destructive path (picker/drop replace, remove image, delete pin/slide/board) goes through `useConfirm` with counts before any upload/write; board navigation only on success; board-create keeps the title and shows the error. `slide-frame.tsx` stays hook-free and print keeps its own absolute pin class. Copy is English (no Indonesian left in Presentation UI); `--ui-ink*`, `bg-neutral-200`, `ring-white` replaced by semantic tokens.
+- **Lead re-ran:** `npm test` **1140/1140** (0 failed/skipped/cancelled), typecheck, full lint, `check:boundaries` PASS on the kantor rebuild test DB.
+- **Non-blocking note:** a drag that grabs the pin off-centre snaps the pin centre to the pointer (up to ~22 px) on the first move instead of keeping the grab offset. Acceptable for now; revisit only if the owner finds it awkward in the browser.
+- **Browser:** not run by the Lead (owner tests in the browser). Groups [R9.64] C and [R9.68] stay PENDING; BACKLOG C2/C3/C4 marked fixed-pending-browser.
+- **Next:** PLAN.md slice D (shared ImageWorkspace: one crop geometry for preview and export, 1:1 pan, cursor zoom, pinch, Reset crop, Pan-first, Undo last stroke, local hit-area/contrast) READY as R9.70. Slice B follows the Lead's G2 shared-editor revision.
+
 ## R9.68 | 2026-10-15 | fix(presentation): Move pins and confirm destructive changes (Executor)
 
 - **WO-SF-NOTES-PRESENTATION-IMAGE-01, slice C only:** implemented the R9.67 READY contract with the owner's expanded Presentation UI lane on `main` from `39d2290`; published baseline `origin/main` R9.63 `ed169fb`. The only pre-existing dirty files were the owner's untracked `test/BOQ TEST.xlsx` and `test/BOQ TEST 2 - PDF.pdf`; both preserved. PLAN.md, slices B/D, StudioFlow and shared UI Engine source are unchanged.

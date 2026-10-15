@@ -1,13 +1,13 @@
 # Active Plan
 
 Plan ID: WO-SF-NOTES-PRESENTATION-IMAGE-01
-Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66, Lead review R9.67); **slice C READY**; B waits for the Lead's G2 editor revision; D DRAFT
+Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66/R9.67); slice C **PASS** (R9.68/R9.69); **slice D READY**; B waits for the Lead's G2 editor revision
 Module(s): studioflow (Notes and Schedule reads), presentation, shared platform UI Engine image patterns; workspace-board is an unchanged optional view of the same StudioFlow records
-Target revision: slice C = **R9.68** (next unused after Lead review R9.67); B/D allocated later from CHANGELOG.md
-Status: READY (slice C only); A PASS; B, D remain DRAFT
+Target revision: slice D = **R9.70** (next unused after Lead review R9.69); G2 + B allocated later from CHANGELOG.md
+Status: READY (slice D only); A and C PASS; B DRAFT (after Lead G2)
 Priority: P1 recommended for A; P2 for B/C/D, subject to owner priorities
 Owner: Product Owner; Lead approves and locks each READY slice
-Last updated: 2026-10-15 (Lead review R9.67)
+Last updated: 2026-10-15 (Lead review R9.69)
 
 ## Outcome
 
@@ -195,7 +195,7 @@ One independently useful interaction revision, after the Lead's G2 shared-editor
 
 Tests: empty/prefix/exact/name/final-option/project scope; signed/missing image+ID; middle-text caret/punctuation/escaping/IME; stale result/Escape; Up/Down/Enter/Tab and focus; no results/error/retry; formatted chips/card link; # new/existing/feedback/limit; send/Shift/list Enter, attachments/album. G2 requires its separate complete shared-editor/formatter consumer matrix before implementation.
 
-### Ordered slice C — Presentation pin movement and safe actions (READY, R9.68)
+### Ordered slice C — Presentation pin movement and safe actions (PASS: R9.68 `0907c7d`, Lead review R9.69)
 
 One coherent revision. Module: presentation. Files: PE `src/apps/presentation/ui/presentation-editor.tsx`, PF `src/apps/presentation/ui/slide-frame.tsx`, PL `src/apps/presentation/ui/presentation-board-list.tsx`, PS `src/apps/presentation/service.ts`; PA `src/apps/presentation/actions.ts` only if a test proves a validation gap; `src/apps/presentation/presentation.integration.test.ts`; print page only to confirm it still renders. No schema, migration, dependency, shared UI Engine or StudioFlow change. The owner's expanded UI lane covers this slice.
 
@@ -234,17 +234,39 @@ One coherent revision. Module: presentation. Files: PE `src/apps/presentation/ui
 
 **Executor verification:** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Kantor env as before; no migration expected. Browser acceptance: Reviewer, group [R9.64] C.
 
-### Ordered slice D — shared image geometry/gestures
+### Ordered slice D — shared image geometry and gestures (READY, R9.70)
 
-One independent shared image revision with every affected consumer. Files: IW/IA/IP/IG only as needed, existing image/UI Engine tests and browser image fixtures. Keep helpers in existing image-pattern scope; no graphics framework or dependency.
+One coherent revision. Area: shared UI Engine image patterns (owner's expanded UI lane covers them). Files: IW `src/platform/ui_engine/patterns/image-workspace.tsx`, a new pure helper beside it (e.g. `patterns/image-crop.ts`, not exported from the public index unless a test needs it), existing tests `ui-engine.test.ts`, `patterns/image-adjust.test.ts`, `patterns/image-prepare.test.ts`, `src/apps/studioflow/mom.contract.test.ts`. IG/IA/IP only for the local hit-area/contrast fixes named below. No public prop change on `ImageWorkspace`; all four consumers (Schedule photo `schedule-board.tsx:163`, option photo `:974`, new option photo `:1270`, MOM `mom-editor.tsx:159`) must work unchanged. No dependency, no schema, no app change.
 
-- One crop calculation drives source rectangle and preview for landscape/portrait/square, fixed/omitted aspect; cursor wheel zoom, midpoint pinch, direct source-space pan with limits, clean capture/release/cancel. Preserve keyboard sliders and URL cleanup.
-- Visible fixed-aspect guide plus Reset crop/Fit. For existing fixed-aspect callers Fit means minimum cover crop, preserving output aspect. Omitted aspect preserves original. Letterboxing/changed output policy needs a new decision.
-- Clear Pan/Draw and active subtool states, distinct Undo last stroke/Clear annotations; mode switches preserve strokes. Keep existing crop/output-space stroke bake; new-file selection resets crop/strokes/colors. Disabled/pending prevents intake and gestures from changing a file mid-preparation.
-- Preserve PNG/JPEG options, max/target bytes, quality/dimensions, transparency-white JPEG background, canvas-filter fallback, pass-through of small shrinkImageFile inputs, gallery sizes/indices/callbacks/consumer overrides and signed URLs.
-- Local 44px hit regions/stronger text tokens on touched controls; no global density/token redesign. Do not expose scribbles in simple upload flows.
+**D3 — one crop geometry for preview and export (correctness; do first).**
+- Pure `cropRect({ naturalWidth, naturalHeight, aspect, zoom, panX, panY })` → `{ x, y, width, height }` in source pixels, using exactly today's export rule (IW:197–206): base = largest rectangle of `aspect` inside the source (or the whole source when aspect is omitted), size = base / zoom, `x = (naturalWidth − width) · panX/100`, `y` likewise. `prepare()` uses it — export output must stay byte-for-byte equivalent for the same zoom/pan (test with a fixture).
+- The preview shows **exactly that rectangle**: the viewport's aspect is `aspect` when given, otherwise the source aspect (fixes the 16:9 preview vs original-aspect export). Position the image with percentages derived from the same rect (`width = naturalWidth/rect.width·100%`, `left = −rect.x/rect.width·100%`, same for height/top) instead of `object-cover` + `scale()` + `transformOrigin`. Colour filter preview unchanged.
+- Strokes keep their current meaning (fractions of the viewport = fractions of the output crop), so once preview = export they bake where they were drawn. Persistent image-anchored strokes stay out of scope.
 
-Tests: pure crop/cursor/midpoint invariants, bounds/zero overflow/min/max zoom; colored-quadrant pixel fixture proves preview/export match; pinch versus strokes/cancel, mode/undo/clear/new-file/pending; every matrix consumer's intake/callback/output; all gallery sizes/actions and compression error/size/fallback cases.
+**D1/D2/D3 — gestures.**
+- Pan state stays `panX/panY` 0–100 so the sliders keep working. Drag-pan in Pan mode converts pixel movement through the real overflow: `ΔpanX = −dx / overflowPx · 100` where `overflowPx = (naturalWidth − rect.width) · viewportWidth / rect.width`; no movement when overflow is 0. The picture follows the finger 1:1, never shows a blank edge.
+- Wheel zoom anchored at the cursor: the source point under the cursor stays under the cursor after zoom (solve the new pan from it, clamp 0–100, zoom clamp 1–3 as today). `preventDefault` only while an image is loaded.
+- Two-pointer pinch (track pointers in a Map): zoom by distance ratio around the midpoint, midpoint movement pans; works in both Pan and Draw modes and never creates a stroke — a second pointer arriving cancels/removes the stroke the first pointer started. `pointercancel`/`lostpointercapture` end the gesture cleanly.
+- All gesture math lives in the pure helper and is unit-tested.
+
+**D4 — frame and reset.** The viewport border is the crop frame (it now matches output). Add **Reset crop** (zoom 1, pan 50/50), disabled when already reset. No letterboxing, no output-aspect change.
+
+**D5/D6 — modes and undo (G4: start in Pan).**
+- Default tool `pan` on mount and on new file. Group the toolbar as Pan | Draw tools with `aria-pressed` on the active one; colour swatches show only for draw tools (as now). Hint text: "Drag to move the photo, scroll or pinch to zoom. Pick a drawing tool to mark it up."
+- **Undo last stroke** (removes the last stroke; disabled when none) beside **Clear annotations**. Switching tools keeps strokes. New file resets crop, strokes, colours and tool. While `pending` or `disabled`, gestures/drawing/intake do nothing.
+
+**Local polish (E3/E5).** IW colour swatches (24 px) and IG remove control (24 px) get ≥ 44 px hit areas with the same visible size; IG unavailable-tile text and any tertiary text on muted dark background in these files use a stronger existing token (e.g. `text-ink-secondary`). No global token/density change; Ideas square override and gallery sizes unchanged.
+
+**Preserve exactly:** PNG/JPEG output, `outputQuality`, `maxDimension`, `targetBytes`/`maxBytes` compression loop, JPEG white background, colour-filter fallback, file checks/intake/paste/openOnMount/initialFile, object-URL revocation, callback/pending/error behaviour, simple uploads (`shrinkImageFile`) gain no crop or drawing step.
+
+**Tests.**
+1. Pure: `cropRect` for landscape/portrait/square sources × fixed aspect 4:5, 4:3 and omitted, zoom 1/2/3, pan 0/50/100 — matches the previous export formula; preview percentages reconstruct the same rect.
+2. Pure: drag-pan with zero overflow does nothing; pan never leaves 0–100; cursor-anchored zoom keeps the anchor's source point within 0.5 px; pinch around a midpoint likewise; zoom bounds.
+3. The R9.64 trace case: 1600×900 at 4:3, zoom 1 — pan 0 and pan 100 previews now show source x = 0 and x = 400 (equal to export), not centred.
+4. Stroke state: undo removes only the last; clear removes all; tool switch keeps them; new file resets; a second pointer cancels the in-progress stroke.
+5. Existing image/UI Engine/MOM contract tests stay green; add a consumer test if one asserts the old `object-cover` markup.
+
+**Executor verification:** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Kantor env; no DB change expected. Browser acceptance (Reviewer/owner): groups [R9.64] D and E.
 
 ## UI Contract
 
@@ -284,19 +306,20 @@ A, B, C and D are independently useful acceptance/revert boundaries; no preparat
 ## Executor Prompt
 
 ```text
-ROLE: BACKEND EXECUTOR with the owner's expanded UI lane for Presentation.
-Location: kantor (load .env.kantor, set STUDIOFLOW_LOCATION=kantor, verify
-rebuild-only dev/test targets). Read AGENTS.md, docs/agent/EXECUTOR.md and
-PLAN.md WO-SF-NOTES-PRESENTATION-IMAGE-01. Implement ONLY "Ordered slice C -
-Presentation pin movement and safe actions (READY, R9.68)": getBoard becomes
-read-only (dangling links projected as unlinked, explicit lifecycle cleanup
-unchanged), pins drag with pointer capture and keyboard nudge 1%/Shift 5% saved
-once, every destructive action confirmed with counts and navigation only on
-success, visible errors, the listed English copy, local token/contrast and 44px
-hit-area fixes. Keep slide-frame.tsx hook-free for print. No schema, migration,
-dependency, shared UI Engine or StudioFlow change; no legacy; no remote
+ROLE: BACKEND EXECUTOR with the owner's expanded UI lane for shared image
+patterns. Location: kantor (load .env.kantor, set STUDIOFLOW_LOCATION=kantor).
+Read AGENTS.md, docs/agent/EXECUTOR.md and PLAN.md
+WO-SF-NOTES-PRESENTATION-IMAGE-01. Implement ONLY "Ordered slice D - shared
+image geometry and gestures (READY, R9.70)": one pure crop geometry used by
+both preview and export (preview shows exactly what is saved, omitted aspect
+previews the source aspect), 1:1 drag-pan through real overflow, cursor-anchored
+wheel zoom, two-pointer pinch that never draws, Reset crop, Pan as the default
+tool, Undo last stroke beside Clear annotations, local 44px/contrast fixes.
+No public ImageWorkspace prop change; all four consumers (Schedule x3, MOM)
+unchanged; export identical for the same zoom/pan; compression/format/intake
+contracts preserved. No dependency, schema, app or legacy change; no remote
 operations. Preserve untracked owner files under test/. Finish with the listed
-tests and all checks, CHANGELOG R9.68, one local commit. Return only the
+tests and all checks, CHANGELOG R9.70, one local commit. Return only the
 Planner/Reviewer prompt: outcome, commit, checks, limitations, remaining dirty
 files. Stop with BLOCKED / CONFLICT if the plan contradicts the repository.
 ```
