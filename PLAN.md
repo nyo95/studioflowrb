@@ -1,13 +1,13 @@
 # Active Plan
 
 Plan ID: WO-SF-NOTES-PRESENTATION-IMAGE-01
-Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66/R9.67); slice C **PASS** (R9.68/R9.69); slice D **PASS** (R9.70/R9.71); G2 shared editor hooks built by the Lead (R9.72); **slice B READY**
+Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66/R9.67); slice C **PASS** (R9.68/R9.69); slice D **PASS** (R9.70/R9.71); G2 shared editor hooks built by the Lead (R9.72); slice B **PASS** (R9.73/R9.74). All slices done in code; owner browser acceptance pending
 Module(s): studioflow (Notes and Schedule reads), presentation, shared platform UI Engine image patterns; workspace-board is an unchanged optional view of the same StudioFlow records
-Target revision: slice B = **R9.73** (next unused after Lead G2 R9.72)
-Status: READY (slice B only); A, C, D PASS (browser pending); G2 prerequisite landed in R9.72
+Target revision: none open (last R9.74)
+Status: COMPLETE in code — A, B, C, D PASS (Lead code review + automated checks); browser acceptance groups [R9.64] A–E and the R9.66/R9.68/R9.70/R9.73 supplements pending with the owner
 Priority: P1 recommended for A; P2 for B/C/D, subject to owner priorities
 Owner: Product Owner; Lead approves and locks each READY slice
-Last updated: 2026-10-15 (Lead G2 R9.72)
+Last updated: 2026-10-15 (Lead review R9.74)
 
 ## Outcome
 
@@ -191,7 +191,7 @@ Domain-neutral, optional, no behaviour change for any consumer that does not pas
 - `HoverCard` (UI Engine overlays): `<HoverCard label content side align><button>…</button></HoverCard>` — hover/focus shows it without taking focus; click/tap/Enter opens it with focus inside (links reachable); Escape/leave closes and returns focus when engaged.
 - Pure helpers in `patterns/rich-text-tokens.ts` (`tokenAtCaret`, `tokenRanges`, `tokenReplacement`) with tests.
 
-### Ordered slice B — @/# suggestions, inline item chips and composer (READY, R9.73)
+### Ordered slice B — @/# suggestions, inline item chips and composer (PASS: R9.73 `73ab6d2`, Lead review R9.74)
 
 One coherent revision. Module: studioflow. Files: N `notes-chat.tsx`, NC `src/app/(platform)/studioflow/_components/phase-note-composer.tsx` (`NoteDraftFields` pass-through + round buttons), W `src/apps/studioflow/workspace/service.ts` (`searchNoteItems`, note item view), A only for the search action's input/output types, the Schedule page `src/app/(platform)/studioflow/projects/[projectId]/schedule/page.tsx` + `schedule-board.tsx` for the deep link, `src/apps/studioflow/public/nav.ts` (optional `entryId` on `projectSchedule`), StudioFlow tests and `e2e/notes-chat.spec.ts`. No schema, migration, dependency or shared UI Engine change (use the G2 API as is; if it is insufficient, stop with BLOCKED and describe the gap). G3: phase stays required, no ×.
 
@@ -336,25 +336,4 @@ A, B, C and D are independently useful acceptance/revert boundaries; no preparat
 
 ## Executor Prompt
 
-```text
-ROLE: BACKEND EXECUTOR with the owner's expanded UI lane for Notes.
-Location: kantor (load .env.kantor, set STUDIOFLOW_LOCATION=kantor, verify
-rebuild-only dev/test targets). Read AGENTS.md, docs/agent/EXECUTOR.md and
-PLAN.md WO-SF-NOTES-PRESENTATION-IMAGE-01. Implement ONLY "Ordered slice B -
-@/# suggestions, inline item chips and composer (READY, R9.73)" using the
-Lead's G2 API from R9.72 exactly as documented (RichTextEditor tokenTriggers/
-onTokenChange/highlightPattern/listboxId/activeOptionId, FormattedText tokens,
-HoverCard). Do NOT edit rich-text-editor*.tsx, rich-text-tokens.ts,
-formatted-text.tsx or layouts/overlays.tsx; if the API is insufficient, stop
-with BLOCKED and describe the gap. Search: empty -> first 10 in Schedule order,
-partial code OR name, exact code first, signed thumbnails; caret-anchored
-popup with loading/results/empty/error+retry and stale-response guard; exact
-mid-text replacement; inline @CODE chips with HoverCard and Open item deep link
-to the Schedule entry; round 44px attach/send. Phase stays required (no x).
-No schema, migration, dependency or legacy; no remote operations. Preserve
-untracked owner files under test/. Finish with the listed tests (including the
-notes-chat e2e) and all checks, CHANGELOG R9.73, one local commit. Return only
-the Planner/Reviewer prompt: outcome, commit, checks, limitations, remaining
-dirty files. Stop with BLOCKED / CONFLICT if the plan contradicts the
-repository.
-```
+No Executor slice is READY. WO-SF-NOTES-PRESENTATION-IMAGE-01 is complete in code; what remains is the owner's browser acceptance (groups in docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md). A FAIL there opens a correction plan here.
