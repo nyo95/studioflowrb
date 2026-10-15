@@ -1,17 +1,18 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
-import { AuthenticatedShell } from "@/platform/authenticated-shell";
+import { AuthenticatedShell, type ShellAreaBrand } from "@/platform/authenticated-shell";
 import { requirePrincipalGrants } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
 import { enabledModuleIds } from "@platform/core/modules";
 import { hasPermission } from "@platform/core/rbac";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
-import { brandMarkStorage, userPreferences, userTutorials } from "@platform/runtime";
+import { brandMarkStorage, objectStorage, userPreferences, userTutorials } from "@platform/runtime";
 import { validateAppTutorial } from "@platform/core/tutorials";
+import { readBqIssuerIdentity } from "@/apps/bq/public";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
-import { STUDIOFLOW_PERMISSIONS, STUDIOFLOW_TOUR } from "@/apps/studioflow/public";
+import { STUDIOFLOW_PERMISSIONS, STUDIOFLOW_TOUR, readStudioFlowDocumentIdentity } from "@/apps/studioflow/public";
 import { studioFlow, studioFlowSampleRequestRead } from "@/apps/studioflow/runtime";
 import { recordTutorialAction, setGuideLanguageAction } from "./account/actions";
 import { logoutAction } from "./logout-action";
@@ -25,18 +26,41 @@ import { studioFlowSettingsGroups } from "./studioflow/settings/sections";
 
 export const dynamic = "force-dynamic";
 
+/** A shell mark link is long-lived (stable since R9.82), so a page left open keeps its logo. */
+const AREA_LOGO_LINK_SECONDS = 12 * 60 * 60;
+
+/**
+ * Brand by role (owner 2026-10-15): the contractor identity (BQ's issuer) marks BQ and Master Data, the consultant
+ * identity (StudioFlow's letterhead) marks StudioFlow. An identity with neither name nor logo leaves the platform mark.
+ */
+async function areaBrands(): Promise<ShellAreaBrand[]> {
+  const [contractor, consultant] = await Promise.all([readBqIssuerIdentity(prisma), readStudioFlowDocumentIdentity(prisma)]);
+  const areas = [
+    { identity: contractor, rootPaths: ["/bq", "/masterdata"] },
+    { identity: consultant, rootPaths: ["/studioflow"] },
+  ];
+  return Promise.all(areas
+    .filter(({ identity }) => identity.companyName || identity.logoKey)
+    .map(async ({ identity, rootPaths }) => ({
+      rootPaths,
+      name: identity.companyName ?? "",
+      logoUrl: identity.logoKey ? await objectStorage.createSignedReadUrl(identity.logoKey, AREA_LOGO_LINK_SECONDS).catch(() => null) : null,
+    })));
+}
+
 export default async function PlatformLayout({ children }: { children: ReactNode }) {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { principal, grants } = principalGrants;
   const canManageSampleRequests = hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
   const display = await userPreferences.resolveDisplay({ userId: principal.userId });
-  const [settings, tutorial, waitingOnYou, openSampleRequests, enabledModules] = await Promise.all([
+  const [settings, tutorial, waitingOnYou, openSampleRequests, enabledModules, brands] = await Promise.all([
     readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key)),
     userTutorials.getShellState({ userId: principal.userId, language: display.language }),
     grants.includes("studioflow.access") ? studioFlow.projects.countWaitingOnYou({ grants, actorId: principal.userId }) : Promise.resolve(0),
     canManageSampleRequests ? studioFlowSampleRequestRead.countPendingSampleRequests() : Promise.resolve(0),
     enabledModuleIds(),
+    areaBrands(),
   ]);
   const apps = getPermissionRegistry().apps
     .filter((app) => grants.includes(app.accessPermission))
@@ -59,7 +83,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
 
   const contextSlot = apps.some((app) => app.appId === "studioflow") ? <StudioFlowHeaderSearch /> : null;
 
-  return <AuthenticatedShell principal={principal} grants={grants} settings={{ ...settings, ...display }} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation} domainUtilityNavigation={domainUtilityNavigation} contextSlot={contextSlot} tours={tours} tutorial={tutorial} tourActions={{ record: recordTutorialAction, setLanguage: setGuideLanguageAction }}>
+  return <AuthenticatedShell principal={principal} grants={grants} settings={{ ...settings, ...display }} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation} domainUtilityNavigation={domainUtilityNavigation} contextSlot={contextSlot} areaBrands={brands} tours={tours} tutorial={tutorial} tourActions={{ record: recordTutorialAction, setLanguage: setGuideLanguageAction }}>
     {children}
   </AuthenticatedShell>;
 }

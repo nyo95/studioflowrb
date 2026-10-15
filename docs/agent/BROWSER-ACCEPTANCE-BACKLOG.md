@@ -30,6 +30,12 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.86] Brand by role: consultant letterhead on prints, mark follows the area
+- Surface: StudioFlow Settings → Document letterhead; BQ Settings (quotation letterhead); any project's MOM, Schedule and Presentation prints; a BQ quotation print
+- Steps: 1. Fill B (name, logo, address, e-mail) in StudioFlow Settings and A in BQ Settings. 2. Print a MOM and a Schedule: B's logo at top left, address/e-mail at top right. 3. Print a Presentation: B's small logo beside the date on every page. 4. Print a BQ quotation: A as before. 5. Move between StudioFlow, BQ, Master Data, Home and Settings: the top-left mark shows B, A, A, then the platform mark. 6. Remove B's logo and clear its name: StudioFlow prints and the StudioFlow mark fall back to the platform mark.
+- Acceptance: each role's brand shows only in its own area and documents; the fallback never leaves a blank.
+- Status: PENDING
+
 ### [R9.84] Project tabs scroll again; Phases stays fixed
 - Surface: a project with many Schedule entries, a long MOM list and Timeline
 - Steps: 1. Open Schedule (Board and List), MOM, Presentation, Timeline and History: scroll to the bottom of each with the mouse wheel. 2. Open Phases at ≥ 1280 px: the page stays put and only the notes/board scroll inside; below 1280 px it scrolls as a page.

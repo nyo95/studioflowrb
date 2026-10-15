@@ -5,12 +5,9 @@ import { DisplaySettingsProvider } from "./display-settings";
 import { NotificationBell } from "./notification-bell";
 import { QuickMessenger } from "./quick-messenger";
 
-import Link from "next/link";
 
 import type { ReactNode } from "react";
 
-
-/* eslint-disable @next/next/no-img-element -- brand mark accepts a local path or owner-configured host. */
 
 import type { SessionPrincipal } from "@platform/core/auth";
 
@@ -19,28 +16,17 @@ import type { PlatformGeneralSettings } from "@platform/core/settings";
 
 import { AuthenticatedPlatformNavigation,HeaderApplicationNavigation,type ShellAppLink } from "./navigation";
 import { RouteAwareAppShell } from "./route-aware-app-shell";
+import { brandMark, type ShellAreaBrand } from "./brand-rules";
+import { ShellBrand } from "./shell-brand";
+
+export type { ShellAreaBrand } from "./brand-rules";
 import { getSettingsMenuVisibility } from "./shell-rules";
 import { TourProvider, type TourActions } from "./tour";
 import type { ShellTour } from "./tour-rules";
 import type { ShellTutorialState } from "@platform/core/tutorials";
 
 
-/**
- * The top bar's mark, per the prototype's `.a-logo`. Initials for a multi-word
- * name; a name that is already an abbreviation is kept whole; a single
- * closed-up product name is split on its capitals, so "StudioFlow" reads "SF"
- * and not "S" — the previous rule took the first letter of each whitespace-
- * separated word, which yields exactly one letter for a one-word title.
- */
-function brandMark(name: string): string {
-  const words = name.trim().split(/[\s_/-]+/).filter(Boolean);
-  if (words.length === 1 && words[0].length <= 3) return words[0].toUpperCase();
-  const parts = words.flatMap((word) => word.match(/[A-Z]+(?![a-z])|[A-Z][a-z0-9]*|[a-z0-9]+/g) ?? [word]);
-  const initials = parts.length > 1 ? parts.map((part) => part[0]).join("") : (parts[0] ?? "");
-  return initials.slice(0, 3).toUpperCase();
-}
-
-export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, tours = [], tutorial = { language: null, tutorials: [] }, tourActions, children }: {
+export function AuthenticatedShell({ principal, grants, settings, apps, logoutAction, appAbbreviation, domainNavigation, domainUtilityNavigation, contextSlot, areaBrands = [], tours = [], tutorial = { language: null, tutorials: [] }, tourActions, children }: {
   principal: SessionPrincipal;
   grants: readonly string[];
   settings: PlatformGeneralSettings;
@@ -50,6 +36,8 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
   domainNavigation?: ReactNode;
   domainUtilityNavigation?: ReactNode;
   contextSlot?: ReactNode;
+  /** Identities that replace the platform mark inside their areas (owner 2026-10-15); outside them the platform mark shows. */
+  areaBrands?: readonly ShellAreaBrand[];
   /** Each app's first-use tour (app-owned), plus this person's guide language and progress. */
   tours?: readonly ShellTour[];
   tutorial?: ShellTutorialState;
@@ -67,19 +55,7 @@ export function AuthenticatedShell({ principal, grants, settings, apps, logoutAc
   return (
     <DisplaySettingsProvider value={{ locale: settings.locale, timezone: settings.timezone }}><TourProvider tours={tours} grants={grants} language={tutorial.language} progress={tutorial.tutorials} actions={tourActions}><RouteAwareAppShell
       appRootPaths={apps.map((app) => app.rootPath)}
-      /* The top bar is one 46px line and the app chip beside it already names
-         the application, so the mark stays compact in both rail states: the
-         configured brand image, or a mono monogram on its own baseline —
-         no chip, no box. */
-      brand={settings.brandMarkUrl ? (
-        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex items-center rounded-action focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
-          <img src={settings.brandMarkUrl} alt={settings.appTitle} className="h-6 w-auto max-w-24 object-contain" />
-        </Link>
-      ) : (
-        <Link href="/" aria-label={`Open ${settings.appTitle} home`} className="flex items-center rounded-action px-0.5 font-ui-mono text-xs font-medium tracking-[0.16em] text-ink no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
-          {appAbbreviation ?? productMark}
-        </Link>
-      )}
+      brand={<ShellBrand appTitle={settings.appTitle} logoUrl={settings.brandMarkUrl ?? null} monogram={appAbbreviation ?? productMark} areas={areaBrands} />}
       collapsible
       navigationLabel={`${settings.appTitle} navigation`}
       navigation={<AuthenticatedPlatformNavigation domainNavigation={domainNavigation} apps={apps} />}

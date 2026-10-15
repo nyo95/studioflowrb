@@ -9,6 +9,8 @@ import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { DocumentBlock, DocumentSheet, FormattedText, PrintButton } from "@/platform/ui_engine";
 
+import { LetterheadStrip, readConsultantLetterhead } from "@/apps/studioflow/public/letterhead";
+
 export const dynamic = "force-dynamic";
 
 const LABEL = "text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral-500";
@@ -27,7 +29,7 @@ export default async function MomPrintPage({ params }: { params: Promise<{ proje
       throw error;
     }
   };
-  const [project, doc] = await load();
+  const [[project, doc], letterhead] = await Promise.all([load(), readConsultantLetterhead()]);
 
   return (
     <>
@@ -42,6 +44,7 @@ export default async function MomPrintPage({ params }: { params: Promise<{ proje
           </>
         }
       >
+        <LetterheadStrip letterhead={letterhead} />
         <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
           <div className="min-w-0">
             <p className={LABEL}>Minutes of meeting</p>

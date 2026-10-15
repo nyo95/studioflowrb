@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.86 | 2026-10-15 | feat(studioflow,platform): Consultant letterhead on StudioFlow prints; the top-left mark follows the area (Lead)
+
+- **Review of R9.85 (`b77be7c`): PASS with one correction.** Schema, service, cleanup reference, public reads, permission-gated page and tests match WO-BRAND-BY-ROLE-01. Correction made here: `asset-sweep.test.ts` and `asset-cleanup.test.ts` fake the cleanup owners and lacked the new `sfSettings` owner, so three cleanup tests failed (the R9.85 report claimed `npm test` passed). Minor, left as is: the letterhead logo's upload errors still say "Brand mark" (shared PNG policy copy).
+- **Prints (consultant B):** `studioflow/public/letterhead` reads StudioFlow's identity (falling back to the platform organisation and mark, as the BQ quotation does) and renders it: a letterhead strip (logo or name left, address and e-mail right) above the Minutes of meeting and Product schedule headers; a small logo beside the date in the Presentation's running header on every page. BQ quotation (contractor A) unchanged.
+- **Shell:** `AuthenticatedShell` takes domain-neutral `areaBrands` (root paths, name, logo link); a client `ShellBrand` picks the area by path. `(platform)/layout.tsx` composes BQ's issuer identity for `/bq` and `/masterdata` and StudioFlow's letterhead for `/studioflow` (12 h signed links); an identity with neither name nor logo, and every other path, keeps the platform mark. `brandMark` moved to `brand-rules.ts` with a new unit test.
+- **Checks:** `npm test` 1199/1201 before the test-fake correction, then the two cleanup files 9/9; typecheck, full lint, `check:boundaries` (the letterhead lives in StudioFlow public because the Presentation print route belongs to the Presentation app), `check:legacy-runtime`, production build PASS. Not checked in a browser (needs the owner's sign-in); browser group [R9.86] added. No push.
+
 ## R9.85 | 2026-10-15 | feat(studioflow,bq): Add role-owned document identity backend (Executor)
 
 - **WO-BRAND-BY-ROLE-01, Executor scope only:** StudioFlow now owns nullable consultant letterhead fields (company name, private PNG key, address and e-mail) on its singleton settings row. The additive migration `20261015130000_studioflow_document_identity` was applied to the verified kantor rebuild-only dev and test databases; no backfill or workflow-setting change.

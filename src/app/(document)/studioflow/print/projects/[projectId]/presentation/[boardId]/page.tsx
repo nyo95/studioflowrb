@@ -15,6 +15,8 @@ import { formatInstant } from "@platform/utilities/date";
 import { printTitle } from "@/apps/studioflow/public/print-title";
 import { SlideGrid, SlideImageBox, numberPins } from "@/apps/presentation/ui/slide-frame";
 
+import { LetterheadMark, readConsultantLetterhead } from "@/apps/studioflow/public/letterhead";
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -45,15 +47,18 @@ export default async function PresentationPrintPage({ params, searchParams }: { 
   ]).catch((error) => { if (error instanceof AppError && (error.kind === "NOT_FOUND" || error.kind === "FORBIDDEN")) notFound(); throw error; });
   const now = new Date();
   const printed = formatInstant(now, { locale: "id-ID", style: "date" });
-  const { timezone } = await readPlatformGeneralSettings(prisma);
+  const [{ timezone }, letterhead] = await Promise.all([readPlatformGeneralSettings(prisma), readConsultantLetterhead()]);
 
   const header = (
-    <header className="flex shrink-0 items-baseline justify-between gap-6 border-b border-black pb-[2.5mm]">
+    <header className="flex shrink-0 items-center justify-between gap-6 border-b border-black pb-[2.5mm]">
       <h1 className="m-0 min-w-0 truncate text-[10pt] font-semibold uppercase tracking-[0.16em]">
         <span className="text-neutral-500">Presentation · {project.name} · </span>
         <span>{board.title}</span>
       </h1>
-      <p className="m-0 shrink-0 text-[8pt] text-neutral-500">{printed}</p>
+      <div className="flex shrink-0 items-center gap-[3mm]">
+        <p className="m-0 text-[8pt] text-neutral-500">{printed}</p>
+        <LetterheadMark letterhead={letterhead} size="running" />
+      </div>
     </header>
   );
 

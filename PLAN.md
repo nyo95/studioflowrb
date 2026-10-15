@@ -4,7 +4,7 @@ Plan ID: WO-BRAND-BY-ROLE-01
 Scope: Two brands fixed by role — contractor brand (A) for BQ and Master Data, consultant brand (B) for StudioFlow — on every printable document and in the app's top-left mark per area
 Module(s): studioflow (settings: document identity), bq (public read of its existing issuer identity), platform authenticated shell (Lead, per-area mark)
 Target revision: **R9.85** Executor backend (Lead plan R9.83; R9.84 was a Lead layout fix); Lead UI and integration follow as R9.86
-Status: READY
+Status: COMPLETE in code (R9.85 Executor, R9.86 Lead); owner browser check pending
 Priority: P2
 Owner: Product Owner; Lead locks and reviews
 Last updated: 2026-10-15

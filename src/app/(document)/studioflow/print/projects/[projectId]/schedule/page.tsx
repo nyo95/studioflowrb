@@ -18,6 +18,8 @@ import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { DocumentBlock, DocumentSheet, PrintButton, PrintFormatPicker, printFormatFromSearchParams } from "@/platform/ui_engine";
 
+import { LetterheadStrip, readConsultantLetterhead } from "@/apps/studioflow/public/letterhead";
+
 export const dynamic = "force-dynamic";
 
 const LABEL = "text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral-500";
@@ -50,7 +52,7 @@ export default async function SchedulePrintPage({
       throw error;
     }
   };
-  const [project, entries] = await load();
+  const [[project, entries], letterhead] = await Promise.all([load(), readConsultantLetterhead()]);
   const cardColumns = printFormat.orientation === "landscape" ? "grid-cols-4" : "grid-cols-3";
 
   return (
@@ -70,6 +72,7 @@ export default async function SchedulePrintPage({
           </>
         }
       >
+        <LetterheadStrip letterhead={letterhead} />
         <header className="flex items-start justify-between gap-6 border-b-2 border-black pb-4">
           <div className="min-w-0">
             <p className={LABEL}>Product Schedule</p>
