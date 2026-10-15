@@ -1,10 +1,22 @@
 import { readFileSync } from "node:fs";
 
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 /** Destructive Presentation commands must wait for an explicit confirmation. */
 const { sf } = JSON.parse(readFileSync("e2e/.tmp/owner.json", "utf8")) as { sf: Record<string, string> };
 const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+
+async function refuseNextAction(page: Page) {
+  let refused = false;
+  const handler = async (route: Route) => {
+    if (!refused && route.request().method() === "POST" && route.request().headers()["next-action"]) {
+      refused = true;
+      await route.abort("failed");
+    } else await route.continue();
+  };
+  await page.route("**/*", handler);
+  return () => page.unroute("**/*", handler);
+}
 
 test("Presentation replacements and deletions wait for confirmation and Cancel preserves the board", async ({ page }) => {
   await page.goto(`/studioflow/projects/${sf.notesChat}/presentation`);
@@ -89,6 +101,46 @@ test("Presentation replacements and deletions wait for confirmation and Cancel p
   await page.getByRole("alertdialog", { name: "Delete this slide?" }).getByRole("button", { name: "Delete slide" }).click();
   await expect(page.getByRole("button", { name: "Slide 1" })).toHaveCount(0);
 
+  await page.getByRole("button", { name: "Delete board" }).click();
+  await page.getByRole("alertdialog", { name: "Delete this board?" }).getByRole("button", { name: "Delete board" }).click();
+  await expect(page).toHaveURL(`/studioflow/projects/${sf.notesChat}/presentation`);
+});
+
+test("Presentation creation, pin, and board deletion refusals stay visible and retryable", async ({ page }) => {
+  await page.goto(`/studioflow/projects/${sf.notesChat}/presentation`);
+  await page.waitForLoadState("networkidle");
+  await page.getByLabel("New board").fill("ZZ-Test Refusal Recovery");
+  let release = await refuseNextAction(page);
+  await page.getByRole("button", { name: "Create board" }).click();
+  await expect(page.getByText("The board could not be created. Please try again.")).toBeVisible();
+  await expect(page.getByLabel("New board")).toHaveValue("ZZ-Test Refusal Recovery");
+  await release();
+  await page.getByRole("button", { name: "Create board" }).click();
+  await expect(page.getByLabel("Board title")).toHaveValue("ZZ-Test Refusal Recovery");
+  const boardUrl = page.url();
+
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: "refusal.png", mimeType: "image/png", buffer: PNG });
+  const image = page.locator('section[aria-label="Slide"] img').first();
+  await expect(image).toBeVisible();
+  await image.click();
+  release = await refuseNextAction(page);
+  await image.click();
+  await expect(page.getByRole("alert").filter({ hasText: "The change could not be saved. Please try again." }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pin 1", exact: true })).toHaveCount(0);
+  await release();
+  await page.reload();
+  await page.waitForLoadState("networkidle");
+  await image.click();
+  await expect(page.getByRole("button", { name: "Replace image" })).toBeVisible();
+  await image.click();
+  await expect(page.getByRole("button", { name: "Pin 1", exact: true })).toBeVisible();
+
+  release = await refuseNextAction(page);
+  await page.getByRole("button", { name: "Delete board" }).click();
+  await page.getByRole("alertdialog", { name: "Delete this board?" }).getByRole("button", { name: "Delete board" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "The change could not be saved. Please try again." }).first()).toBeVisible();
+  await expect(page).toHaveURL(boardUrl);
+  await release();
   await page.getByRole("button", { name: "Delete board" }).click();
   await page.getByRole("alertdialog", { name: "Delete this board?" }).getByRole("button", { name: "Delete board" }).click();
   await expect(page).toHaveURL(`/studioflow/projects/${sf.notesChat}/presentation`);

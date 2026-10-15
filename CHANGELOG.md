@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.96 | 2026-10-15 | test(presentation): Accept visible failure recovery in the browser (Reviewer partial)
+
+- **Scope:** expanded Presentation browser regression with one-shot refused requests for board creation, pin creation and board deletion. Creation keeps its typed title and can retry; pin failure displays a safe error and can retry after reload; board deletion failure stays in the editor and succeeds on retry. Existing R9.68 integration evidence had already proved board reads do not write, so it was not repeated. The combined read-write/silent-failure `[BUG]` remains open pending in-page pin-retry diagnosis.
+- **Verdict:** PARTIAL for R9.64 C3/C4 and wider R9.68 Presentation acceptance. Pin movement, pending-repeat, permission, viewport and print checks remain queued. No production code, migration, dependency, or push; root `test/` untouched.
+- **Checks:** focused Presentation browser suite 2/2 PASS and refusal case repeated 1/1 PASS on the verified disposable office rebuild test database; `npm run check`, targeted lint and whitespace check PASS. Earlier in-page pin retries did not reliably recreate the pin; the passing test uses a full reload before retry, and this limitation remains explicit. Test-server aborted-request/ECONNRESET messages did not affect the passing runs.
+
 ## R9.95 | 2026-10-15 | test(studioflow): Accept Notes suggestion feedback and retry in the browser (Reviewer partial)
 
 - **Scope:** added a browser regression for unmatched Schedule `@` queries and a forced first lookup failure. The popup reports no results instead of disappearing, exposes Retry on failure, then shows `HT-01` after retry without losing the draft. Existing browser coverage had already passed bare `@`, HT prefix selection, inline chip/card and deep link; the fixed R9.73 suggestion-state `[BUG]` is closed.
