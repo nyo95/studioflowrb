@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.88 | 2026-10-15 | fix(studioflow): Keep drawings and notes usable on short desktop windows (Lead)
+
+- **Review correction to R9.87:** at 1280–1440 × 720, the Drawing list no longer clipped, but its stacked height left the Notes composer outside the viewport. Short desktop windows now place the drawing list and Notes side by side with their own scrolling areas, compact phase-strip secondary text and vertical spacing, and keep the add row, editor, and Send button in view. Taller desktop and narrower layouts retain their previous arrangement.
+- **Office-only fixtures:** ignore the root `/test/` directory. It was untracked and absent from available Git history, so no fixture was removed locally or from a published revision.
+- **Regression coverage:** new desktop-height browser checks at 720, 900, and the 1141 px layout transition require no outer project scrolling, no clipped Notes content, and visible drawing add/editor/Send controls. Updated the stale StudioFlow settings redirect assertion and covered the new document-letterhead settings page (introduced in R9.86).
+- **Checks:** full Playwright browser suite 155/155; `npm run check` (typecheck, boundaries, legacy-runtime) PASS; full lint PASS; staged whitespace check PASS. No migration or dependency; no push.
+
 ## R9.87 | 2026-10-15 | fix(studioflow,presentation,bq,ui-engine): Browser acceptance walk of the pending groups and the defects it found (Lead)
 
 - **Owner 2026-10-15:** "coba browser acceptance seluruh yg perlu dan tertunda" → the 56 pending groups were reviewed for browser acceptance. Walked reachable paths in the in-app browser on the owner's session with disposable "ZZ QA" data (StudioFlow project, BQ project, two suppliers, a brand, a SKU, three prices, a sample request); everything was archived or declined afterwards, and the BQ/StudioFlow letterheads were emptied again. Remaining paths are recorded precisely in the browser backlog.

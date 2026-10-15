@@ -1,0 +1,59 @@
+/* At desktop widths with little vertical room, keep the project header fixed
+   and give drawings and notes their own full-height columns. */
+@media (min-width: 1280px) and (max-height: 1140px) {
+  .phasePage [data-variant="track"] li {
+    padding-block: 0.5rem;
+  }
+
+  .phasePage [data-variant="track"] li > button {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  .phasePage [data-variant="track"] li > button > span:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .phasePage [data-variant="track"] li > button > span:nth-child(3) {
+    grid-column: 2;
+    max-width: 6rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .phasePage [data-variant="track"] li > button > span:nth-child(4) {
+    grid-column: 2;
+    white-space: nowrap;
+  }
+
+  .notesLayout {
+    flex-direction: row;
+  }
+
+  .notesLayout > section {
+    display: flex;
+    flex: 0 0 35%;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .notesLayout > section > div:last-child {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .notesLayout > section > div:last-child > div {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .notesLayout [aria-label="Project notes"] > div:first-child {
+    padding-block: 0.25rem;
+  }
+
+  .notesLayout [data-notes-composer] {
+    padding-block: 0.375rem;
+  }
+}

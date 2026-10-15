@@ -662,7 +662,7 @@ function ChatComposer({ poster, projectId, phases, defaultPhaseId, replyTo, onCa
   };
 
   return (
-    <div ref={wrapperRef} className="relative shrink-0 border-t border-line-subtle bg-surface px-4 py-2.5"
+    <div ref={wrapperRef} data-notes-composer className="relative shrink-0 border-t border-line-subtle bg-surface px-4 py-2.5"
       onKeyDownCapture={(event) => {
         if (event.nativeEvent.isComposing || sending) return;
         if (event.key === "Escape" && popup.status !== "closed") { event.preventDefault(); event.stopPropagation(); closeSuggestions(); return; }

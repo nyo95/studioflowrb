@@ -15,6 +15,7 @@ import { pageSession } from "../../_components/session";
 import { ProjectNotes } from "./_notes-stream/project-notes";
 import { ProjectWorkspace } from "./_workspace-canvas/project-workspace";
 import { PhaseTabs } from "./phase-tabs";
+import styles from "./phase-layout.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +65,7 @@ export default async function ProjectOverviewPage({
 
   // Record workspace (DESIGN.md §6.2): the page fills the window below the header and the notes keep their own scroll.
   return (
-    <div data-fill-page className="flex flex-1 flex-col gap-4 xl:min-h-0">
+    <div data-fill-page className={`${styles.phasePage} flex flex-1 flex-col gap-4 xl:min-h-0`}>
       {/* One row (owner 2026-10-14, DESIGN.md §6.2): the phase strip, and at its right end the selected phase's round,
           state and primary step. Below 1280px the workflow wraps under the strip. Switching a phase is a transition,
           so the old bar stays until the new one is ready and the notes below are never reloaded. */}
@@ -90,7 +91,7 @@ export default async function ProjectOverviewPage({
       {/* Notes (or, with the Workspace board module on, the board) with the phase's requirements and files beside them.
           Both read the same notes; each column scrolls by itself. */}
       <div className="flex flex-1 gap-4 max-xl:flex-col xl:min-h-0">
-        <div className="flex min-h-[28rem] min-w-0 flex-1 flex-col gap-4">
+        <div className="flex min-h-[28rem] min-w-0 flex-1 flex-col gap-4 xl:min-h-0">
           <Suspense fallback={<SectionCard padded><SkeletonBlock className="h-[420px] w-full" /></SectionCard>}>
             {boardEnabled
               ? <ProjectWorkspace projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />

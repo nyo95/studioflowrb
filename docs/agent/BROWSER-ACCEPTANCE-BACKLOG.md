@@ -47,7 +47,7 @@ Ran on a disposable "ZZ QA" project, BQ project and Master Data records (all arc
 - Surface: a project with many Schedule entries, a long MOM list and Timeline
 - Steps: 1. Open Schedule (Board and List), MOM, Presentation, Timeline and History: scroll to the bottom of each with the mouse wheel. 2. Open Phases at ≥ 1280 px: the page stays put and only the notes/board scroll inside; below 1280 px it scrolls as a page.
 - Acceptance: no project tab is cut off at the window bottom; Phases keeps its fixed layout.
-- Status: PASS 2026-10-15 (Lead walk, R9.87) — Schedule scrolls (854/7212), no clipped card; Phases fixed at 1440, page-scroll at 1024.
+- Status: PASS 2026-10-15 (Lead walk, R9.87; short-desktop correction R9.88) — Schedule scrolls (854/7212), no clipped card; Phases fixed at 1440, page-scroll at 1024. Subsequent 720 px review found the Notes composer clipped after R9.87's Drawing list fix; R9.88 automated browser checks cover 1280/1440 × 720 and × 900 plus the 1280 × 1141 transition, with the add row, editor, and Send button in view and no outer scroll.
 
 ### [R9.82] Presentation editor feels instant
 - Surface: a Presentation board with several slides and large renders

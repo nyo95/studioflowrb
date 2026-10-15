@@ -22,6 +22,7 @@ async function sidebarHrefs(page: Page) {
 const AREAS = [
   { route: "/settings/general", prefix: "/settings/", back: "Home" },
   { route: "/settings/access/users", prefix: "/settings/", back: "Home" },
+  { route: "/studioflow/settings/document-letterhead", prefix: "/studioflow/settings/", back: "StudioFlow" },
   { route: "/studioflow/settings/phases", prefix: "/studioflow/settings/", back: "StudioFlow" },
   { route: "/studioflow/settings/checklists", prefix: "/studioflow/settings/", back: "StudioFlow" },
   { route: "/studioflow/settings/schedule", prefix: "/studioflow/settings/", back: "StudioFlow" },
@@ -50,7 +51,7 @@ test("old settings URLs land on their new pages", async ({ page }) => {
     ["/settings/general/masterdata", "/masterdata/settings/units"],
     ["/masterdata/units", "/masterdata/settings/units"],
     ["/studioflow/schedule-templates", "/studioflow/settings/schedule"],
-    ["/studioflow/settings", "/studioflow/settings/phases"],
+    ["/studioflow/settings", "/studioflow/settings/document-letterhead"],
   ] as const) {
     await page.goto(from);
     await expect(page).toHaveURL(new RegExp(`${to.replaceAll("/", "\\/")}$`));
