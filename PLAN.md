@@ -1,339 +1,119 @@
 # Active Plan
 
-Plan ID: WO-SF-NOTES-PRESENTATION-IMAGE-01
-Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66/R9.67); slice C **PASS** (R9.68/R9.69); slice D **PASS** (R9.70/R9.71); G2 shared editor hooks built by the Lead (R9.72); slice B **PASS** (R9.73/R9.74). All slices done in code; owner browser acceptance pending
-Module(s): studioflow (Notes and Schedule reads), presentation, shared platform UI Engine image patterns; workspace-board is an unchanged optional view of the same StudioFlow records
-Target revision: none open (last R9.74)
-Status: COMPLETE in code — A, B, C, D PASS (Lead code review + automated checks); browser acceptance groups [R9.64] A–E and the R9.66/R9.68/R9.70/R9.73 supplements pending with the owner
-Priority: P1 recommended for A; P2 for B/C/D, subject to owner priorities
-Owner: Product Owner; Lead approves and locks each READY slice
-Last updated: 2026-10-15 (Lead review R9.74)
+Plan ID: WO-SF-BOARD-THREADS-01
+Scope: Workspace board note threads — double-click anywhere on the board to open a small Notes chat at that spot, a speech-bubble marker with its count, and "All notes · N" in the board toolbar
+Module(s): studioflow (data, services, actions); `workspace-board` feature module (board UI, board-only actions gated by it)
+Target revision: Executor backend **R9.76**; Lead board UI R9.77 (Lead plan R9.75)
+Status: READY (Executor backend slice)
+Priority: P1
+Owner: Product Owner; Lead locks and reviews
+Last updated: 2026-10-15
 
 ## Outcome
 
-This run delivers an evidenced audit and reviewable plan. Run 2 starts only after the Lead's OK and resolution of the decision gates. No fixes or Reviewer acceptance are claimed by R9.64.
+On the Workspace board (module on), double-clicking empty space or an element opens a small chat window at that spot — the same chat as Notes (bubbles, albums, replies, the auto phase tag, `#` topics, `@` Schedule codes). Sending the first message creates a **thread** at that point; the point keeps a speech-bubble marker with its message count (amber when any message is client feedback); clicking it reopens the thread. A marker placed on an element moves with that element; a free marker can be dragged. "All notes · N" in the toolbar lists every thread's messages as one stream. Thread messages are ordinary project notes: they also appear in the Notes stream, so switching the board off never hides or loses them.
 
-Proposed final outcome: official records keep their locked origin/phase/round labels and stay editable (G1); ordinary edits reject stale versions and keep Schedule links consistent; refreshing retains the reader's selected view; existing General notes can be edited under their established rights with Board off. Mentions open useful suggestions immediately. Presentation pins move without moving their image, destructive changes are confirmed, board reads do not write, and shared image previews agree with saved output for every consumer.
+This plan: the **Executor delivers the backend** (schema, migration, services, actions, tests). The **Lead builds the board UI** afterwards as R9.77 (marker, chat window, double-click change, All notes drawer). No UI work in the Executor slice beyond what compiling callers need.
+
+The previous Work Order (WO-SF-NOTES-PRESENTATION-IMAGE-01) is complete in code through R9.74; its browser groups stay pending in `docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` and its full plan is in git history (`ec86b48:PLAN.md`).
 
 ## Context and Evidence
 
-### Baseline, environment and authority
-
-- Location: **kantor**. Initial HEAD `b3d0fe5872db8d8bc5919cad8b234c7f458eaeb6` (R9.53), branch `main`, ten commits behind the already-local origin/main. Owner explicitly approved a local fast-forward to the required baseline. No fetch/pull/push, PR or merge commit was made.
-- Audit/pre-edit HEAD and origin/main: `ed169fb59b83349b4530995fdef8117c8814d966` (R9.63). Published whole revision R9; latest local/published ledger entry R9.63. Next unused revision: **R9.64**.
-- Complete pre-existing dirty list: untracked `test/BOQ TEST.xlsx` and `test/BOQ TEST 2 - PDF.pdf`. Preserve both; neither is an audit fixture or staged file.
-- Owner's 2026-10-15 Work Order authorizes Run 1 planning and later UI polish in Notes, Presentation and shared image patterns. It does not authorize other shared editor/formatter changes, new dependencies/schema/migrations, or remote actions.
-- Authority read: AGENTS.md, EXECUTOR.md, agent README/revision protocol, PLAN-TEMPLATE.md; scoped UI_ENGINE.md ownership/tokens/overlays/actions; DESIGN.md fixed frame/responsive/interaction rules; StudioFlow rework contract §6.1; module decision record. Existing implementation/tests are evidence, not authority to change product decisions.
-- **Material contract conflict:** `docs/apps/studioflow/STUDIOFLOW-REWORK-CONTRACT.md:302` explicitly permits correcting/deleting workflow-record text; `src/apps/studioflow/service.integration.test.ts:3822` tests that permission. A1 confirms this behavior and the newly requested integrity change; it does not prove violation of the prior policy. G1 must replace that policy before execution. The contract's older Board-off description also predates the R9.61 project chat; do not restore the older phase-only stream.
-- Ignored office/test settings identified only localhost:5433 databases `studioflow_rebuild` and `studioflow_rebuild_test`. Both lacked the already-committed Notes-chat migration. Per the baseline-sync rule, existing `20261014230000_studioflow_note_chat` was deployed to both and the ignored Prisma client regenerated. This authored no migration/schema/dependency source. Tests used only the guarded disposable test DB. No credentials printed/copied/committed; no legacy inspected.
-
-### Evidence key and method
-
-Line numbers refer to R9.63. Keys below expand to exact paths; for example N:421 is the exact file in the N row, line 421.
-
-| Key | Repository path |
-| --- | --- |
-| N | `src/app/(platform)/studioflow/projects/[projectId]/_notes-stream/notes-chat.tsx` |
-| PN | `src/app/(platform)/studioflow/projects/[projectId]/_notes-stream/project-notes.tsx` |
-| A | `src/app/(platform)/studioflow/actions.ts` |
-| W | `src/apps/studioflow/workspace/service.ts` |
-| PH | `src/apps/studioflow/phases/service.ts` |
-| S | `src/apps/studioflow/shared.ts` |
-| NC | `src/app/(platform)/studioflow/_components/phase-note-composer.tsx` |
-| PE | `src/apps/presentation/ui/presentation-editor.tsx` |
-| PF | `src/apps/presentation/ui/slide-frame.tsx` |
-| PS | `src/apps/presentation/service.ts` |
-| PA | `src/apps/presentation/actions.ts` |
-| PL | `src/apps/presentation/ui/presentation-board-list.tsx` |
-| IW | `src/platform/ui_engine/patterns/image-workspace.tsx` |
-| IG | `src/platform/ui_engine/patterns/image-gallery.tsx` |
-| IA | `src/platform/ui_engine/patterns/image-adjust.ts` |
-| IP | `src/platform/ui_engine/patterns/image-prepare.ts` |
-| RE | `src/platform/ui_engine/patterns/rich-text-editor.tsx` |
-| RI | `src/platform/ui_engine/patterns/rich-text-editor-impl.tsx` |
-| FT | `src/platform/ui_engine/patterns/formatted-text.tsx` |
-
-CONFIRMED = deterministic source trace and/or real-service probe demonstrates the behavior. PARTIAL = a subset exists or visual/touch claims remain unverified. NOT REPRODUCED = inspection disproves the alleged absence within the stated scope, not a blanket acceptance PASS. No authenticated browser/caret/physical-touch/screenshot acceptance was performed.
-
-Six in-memory scenarios executed the real createWorkspaceService/createPresentationService with fake persistence/storage ports: official text changed; omitted links survived that edit; a later unversioned phase save overwrote a prior save; official record deletion succeeded; HT searched names rather than code prefixes; a read-only board request invoked updateMany. These are service reproductions, not real database race or browser tests. Reproduce with an authorized ACTIVE project/phase and a TEXT card marked workflow_record=true, then edit/delete through phaseNotes; for the read probe resolve a stored annotation's Schedule ID to no entry and count write calls.
-
-### A. Notes integrity
-
-| ID / status | Evidence and reproduction | Proposed outcome / limit |
-| --- | --- | --- |
-| A1 CONFIRMED | PH:325–338 creates official answers as cards; W:304–317 edits and W:355–365 hard-deletes without a workflow_record guard. Only origin/phase are locked (W:346,500). N:286–290 still offers Edit/Delete. W:316,361 audit metadata contains no prior body; PH:335,446 undo is not a content recovery store. Probes changed/deleted an official card. | Recommend immutable official body/assets and refusal of ordinary deletion on Notes and Board; retain existing organizational starring. G1 settles metadata/retention exceptions. No promise of recovering earlier lost content. |
-| A2 CONFIRMED | N:16–34 omits version; N:230 and strict action A:378 send none; W:709 makes it optional; W:197 checks only supplied versions. W:312 protects overlapping database writes, not a later old-screen save. Sequential editor probe overwrote the first save. Board's existing stale test at service.integration.test.ts:3739 misses phase transport. | Require read version and preserve the edit-session base. Conflict keeps draft and offers explicit reload; never adopt a refreshed version for an old draft. Existing version column is enough. Cover flags/delete too. |
-| A3 CONFIRMED | N:230 recomputes tags but omits itemEntryIds; W:269 returns for undefined. Removing @HT-01 retained its link in the probe. Post resolves items (N:446–457), edit does not. W:603 renders retained links. | Resolve the complete edited-body mention set once in app-owned logic, validate and save atomically with body/tags/version; [] clears links. Do not inadvertently erase deliberate Board explicit links. |
-| A4 CONFIRMED filter; PARTIAL search | Fresh initial object resets All at N:109–112 and replaces the page. N:123–155 also sticks to bottom. A:397 refreshes after actions. N:38,115–121/A:413 have no chat text-search state to reproduce losing. | Retain chosen phase/tag/feedback/starred filter and appropriate scroll anchor; guard stale refresh/filter requests and pagination. Reset on actual project change. Add no search feature. |
-| A5 CONFIRMED | W:629–641 includes null-phase cards; N:212 hides their actions and N:159 refuses them. A:378 requires phase. Alternate Board action A:452 refuses Board off. Existing General policy is W:156–181/S:83–129. | Notes transport for existing General edits reuses phaseWork + project document access, ACTIVE/unarchived rules. Derive canEditGeneral server-side. Do not bypass Board's gate or infer General rights from a writable phase. Creation via phase × is G3. |
-
-### B. Mentions and composer
-
-| ID / status | Evidence | Proposed outcome / limit |
-| --- | --- | --- |
-| B1 CONFIRMED bare @ hidden | N:421 returns []; N:481 renders nonempty lists only. A:418 already permits empty query; W:647 can return first ten for it. | Open immediately with loading then first ten project items, stable Schedule order; no recents tracking. |
-| B2 CONFIRMED prefix gap | `src/apps/studioflow/domain/schedule.ts:289` needs digits to parse a code; W:646–648 searches product_name for HT instead of prefix. Probe confirms. Full HT1/HT-01 already works. | Match normalized partial code OR name, retain exact full-code behavior/project scope/final-active naming/ten-result bound. |
-| B3 PARTIAL rows/placement | Header/chip/first selection/hover/pick exist (N:424–425,482–488). Name/location are one string; popup anchors composer-left, not caret. | Separate code/name/right-muted-location and caret anchor above editor, clamped to viewport with selected-row scrolling. Header PRODUCT SCHEDULE. G2 governs editor hooks. |
-| B4 NOT REPRODUCED absent keyboard picks | N:474–478 already handles Up/Down, Enter/Tab, Esc. | Preserve; add editor/listbox active-descendant association, IME and empty/pending guards, focus retention. Browser behavior still pending. |
-| B5 CONFIRMED silent empty/loading/error | N:414,423 silently returns on action error; async callbacks have no catch; N:481 hides zero results. | Explicit closed/loading/results/empty/error states for @/#, No item matches, safe error/retry, ignore stale responses after close/new query. Lookup failure must not silently lose a link on send/edit. |
-| B6 CONFIRMED caret/highlight gap | N:402–405 matches serialized-text end, N:433 replaces suffix. RE:7–32 exposes no caret/token-range/decoration API. | Canonical domain-neutral editor hooks/transient marks under G2; replace the active token range, including in mid-text. No private duplicate editor/formatter. |
-| B7 PARTIAL sent chips/card | N:324 uses FT plain inline formatting; FT:50–64 has no mentions. N:335–344 displays separate code/name links/native title to Schedule root. W:560–567,601–604 returns no entry ID/thumbnail in items. | Resolved inline dark @CODE chips preserving formatting; hover/focus card with signed thumbnail, CODE · Product Schedule, name/location, Open item → specific entry. Missing/deleted image/entry stays usable. G2 governs rendering extension. |
-| B8 PARTIAL #/composer | Tags header exists (N:483), known/new tags/#feedback (413–419). Phase is Select/static chip without × (504–508); dashed + #feedback exists (509). NC:109/N:520 use rectangular attach/send buttons. Enter already sends, with Shift/list/IME rules (RI:96–110). | Preserve rules; round accessible attach/send controls; # loading/empty/error states. Phase × requires G3 before removal creates new General-note behavior. |
-
-### C. Presentation
-
-| ID / status | Evidence | Proposed outcome / limit |
-| --- | --- | --- |
-| C1 CONFIRMED no pin drag | PF:28–48 provides click only; PE:193 makes image ancestor draggable. Frame-relative percentages already exist (PF:17–25); PA:102–107/PS:415–418 already update coordinates. | Pointer capture/local preview/clamp 0–100 in full image frame; save once on release, cancel restores position. Suppress ancestor image drag and click-to-add after pin drag. Retain image swap/click-select/add; keyboard nudge if G4 approves. |
-| C2 CONFIRMED unconfirmed destruction | PE:89–108 replaces via picker/drop; PS:364–370 deletes old image/pins and queues object cleanup. PE:140,217,228 delete board/slide/pin; PE:264 removes image immediately. Child cascades in prisma/schema/presentation.prisma. | Reuse useConfirm for every destructive intent with affected counts; cancel performs no write/upload. Empty-slot placement/swap need no destructive confirmation. Navigate only after successful board deletion. |
-| C3 CONFIRMED read writes | PS:223–232 uses read access then annotation.updateMany; fake-port probe counts one write. presentation.integration.test.ts:71–73 expects that read-side repair. | Pure reads/project missing links as null; persistence cleanup stays explicit at PS:426–427, presentation/public/lifecycle.ts:8, A:835–843. Change test contract; no new cross-schema relation or cleanup hidden in viewing. |
-| C4 PARTIAL polish; CONFIRMED silent action failures | Existing hints/selection/empty states at PE:176,187,224,254,268–274. Mixed English/Indonesian PE:132–140,168,225–229/PL:25–27. PE:116 ignores pin-add failure; PE:140 navigates after failed deletion; PL:19–22 drops create errors. | Approved label list, safe errors for every action, pending/read-only/selection hints. Retain editor structure/product terms; no new layouts, modes or presentation behavior. |
-
-### D. Shared image tools
-
-| ID / status | Evidence | Proposed outcome / limit |
-| --- | --- | --- |
-| D1 CONFIRMED wheel ignores cursor | IW:269–272 changes zoom only; IW:283 uses existing pan as transform origin. | Cursor-anchored, bounded zoom using the same transform as export; keep sliders. |
-| D2 CONFIRMED no pinch | IW:133 stores one pointer; IW:238–267 lacks pointer-distance handling; 279 uses touch-none. | Two-pointer midpoint-anchored pinch, correct capture/cancel, no accidental stroke. |
-| D3 PARTIAL pan; CONFIRMED preview/export mismatch | Pan exists (IW:238–257), displacement is viewport percentage, not actual crop overflow. IW:283 object-cover at zoom=1 remains centered regardless of pan; export IW:199–206 uses pan. For 1600×900 at 4:3/zoom 1 export x=0/400 at pan 0/100 while preview remains x=200. With no aspect, preview is 16:9 (279), export source aspect (197–204). | One geometry calculation for preview/export, direct source-space pan with bounds; preserve fixed and omitted aspect output contracts. This is correctness, beyond subjective feel. |
-| D4 CONFIRMED reset absent; PARTIAL frame | Only zoom/focus sliders IW:287–289. Fixed viewport/border at 279–280, no explicit crop guide/fit/reset. | Visible fixed frame, Reset crop/Fit to declared crop viewport; no accidental letterbox/aspect change. |
-| D5 PARTIAL scribble discovery | Tools become visible after choosing image (IW:277–307); default pen (140); visual active state (306), hint (323). Simple upload consumers use shrinkImageFile, so expose no scribbles. | Clear Pan/Draw grouping, pressed state, subtools and colors and availability hint. Recommend initial Pan under G4. No new drawing workflow in Notes/Ideas/Presentation simple uploads. |
-| D6 CONFIRMED no undo stroke | Accumulates strokes IW:247,261–264; only Clear annotations IW:324. | Separate Undo last stroke and Clear annotations; preserve strokes on mode changes. Keep existing output/crop-space overlay bake (220); image-anchored editable-after-save drawings would be new behavior. |
-| D7 NOT REPRODUCED missing gallery/compression foundations | IG:48 focus, IG:62–72 dialog/arrows/actions/missing image. IA:31–40/IP:35–55 shared bounded compression/cleanup/pass-through. | Preserve gallery sizes/index/actions and upload/quality/color limits; reuse, do not rewrite. |
-
-### E. UI Engine compliance
-
-| ID / status | Exact evidence and bounded response |
-| --- | --- |
-| E1 NOT REPRODUCED raw legacy class | No literal legacy ui-* class found in N/PN, Presentation UI or four image patterns. Semantic utilities and --ui-* custom properties are not legacy classes. |
-| E2 CONFIRMED token/contrast bypass | PE:172 uses nonexistent --ui-ink/--ui-ink-tertiary with literal fallback colors; active glyph #24211e against dark #1c1a18 calculates **1.08:1**. PF:43 uses bg-neutral-200; PF:46 ring-white is theme-fixed. Use existing semantic tokens locally. |
-| E3 CONFIRMED explicit hit areas <44px | N:368/498 star/reply cancel 24px; NC:102 attachment-remove 24px; N:486 option approximately 32px, N:354/509 topic/feedback chips smaller than 44. PE:128 pin 28px, 172 layout 40px, 237 fit 32px. IW:317 colors and IG:56 remove 24px. Shared Button defaults also 32/36px, compact24/28 (`tokens/tokens.css:145–146,177–178`): replacing with Button alone does not fix hit size. Enlarge local interaction area while retaining visual density; no global density change. |
-| E4 PARTIAL focus/access | Global visible focus already exists at `src/platform/ui_engine/styles/base.css:18`. Missing local focus utility is not proof of missing focus. Actual gaps: PF:38 click-only image frame and IW:284 canvas have no equivalent focusable gesture surface; N:482–486 lacks editor active-descendant linkage. Browser clipping/focus review pending. Preserve keyboard crop controls, add pin nudge; complete keyboard drawing editor is outside scope. |
-| E5 CONFIRMED calculated contrast; PARTIAL rendered review | Dark tertiary #8a837a on muted #2a2825 = **3.93:1**, below 4.5 for small normal text: selected suggestion detail N:486–488 and unavailable gallery tile IG:48,52. `tokens/tokens.css:199–210`; light tertiary/white=5.91:1. Use a stronger existing text token locally; verify rendered themes later. |
-| E6 PARTIAL duplicate chrome | N:509 feedback, PE:169–172/236–237 selection controls, N:332 download recreate chrome covered by FilterChip/Button/buttonClasses (`primitives/actions.tsx:25,115`, `primitives/button-classes.ts:26,45`). Reuse where fitting; keep app-owned pin/glyph geometry. No duplicate full cropper/gallery found. A linked preview card needs interactive focus semantics, not a text-only Tooltip; any missing canonical overlay is G2. |
-
-### Complete shared image consumer matrix
-
-Search covered symbol references and image filenames across all src and tests/public exports. These are all production call sites; this matrix specifies required coverage, not a pre-implementation no-regression claim.
-
-| Capability | Every direct consumer | Required regression |
-| --- | --- | --- |
-| ImageWorkspace | `src/app/(platform)/studioflow/projects/[projectId]/schedule/schedule-board.tsx:163` Schedule photo/change (4:5/JPEG/1600, initialFile, openOnMount, page paste); same file `:974` option photo and `:1270` new option photo; `src/app/(platform)/studioflow/projects/[projectId]/mom/[momId]/mom-editor.tsx:159` MOM (4:3/JPEG/1600) | All four call sites: existing picker/drop/paste, crop/export, callback/pending/error. Also public default no-aspect/PNG fixture. |
-| ImageGallery | N:317 single fill/album+viewerActions; `src/app/(platform)/studioflow/projects/[projectId]/_workspace-canvas/card.tsx:344` fill+actions; `src/apps/ideas/ui/ideas-board.tsx:138` square full-width override | Single/5-image album +N, actual indices, previous/next, signed/missing URLs, actions/removal when supplied, focus return; preserve Ideas override. |
-| shrinkImageFile / image-prepare | NC:29 Notes/client-answer upload; `src/app/(platform)/studioflow/projects/[projectId]/_workspace-canvas/card.tsx:66,86` intake/replacement; `src/apps/ideas/ui/ideas-board.tsx:22`; PE:31 | Exact existing file limits, small-file identity, large JPEG/PNG, transparency-white JPEG background, dimensions/errors/cleanup. No extra crop step. |
-| image-adjust | IW:9,217,225 and IP:1,40 | Neutral colors, unsupported filter fallback, compression quality-before-size order, annotation colors untouched by photo filter. |
-| Public exports/tests | `src/platform/ui_engine/patterns/index.tsx:10,11,17`; ui-engine.test.ts, patterns/image-adjust.test.ts, patterns/image-prepare.test.ts, `src/apps/studioflow/mom.contract.test.ts` | Stable public surface; update every consumer together if a shared API changes. |
+- Backlog item `[PLANNED][P1] Workspace board: a note thread where you double-click` (owner 2026-10-15, R9.63) and mockup artboard *Workspace — klik dua kali untuk catatan* (`project/WorkspaceChat.dc.html` in https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF).
+- Every note and board element is an `SfWorkspaceCard` (`prisma/schema/studioflow.prisma:308`). Notes posted from the chat have no canvas point; `readWorkspace` (`src/apps/studioflow/workspace/service.ts:611`) returns **every** card and the board lays unplaced ones out automatically (`_workspace-canvas/canvas.tsx:172–181`). Thread messages must therefore be excluded from the board's element read, or they would become loose cards.
+- Card writes are gated by `writableScope` (phase label → that phase's `phaseWork`+`transition`; unlabelled → `phaseWork`+`document`; open ACTIVE project); every mutation names its read `version` (R9.66 `noteAction`). Deletion cleans storage through `enqueueUnreferencedCleanup` + `discardObjects` (service.ts:355–365).
+- Replies (`reply_to_id`), tags, item links, client-feedback origin, albums and the shared mention resolver exist (WO-SF-NOTES-CHAT-01, R9.66, R9.73).
+- Board actions refuse with `MODULE_DISABLED` while `workspace-board` is off (`actions.ts` `workspaceAction`); Notes actions (`phaseNoteAction`, `noteAction`, `postPhaseImageAction`) stay on (MODULES-DECISION D11: switching never loses data).
+- Current board double-click on empty space opens a new text draft (`canvas.tsx:298–302`); this changes in the Lead UI slice (owner decision below).
+- Archived-project asset retention deletes image cards in bulk (`src/apps/studioflow/projects/asset-retention.ts:76`).
+- Latest migration `20261014230000_studioflow_note_chat`. Baseline R9.74 `ec86b48`; untracked owner files `test/BOQ TEST.xlsx`, `test/BOQ TEST 2 - PDF.pdf` must be preserved.
 
 ## Locked Decisions
 
-1. Run 1 documents only. Status stays DRAFT until Lead approval and the material gates below; no execution authority inferred from backlog.
-2. No new dependency, schema/migration source, business module, permission, cross-module internals or legacy use. No remote operations. One local revision per coherent later slice.
-3. Notes stay StudioFlow-owned; Board is a Developer switch, not a role permission. Presentation writes its own data and uses only StudioFlow public facts.
-4. Reuse established project/PIC/security gates, version column, ActionResult safe errors, confirmation, formatting dialect, upload/cleanup contracts and print geometry. Manual feedback and official workflow records are distinct.
-5. **G1 (owner, 2026-10-15: "harusnya bisa di edit dong, kalau typo gmn") — keep the existing policy.** Official workflow records stay correctable, starrable and deletable exactly as contract §6.1 and `service.integration.test.ts:3822` say; only origin and phase/round labels stay locked (`WORKSPACE_RECORD_LOCKED`). No immutability, no delete refusal, no contract amendment. A1 is closed as *by design*, not a defect. The owner did not ask to change deletion; it stays allowed.
-6. **G2 (owner) — Lead-owned prerequisite.** Caret/token-range/decoration hooks in the shared RichTextEditor, inline-token rendering in FormattedText and any interactive hover card are built by the Lead as a separate revision before slice B, with its own consumer matrix. The Executor never edits `rich-text-editor*.tsx`, `formatted-text.tsx` or shared overlays.
-7. **G3 (owner) — phase stays required for new notes.** No phase ×; no General-note creation from Notes. Editing/starring/deleting *existing* General notes under the existing project document right is in slice A (A5).
-8. **G4 (owner) — package approved.** English copy matching Notes/Product Schedule; ImageWorkspace opens in Pan (crop) mode; Presentation pin keyboard nudge 1%, Shift 5%. No new drawing tools, recents or chat search.
-
-### Decision gates
-
-G1–G4 resolved 2026-10-15; see Locked Decisions 5–8. Nothing in slice A waits on the owner.
+1. **Storage (Lead).** A new StudioFlow table `sf_workspace_thread`; messages are ordinary `sf_workspace_card` rows with a new nullable `thread_id`. Not a new card kind and not `reply_to_id` (replies keep their quoting meaning inside a thread).
+2. **Anchor (Lead).** A thread is either free (`anchor_card_id` null, point `x`,`y`) or anchored to a board element (`anchor_card_id` + `offset_x`,`offset_y` from that element's top-left, board px). `x`,`y` are always stored too (the absolute point at creation, refreshed on move) as the fallback position.
+3. **Deleting the anchor element deletes its threads and their messages (owner 2026-10-15: "Ikut terhapus").** Done explicitly in the service in the same transaction as the element deletion, with storage cleanup for message images/files. The UI confirms with the message count (Lead UI; the read model exposes the count). **Security (Lead):** the cascade is refused (`WORKSPACE_THREAD_LOCKED`, nothing deleted) unless the actor passes the write gate of every message's label — deleting an element must never become a way to delete notes the actor could not delete one by one. Official workflow records follow G1 (deletable).
+4. **Non-user deletions do not cascade.** At the database level `anchor_card_id` is `ON DELETE SET NULL` (asset retention, project-level purges): the thread survives at its stored `x`,`y` and its text messages are kept.
+5. **Double-click = note thread (owner: "Ya, ikut mockup").** On empty space and on elements. New text boxes come from the toolbar's **+ Text** (Lead UI).
+6. **Free markers can be dragged (owner: "Boleh digeser").** Anchored markers follow their element and cannot be moved on their own.
+7. **No empty threads.** A thread is created only together with its first message (text or image) in one transaction; deleting a thread's last message deletes the thread in the same transaction.
+8. **Phase stays required for new messages (G3).** A thread message carries the phase label chosen in the window (default: the page's selected phase) exactly like a Notes post; the thread itself has no phase.
+9. **Board off:** thread messages appear in the Notes stream as ordinary notes and stay editable/deletable there through `noteAction`; markers and thread commands are board-only (`MODULE_DISABLED` while off). No data is hidden or lost.
+10. No new dependency, no shared UI Engine change, no cross-module relation, no legacy, no remote operation.
 
 ## Business Rules and Architecture Constraints
 
-- **REUSE** shared safe errors, ActionResult, UI Engine Button/IconButton/FilterChip, useConfirm/overlays, RichTextEditor/FormattedText, file intake/gallery/compression/preparation.
-- **EXTEND** existing StudioFlow note transport/resolution and shared image geometry/gestures. Keep code parsing/item resolution and authorization **APP-OWNED**.
-- **EXTEND after G2 only** the canonical editor/formatter/interactive overlay through proven domain-neutral hooks. Platform must never import StudioFlow data/permissions. No speculative framework or registry.
-- **PURGE** Presentation read-side mutation and silent action errors. No cross-schema FK, implicit cross-module writes or new background cleanup mechanism.
-- This corrects existing module capabilities; no module manifest/version/install/enable permission change is part of R9.64.
+- **EXTEND** StudioFlow workspace service/actions; **REUSE** `insertWorkspaceCard`, `createImage`, `writablePhase`/`writableProject`/`writableScope`, `syncTags`, `syncItemLinks`, `validateReply`, `enqueueUnreferencedCleanup`/`discardObjects`, version/stale errors, `runSafeAction`, `requireModuleEnabled(WORKSPACE_BOARD)`.
+- Thread rows are project-level: creating one requires the first message's phase gate; moving a free marker requires `phaseWork` + project `document` access on an open ACTIVE project (same as unlabelled cards).
+- An anchor must be a board element of the same project that is **not itself a thread message**; a thread message can never be an anchor.
+- Thread messages are excluded from the board element read and from `placeItems` (refuse placing a thread message: `WORKSPACE_THREAD_MESSAGE`).
 
 ## Backend Contract
 
-### Ordered slice A — reliable Notes (PASS: R9.66 `f88a592`, Lead review R9.67)
+**Schema + migration** (one migration, e.g. `20261015…_studioflow_workspace_threads`, applied to the kantor dev and test databases after verifying both are rebuild-only):
+- `SfWorkspaceThread`: `id` uuid, `project_id` (FK project, cascade), `x` Int, `y` Int (0…`WORKSPACE_CANVAS_MAX`), `anchor_card_id` String? (FK `SfWorkspaceCard`, `onDelete: SetNull`), `offset_x` Int?, `offset_y` Int? (both set iff anchored), `created_by_id` String?, `created_at`, `updated_at`, `version` Int default 1. Indexes on `project_id` and `anchor_card_id`.
+- `SfWorkspaceCard.thread_id` String? (FK thread, `onDelete: Cascade` as an integrity net; the service deletes explicitly with storage cleanup), index on `thread_id`.
 
-One coherent revision. Module: studioflow. Files: W (`src/apps/studioflow/workspace/service.ts`), A (`src/app/(platform)/studioflow/actions.ts`), N, PN; StudioFlow service/integration tests. No schema, migration, dependency, shared UI Engine or contract-policy change (G1 keeps §6.1). A1 is **out of scope** (by design).
-
-**A2 + A5 — one Notes mutation door that always names the version it read.**
-- In A add `noteAction` (strict discriminated union, `runSafeAction`, **no** `requireModuleEnabled(WORKSPACE_BOARD)`): `edit {projectId, noteId, version, body, tags?, itemEntryIds}`, `flags {projectId, noteId, version, starred?, clientFeedback?}`, `delete {projectId, noteId, version}`. `version` is the existing `Version` schema (positive int, required). No `phaseId` from the client: the service gates by the card's own stored label.
-- Route to the existing `studioFlow.workspace.updateWorkspaceCardText` / `setWorkspaceCardFlags` / `deleteWorkspaceCard` (W:476–488). These already require `version`, load the card by project and apply `writableScope(card.phase_id)`: phase-labelled → that phase's `phaseWork`+`transition`; unlabelled (General) → `phaseWork`+`document`; open ACTIVE unarchived project. Do not add a new gate, do not fabricate a phase, do not infer General rights from a writable phase. `refresh(projectId)` as today.
-- Remove the `edit`/`flags`/`delete` members of `PhaseNoteCommand` and their switch cases, and `editPhaseNote`/`setPhaseNoteFlags`/`deletePhaseNote` from `phaseNotes` if nothing else calls them (grep shows only N uses them; `post` stays for N, NC and phase-commands). Update tests that called the removed phase-note doors to call the workspace door instead.
-- N: add `version: number` to `ChatNote` (cardView already returns it, W:580). Capture the version when an edit begins and send *that* captured value on save, never a version refreshed while the draft was open. Flags/delete send the version of the note as rendered; album group actions send each note's own version.
-- On `WORKSPACE_CARD_STALE`: keep the editor open with the draft intact, show the safe message, and offer an explicit **Reload** that refetches the current view; the draft is never silently re-based. For star/feedback/delete, show the error and reload the view.
-- PN: compute `canEditGeneral = open && access.canEditDocuments` server-side (same rule as `project-workspace.tsx:58`) and pass it. N: `canEdit = note.phaseId ? writable.has(note.phaseId) : canEditGeneral`; `run` no longer bails out on a null phase. Composer visibility and posting rules are unchanged (G3).
-
-**A3 — edits resend the complete mention set.**
-- Extract the existing send-path resolution (N:446–457: find `@CODE` tokens, resolve via `searchNoteItemsAction`, keep exact matches) into one app-owned helper in N used by both post and edit. Edit always sends `itemEntryIds` = the de-duplicated resolved set of the edited body, `[]` when none remain, max 10.
-- Unmatched/ambiguous codes stay plain text, as on send. If a lookup call itself fails, do not save: keep the draft and show the error (never save with a partially resolved set).
-- Do not change service semantics of `itemEntryIds: undefined` (Board relies on it to keep explicit links).
-
-**A4 — keep the reader's view.**
-- When a fresh `initial` arrives from a page refresh, keep the current filter: if it is `all`, adopt `initial` as today; otherwise refetch the current filter instead of showing the unfiltered page. Reset the filter to `all` only when `projectId` changes.
-- Keep scroll position when the reader is not at the bottom (do not force `stickToBottom` on a background refresh); after the reader's own post, still scroll to the newest.
-- Guard request ordering: a response for a filter/project that is no longer current, or from an older request, is ignored (request counter or equivalent); `olderPage` also handles thrown errors (currently no catch) with the existing safe message.
-- No search feature.
-
-**Tests (integration on the guarded test DB; pure tests where natural).**
-1. `noteAction` contract: missing or non-positive version rejected by the schema.
-2. Two sequential editors on one note: first save passes, second with the old version → `WORKSPACE_CARD_STALE`, body unchanged. Same for flags and delete with a stale version.
-3. General note with Board **disabled**: project document PIC can edit/star/delete; a user with only a phase transition right and no document right is refused; outsider refused; completed/archived/non-ACTIVE project refused.
-4. A phase-labelled note through the new door still follows that phase's rule (writer of another phase refused).
-5. Official workflow record: body edit and delete still succeed; origin change still `WORKSPACE_RECORD_LOCKED` (pins the G1 behaviour).
-6. Edit that removes `@HT-01` with `itemEntryIds: []` clears the link; replacing HT-01→HT-02 swaps it; duplicates collapse; >10 → `NOTE_ITEM_LIMIT`; wrong-project id → `NOTE_ITEM_INVALID`; Board `updateCard` with `itemEntryIds` omitted still keeps links.
-7. If N's resolver/filter logic is extracted as a pure function, unit-test token extraction (punctuation, escaped Markdown, repeated codes) and the stale-response guard.
-
-**Executor verification (all required):** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Location kantor: load `.env.kantor`, set `STUDIOFLOW_LOCATION=kantor`, confirm both targets are the rebuild dev/test DBs before any DB command; no migration expected. Read the installed Next.js server-action docs before adding the action. Browser acceptance belongs to the Reviewer (group [R9.64] A, without the official-record lock step).
-
-### G2 prerequisite — shared editor, formatter and hover card (DONE by Lead, R9.72)
-
-Domain-neutral, optional, no behaviour change for any consumer that does not pass the new props (RichTextEditor: Notes edit, Notes composer via `NoteDraftFields`, Workspace canvas and card, MOM editor; FormattedText: Notes, Workspace card, phase-notes dialog, MOM print). Contract the Executor uses — do **not** modify these files in slice B:
-- `RichTextEditor` new props: `tokenTriggers` (e.g. `["@", "#"]`), `onTokenChange(token | null)` where `token = { trigger, query, caret: {left, top, bottom} (viewport px), replace(text) }` — `replace` swaps exactly that token wherever it sits (mid-text too) and adds one space unless one follows; never reported while an IME composes; reported `null` on blur. `highlightPattern` (RegExp) paints matching text as a dark token chip while writing; the caret's token gets a light underline highlight. `listboxId` / `activeOptionId` wire `aria-controls` / `aria-activedescendant` / `aria-autocomplete="list"` on the text box. Key handling stays with the caller (the existing `onKeyDownCapture` on the composer wrapper keeps working: capture runs before the editor).
-- `FormattedText` new prop `tokens = { pattern, render(match, key) }`: matches are found in unescaped text (so `@HT\-01` matches), inside bold/italic and lists; the caller renders the element.
-- `HoverCard` (UI Engine overlays): `<HoverCard label content side align><button>…</button></HoverCard>` — hover/focus shows it without taking focus; click/tap/Enter opens it with focus inside (links reachable); Escape/leave closes and returns focus when engaged.
-- Pure helpers in `patterns/rich-text-tokens.ts` (`tokenAtCaret`, `tokenRanges`, `tokenReplacement`) with tests.
-
-### Ordered slice B — @/# suggestions, inline item chips and composer (PASS: R9.73 `73ab6d2`, Lead review R9.74)
-
-One coherent revision. Module: studioflow. Files: N `notes-chat.tsx`, NC `src/app/(platform)/studioflow/_components/phase-note-composer.tsx` (`NoteDraftFields` pass-through + round buttons), W `src/apps/studioflow/workspace/service.ts` (`searchNoteItems`, note item view), A only for the search action's input/output types, the Schedule page `src/app/(platform)/studioflow/projects/[projectId]/schedule/page.tsx` + `schedule-board.tsx` for the deep link, `src/apps/studioflow/public/nav.ts` (optional `entryId` on `projectSchedule`), StudioFlow tests and `e2e/notes-chat.spec.ts`. No schema, migration, dependency or shared UI Engine change (use the G2 API as is; if it is insufficient, stop with BLOCKED and describe the gap). G3: phase stays required, no ×.
-
-**B1/B2 — search (backend).** `searchNoteItems(projectId, query)`:
-- Empty/blank query (or bare `@`) → the first 10 entries of the project in Schedule order (`section`, `sort_order`), including entries without options (name `null`).
-- Otherwise match **partial code OR name**: normalise the query (drop `@`, spaces, `-`; uppercase); letters `L` + optional digits `D` (leading zeros dropped) match entries whose prefix starts with `L` and, when `D` is present, whose increment's decimal string starts with `D` (so `HT`, `ht`, `H`, `HT0`, `HT1`, `HT-01` all work); in addition any option `product_name` containing the raw trimmed query (case-insensitive). An exact full-code match is listed first, then Schedule order; max 10; project scope only. Keep final-option-else-active naming.
-- Each result also returns `thumbnailUrl`: a short-lived signed URL (existing `signedUrl` helper/storage port) for the image of the final option, else the active option, else `null`. Never persist URLs.
-- The note view's `items` (W:601) gain `entryId` and `thumbnailUrl` the same way; keep `code`, `name`, `location`. Update `ChatNote` accordingly.
-
-**B3/B4/B5/B6 — composer popup (UI).**
-- `NoteDraftFields` passes through optional `tokenTriggers`, `onTokenChange`, `highlightPattern`, `listboxId`, `activeOptionId` to its `RichTextEditor` (other callers unchanged).
-- `ChatComposer` drops the trailing-text `TRAILING` regex and uses `onTokenChange` (`["@", "#"]`). State machine per token: `loading` → `results` | `empty` | `error`; closed when the token is null or Escape is pressed (Escape keeps the typed text; typing a new token reopens). Popup opens **immediately** on a bare trigger (shows "Loading…" until results). Debounce 150 ms; a request counter drops responses for an older token/closed popup. Error state shows a safe message and a **Retry** button.
-- Placement: absolutely positioned inside the composer's `relative` wrapper, **above the caret**: `left = clamp(token.caret.left − wrapperRect.left, 8, wrapperWidth − popupWidth − 8)`, `bottom = wrapperRect.bottom − token.caret.top + 6`; width `min(22rem, 100% − 16px)`, max-height ≈ 18rem with internal scroll; the active row scrolls into view (`block: "nearest"`).
-- Rows: header **PRODUCT SCHEDULE** (or **TAGS**); `@` rows = dark code chip, product name, and the location right-aligned in `text-ink-secondary` (not tertiary — E5 contrast); `#` rows as today (feedback/known/new tag, five-tag rule). First row active. Each option has `id = ${listboxId}-${index}`; pass `listboxId` and `activeOptionId` to the editor. Rows ≥ 44 px tall on touch (`min-h-11`), compact visual.
-- Keys (existing capture handler): only in `results` state Up/Down move, Enter/Tab pick; Escape closes in any open state; in `loading`/`empty`/`error` Enter is not swallowed (sends as usual). Pointer: hover sets active, mousedown (preventDefault) picks.
-- Pick = `token.replace(insert)` (exact range, works mid-text) and record `picked` code → entryId as today. Highlight while writing: `highlightPattern` = the code pattern `(?<=^|\s)@[A-Za-z]{1,4}-?\d{1,3}(?=$|[\s.,!?;:)])`.
-- Send keeps the shared resolver (`resolveNoteItemIds`, lookup failure blocks send with its message — show the resolver's message instead of the generic one).
-
-**B7 — sent mentions (UI).**
-- Bubble text uses `FormattedText tokens` with the same code pattern. A match whose `codeKey` equals one of `note.items` renders a `HoverCard` whose trigger is a dark inline chip button `@CODE` (`bg-action text-action-ink`, rounded, semibold, ≥ 24 px tall inline with a 44 px hit region via padding/negative margin that does not shift line height); unmatched codes stay plain text.
-- Card content: thumbnail (`img` 64×64 object-cover; on missing URL or load error a neutral placeholder), `CODE · Product Schedule`, name (or "No product name yet"), location, and a link **Open item →** to `STUDIOFLOW_ROUTES.projectSchedule(projectId, entryId)`.
-- The separate items row under the bubble (N:407–411) shows only items **not** mentioned inline (e.g. Board explicit links), each with the same HoverCard.
-- Deep link: `projectSchedule(projectId, entryId?)` adds `?entry=<id>`; the Schedule page reads it (read the installed Next.js docs on `searchParams` for this version first), passes `initialOpenId` to `ScheduleBoard` (`useState(initialOpenId)`), and scrolls that entry into view once. Unknown/deleted id: page opens normally.
-
-**B8 — composer polish.** Attach and Send become round 44 px controls (`IconButton`/`Button` with explicit local size; keep labels for assistive tech, Send keeps its pending state). Keep Enter/Shift+Enter/list rules, reply, album upload, `#feedback` toggle, phase Select (no ×), PIC rules. Copy stays English.
-
-**Tests.**
-1. Integration (`service.integration.test.ts`): empty query → first 10 in Schedule order incl. an entry without options; `HT`, `ht`, `H`, `HT0`, `HT1`, `HT-01`; name search; exact code listed first; other project's entries never returned; final vs active option naming; `thumbnailUrl` present for an option image and `null` without one; note view items carry `entryId`/`thumbnailUrl`.
-2. Unit (pure, next to N): popup state transitions incl. stale response ignored after token change/close, retry, placement clamp math; code-chip matching via `codeKey` (escaped hyphen, unmatched code plain).
-3. e2e `notes-chat.spec.ts` (run it; if the e2e environment is unavailable report that precisely, it is not a pass): bare `@` shows ≥ 1 item immediately; `HT` filters; insert a code in the middle of text with keyboard; send; hover/focus the sent chip shows the card; Enter on the chip then **Open item →** lands on Schedule with that entry open; `#` popup shows Tags; Escape closes.
-4. Existing notes/workspace/MOM/formatted-text/ui-engine tests stay green.
-
-**Executor verification:** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace, plus the e2e above. Kantor env; no migration expected. Browser acceptance: Reviewer/owner group [R9.64] B.
-
-### Ordered slice C — Presentation pin movement and safe actions (PASS: R9.68 `0907c7d`, Lead review R9.69)
-
-One coherent revision. Module: presentation. Files: PE `src/apps/presentation/ui/presentation-editor.tsx`, PF `src/apps/presentation/ui/slide-frame.tsx`, PL `src/apps/presentation/ui/presentation-board-list.tsx`, PS `src/apps/presentation/service.ts`; PA `src/apps/presentation/actions.ts` only if a test proves a validation gap; `src/apps/presentation/presentation.integration.test.ts`; print page only to confirm it still renders. No schema, migration, dependency, shared UI Engine or StudioFlow change. The owner's expanded UI lane covers this slice.
-
-**C3 — viewing never writes (do first; backend).**
-- PS `getBoard` (PS:223–232): delete the `updateMany` that nulls unresolved `schedule_entry_id`. Project an annotation whose stored entry no longer resolves as unlinked in the returned view (`scheduleEntry: null`, and whatever field the editor uses for the Select default becomes `null`) without touching storage. Saving that pin later with "No linked item" clears it through the normal write.
-- Explicit cleanup stays where it is: `clearScheduleEntryLink` (PS:426) via `presentation/public/lifecycle.ts`, called when a Schedule entry is deleted. Do not add cleanup elsewhere, no background job.
-- Update `presentation.integration.test.ts:71–73` (which expects the read-side repair): reading a board with a dangling link returns it unlinked and the stored id is unchanged; repeated reads do not write (use a db/port whose annotation write delegates throw, or compare `updated_at`/row state); `clearScheduleEntryLink` still clears it.
-
-**C1 — drag a pin (UI).**
-- PF stays hook-free (print renders it). Add optional props only: `onPinPointerDown?(event, pinId, frameRect)` and a way to render a pin at a preview position (e.g. `previewPins?: Record<string,{x:number;y:number}>` or the editor passing already-overridden coordinates). The frame element whose rect is used is the inner image frame (`frameStyle`), so percentages include cropped overflow exactly like click-to-add (PE onImageClick uses `event.currentTarget` = that frame).
-- PE: on pointerdown on a pin (canEdit only) call `setPointerCapture`, `stopPropagation`, `preventDefault`; on pointermove compute x/y = clamp 0–100 of (client − frameRect) / frameRect size, keep as local preview; movement under 3 px is a click (select pin as today). On pointerup after a real move: one `updatePresentationAnnotationAction({ projectId, annotationId, pinX, pinY })` with no other fields (service treats undefined as keep — test proves note/item/side/order survive). On failure revert preview and show the safe error. `pointercancel`/lost capture/Escape revert with no write.
-- While a pin drag is active or just ended: the image box `draggable` wrapper must not start an HTML drag (set `draggable={canEdit && !pinDragging}` or stop dragstart from the pin), and the trailing click must not select/add a pin on the image. Image click-select, second-click add, image drag between boxes and swap keep working.
-- Keyboard (G4): focused selected pin, Arrow keys move 1%, Shift+Arrow 5%, clamped; save debounced once per burst (≈400 ms after last key) through the same action; revert on failure.
-- Pin hit area ≥ 44 px (E3) while the visible dot stays `size-7`: transparent padding/pseudo-element around the dot, centred on the same point. Add `touch-action: none` on pins so touch drags work.
-
-**C2 — confirm destructive actions (UI).** Use UI Engine `useConfirm` (`patterns/hooks.tsx:66`), tone danger, cancel = no upload, no write:
-- Replace an occupied box by file picker ("Replace image") or by dropping a file on an occupied box: "Replace this image? Its N pins will be deleted." (N = that image's annotations). Dropping onto an empty box, and moving an existing image between boxes, need no confirmation.
-- "Remove from slide": "Remove this image? Its N pins will be deleted."
-- Delete pin: "Delete pin N?"
-- Delete slide: "Delete this slide? Its N images and M pins will be deleted."
-- Delete board: "Delete this board? Its N slides will be deleted." Navigate to the board list **only** when the action returned ok; otherwise show the error and stay.
-- Prepare/compress the file only after the confirm resolves true.
-
-**C4 — visible failures, pending, copy and tokens (UI).**
-- Every action surfaces its safe error: pin add (PE:116 currently ignores), board delete (PE:140), board create in PL (currently drops the error; show InlineError and keep the typed title). `pending` disables the triggering control; no duplicate submissions.
-- G4 copy is English. Replace every Indonesian string in PE/PL with: Slide baru→New slide; Tata letak slide→Slide layout; Seret gambar ke kotak · klik gambar terpilih untuk pasang pin→Drag images into boxes · click the selected image to add a pin; Judul slide / Judul slide (boleh kosong)→Slide title / Title (optional); Gambar → slide baru→Images → new slides; Tambah gambar atau seret ke sini→Add an image or drop one here; Keterangan slide / Keterangan (boleh kosong)→Slide caption / Caption (optional); Naikkan slide→Move slide up; Turunkan slide→Move slide down; Hapus slide→Delete slide; Hapus pin→Delete pin; Kembali ke gambar→Back to image; Gambar terpilih→Selected image; Kotak N→Box N; Cara isi kotak→Fill; Penuh (crop) / Utuh→Crop to fill / Show whole; Gambar lama ini selalu tampil utuh; ganti gambarnya untuk memakai crop.→This older image always shows whole; replace it to crop.; Posisi potongan→Crop position; Kiri ↔ kanan→Left ↔ right; Atas ↕ bawah→Top ↕ bottom; Pin di gambar ini→Pins on this image; Klik gambar sekali lagi untuk memasang pin.→Click the image again to add a pin. Drag a pin to move it.; Pin tanpa keterangan→Pin without a note; Ganti gambar→Replace image; Keluarkan dari slide→Remove from slide; the two empty-panel hints→"Click an image to set how it fills its box and to add pins." / "Empty box: click to choose an image, or drop one from your computer. Drag an image to another box to move it."; Tambahkan slide baru atau gambar untuk memulai presentasi ini.→Add a slide or images to start this presentation.; Presentasi ini belum punya slide.→This presentation has no slides yet. Any other Indonesian string found in these two files: translate in the same plain style and list it in the changelog.
-- E2: PE:172 layout glyph uses non-existent `--ui-ink*` tokens with literal fallbacks — use existing semantic classes/tokens (e.g. `text-ink` / `text-ink-tertiary`, selected state on `bg-action text-action-ink`) so active contrast is ≥ 4.5:1 in both themes. PF:43 `bg-neutral-200` → `bg-surface-muted`; PF:46 `ring-white` → a theme token ring (e.g. `ring-surface`). Print output must still look the same on paper.
-- E3 locally: layout buttons (PE:172, 40 px) and fit buttons (PE:237, 32 px) get ≥ 44 px hit area; no global density change.
-- No new layouts, modes or editor structure.
-
-**Tests.**
-1. Integration: `getBoard` with a dangling entry → unlinked view, stored id unchanged, zero annotation writes over two reads; `clearScheduleEntryLink` still clears.
-2. Integration: `updateAnnotation` with only pinX/pinY keeps note, schedule link, label side and sort order; 0/100 bounds accepted, out-of-range refused by the action schema; archived/other-project/read-only refused as today.
-3. Pure unit test for the pin geometry helper (client point + frame rect → clamped percent; click-vs-drag threshold; keyboard step 1/5 with clamping), placed next to the editor.
-4. If confirm-text builders are extracted, unit-test the counts. Existing presentation lifecycle/composition/print tests stay green.
-
-**Executor verification:** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Kantor env as before; no migration expected. Browser acceptance: Reviewer, group [R9.64] C.
-
-### Ordered slice D — shared image geometry and gestures (PASS: R9.70 `fb253cb`, Lead review R9.71)
-
-One coherent revision. Area: shared UI Engine image patterns (owner's expanded UI lane covers them). Files: IW `src/platform/ui_engine/patterns/image-workspace.tsx`, a new pure helper beside it (e.g. `patterns/image-crop.ts`, not exported from the public index unless a test needs it), existing tests `ui-engine.test.ts`, `patterns/image-adjust.test.ts`, `patterns/image-prepare.test.ts`, `src/apps/studioflow/mom.contract.test.ts`. IG/IA/IP only for the local hit-area/contrast fixes named below. No public prop change on `ImageWorkspace`; all four consumers (Schedule photo `schedule-board.tsx:163`, option photo `:974`, new option photo `:1270`, MOM `mom-editor.tsx:159`) must work unchanged. No dependency, no schema, no app change.
-
-**D3 — one crop geometry for preview and export (correctness; do first).**
-- Pure `cropRect({ naturalWidth, naturalHeight, aspect, zoom, panX, panY })` → `{ x, y, width, height }` in source pixels, using exactly today's export rule (IW:197–206): base = largest rectangle of `aspect` inside the source (or the whole source when aspect is omitted), size = base / zoom, `x = (naturalWidth − width) · panX/100`, `y` likewise. `prepare()` uses it — export output must stay byte-for-byte equivalent for the same zoom/pan (test with a fixture).
-- The preview shows **exactly that rectangle**: the viewport's aspect is `aspect` when given, otherwise the source aspect (fixes the 16:9 preview vs original-aspect export). Position the image with percentages derived from the same rect (`width = naturalWidth/rect.width·100%`, `left = −rect.x/rect.width·100%`, same for height/top) instead of `object-cover` + `scale()` + `transformOrigin`. Colour filter preview unchanged.
-- Strokes keep their current meaning (fractions of the viewport = fractions of the output crop), so once preview = export they bake where they were drawn. Persistent image-anchored strokes stay out of scope.
-
-**D1/D2/D3 — gestures.**
-- Pan state stays `panX/panY` 0–100 so the sliders keep working. Drag-pan in Pan mode converts pixel movement through the real overflow: `ΔpanX = −dx / overflowPx · 100` where `overflowPx = (naturalWidth − rect.width) · viewportWidth / rect.width`; no movement when overflow is 0. The picture follows the finger 1:1, never shows a blank edge.
-- Wheel zoom anchored at the cursor: the source point under the cursor stays under the cursor after zoom (solve the new pan from it, clamp 0–100, zoom clamp 1–3 as today). `preventDefault` only while an image is loaded.
-- Two-pointer pinch (track pointers in a Map): zoom by distance ratio around the midpoint, midpoint movement pans; works in both Pan and Draw modes and never creates a stroke — a second pointer arriving cancels/removes the stroke the first pointer started. `pointercancel`/`lostpointercapture` end the gesture cleanly.
-- All gesture math lives in the pure helper and is unit-tested.
-
-**D4 — frame and reset.** The viewport border is the crop frame (it now matches output). Add **Reset crop** (zoom 1, pan 50/50), disabled when already reset. No letterboxing, no output-aspect change.
-
-**D5/D6 — modes and undo (G4: start in Pan).**
-- Default tool `pan` on mount and on new file. Group the toolbar as Pan | Draw tools with `aria-pressed` on the active one; colour swatches show only for draw tools (as now). Hint text: "Drag to move the photo, scroll or pinch to zoom. Pick a drawing tool to mark it up."
-- **Undo last stroke** (removes the last stroke; disabled when none) beside **Clear annotations**. Switching tools keeps strokes. New file resets crop, strokes, colours and tool. While `pending` or `disabled`, gestures/drawing/intake do nothing.
-
-**Local polish (E3/E5).** IW colour swatches (24 px) and IG remove control (24 px) get ≥ 44 px hit areas with the same visible size; IG unavailable-tile text and any tertiary text on muted dark background in these files use a stronger existing token (e.g. `text-ink-secondary`). No global token/density change; Ideas square override and gallery sizes unchanged.
-
-**Preserve exactly:** PNG/JPEG output, `outputQuality`, `maxDimension`, `targetBytes`/`maxBytes` compression loop, JPEG white background, colour-filter fallback, file checks/intake/paste/openOnMount/initialFile, object-URL revocation, callback/pending/error behaviour, simple uploads (`shrinkImageFile`) gain no crop or drawing step.
-
-**Tests.**
-1. Pure: `cropRect` for landscape/portrait/square sources × fixed aspect 4:5, 4:3 and omitted, zoom 1/2/3, pan 0/50/100 — matches the previous export formula; preview percentages reconstruct the same rect.
-2. Pure: drag-pan with zero overflow does nothing; pan never leaves 0–100; cursor-anchored zoom keeps the anchor's source point within 0.5 px; pinch around a midpoint likewise; zoom bounds.
-3. The R9.64 trace case: 1600×900 at 4:3, zoom 1 — pan 0 and pan 100 previews now show source x = 0 and x = 400 (equal to export), not centred.
-4. Stroke state: undo removes only the last; clear removes all; tool switch keeps them; new file resets; a second pointer cancels the in-progress stroke.
-5. Existing image/UI Engine/MOM contract tests stay green; add a consumer test if one asserts the old `object-cover` markup.
-
-**Executor verification:** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Kantor env; no DB change expected. Browser acceptance (Reviewer/owner): groups [R9.64] D and E.
+**Service (workspace service) and transport:**
+1. `postThreadMessage({ projectId, thread, phaseId, body, clientFeedback?, replyToId?, tags?, itemEntryIds? })` where `thread` is `{ threadId }` or `{ x, y }` (new free thread) or `{ anchorCardId, offsetX, offsetY }` (new anchored thread; `x`,`y` computed from the anchor's canvas point, or the offset alone when the anchor is unplaced). Same validation and phase gate as `postPhaseNote` (body, tags, items, reply in the same project), creates the thread when new, inserts the message with `thread_id` and no canvas point. Returns `{ threadId, noteId }`. A reply must target a message of the same thread.
+2. `postThreadImage(FormData: projectId, phaseId, thread spec as fields, file, clientFeedback?, replyToId?, tags?)` — reuse `createImage` with the same thread creation rule. Returns `{ threadId, imageId }`.
+3. `moveThread({ projectId, threadId, version, x, y })` — free threads only (`WORKSPACE_THREAD_ANCHORED` otherwise); bounds-validate coordinates; stale version → `WORKSPACE_THREAD_STALE`.
+4. Deleting a message (existing `deleteCard` via `noteAction`, single and album groups): if it was the thread's last message, delete the thread in the same transaction.
+5. Deleting an element (`deleteCard` from any door, board multi-delete included): load threads anchored to it and their messages; check every distinct message label with `writableScope` (refuse `WORKSPACE_THREAD_LOCKED` before any write); delete messages (collect storage keys), threads, then the element; queue storage cleanup for all keys; audit `workspace-thread` `deleted` with message count.
+6. `readWorkspace` excludes thread messages. New `listWorkspaceThreads({ projectId })` → `[{ id, version, x, y, anchorCardId, offsetX, offsetY, messageCount, clientFeedback (any message CLIENT_ANSWER), lastMessageAt }]`. `listProjectNotes` gains filters `threadId` and `inThreads: true` (for "All notes"); its notes gain `threadId`. `cardView` gains `anchoredThreadMessages` (count of messages in threads anchored to this element; 0 otherwise) for the delete confirmation.
+7. Asset retention (`asset-retention.ts`): after its bulk image deletion, delete threads left without messages (no empty markers); anchors cleared by SET NULL keep their threads.
+8. Actions (`actions.ts`, board section, all behind `requireModuleEnabled(WORKSPACE_BOARD)`): `threadCommandAction` strict union `post` / `move`; `postThreadImageAction(FormData)`; `listWorkspaceThreadsAction(projectId)`. `listProjectNotesAction` accepts `threadId`/`inThreads` (not gated: Notes reads stay on). Edits/flags/deletes of messages keep using `noteAction`.
+9. Audit: `workspace-thread` `created` / `moved` / `deleted`; messages as today's `workspace-card` events.
 
 ## UI Contract
 
-Owner's temporary grant covers Notes, Presentation and shared image patterns, not unrelated shared editor code. Use semantic tokens/canonical components; retain compact visual composition while expanding local interactive hit areas to 44px. Safe loading/empty/error/focus states are required. Lead owns final visual acceptance and out-of-grant shared prerequisites.
+Executor: none beyond types/callers that must compile. Do not change the board or Notes UI.
+Lead (R9.77, after review): double-click opens the thread window at the point/element (replacing the text draft; + Text stays in the toolbar), marker with count/amber/drag for free threads, chat window reusing the Notes bubble/composer pieces, "All notes · N" drawer, delete confirmations naming the thread message count, English copy.
 
 ## Boundaries and Non-goals
 
-No Run 1 application changes; historical backfill, soft-delete/edit-history schema, new modules/permissions/dependencies; legacy; unrelated Board note-thread follow-up; person mentions/chat search/recents; image-anchored persistent scribble editing; simple-upload crop editor injection; new presentation layouts. Presentation numbered pins remain distinct from baked scribbles. No live Design canvas was attached/accessed: target visuals use the owner's written spec, with pixel/feel review deferred. No remote operation/publication. Preserve owner test files.
+No change to Notes stream behaviour except that thread messages carry `threadId`; no thread labels in Notes in this WO; no person mentions, thread titles, resolving/closing threads, notifications, cross-project threads or thread print/export. No new dependency, no shared UI Engine change, no legacy, no remote operations.
 
 ## Acceptance Criteria
 
-1. Lead resolves G1–G4 and makes one vertical slice READY with next-unused revision; decisions are not implementation guesses.
-2. A rejects stale mutations (keeping the draft), synchronizes edited-body links, preserves reader/draft state and supports existing General edits under unchanged rights with Board off.
-3. B meets bare @/#, filtering/states/caret/highlight/keys/pointer/inline card/composer requirements, with phase-removal decision explicit.
-4. C moves pins without breaking image drag/click/print, confirms destruction, shows failures and makes reads pure.
-5. D makes preview/output agree and gestures/undo understandable, with every consumer verified.
-6. Only Reviewer records acceptance PASS after applicable browser scenarios. This docs commit closes no existing [BUG]/[PLANNED] item.
+1. A thread exists only with ≥1 message; the first message (text or image) creates it atomically in each of the three spec forms; replies stay inside the thread.
+2. Thread messages never appear in `readWorkspace` and cannot be placed; they appear in `listProjectNotes` (all, `threadId`, `inThreads`).
+3. Free threads move with version checks; anchored threads refuse moves.
+4. Deleting the last message removes the thread; deleting an anchor removes its threads and messages with storage cleanup, or refuses entirely when any message is outside the actor's rights.
+5. Retention keeps text messages and threads (anchor cleared) and removes only emptied threads.
+6. Board off: thread commands refuse `MODULE_DISABLED`; Notes reads and `noteAction` keep working on thread messages.
 
 ## Verification
 
-Run 1 final checks: **npm test 1119/1119**, typecheck, full lint, architecture boundaries, legacy-runtime, production build PASS; focused existing image tests 8/8; six successful in-memory service scenarios; source/consumer scan and calculated contrast as above. Initial typecheck failed on stale generated Prisma definitions and passed after regeneration. Initial production invocation using Node --env-file failed worker startup; loading office variables in a wrapper and invoking Next normally passed. These recovered setup failures are not application fixes. Existing test success does not prove the proposed corrections.
+Executor: integration tests on the guarded test DB for 1–6, including: phase gate on post (other phase's writer, outsider, completed/archived/non-ACTIVE refused), reply from another thread refused, anchor that is a thread message or in another project refused, moveThread stale/anchored/bounds, last-message deletion (single and album group), anchor delete with mixed-label messages refused with nothing deleted vs. allowed, storage cleanup queued for message images, retention behaviour, `MODULE_DISABLED` on every thread action, Notes filters. Then `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Load `.env.kantor`, set `STUDIOFLOW_LOCATION=kantor`, verify both DB targets are rebuild-only before `prisma migrate`; apply the migration to dev and test; regenerate the client. Read the installed Next.js server-action docs before adding actions.
 
-Browser/e2e/rendered visual/touch/caret checks were not run: Run 1 changes docs only and deterministic traces/probes establish the functional findings. Visual or subjective claims are PARTIAL. No claim of manual acceptance. Build-generated next-env.d.ts route-import changes were restored to HEAD; no application source/test changed.
-
-Later slice gates: npm test, typecheck, full lint, check:boundaries, check:legacy-runtime, production build, staged/unstaged whitespace. Set location/load ignored settings and guard explicit rebuild-only targets; synchronize already-committed migrations on every used local DB. Do not author new migration without separate owner approval. Read relevant installed Next.js docs before route/action implementation. Add proportionate focused tests listed above and screen-size e2e when layout/token changes actually occur. A skipped/unavailable/cancelled check is never a pass.
-
-## Reviewer Acceptance
-
-Five PENDING groups under R9.64/WO-SF-NOTES-PRESENTATION-IMAGE-01 are appended to docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md: A integrity/context/General rights; B mentions/card/composer; C pins/confirm/print; D crop/gestures/undo; E every image consumer/themes/access/viewports. They depend on future implementation; they are not acceptance of R9.63 or R9.64. Executor may diagnose implementation failures when required; only Reviewer records PASS.
+Reviewer (Lead): code review and re-run checks, then the UI slice R9.77; browser acceptance by the owner after R9.77.
 
 ## Regression Risks and Recovery
 
-Distinguish manual feedback/official records; keep old draft version; preserve explicit Board links and phase/project rights; handle refresh/request races. Canonical editor changes risk every formatted consumer/IME, so G2 requires separate authority/matrix. Pin coordinates must stay image-relative through cover/contain/print and not compete with image drag. Destructive confirmation must include drop replacement. Read purity must not conceal implicit lifecycle writes. Image preview/output parity and all callbacks/byte limits/color/URL handling matter beyond visual polish; Ideas overrides are sensitive to shared CSS.
-
-A, B, C and D are independently useful acceptance/revert boundaries; no preparatory placeholders. Each gets one next-unused revision; corrections use a new revision, never amend an accepted commit. Recovery is a reviewed local revert of that slice; reverting code cannot recover previously lost history. Baseline migrations applied for synchronization remain baseline, not an audit rollback target.
+The board element read now filters by `thread_id` — confirm no other board consumer needs thread messages. Cascade deletion is destructive: the permission pre-check and one transaction are mandatory. Notes stream size grows with thread messages (expected). Recovery: revert the revision and roll back the migration on the rebuild databases only.
 
 ## Executor Prompt
 
-No Executor slice is READY. WO-SF-NOTES-PRESENTATION-IMAGE-01 is complete in code; what remains is the owner's browser acceptance (groups in docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md). A FAIL there opens a correction plan here.
+```text
+ROLE: BACKEND EXECUTOR. Location: kantor (load .env.kantor, set
+STUDIOFLOW_LOCATION=kantor, verify the dev and test databases are
+rebuild-only before any prisma command). Read AGENTS.md,
+docs/agent/EXECUTOR.md and PLAN.md WO-SF-BOARD-THREADS-01. Implement the
+backend exactly as locked: sf_workspace_thread table + sf_workspace_card.
+thread_id (one migration, applied to dev and test), postThreadMessage /
+postThreadImage creating a thread only with its first message (free point or
+anchored to a non-thread element), moveThread for free threads with version,
+last-message deletion removes the thread, anchor deletion removes its threads
+and messages with storage cleanup but refuses entirely (WORKSPACE_THREAD_LOCKED)
+unless the actor may write every message's label, anchor FK ON DELETE SET NULL
+for non-user deletions, retention removes only emptied threads, readWorkspace
+excludes thread messages, listWorkspaceThreads, listProjectNotes threadId /
+inThreads filters, cardView anchoredThreadMessages, board-gated actions. No
+board or Notes UI changes (the Lead builds the UI next). No new dependency,
+shared UI Engine change, legacy or remote operation. Preserve untracked owner
+files under test/. Finish with the listed tests and all checks, CHANGELOG
+R9.76, one local commit. Return only the Planner/Reviewer prompt: outcome,
+commit, checks, migration applied (dev/test), limitations, remaining dirty
+files. Stop with BLOCKED / CONFLICT if the plan contradicts the repository.
+```

@@ -213,6 +213,12 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
   anchor element is deleted, and whether board threads show in Notes mode if an
   office later switches the module off (MODULES-DECISION: switching never loses
   data). Backend by Codex, the board UI by the Lead.
+  **Settled R9.75 (WO-SF-BOARD-THREADS-01, PLAN.md):** own thread table,
+  messages are ordinary notes with `thread_id`; deleting the anchor element
+  deletes its threads and messages (owner) only when the actor may delete every
+  message; free markers can be dragged; double-click replaces "new text" (text
+  via + Text); board off shows messages in Notes. Backend READY as R9.76, Lead
+  UI R9.77.
 
 - [ ] [PLANNED][P2] Ideas board (owner, 2026-10-08): a personal page where a
   user drops any image (Ctrl+V screenshot, a dropped download, picked files)
