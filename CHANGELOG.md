@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.89 | 2026-10-15 | fix(ui): Keep pricing entry, plan controls, pin creation, and dark text usable (Lead)
+
+- **Scope:** closed four verified browser defects in the Master Data Labor entry, StudioFlow dates dialog, Presentation editor, and dark-theme Notes/gallery surfaces. Enter in a non-last Labor amount advances to the next amount instead of submitting; Enter in the last amount still adds a row. Per the owner's choice, Save and apply plan stays disabled until Fit Out Start is filled, with a nearby explanation; plain Save remains available.
+- **Presentation and contrast:** creating a pin now runs as a quiet queued save so the board toolbar and title remain usable while its ID arrives. The Presentation layout glyph already used the canonical action/ink tokens in the current checkout. Notes metadata now uses secondary ink, and the gallery +N overlay uses an 85% ink layer; calculated light/dark minimum contrast for the changed text is 5.42:1 and 6.89:1, with the gallery overlay above 10:1 against black or white thumbnails.
+- **Checks:** focused Playwright browser cases for Labor Enter, Dates & plan, and delayed pin creation all PASS; dark-theme suite 5/5 PASS (an isolated dark-screen case failed because it depends on a preceding serial theme-setting case, then passed in the complete suite); `npm run check` and targeted lint PASS. The test server still logged intermittent aborted-request/ECONNRESET messages although the passing cases exited 0. No migration or dependency; no push.
+- **Limitations:** deliverable version numbering remains open in BACKLOG; stable numbering after pruning needs persisted version data and a backend work order. Six earlier code-fixed findings still await their browser acceptance, and the intermittent shell hydration report remains unreproduced.
+
 ## R9.88 | 2026-10-15 | fix(studioflow): Keep drawings and notes usable on short desktop windows (Lead)
 
 - **Review correction to R9.87:** at 1280–1440 × 720, the Drawing list no longer clipped, but its stacked height left the Notes composer outside the viewport. Short desktop windows now place the drawing list and Notes side by side with their own scrolling areas, compact phase-strip secondary text and vertical spacing, and keep the add row, editor, and Send button in view. Taller desktop and narrower layouts retain their previous arrangement.

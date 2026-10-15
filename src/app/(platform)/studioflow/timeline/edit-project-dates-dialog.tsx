@@ -168,6 +168,7 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
           <Button type="button" disabled={!form.fitOutStartDate || leadInvalid || pending} pending={pendingKey === "apply"} onClick={() => void onApply()}>Save and apply plan</Button>
           <Button type="submit" variant="primary" disabled={leadInvalid} pending={pendingKey === "save" || pendingKey === "fit-out" || pendingKey === "overrides"}>Save</Button>
         </FormActions>
+        {!form.fitOutStartDate ? <Text size="sm" tone="secondary">Enter Fit Out Start to enable Save and apply plan. You can still Save these dates without applying the plan.</Text> : null}
         <Text size="sm" tone="tertiary">Apply plan writes the computed dates to Design 3D, Construction Drawing and Construction. Dates you set by hand are kept.</Text>
       </form>
     </DraftDialog>

@@ -670,10 +670,15 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
               <option value="">Unit</option>
               {refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}
             </Select>
-            <PrefixedInput prefix={currencyPrefix(currency)} prefixVisible={shouldShowAmountPrefix(entry.amount, entry.amountDisplay)} aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="text" placeholder={`15.000 · 0 = by request · "text"`} className="tabular-nums" value={entry.amountDisplay}
+            <PrefixedInput id={`bulk-amount-${entry.key}`} prefix={currencyPrefix(currency)} prefixVisible={shouldShowAmountPrefix(entry.amount, entry.amountDisplay)} aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="text" placeholder={`15.000 · 0 = by request · "text"`} className="tabular-nums" value={entry.amountDisplay}
               onChange={(event) => { const read = readTypedAmount(event.target.value); if (read === null) return; patchRow(entry.key, { amount: read.value, amountDisplay: read.display }); }}
               onBlur={() => patchRow(entry.key, { amountDisplay: blurDisplay(entry.amount) })}
-              onKeyDown={(event) => { if (event.key === "Enter" && index === rows.length - 1) { event.preventDefault(); addRow(); } }}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                if (index === rows.length - 1) addRow();
+                else document.getElementById(`bulk-amount-${rows[index + 1]!.key}`)?.focus();
+              }}
               invalid={Boolean(rowProblems[entry.key])} />
             <Input aria-label={`Notes, row ${index + 1}`} density="compact" maxLength={1000} placeholder="Specification, brand reference…" value={entry.notes} onChange={(event) => patchRow(entry.key, { notes: event.target.value })} />
             {editor.kind === "material-labor" ? <Input aria-label={`Scope note, row ${index + 1}`} density="compact" maxLength={1000} placeholder="Included work or materials" value={entry.scopeNote} onChange={(event) => patchRow(entry.key, { scopeNote: event.target.value })} /> : null}

@@ -156,6 +156,9 @@ test("8.1 the project Timeline tab leads to the Dates & plan dialog, which saves
   await page.getByRole("link", { name: "Edit dates and plan" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Fit Out Start").fill("");
+  await expect(dialog.getByRole("button", { name: "Save and apply plan" })).toBeDisabled();
+  await expect(dialog.getByText("Enter Fit Out Start to enable Save and apply plan.", { exact: false })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/8.1-dates-and-plan.png` });
   await dialog.getByRole("button", { name: /^Save$/ }).click();
   await expect(dialog).toBeHidden();

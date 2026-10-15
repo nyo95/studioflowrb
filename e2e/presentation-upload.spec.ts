@@ -48,3 +48,36 @@ test("P.2 a file that is not an image says why", async ({ page }) => {
   await page.locator('input[type="file"][multiple]').setInputFiles({ name: "note.png", mimeType: "image/png", buffer: Buffer.from("this is not an image") });
   await expect(page.getByText("This file is not a valid image.")).toBeVisible({ timeout: 30_000 });
 });
+
+test("creating a pin leaves the board toolbar usable while saving", async ({ page }) => {
+  await page.goto(`/studioflow/projects/${projectId}/presentation`);
+  await page.getByLabel("New board").fill("ZZ-Test Pin Toolbar");
+  await page.getByRole("button", { name: /Create|Add|New/ }).first().click();
+  await expect(page.getByLabel("Board title")).toBeVisible();
+  const image = await page.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 80; canvas.height = 80;
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "#aabbcc";
+    context.fillRect(0, 0, 80, 80);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: "pin.png", mimeType: "image/png", buffer: Buffer.from(image, "base64") });
+  const slideImage = page.locator('section[aria-label="Slide"] img').first();
+  await expect(slideImage).toBeVisible();
+  await slideImage.click();
+  await page.route("**/*", async (route) => {
+    if (route.request().method() === "POST" && route.request().headers()["next-action"]) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    await route.continue();
+  });
+  await slideImage.click();
+  await expect(page.getByText("Saving…")).toBeVisible();
+  await expect(page.getByRole("button", { name: "New slide", exact: true })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Images → new slides" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Save title" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Delete board" })).toBeEnabled();
+  await expect(page.getByLabel("Board title")).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Pin 1", exact: true })).toBeVisible();
+});

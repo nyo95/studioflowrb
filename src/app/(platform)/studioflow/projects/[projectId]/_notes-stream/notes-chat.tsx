@@ -488,7 +488,7 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
               <FileText aria-hidden="true" className="h-5 w-5 shrink-0 text-ink-secondary" />
               <span className="grid min-w-0 flex-1">
                 <span className="truncate text-sm font-semibold text-ink">{note.file.name}</span>
-                <span className="text-xs text-ink-tertiary">{formatBytes(note.file.bytes)}</span>
+                <span className="text-xs text-ink-secondary">{formatBytes(note.file.bytes)}</span>
               </span>
               {note.file.url ? <a href={note.file.url} download={note.file.name} className="inline-flex h-8 shrink-0 items-center rounded-action bg-action px-3 text-xs font-medium text-action-ink hover:bg-action-hover">Open</a> : <Text size="sm" tone="tertiary">Unavailable</Text>}
             </div>
@@ -501,7 +501,7 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
         </>
       )}
 
-      <div className={`flex flex-wrap items-center gap-1.5 text-[11px] text-ink-tertiary ${images.length && !note.body ? "px-2 pb-1" : ""}`}>
+      <div className={`flex flex-wrap items-center gap-1.5 text-[11px] text-ink-secondary ${images.length && !note.body ? "px-2 pb-1" : ""}`}>
         {note.phaseName ? <span className="rounded-pill bg-surface-muted px-1.5 py-px text-ink-secondary">#{note.phaseName}{note.iterationLabel ? ` · ${note.iterationLabel}` : ""}</span> : null}
         {feedback ? <span className="rounded-pill border border-warning/40 bg-warning/10 px-1.5 py-px text-warning">#feedback</span> : null}
         {note.origin === "SITE_VISIT" ? <span className="rounded-pill bg-surface-muted px-1.5 py-px text-ink-secondary">Site visit</span> : null}

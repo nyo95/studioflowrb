@@ -151,6 +151,22 @@ test("3.2 a material-only supplier can save a Material + labor price", async ({ 
   await expect(page.getByText("ZZ-Test 3.2 Install", { exact: true })).toBeVisible();
 });
 
+test("Labor amount Enter advances within the table without saving it", async ({ page }) => {
+  await openPricing(page);
+  await page.getByRole("button", { name: "New price" }).click();
+  const dialog = page.getByRole("dialog", { name: "New price" });
+  await dialog.getByRole("button", { name: "Labor", exact: true }).click();
+  await dialog.getByRole("button", { name: "Add row" }).click();
+  await dialog.getByLabel("Amount, row 1").fill("21000");
+  await dialog.getByLabel("Amount, row 1").press("Enter");
+  await expect(dialog.getByLabel("Amount, row 2")).toBeFocused();
+  await expect(dialog).toBeVisible();
+  await dialog.getByLabel("Amount, row 2").fill("22000");
+  await dialog.getByLabel("Amount, row 2").press("Enter");
+  await expect(dialog.getByLabel("Name, row 3")).toBeFocused();
+  await expect(dialog).toBeVisible();
+});
+
 test("3.3 several-suppliers mode is reachable with its real label", async ({ page }) => {
   await openPricing(page);
   await page.getByRole("button", { name: "New price" }).click();

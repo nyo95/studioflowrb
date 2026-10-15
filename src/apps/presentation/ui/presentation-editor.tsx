@@ -108,10 +108,10 @@ export function PresentationEditor({ projectId, board, scheduleEntries, canEdit 
    * Server work whose result the screen needs (uploads, new slides, a new pin's id): queued after any quiet saves, and
    * the action's own page refresh brings the new data. Nothing else is locked while it runs except its own buttons.
    */
-  const act = <T,>(work: () => Promise<ActionResult<T> | undefined>, options: { after?: (data: T) => void } = {}) => {
+  const act = <T,>(work: () => Promise<ActionResult<T> | undefined>, options: { after?: (data: T) => void; heavy?: boolean } = {}) => {
     if (!canEdit || pinDrag.current || pinKeys.current) return;
     setError(null);
-    saves.run(work, { heavy: true, after: (data) => options.after?.(data as T) });
+    saves.run(work, { heavy: options.heavy ?? true, after: (data) => options.after?.(data as T) });
   };
   /** An editor-only change: shown at once, saved quietly; repeated changes of the same thing within `delay` save once. */
   const save = (key: string, work: () => Promise<ActionResult<unknown>>, delay = 0) => {
@@ -257,7 +257,7 @@ export function PresentationEditor({ projectId, board, scheduleEntries, canEdit 
     const rect = event.currentTarget.getBoundingClientRect();
     const pinX = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
     const pinY = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
-    act(() => addPresentationAnnotationAction({ projectId, imageId: image.id, pinX, pinY }), { after: (data) => {
+    act(() => addPresentationAnnotationAction({ projectId, imageId: image.id, pinX, pinY }), { heavy: false, after: (data) => {
       patchImages((current) => (current.id === image.id ? { ...current, annotations: [...current.annotations, { id: data.annotationId, pinX, pinY, scheduleEntryId: null, labelSide: "auto", note: null, scheduleEntry: null }] } : current));
       setSelectedPinId(data.annotationId);
     } });
