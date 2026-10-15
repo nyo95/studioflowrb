@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.80 | 2026-10-15 | feat(studioflow): Done (handover) for Supervision without an open visit (Lead)
+
+- **WO-SF-SUPERVISION-HANDOVER-01**, built by the Lead (owner 2026-10-15: "kamu aja takeover"). `phases.finishSupervision`: an ACTIVE Supervision phase with no open visit and at least one DONE visit closes like Done (handover) on a visit — phase DONE and locked, `autoAdvance`, an undoable event on the last completed visit (`phaseBefore: ACTIVE`, `autoAdvance`), audit `supervision-finished`; the completed visit is not touched. Refused (`PHASE_INVALID_STATE`) for a non-Supervision phase, a phase that is not active, an open visit, or no completed visit; the usual phase-work rights and active-project rule apply through `writableIteration`. `canFinishSupervision` on the phase detail and `can_finish_supervision` on the project card feed; `PhaseCommand` `finishSupervision`; `IterationButtons` shows **Done (handover)** beside **New visit** (which becomes secondary) when allowed. No schema, migration or dependency.
+- **Tests:** new integration case (flag false with no visit and with an open visit, refusal with an open visit, NEXT_VISIT then flag true, other seat refused, non-Supervision refused, success with phase DONE/locked and visit unchanged, second call refused, undo reopens with the flag back, non-active project refused). `npm test` **1184/1184** (phase service surface test updated for the new command), typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build.
+- **Ledgers:** PLAN.md complete in code; browser group [R9.80] added. No push.
+
 ## R9.79 | 2026-10-15 | docs(plan): WO-SF-SUPERVISION-HANDOVER-01 — Done (handover) without an open visit, READY (Lead)
 
 - **Owner 2026-10-15:** "kalau ga ada "visit" gmn?" then "Ya, tambahkan tombol Done (handover) saat fase pengawasan aktif tanpa kunjungan terbuka (kalau sudah pernah ada kunjungan)."

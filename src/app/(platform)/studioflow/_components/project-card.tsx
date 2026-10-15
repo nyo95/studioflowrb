@@ -21,6 +21,7 @@ export type ProjectCardPhase = {
   status: "PENDING" | "ACTIVE" | "DONE";
   seat: "designer" | "drafter";
   is_supervision: boolean;
+  can_finish_supervision?: boolean;
   can_start: boolean;
   /** Starred messages in the phase notes. */
   starred_notes: number;
@@ -67,7 +68,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
   ];
   const steps = card.phases.map((phase, index) => {
     const current = phase.current_iteration;
-    const view: PhaseView = { id: phase.id, name: phase.name, status: phase.status, isSupervision: phase.is_supervision, canStart: phase.can_start };
+    const view: PhaseView = { id: phase.id, name: phase.name, status: phase.status, isSupervision: phase.is_supervision, canStart: phase.can_start, canFinishSupervision: phase.can_finish_supervision };
     const iteration: IterationView | null = current ? { id: current.id, name: current.short_name ?? current.name, state: current.state, waitingDays: current.waiting_days, choices: current.available_choices, answerChoices: current.answer_choices, nextStepName: current.next_step_name ?? null } : null;
     const canAct = !completed && projectActive && viewer.canWork && seatOwner(phase);
     const display = phaseStepPresentation({

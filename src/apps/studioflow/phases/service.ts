@@ -418,6 +418,25 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     async chooseSupervisionVisit(input: PhaseCommandInput & { iterationId: string; outcome: "NEXT_VISIT" | "DONE" }) {
       return runTransaction(async (tx) => { const { phase, project } = await writableIteration(tx, input); if (!isLegacySupervisionDefinition(phase.definition_id)) throw invalidState(); const visit = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } }); if (!visit || visit.status !== "NOT_SENT") throw invalidState("Only the open visit can be completed."); if (input.outcome === "NEXT_VISIT") { await tx.sfRevision.update({ where: { id: visit.id }, data: { status: "DONE", done_at: nowOf(ports) } }); await recordEvent(tx, input, phase, visit.id, "NOT_SENT", "DONE", { beforeIteration: iterationUndo(visit) }); await audit(tx, input.actor, "visit-completed", phase, "ACTIVE", "ACTIVE", { iterationId: visit.id }); return { iterationId: visit.id }; } return closePhase(tx, input, phase, project, visit); });
     },
+    /**
+     * Done (handover) when no visit is open (owner 2026-10-15): the last visit was closed with "Next visit" and no further
+     * visit happened. Closes the phase exactly like closing it on a visit; the event sits on the last completed visit.
+     */
+    async finishSupervision(input: PhaseCommandInput) {
+      return runTransaction(async (tx) => {
+        const { phase } = await writableIteration(tx, input);
+        if (!isLegacySupervisionDefinition(phase.definition_id)) throw invalidState("Only Supervision closes without a visit.");
+        if (phase.status !== "ACTIVE") throw invalidState("Only an active Supervision phase can be closed.");
+        if (await activeRevision(tx, phase.id)) throw invalidState("Close the open visit with Done (handover).");
+        const lastVisit = await tx.sfRevision.findFirst({ where: { phase_id: phase.id, status: "DONE" }, orderBy: [{ done_at: "desc" }, { major: "desc" }] });
+        if (!lastVisit) throw invalidState("Record at least one visit, or skip the phase.");
+        await setPhase(tx, phase, { status: "DONE", is_locked: true });
+        const auto = await autoAdvance(tx, input, phase);
+        await recordEvent(tx, input, phase, lastVisit.id, "DONE", "DONE", { phaseBefore: "ACTIVE", autoAdvance: auto });
+        await audit(tx, input.actor, "supervision-finished", phase, "ACTIVE", "DONE", { iterationId: lastVisit.id, autoAdvance: auto });
+        return { phaseId: phase.id, autoAdvance: auto };
+      });
+    },
     async undoPhaseEvent(input: CommandContext & { projectId: string; eventId: string }) {
       return runTransaction(async (tx) => {
         const event = await tx.sfPhaseEvent.findUnique({ where: { id: input.eventId } });
@@ -626,6 +645,8 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
         /** The phase's note messages, oldest first (WO-SF-NOTEFEED-01). */
         notes: phaseNotes,
         isSupervision,
+        // Done (handover) without an open visit, once a visit has been completed (WO-SF-SUPERVISION-HANDOVER-01).
+        canFinishSupervision: isSupervision && status === "ACTIVE" && !active && phase.revisions.some((rev) => rev.status === "DONE"),
         skippedReason: phaseSkipReason(phase.events[0]),
         canStart: status === "PENDING" && phase.project.status === "ACTIVE" && canStart,
         /** The open iteration with the next steps the server will accept (the same choices the project card shows). */

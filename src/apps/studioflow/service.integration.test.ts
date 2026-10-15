@@ -2599,6 +2599,48 @@ describe("SF-V2-E phase definitions", () => {
     assert.equal(await testDb.prisma.sfChecklistItem.count({ where: { phase_id: supervision.id } }), 0, "closing a visit adds nothing to the requirements");
   });
 
+  it("closes Supervision with Done (handover) when no visit is open after a completed visit, and undoes it", async () => {
+    const { projectId } = await newProject();
+    for (const key of ["layout", "design3d", "cd"] as const) {
+      await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: (await phaseOf(projectId, key)).id, reason: "Skip" });
+    }
+    const supervision = await phaseOf(projectId, "supervision");
+    const base = { ...as(designer), projectId, phaseId: supervision.id };
+    const flag = async () => (await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: supervision.id })).canFinishSupervision;
+
+    // No visit yet: nothing to hand over from.
+    assert.equal(await flag(), false);
+    const first = await sf.phases.createSupervisionVisit({ ...base, visitDate: "2026-09-20" });
+    // A visit is open: it is closed on the visit itself.
+    assert.equal(await flag(), false);
+    await rejectsWith(sf.phases.finishSupervision(base), "PHASE_INVALID_STATE");
+    await sf.phases.chooseSupervisionVisit({ ...base, iterationId: first.iterationId, outcome: "NEXT_VISIT" });
+    assert.equal(await flag(), true);
+
+    // Only the phase's own people, and only Supervision.
+    await assert.rejects(sf.phases.finishSupervision({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: supervision.id }));
+    await rejectsWith(sf.phases.finishSupervision({ ...base, phaseId: (await phaseOf(projectId, "cd")).id }), "PHASE_INVALID_STATE");
+
+    await sf.phases.finishSupervision(base);
+    const closed = await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: supervision.id } });
+    assert.deepEqual([closed.status, closed.is_locked], ["DONE", true]);
+    assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: first.iterationId } })).status, "DONE", "the completed visit is left as it was");
+    assert.equal(await flag(), false);
+    await rejectsWith(sf.phases.finishSupervision(base), "PHASE_INVALID_STATE");
+
+    // Undo reopens the phase with no open visit, so it can be closed again.
+    const event = await testDb.prisma.sfPhaseEvent.findFirstOrThrow({ where: { project_id: projectId }, orderBy: { occurred_at: "desc" } });
+    assert.equal(event.iteration_id, first.iterationId);
+    await sf.phases.undoPhaseEvent({ ...as(designer), projectId, eventId: event.id });
+    const reopened = await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: supervision.id } });
+    assert.deepEqual([reopened.status, reopened.is_locked], ["ACTIVE", false]);
+    assert.equal(await flag(), true);
+
+    // A project that is not active takes no handover.
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { status: "ON_HOLD" } });
+    await assert.rejects(sf.phases.finishSupervision(base));
+  });
+
   it("never rewrites project snapshots when the template is edited, and protects definitions in use", async () => {
     const { projectId } = await newProject();
     const before = await phasesOf(projectId);

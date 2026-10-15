@@ -759,6 +759,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
             skipped_reason: phaseSkipReason(phase.events[0]),
             can_add_round: choices.includes("add_iteration"),
             is_supervision: isSupervision,
+            /** Done (handover) without an open visit, once a visit has been completed. */
+            can_finish_supervision: isSupervision && phase.status === "ACTIVE" && !current && phase.revisions.some((iteration) => iteration.status === "DONE"),
             seat: phase.seat_snapshot as "designer" | "drafter",
             /** A not-started phase may be started now: the project is active and the phase is parallel or its predecessor is done. */
             can_start: phase.status === "PENDING" && project.status === "ACTIVE" && (phase.allow_parallel || !previous || previous.status === "DONE"),

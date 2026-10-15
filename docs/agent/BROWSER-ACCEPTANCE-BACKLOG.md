@@ -30,6 +30,13 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.80] Supervision: Done (handover) without an open visit
+- Surface: project card and the Supervision phase panel
+- Fixture: ACTIVE project whose Supervision phase is active
+- Steps: 1. Record a visit, close it with "Next visit", then Cancel the "New site visit" dialog. 2. Both "New visit" and "Done (handover)" show; press Done (handover). 3. Use Undo. 4. On a Supervision phase with no visit yet, only "New visit" shows.
+- Acceptance: the phase closes and locks like a handover on a visit (next phase starts if any), the completed visit is unchanged, Undo reopens it with both buttons again; no button without a completed visit; "Skip this phase…" unchanged.
+- Status: PENDING
+
 ### [R9.78] Workspace board note threads
 - Surface: StudioFlow project Phases page with the `workspace-board` module on; the Notes stream with it off
 - Fixture: ACTIVE project with an image, a file and a text element on the board; designer of one phase, drafter of another; a second session

@@ -84,7 +84,7 @@ export type IterationView = {
   nextStepName?: string | null;
 };
 
-export type PhaseView = { id: string; name: string; status: "PENDING" | "ACTIVE" | "DONE"; isSupervision: boolean; canStart: boolean };
+export type PhaseView = { id: string; name: string; status: "PENDING" | "ACTIVE" | "DONE"; isSupervision: boolean; canStart: boolean; /** Supervision with no open visit after at least one completed visit. */ canFinishSupervision?: boolean };
 
 /**
  * The buttons that move a phase forward from where it is now. Which ones exist is decided by the server's `choices`.
@@ -118,7 +118,13 @@ export function IterationButtons({
       return canAct ? <Button size="sm" variant={startVariant} pending={busy("start")} onClick={() => phase.isSupervision ? onNewVisit() : run("start", { ...base, command: "addIteration" }, `${phase.name} started`)}>Start</Button> : null;
     }
     if (!canAct) return null;
-    if (phase.isSupervision && phase.status === "ACTIVE") return <Button size="sm" variant={startVariant} onClick={onNewVisit}>New visit</Button>;
+    if (phase.isSupervision && phase.status === "ACTIVE") {
+      // No further visit happened after "Next visit": the handover can still be recorded (owner 2026-10-15).
+      return <>
+        <Button size="sm" variant={phase.canFinishSupervision ? "secondary" : startVariant} onClick={onNewVisit}>New visit</Button>
+        {phase.canFinishSupervision ? <Button size="sm" variant="primary" pending={busy("finish")} onClick={() => run("finish", { ...base, command: "finishSupervision" }, `${phase.name} done`)}>Done (handover)</Button> : null}
+      </>;
+    }
     if (!lead) return null;
     return <Button size="sm" variant="secondary" pending={busy("add")} onClick={() => phase.isSupervision ? onNewVisit() : run("add", { ...base, command: "addIteration" }, `New ${phase.name} iteration added`)}>+ New iteration</Button>;
   }

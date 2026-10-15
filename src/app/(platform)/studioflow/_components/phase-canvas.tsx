@@ -29,7 +29,7 @@ export async function PhaseCanvas({ projectId, phaseId, archived }: { projectId:
       {!archived && !access.completed && !canTransition && !canContent ? <div className="px-4 pt-3"><ReadOnlyNotice scope={access.isDesigner || access.isDrafter ? "phase" : "project"} /></div> : null}
       <PhasePanel
         projectId={projectId}
-        phase={{ id: phase.id, name: phase.label, status: phase.status, isSupervision: phase.isSupervision, canStart: phase.canStart }}
+        phase={{ id: phase.id, name: phase.label, status: phase.status, isSupervision: phase.isSupervision, canStart: phase.canStart, canFinishSupervision: phase.canFinishSupervision }}
         current={current ? { id: current.id, name: current.shortName, state: current.state, waitingDays: current.waitingDays, choices: current.choices, answerChoices: current.answerChoices, nextStepName: current.nextStepName } : null}
         iterations={phase.iterations}
         skippedReason={phase.skippedReason}

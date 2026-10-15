@@ -331,6 +331,7 @@ const PhaseCommand = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("dismissRequirement"), projectId: Id, phaseId: Id, itemId: Id }),
   z.strictObject({ command: z.literal("createVisit"), projectId: Id, phaseId: Id, visitDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), note: z.string().max(2000).nullish() }),
   z.strictObject({ command: z.literal("chooseVisit"), projectId: Id, phaseId: Id, iterationId: Id, outcome: z.enum(["NEXT_VISIT", "DONE"]) }),
+  z.strictObject({ command: z.literal("finishSupervision"), projectId: Id, phaseId: Id }),
   z.strictObject({ command: z.literal("bypass"), projectId: Id, phaseId: Id, reason: Reason }),
   z.strictObject({ command: z.literal("override"), projectId: Id, phaseId: Id, mode: z.enum(["HARD_RESET_ACTIVE", "HARD_RESET_PENDING"]), major: z.number().int().optional(), note: z.string().max(1000) }),
 ]);
@@ -357,6 +358,7 @@ export async function phaseCommandAction(input: PhaseCommandInput): Promise<Acti
       case "dismissRequirement": result = await phases.dismissRequirement({ ...base, itemId: data.itemId }); break;
       case "createVisit": result = await phases.createSupervisionVisit({ ...base, visitDate: data.visitDate, note: data.note ?? null }); break;
       case "chooseVisit": result = await phases.chooseSupervisionVisit({ ...base, iterationId: data.iterationId, outcome: data.outcome }); break;
+      case "finishSupervision": result = await phases.finishSupervision(base); break;
       case "bypass": result = await phases.bypassPhase({ ...base, reason: data.reason }); break;
       case "override": result = await phases.overrideRevision({ ...base, mode: data.mode, major: data.major, note: data.note }); break;
     }

@@ -3,8 +3,8 @@
 Plan ID: WO-SF-SUPERVISION-HANDOVER-01
 Scope: Close the Supervision phase ("Done (handover)") when it is active with no open visit, provided at least one visit was completed
 Module(s): studioflow (phases service, phase command action, phase actions UI)
-Target revision: Executor **R9.80** (Lead plan R9.79)
-Status: READY
+Target revision: **R9.80** (Lead plan R9.79; built by the Lead on the owner's "kamu aja takeover")
+Status: COMPLETE in code (R9.80); owner browser check pending
 Priority: P2
 Owner: Product Owner; Lead locks and reviews
 Last updated: 2026-10-15
