@@ -67,7 +67,7 @@ async function saveDeliverable(
   await runTransaction(async (tx) => {
     const phase = await loadWritablePhase(tx, input.projectId, input.phaseId);
     await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: phase.id, kind: "content" });
-    if (!(await activeRevision(tx, phase.id))) throw invalid("ACTIVE_REVISION_REQUIRED", "Start this phase before uploading deliverables.");
+    if (!(await activeRevision(tx, phase.id))) throw invalid("ACTIVE_REVISION_REQUIRED", "Open an iteration (or a new site visit) in this phase before uploading deliverables.");
   });
   const key = createPrivateObjectKey(`studioflow/deliverables/${input.projectId}`, extension);
   let stored: { bytes: number };
@@ -79,7 +79,7 @@ async function saveDeliverable(
       const phase = await loadWritablePhase(tx, input.projectId, input.phaseId);
       await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: phase.id, kind: "content" });
       const revision = await activeRevision(tx, phase.id);
-      if (!revision) throw invalid("ACTIVE_REVISION_REQUIRED", "Start this phase before uploading deliverables.");
+      if (!revision) throw invalid("ACTIVE_REVISION_REQUIRED", "Open an iteration (or a new site visit) in this phase before uploading deliverables.");
       const created = await tx.sfDeliverable.create({ data: { project_id: input.projectId, phase_id: input.phaseId, revision_id: revision.id, name, slot_key: slotKey(name), storage_key: key, file_size_bytes: stored.bytes, content_type: contentType, created_by_id: input.actor.userId, expires_at: expiryFrom(nowOf(ports)) } });
       const older = await tx.sfDeliverable.findMany({ where: { phase_id: input.phaseId, slot_key: created.slot_key, is_final: false }, orderBy: [{ created_at: "desc" }, { id: "desc" }], skip: 2, select: { id: true, storage_key: true } });
       if (older.length) await tx.sfDeliverable.deleteMany({ where: { id: { in: older.map((row) => row.id) } } });

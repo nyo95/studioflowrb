@@ -36,8 +36,12 @@ export async function ProjectNotes({ projectId, projectName, selectedPhaseId, pe
   return (
     <>
       {drawings && selected ? (
-        <SectionCard title="Drawing list" description="The drawings this phase needs. Tick them off as they are drawn; it never blocks a step.">
-          <CdList projectId={projectId} phaseId={selected.id} items={drawings} people={people} canEdit={canEditDrawings} />
+        // Above the chat in the window-tall Phases column: it keeps its size (a shrinking card clipped to its title and
+        // hid the add row) and a long list scrolls inside it.
+        <SectionCard className="shrink-0" title="Drawing list" description="The drawings this phase needs. Tick them off as they are drawn; it never blocks a step.">
+          <div className="max-h-[40vh] overflow-y-auto">
+            <CdList projectId={projectId} phaseId={selected.id} items={drawings} people={people} canEdit={canEditDrawings} />
+          </div>
         </SectionCard>
       ) : null}
       {/* The chat keeps its own scroll: the newest message and the composer stay in view (DESIGN.md §6.2). */}

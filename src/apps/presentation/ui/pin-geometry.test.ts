@@ -24,6 +24,11 @@ it("nudges one or five percent and clamps every edge without handling other keys
   assert.deepEqual(nudgePin(position, "ArrowDown", false), { pinX: 99, pinY: 2 });
   assert.equal(nudgePin(position, "Enter", false), null);
 });
+it("returns only the coordinates when nudging from a whole stored pin", () => {
+  const stored = { id: "pin-1", imageId: "image-1", note: "Lobby", scheduleEntry: null, pinX: 40, pinY: 60 };
+  assert.deepEqual(nudgePin(stored, "ArrowLeft", false), { pinX: 39, pinY: 60 });
+  assert.deepEqual(nudgePin(stored, "ArrowDown", true), { pinX: 40, pinY: 65 });
+});
 it("confirms actual image, pin, slide and board counts, including empty and singular cases", () => {
   const empty = { annotations: [] };
   const one = { annotations: ["pin"] };

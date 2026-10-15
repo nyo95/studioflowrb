@@ -269,7 +269,7 @@ function ReadinessBar({ readiness, onJump }: { readiness: Readiness; onJump: (ju
         );
       })}
       {readiness.total > 0 ? (
-        <Text tone="tertiary" size="sm" className="ml-auto">{readiness.priced} dari {readiness.total} rincian sudah ada harga</Text>
+        <Text tone="tertiary" size="sm" className="ml-auto">{readiness.priced} dari {readiness.total} Cost Component sudah ada harga</Text>
       ) : null}
     </div>
   );
@@ -864,7 +864,7 @@ export function ProjectEditor({
 
   const totalColumns = 8;
   const readiness = summarizeReadiness(project.sections);
-  /** The bar already states "X dari Y rincian sudah ada harga", so the footer drops its copy while the bar shows. */
+  /** The bar already states "X dari Y Cost Component sudah ada harga", so the footer drops its copy while the bar shows. */
   const readinessBarShown = project.status === "ACTIVE" && readiness.total + readiness.counts.tbc + readiness.counts.byOwner > 0;
 
   /** Opens the Work Item / Component Group that holds the row, then scrolls to it once it is on screen. */
@@ -934,7 +934,7 @@ export function ProjectEditor({
               <EmptyState
                 title="Belum ada Section"
                 description={editable
-                  ? "1. Buat Section, mis. \"Pekerjaan Sipil\". 2. Ketik pekerjaan di baris isi cepat (Enter untuk simpan), atau tempel langsung dari Excel. 3. Klik baris untuk mengubah nilainya di panel samping; klik kanan untuk pilihan lain."
+                  ? "1. Buat Section, mis. \"Pekerjaan Sipil\". 2. Ketik Work Item di baris isi cepat (Enter untuk simpan), atau tempel langsung dari Excel. 3. Klik baris untuk mengubah nilainya di panel samping; klik kanan untuk pilihan lain."
                   : "Project ini belum memiliki Section."}
                 action={editable ? <AddSectionDialog projectId={project.id} /> : undefined}
               />
@@ -1018,7 +1018,7 @@ export function ProjectEditor({
             size="sm"
             className={readiness.priced === readiness.total ? undefined : "text-warning"}
           >
-            {readiness.priced} dari {readiness.total} rincian sudah ada harga
+            {readiness.priced} dari {readiness.total} Cost Component sudah ada harga
           </Text>
         ) : <span />}
         <div className="flex items-baseline gap-2">
@@ -1297,7 +1297,7 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
         <Heading level={4}>{section.name}</Heading>
         {folded ? (
           <span className="ml-auto flex items-baseline gap-3 pr-2 text-sm">
-            <Text size="sm" tone="tertiary">{counter} pekerjaan</Text>
+            <Text size="sm" tone="tertiary">{counter} Work Item</Text>
             <span className="font-semibold tabular-nums">{subtotal === null ? "—" : money(subtotal)}</span>
           </span>
         ) : null}
@@ -1329,7 +1329,7 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
               <TableCell />
               <TableCell colSpan={span - 1} className="!pt-4">
                 <span className="text-sm font-semibold uppercase tracking-[0.04em] text-ink">{subsection.name}</span>
-                <span className="ml-2 text-xs text-ink-tertiary">{subsection.items.length} pekerjaan</span>
+                <span className="ml-2 text-xs text-ink-tertiary">{subsection.items.length} Work Item</span>
               </TableCell>
             </TableRow>
             {subsection.items.map((item, index) => <ItemRows key={item.id} item={item} number={grouped[subsectionIndex]![index]!} ctx={ctx} columns={span} />)}
@@ -1386,7 +1386,7 @@ function ItemRows({ item, number, ctx, columns }: { item: BqItemDetail; number: 
               const note = isMarkerPriceMode(item.priceMode)
                 ? null
                 : hasChildren
-                  ? `Dari rincian (${lineItemIds(item).length} baris)${isZeroPrice(item.markupL1Pct) ? "" : ` · markup ${item.markupL1Pct}%`}`
+                  ? `Dari Cost Component (${lineItemIds(item).length} baris)${isZeroPrice(item.markupL1Pct) ? "" : ` · markup ${item.markupL1Pct}%`}`
                   : isOne(item.koefisien) ? null : `koef ${item.koefisien}`;
               return note ? <Text tone="tertiary" size="sm" className="mt-0.5 block px-1.5 font-normal">{note}</Text> : null;
             })()}
@@ -1650,7 +1650,7 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
               onClick={() => void commit(updateItemAction, item.id, "specification")(suggestion).catch(() => undefined)}
               className="justify-self-start rounded-control text-sm text-action underline-offset-2 hover:underline disabled:opacity-50"
             >
-              {item.specification ? "Ganti dengan isi dari rincian" : "Isi dari rincian"}
+              {item.specification ? "Ganti dengan isi dari Cost Component" : "Isi dari Cost Component"}
             </button>
             <Text size="sm" tone="tertiary" className="line-clamp-2">{suggestion}</Text>
           </div>
@@ -1675,7 +1675,7 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
         ) : <Text size="sm">{item.priceMode === "PRICED" ? "Berharga" : PRICE_STATUS_LABEL[item.priceMode]}</Text>}
       </div>
       {hasChildren ? (
-        number("Markup (%)", item.markupL1Pct, updateItemAction, item.id, "markupL1Pct", "Berlaku untuk semua rincian di bawah Work Item ini; klien tidak melihatnya.")
+        number("Markup (%)", item.markupL1Pct, updateItemAction, item.id, "markupL1Pct", "Berlaku untuk semua Cost Component di bawah Work Item ini; klien tidak melihatnya.")
       ) : marker ? null : <>
         <PanelField label="Harga satuan">
           <InlineEdit label="Harga satuan" inputMode="decimal" placeholder="Belum diisi" value={item.hargaSnapshot ?? ""} display={(value) => priceText(value, "IDR")} disabled={!editable} commitOnBlur onCommit={commitNum(updateItemAction, item.id, "hargaSnapshot")} />
@@ -1683,7 +1683,7 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
         {number("Koefisien", item.koefisien, updateItemAction, item.id, "koefisien")}
       </>}
       <div className="grid gap-1.5 border-t border-line-subtle pt-3">
-        <PanelValue label={hasChildren ? "Harga satuan (dari rincian)" : "Harga satuan"}>{marker ? PRICE_STATUS_LABEL[item.priceMode] : money(item.rate)}</PanelValue>
+        <PanelValue label={hasChildren ? "Harga satuan (dari Cost Component)" : "Harga satuan"}>{marker ? PRICE_STATUS_LABEL[item.priceMode] : money(item.rate)}</PanelValue>
         <PanelValue label="Total">{marker ? PRICE_STATUS_LABEL[item.priceMode] : money(item.total)}</PanelValue>
       </div>
       {hasChildren ? null : <Text size="sm" tone="tertiary">Work Item dengan harga langsung tidak memakai markup.</Text>}
@@ -1691,7 +1691,7 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
   } else if (found.kind === "group") {
     const group = found.group;
     body = <>
-      {number("Jumlah per Work Item", group.qtyPerL1, updateSubObjectAction, group.id, "qtyPerL1", "Rincian di dalam grup ini dikalikan angka ini.")}
+      {number("Jumlah per Work Item", group.qtyPerL1, updateSubObjectAction, group.id, "qtyPerL1", "Cost Component di dalam grup ini dikalikan angka ini.")}
       {number("Markup (%)", group.markupL2Pct, updateSubObjectAction, group.id, "markupL2Pct", "Hanya untuk Cost Component di grup ini; klien tidak melihatnya.")}
       <div className="grid gap-1.5 border-t border-line-subtle pt-3">
         <PanelValue label="Subtotal sebelum markup">{money(group.subtotalL2Raw)}</PanelValue>

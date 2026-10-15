@@ -30,17 +30,24 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### Lead walk 2026-10-15 (R9.87) — what the remaining items still need
+Ran on a disposable "ZZ QA" project, BQ project and Master Data records (all archived afterwards). Items marked PASS above are closed; for the rest:
+- **Needs the Developer switch (separate /system sign-in):** [R9.78], [R9.31] enable/disable flow, [R8.498] toggles, [R8.542], [R8.544], [R8.532], [R8.519] — the Workspace board is Off and Ideas is Off on this database.
+- **Needs a second account:** [R8.376] ×2, [R9.51] hidden-without-permission, [R8.221], unassigned-staff parts of [R8.225]/[R8.228]/[R8.351]/[R8.252], [R8.208] messenger.
+- **Partly walked, PASS so far:** [R9.82] (instant layout, one coalesced save, no picture re-download, kept after reload; minor: adding a pin greys the toolbar ~1 s), [R9.81] (Notes stream zoom + mark-up reply; board variant needs the module), [R9.68]/[R9.64] C (add/link/drag pin, arrow nudge after the R9.87 fix, slide delete confirmation with counts, print legend), [R9.66]/[R9.64] A (two-tab stale edit keeps the draft and shows the latest on Reload; copy says "card"), [R9.64] B/[R9.73] (@ popup above the caret, chip card + Open item), [R9.64] D/[R9.70] (Schedule 4:5 centre and MOM 4:3 top-edge exports match the preview pixel-exact), [R9.64] E (375 px sideways scroll found and fixed in R9.87), [R8.347] steps 3–6, [R8.351] steps 1–4/6, [R8.252] (PIC), [R8.225]/[R8.228] (PIC; Drawing list clipping fixed R9.87), [R8.240] (versions/Final; >52 MB and refusals not run), [R8.249] (locale/timezone; no start-page choice and no Storage screen exist), [R8.173] (mixed case, open result; >6 results not available), [R8.223] (three numbers max; table shows all three, not "+2"), [R8.266] (phone is free text by design; malformed contacts not reachable from the UI), [R8.275] (title case on blur, Enter adds a row, validation keeps rows).
+- **Not run:** [R8.178] ×3 (needs an expired archive), [R8.216]/[R8.278] (need workbook files / downloads), [R8.276], [R8.277], [R8.280], [R9.64] E full consumer matrix, [R8.527] owner verdict. [R8.257] Archived/All and phone-width filter checks were completed in the R9.87 continuation; its permission contrast still needs a second account.
+
 ### [R9.86] Brand by role: consultant letterhead on prints, mark follows the area
 - Surface: StudioFlow Settings → Document letterhead; BQ Settings (quotation letterhead); any project's MOM, Schedule and Presentation prints; a BQ quotation print
 - Steps: 1. Fill B (name, logo, address, e-mail) in StudioFlow Settings and A in BQ Settings. 2. Print a MOM and a Schedule: B's logo at top left, address/e-mail at top right. 3. Print a Presentation: B's small logo beside the date on every page. 4. Print a BQ quotation: A as before. 5. Move between StudioFlow, BQ, Master Data, Home and Settings: the top-left mark shows B, A, A, then the platform mark. 6. Remove B's logo and clear its name: StudioFlow prints and the StudioFlow mark fall back to the platform mark.
 - Acceptance: each role's brand shows only in its own area and documents; the fallback never leaves a blank.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) — A/B saved with logos; MOM/Schedule/Presentation prints carry B, quotation A; shell mark B/A/A/platform incl. client navigation; clearing B falls back to RAD on prints and the mark.
 
 ### [R9.84] Project tabs scroll again; Phases stays fixed
 - Surface: a project with many Schedule entries, a long MOM list and Timeline
 - Steps: 1. Open Schedule (Board and List), MOM, Presentation, Timeline and History: scroll to the bottom of each with the mouse wheel. 2. Open Phases at ≥ 1280 px: the page stays put and only the notes/board scroll inside; below 1280 px it scrolls as a page.
 - Acceptance: no project tab is cut off at the window bottom; Phases keeps its fixed layout.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) — Schedule scrolls (854/7212), no clipped card; Phases fixed at 1440, page-scroll at 1024.
 
 ### [R9.82] Presentation editor feels instant
 - Surface: a Presentation board with several slides and large renders
@@ -61,7 +68,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Fixture: ACTIVE project whose Supervision phase is active
 - Steps: 1. Record a visit, close it with "Next visit", then Cancel the "New site visit" dialog. 2. Both "New visit" and "Done (handover)" show; press Done (handover). 3. Use Undo. 4. On a Supervision phase with no visit yet, only "New visit" shows.
 - Acceptance: the phase closes and locks like a handover on a visit (next phase starts if any), the completed visit is unchanged, Undo reopens it with both buttons again; no button without a completed visit; "Skip this phase…" unchanged.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) — Next visit + Cancel → New visit and Done (handover); handover closes, Undo restores. Step 4 unreachable (Supervision opens SV1 by itself).
 
 ### [R9.78] Workspace board note threads
 - Surface: StudioFlow project Phases page with the `workspace-board` module on; the Notes stream with it off
@@ -157,7 +164,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Select two direct Cost Components. 2. Choose **Kelompokkan…**. 3. Keep the default name, quantity 1, and markup 0. 4. Choose **Lanjut**.
 - Acceptance: the group is applied immediately without the price-change dialog; the returned tree shows both rows in the new Component Group, selection clears, moved rows/group highlight briefly, and the notice says the Work Item price did not change.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87)
 
 ### [R9.21] Price-changing move previews, cancels, then applies
 - Surface: `/bq/[id]` project editor
@@ -165,7 +172,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Select the direct row and choose the quantity-2/markup-10 Component Group from **Pindahkan ke**. 2. Inspect the preview and choose **Batal**. 3. Verify the row stayed direct. 4. Repeat and choose **Pindahkan**.
 - Acceptance: the dialog names one row and its Component Group, shows server values for unit rate and total before/after plus total difference; cancel says nothing changed and writes nothing; apply moves once, updates the returned tree, clears selection, and highlights the destination.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) — preview Rp.288.000 checked by hand; Batal writes nothing.
 
 ### [R9.21] Move a grouped Cost Component back to the Work Item
 - Surface: `/bq/[id]` project editor
@@ -173,7 +180,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Open the Component Group. 2. Select the moved row. 3. Choose **Pindahkan ke → Langsung di Work Item**. 4. Confirm if the server reports a price change.
 - Acceptance: the row moves back under the same Work Item, the empty Component Group remains and says **Component Group kosong**, selection clears, and no row moves to another Work Item.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) — empty group stays "Component Group kosong".
 
 ### [R9.21] Locked project hides selection controls
 - Surface: `/bq/[id]` project editor
@@ -181,7 +188,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Open the project. 2. Inspect direct and grouped Cost Components and their Work Item row.
 - Acceptance: no Cost Component checkbox, select-all checkbox, or selection bar is rendered; the project remains read-only.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) — only "Buka di panel"; selection is now Ctrl/Shift+click, not checkboxes.
 
 ### [R9.21] Stale selection refreshes safely
 - Surface: `/bq/[id]` project editor in two authenticated tabs
@@ -189,7 +196,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Select a row in the first tab. 2. In the second tab, move or delete that row. 3. In the first tab, request a group or move.
 - Acceptance: nothing is applied from the stale request; the first tab says **Daftar berubah. Muat ulang untuk melihat yang terbaru.** and refreshes the project tree.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87)
 
 ### [R9.21] BQ project screen uses the contract nouns
 - Surface: `/bq/[id]` project editor and its add/save/apply dialogs
@@ -197,7 +204,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Read the project tree and price status controls. 2. Open the Section, Work Item, Assembly picker, and save-as-Assembly dialogs. 3. Open the Slice 3 selection/group/move controls.
 - Acceptance: the screen consistently reads **Section / Subsection / Work Item / Component Group / Cost Component / Assembly / TBC / By Owner**; none of the replaced Indonesian nouns reappear.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead continuation, R9.87) — after the copy fix, the live BQ tree, readiness count, quick-entry labels, Work Item form, Assembly picker (including its Cost Component count), and expanded Work Item controls use the contract nouns; no remaining UI copy use of the replaced nouns in the affected editor files.
 
 ### [R8.544] Existing Ideas/Workspace image flows, destinations and recovery
 - Surface: Workspace image actions, Ideas image board, shared Use in schedule and Add to moodboard dialogs, Ideas details dialog
@@ -284,7 +291,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default) and 375 px
 - Steps: 1. On the fresh project, open Moodboard's ⋯ menu, skip it with a reason, inspect the next phase, then Undo. 2. Skip the phase with the sent round and inspect Earlier rounds. 3. Inspect each Home phase menu in pending, active, sent and done states. 4. Sweep Home, phase canvas, dialogs, toasts and History for the word “iteration”.
 - Acceptance: empty unsent round 1 disappears on skip and returns on Undo; sent history and notes stay; auto-advance is identical to a normal finish; Home and the strip say Skipped and the phase page shows the reason; menus expose only allowed actions; every visible workflow label says round.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) for skip/Undo and skip-after-sent; wording later changed to "iteration" by owner decision (leftover: "Round history").
 
 ### [R8.351] StudioFlow Product Schedule re-layout
 - Surface: StudioFlow project → Schedule, Board and List views
@@ -316,7 +323,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Confirm each directory initially shows only Active records, then try Archived and All. 2. Apply and clear each contextual filter; confirm the result count changes. 3. Search supplier/brand/category details and open a Brand link. 4. Check supplier phone links and SKU lowest-price display. 5. Filter pricing by supplier, brand, and work category.
 - Acceptance: filters only alter the displayed rows; cleared filters restore the active default; links are safe and external; pricing is never compared across mixed currency or unit.
-- Status: PASSED by the Lead on 2026-09-30 (R8.261) with "ZZ SAMPLE" fixtures (since removed): Pricing all three tabs (filters, search by brand/category, sort headers, Group by item with Lowest, mixed currency without a badge, contacts with tel/WhatsApp, filtered tab counts, clear filters), SKU per-currency "from" summary, Suppliers (Active default, brand, capability and product-category filters, Brands column including owned brands), Brands (Supplied by, Links, filters). Not covered: Archived/All views on SKUs and Brands with real archived rows, the narrow-width layout of the Pricing filter bar, an account without supplier-read permission (contacts must be hidden).
+- Status: PASSED by the Lead on 2026-09-30 (R8.261) with "ZZ SAMPLE" fixtures (since removed): Pricing all three tabs (filters, search by brand/category, sort headers, Group by item with Lowest, mixed currency without a badge, contacts with tel/WhatsApp, filtered tab counts, clear filters), SKU per-currency "from" summary, Suppliers (Active default, brand, capability and product-category filters, Brands column including owned brands), Brands (Supplied by, Links, filters). Lead continuation 2026-10-15 (R9.87): Brands showed 24 Active, 2 Archived, 26 All and reset to Active; SKUs showed 19 Active, 1 Archived, 20 All and reset to Active. At 375 px, all Pricing filters remained available and page scroll width equalled viewport width. Still not covered: an account without supplier-read permission (contacts must be hidden).
 
 ### [R8.249] My Preferences and Storage report
 - Surface: Settings → My Preferences and Platform → Storage
@@ -340,7 +347,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Open the sample-request queue and record a complete quote with a linked SKU. 2. Use the Lead-owned Add to price list action once it is wired. 3. Open Pricing and locate the matching SKU and supplier. 4. Repeat the action.
 - Acceptance: the price appears or updates with the quoted amount and currency; the sample request shows its linked SKU and price; existing notes remain and the repeat changes nothing.
-- Status: PENDING
+- Status: PARTIAL 2026-10-15 (Lead walk, R9.87) — quote with linked SKU updated the price to the quoted amount; the repeat/no-op condition was not run.
 
 ### [R8.225] StudioFlow CD List phase canvas
 - Surface: `/studioflow/projects/[projectId]/phases/[phaseId]` on a drafter-seat Construction Drawing phase
@@ -372,7 +379,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop and 375 px
 - Steps: 1. Open the messenger from the topbar icon. 2. Repeat at 375 px.
 - Acceptance: the panel sits at the bottom-right of the viewport and is fully visible at both viewports.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) — 375 and 1280 px, bottom-right and fully visible.
 
 ### [R8.178] Archive retains files inside the configured window
 - Surface: StudioFlow project archive dialog and settings (Lead UI follow-up)
@@ -419,7 +426,7 @@ this backlog's former SF-A entries.)_
 - Viewport: desktop (default)
 - Steps: 1. Open Record quote. 2. Type a supplier name that does not exist. 3. Choose "Add … as a new supplier", pick a Supplier Type, create. 4. Save the quote.
 - Acceptance: the new supplier is a real Master Data supplier, is selected on the quote, and the option is hidden for users without supplier manage.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) — new supplier created inline with a type and selected.
 
 ### [R8.213] Schedule: mark a sample received from the card (KB-061)
 - Surface: StudioFlow project → Product Schedule (board view and option cards)
@@ -427,7 +434,7 @@ this backlog's former SF-A entries.)_
 - Viewport: desktop (default)
 - Steps: 1. Find the "Sample requested" badge. 2. Click "Mark received" (board) or "Mark sample received" (option card).
 - Acceptance: badge turns to "Sample received"; Master Data quote status is unchanged.
-- Status: PENDING
+- Status: SUPERSEDED by R8.351 (cards carry no controls); receipt from the drawer PASS 2026-10-15.
 
 ### [R8.213] New/Edit project: free name, searchable client, no project type
 - Surface: StudioFlow → Projects → New project / Edit project; Settings
@@ -435,7 +442,7 @@ this backlog's former SF-A entries.)_
 - Viewport: desktop (default)
 - Steps: 1. Create a project named without year/number. 2. In Client type a new name and add it. 3. Edit the project name. 4. Open Studio Settings.
 - Acceptance: any name saves as typed; duplicate name shows a clear error; client is created and selected; no Project type field and no naming switch.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87) — duplicate name → "A project with this name already exists."
 
 ### [R8.214] Project dates are set only from Timeline
 - Surface: StudioFlow → Timeline; Projects → New / Edit project
@@ -443,7 +450,7 @@ this backlog's former SF-A entries.)_
 - Viewport: desktop (default)
 - Steps: 1. Confirm New and Edit project have no date fields. 2. On Timeline click "Edit project dates", change start and opening date, save. 3. Edit the project's address on Projects and save.
 - Acceptance: the bar and both date labels update immediately; the opening date survives the unrelated edit; clearing start falls back to the day the project was added.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk, R9.87)
 
 ### [R8.221] PIC-based edit rights (WO-SF-ACCESS-01 + UI gating)
 - Surface: StudioFlow → Projects, project page (phase canvas), MOM, Schedule, Presentation, Timeline
@@ -531,7 +538,7 @@ this backlog's former SF-A entries.)_
 - Viewport: desktop (default)
 - Steps: 1. Fill a price row. 2. Search for a new Brand name and choose Create brand. 3. Confirm the stored, title-cased name is selected without losing the row. 4. Add a New SKU row and save its price. 5. Open Brands and inspect the new Brand.
 - Acceptance: the Brand is immediately available and selected, existing row input survives, the saved new SKU carries that Brand, and the Brand has no owner; supplier/category enrichment follows the existing price-save path.
-- Status: PENDING
+- Status: PASS 2026-10-15 (Lead walk and continuation, R9.87) — "zz qa brand" → "Zz Qa Brand" selected, new SKU row saved with it; the archived Brand's Edit dialog showed Owner supplier unset, while ZZ QA Supplier was listed only under Suppliers.
 
 ### [R9.51] Brand creation is hidden without Brand manage access
 - Surface: `/masterdata/pricing` → New price → Material → Brand

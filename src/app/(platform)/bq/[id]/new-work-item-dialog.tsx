@@ -66,7 +66,7 @@ export function NewWorkItemDialog({
           <Field label="Assembly" description="Cost Component Assembly disalin ke Work Item ini; harga mengikuti Assembly saat ini.">
             <Combobox
               label="Assembly"
-              options={assemblies.map((candidate) => ({ id: candidate.id, label: candidate.name, description: `${candidate.lineCount} rincian` }))}
+              options={assemblies.map((candidate) => ({ id: candidate.id, label: candidate.name, description: `${candidate.lineCount} Cost Component` }))}
               value={assemblyId}
               onValueChange={setAssemblyId}
               placeholder="Cari Assembly…"

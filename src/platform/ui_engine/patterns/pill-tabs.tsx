@@ -25,7 +25,9 @@ export function PillTabs({ items, label = "Page views", className, actions }: { 
   const content = items.map((item) => {
     const body = <>{item.icon ? <span aria-hidden="true" className="shrink-0 [&_svg]:h-4 [&_svg]:w-4">{item.icon}</span> : null}<span className={cx("whitespace-nowrap", !item.active && Boolean(item.icon) && "max-[560px]:sr-only")}>{item.label}</span>{item.count !== undefined ? <span className="font-ui-mono text-[11px] tabular-nums opacity-80">{item.count}</span> : null}</>;
     // One colour class per state: two text colours on one element resolve by stylesheet order, not class order.
-    const base = "inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-pill px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus";
+    // `relative` keeps a phone's sr-only label (absolutely positioned) inside the scrolling bar; without it the hidden
+    // label escaped to the page and gave every project tab a sideways scroll at 375 px.
+    const base = "relative inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-pill px-3 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus";
     if (item.disabled) {
       const disabledClass = cx(base, "cursor-not-allowed font-medium text-ink-tertiary opacity-60");
       return links

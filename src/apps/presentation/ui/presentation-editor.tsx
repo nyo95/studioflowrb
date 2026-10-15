@@ -323,7 +323,7 @@ export function PresentationEditor({ projectId, board, scheduleEntries, canEdit 
           <div role="group" aria-label="Slide layout" className="flex gap-1 rounded-control bg-surface-muted p-1">
             {PRESENTATION_LAYOUTS.map((layout) => {
               const on = layout === active.layout;
-              return <button key={layout} type="button" disabled={!canEdit || locked} aria-pressed={on} aria-label={LAYOUT_LABELS[layout]} title={LAYOUT_LABELS[layout]} onClick={() => { patchSlide(active.id, (slide) => ({ ...slide, layout })); save(`slide:${active.id}:layout`, () => updatePresentationSlideAction({ projectId, slideId: active.id, layout }), 300); }} className={`grid h-11 w-[52px] place-items-center rounded-action disabled:opacity-60 ${on ? "bg-action text-action-ink shadow-raise" : "text-ink-secondary hover:bg-surface/60"}`}><LayoutGlyph layout={layout} /></button>;
+              return <button key={layout} type="button" disabled={!canEdit || locked} aria-pressed={on} aria-label={LAYOUT_LABELS[layout]} title={LAYOUT_LABELS[layout]} onClick={() => { patchSlide(active.id, (slide) => ({ ...slide, layout })); save(`slide:${active.id}:layout`, () => updatePresentationSlideAction({ projectId, slideId: active.id, layout }), 300); }} className={`grid h-11 w-11 place-items-center sm:w-[52px] rounded-action disabled:opacity-60 ${on ? "bg-action text-action-ink shadow-raise" : "text-ink-secondary hover:bg-surface/60"}`}><LayoutGlyph layout={layout} /></button>;
             })}
           </div>
           <span className="text-sm font-medium">{LAYOUT_LABELS[active.layout]}</span>

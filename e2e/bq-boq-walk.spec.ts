@@ -95,14 +95,14 @@ async function addRow(page: Page, part: string, box: Locator, row: Row) {
   const where = `Excel row ${row.excelRow} "${row.name}"`;
   const entry = box.locator("tr[data-quick-entry]");
   const before = await box.locator('tr[id^="bq-row-"]').count();
-  await entry.getByLabel("Nama pekerjaan baru", { exact: true }).fill(row.name);
-  if (row.spec) await entry.getByLabel("Spesifikasi pekerjaan baru", { exact: true }).fill(row.spec.slice(0, 1000));
-  await entry.getByLabel("Jumlah pekerjaan baru", { exact: true }).fill(String(row.qty));
-  await entry.getByLabel("Satuan pekerjaan baru", { exact: true }).fill(row.unit);
-  await entry.getByLabel("Harga satuan pekerjaan baru", { exact: true }).fill(row.rate.mode === "PRICED" ? String(row.rate.amount) : "");
-  await entry.getByLabel("Harga satuan pekerjaan baru", { exact: true }).press("Enter");
+  await entry.getByLabel("Nama Work Item baru", { exact: true }).fill(row.name);
+  if (row.spec) await entry.getByLabel("Spesifikasi Work Item baru", { exact: true }).fill(row.spec.slice(0, 1000));
+  await entry.getByLabel("Jumlah Work Item baru", { exact: true }).fill(String(row.qty));
+  await entry.getByLabel("Satuan Work Item baru", { exact: true }).fill(row.unit);
+  await entry.getByLabel("Harga satuan Work Item baru", { exact: true }).fill(row.rate.mode === "PRICED" ? String(row.rate.amount) : "");
+  await entry.getByLabel("Harga satuan Work Item baru", { exact: true }).press("Enter");
   await expect(box.locator('tr[id^="bq-row-"]')).toHaveCount(before + 1, { timeout: 15_000 });
-  await expect(entry.getByLabel("Nama pekerjaan baru", { exact: true })).toHaveValue("");
+  await expect(entry.getByLabel("Nama Work Item baru", { exact: true })).toHaveValue("");
   if (row.rate.mode === "PRICED") expectedSoFar += Math.round(row.qty * row.rate.amount * 100) / 100;
   if (row.rate.mode === "BY_OWNER") {
     const tableRow = box.locator('tr[id^="bq-row-"]').last();

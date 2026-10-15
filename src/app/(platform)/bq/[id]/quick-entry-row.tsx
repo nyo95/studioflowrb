@@ -58,20 +58,20 @@ export function QuickEntryRow({ units, disabled, editableColumn, onAdd, onMore }
       <TableCell />
       <TableCell align="center"><Plus aria-hidden="true" className="inline size-3.5 text-ink-tertiary" /></TableCell>
       <TableCell>
-        <Input ref={nameRef} density="compact" aria-label="Nama pekerjaan baru" placeholder="Ketik pekerjaan baru…" value={name} disabled={disabled} maxLength={160} onChange={(event) => setName(event.target.value)} onKeyDown={onKeyDown} className={`${CELL_INPUT} text-sm`} />
+        <Input ref={nameRef} density="compact" aria-label="Nama Work Item baru" placeholder="Ketik Work Item baru…" value={name} disabled={disabled} maxLength={160} onChange={(event) => setName(event.target.value)} onKeyDown={onKeyDown} className={`${CELL_INPUT} text-sm`} />
       </TableCell>
       <TableCell>
-        <Input density="compact" aria-label="Spesifikasi pekerjaan baru" placeholder={typing ? "Spesifikasi" : ""} value={specification} disabled={disabled} maxLength={1000} onChange={(event) => setSpecification(event.target.value)} onKeyDown={onKeyDown} className={CELL_INPUT} />
+        <Input density="compact" aria-label="Spesifikasi Work Item baru" placeholder={typing ? "Spesifikasi" : ""} value={specification} disabled={disabled} maxLength={1000} onChange={(event) => setSpecification(event.target.value)} onKeyDown={onKeyDown} className={CELL_INPUT} />
       </TableCell>
       <TableCell>
-        <Input density="compact" aria-label="Jumlah pekerjaan baru" placeholder={typing ? "1" : ""} inputMode="decimal" value={qty} disabled={disabled} onChange={(event) => setQty(event.target.value)} onKeyDown={onKeyDown} className={`${CELL_INPUT} text-right tabular-nums`} />
+        <Input density="compact" aria-label="Jumlah Work Item baru" placeholder={typing ? "1" : ""} inputMode="decimal" value={qty} disabled={disabled} onChange={(event) => setQty(event.target.value)} onKeyDown={onKeyDown} className={`${CELL_INPUT} text-right tabular-nums`} />
       </TableCell>
       <TableCell>
-        <Input density="compact" aria-label="Satuan pekerjaan baru" placeholder={typing ? "ls" : ""} list={listId} value={unit} disabled={disabled} maxLength={40} onChange={(event) => setUnit(event.target.value)} onKeyDown={onKeyDown} className={CELL_INPUT} />
+        <Input density="compact" aria-label="Satuan Work Item baru" placeholder={typing ? "ls" : ""} list={listId} value={unit} disabled={disabled} maxLength={40} onChange={(event) => setUnit(event.target.value)} onKeyDown={onKeyDown} className={CELL_INPUT} />
         <datalist id={listId}>{[...units, ...UNIT_ALIAS_WORDS].map((code) => <option key={code} value={code} />)}</datalist>
       </TableCell>
       <TableCell>
-        <Input density="compact" aria-label="Harga satuan pekerjaan baru" placeholder={typing ? "kosong = TBC" : ""} inputMode="decimal" value={price} disabled={disabled} onChange={(event) => setPrice(event.target.value)} onKeyDown={onKeyDown} className={`${CELL_INPUT} text-right tabular-nums`} />
+        <Input density="compact" aria-label="Harga satuan Work Item baru" placeholder={typing ? "kosong = TBC" : ""} inputMode="decimal" value={price} disabled={disabled} onChange={(event) => setPrice(event.target.value)} onKeyDown={onKeyDown} className={`${CELL_INPUT} text-right tabular-nums`} />
       </TableCell>
       <TableCell align="end">
         {typing ? (

@@ -13,13 +13,18 @@ export function isPinDrag(start: ClientPoint, point: ClientPoint): boolean {
   return Math.hypot(point.x - start.x, point.y - start.y) >= 3;
 }
 
+/**
+ * Only the coordinates come back: the editor nudges from the whole stored pin, and the strict update action refuses
+ * any other field ("The submitted data is invalid" — every arrow-key nudge snapped back before R9.87).
+ */
 export function nudgePin(position: PinPosition, key: string, shift: boolean): PinPosition | null {
   const step = shift ? 5 : 1;
+  const { pinX, pinY } = position;
   switch (key) {
-    case "ArrowLeft": return { ...position, pinX: percent(position.pinX - step) };
-    case "ArrowRight": return { ...position, pinX: percent(position.pinX + step) };
-    case "ArrowUp": return { ...position, pinY: percent(position.pinY - step) };
-    case "ArrowDown": return { ...position, pinY: percent(position.pinY + step) };
+    case "ArrowLeft": return { pinX: percent(pinX - step), pinY };
+    case "ArrowRight": return { pinX: percent(pinX + step), pinY };
+    case "ArrowUp": return { pinX, pinY: percent(pinY - step) };
+    case "ArrowDown": return { pinX, pinY: percent(pinY + step) };
     default: return null;
   }
 }
