@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.77 | 2026-10-15 | review(studioflow): WO-SF-BOARD-THREADS-01 backend PASS (Lead)
+
+- **Verdict R9.76 (`812edaf`): PASS (focused code review + automated checks).** Checked the destructive path closely: `deleteCard` locks the project and the anchored messages (`FOR UPDATE`), checks every distinct message label with `writableScope` and refuses the whole deletion with `WORKSPACE_THREAD_LOCKED` before any write, then deletes messages (storage keys collected), threads and the element in one transaction with versioned delete and cleanup queued; a thread losing its last message is deleted with it. Thread messages are excluded from `readWorkspace` and refused by `placeItems`; anchors that are thread messages are refused; moves are versioned and refused for anchored threads; replies are scoped to the thread. Migration applied to kantor dev and test (Executor report).
+- **Lead re-ran:** `npm test` **1183/1183**, typecheck, full lint PASS.
+- **Next:** the Lead's board UI (R9.78 — double-click thread window, markers, All notes drawer, delete confirmations). Note for the UI: R9.75's plan text says "Lead UI R9.77"; the UI revision is R9.78 because this review took R9.77. Browser acceptance by the owner after the UI.
+
 ## R9.76 | 2026-10-15 | feat(studioflow): Add Workspace board thread backend (Executor)
 
 - **Scope/authority:** WO-SF-BOARD-THREADS-01 backend only. Pre-edit HEAD `5fc0a8e993af564eafd03f465e3b56db650ff572` (R9.75), branch `main`, twelve commits ahead of the already-local published baseline `origin/main` `ed169fb` (R9.63), whole revision R9; next unused revision R9.76. Complete initial dirty list: untracked owner files `test/BOQ TEST.xlsx` and `test/BOQ TEST 2 - PDF.pdf`, preserved and excluded. No board/Notes UI, dependency, shared UI Engine, legacy or remote change; PLAN.md and BACKLOG remain unchanged.

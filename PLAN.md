@@ -3,8 +3,8 @@
 Plan ID: WO-SF-BOARD-THREADS-01
 Scope: Workspace board note threads — double-click anywhere on the board to open a small Notes chat at that spot, a speech-bubble marker with its count, and "All notes · N" in the board toolbar
 Module(s): studioflow (data, services, actions); `workspace-board` feature module (board UI, board-only actions gated by it)
-Target revision: Executor backend **R9.76**; Lead board UI R9.77 (Lead plan R9.75)
-Status: READY (Executor backend slice)
+Target revision: Lead board UI **R9.78** (plan R9.75, backend R9.76, review R9.77)
+Status: Backend PASS (R9.76 `812edaf`, Lead review R9.77); next: Lead board UI (R9.78)
 Priority: P1
 Owner: Product Owner; Lead locks and reviews
 Last updated: 2026-10-15
