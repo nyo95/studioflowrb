@@ -183,6 +183,28 @@ test("Schedule suggestions show an empty state and recover from a failed lookup"
   await expect(editor).toHaveText("@HT");
 });
 
+test("a Notes tag filter survives a phase change refreshing the page", async ({ page }) => {
+  await page.goto(`/studioflow/projects/${sf.notesChat}`);
+  await page.waitForLoadState("networkidle");
+  const log = page.getByRole("log", { name: "Notes" });
+  await page.getByRole("textbox", { name: "New note" }).fill("Filter persistence #keepme");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  const tagged = log.getByRole("article").filter({ hasText: "Filter persistence" });
+  await expect(tagged).toBeVisible();
+  await tagged.getByRole("button", { name: "#keepme" }).click();
+  await expect(log.getByRole("article")).toHaveCount(1);
+
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Rename iteration" }).click();
+  const rename = page.getByRole("dialog", { name: "Rename iteration" });
+  await rename.getByRole("textbox", { name: "Name" }).fill("Filter refresh proof");
+  await rename.getByRole("button", { name: "Save" }).click();
+  await expect(rename).toHaveCount(0);
+  await expect(page.getByText("Filter refresh proof").first()).toBeVisible();
+  await expect(log.getByRole("article")).toHaveCount(1);
+  await expect(tagged).toBeVisible();
+});
+
 test("an image opens zoomable and a marked-up copy is sent as a reply, leaving the original as it was", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(`/studioflow/projects/${sf.notesChat}`);

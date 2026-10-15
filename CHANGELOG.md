@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.97 | 2026-10-15 | test(studioflow): Accept Notes filter context across phase refresh (Reviewer partial)
+
+- **Scope:** added a browser journey that creates a tagged note, filters the Notes stream to that tag, renames the current phase iteration, and confirms the filter and matching-only list survive the server refresh. Together with R9.93's persisted General-note edit, this closes the fixed R9.66 Notes-context/General-edit `[BUG]`.
+- **Verdict:** PASS for R9.64 A4/A5; PARTIAL for the wider R9.66 Notes acceptance. Deep scroll anchoring, rapid filter switching, stale concurrent edits, permission variants and failure recovery remain queued. No production code, migration, dependency, or push; root `test/` untouched.
+- **Checks:** full Notes chat browser suite 6/6 PASS on the verified disposable office rebuild test database; `npm run check`, targeted lint and whitespace check PASS. The test server's intermittent aborted-request/ECONNRESET messages did not affect assertions or process exit.
+
 ## R9.96 | 2026-10-15 | test(presentation): Accept visible failure recovery in the browser (Reviewer partial)
 
 - **Scope:** expanded Presentation browser regression with one-shot refused requests for board creation, pin creation and board deletion. Creation keeps its typed title and can retry; pin failure displays a safe error and can retry after reload; board deletion failure stays in the editor and succeeds on retry. Existing R9.68 integration evidence had already proved board reads do not write, so it was not repeated. The combined read-write/silent-failure `[BUG]` remains open pending in-page pin-retry diagnosis.
