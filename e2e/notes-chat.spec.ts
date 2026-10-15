@@ -159,6 +159,30 @@ test("an existing General note stays editable when the board is off", async ({ p
   await expect(note).toContainText("ZZ-Test General note edited with board off");
 });
 
+test("Schedule suggestions show an empty state and recover from a failed lookup", async ({ page }) => {
+  await page.goto(`/studioflow/projects/${sf.notesChat}`);
+  await page.waitForLoadState("networkidle");
+  const editor = page.getByRole("textbox", { name: "New note" });
+  await editor.fill("@ZZZZ");
+  await expect(page.getByRole("status").filter({ hasText: "No suggestions found." })).toBeVisible();
+  await expect(editor).toHaveText("@ZZZZ");
+
+  let refused = false;
+  await page.route("**/*", async (route) => {
+    if (!refused && route.request().method() === "POST" && route.request().headers()["next-action"]) {
+      refused = true;
+      await route.abort("failed");
+    } else await route.continue();
+  });
+  await editor.fill("@HT");
+  await expect(page.getByRole("button", { name: "Retry" })).toBeVisible();
+  await expect(editor).toHaveText("@HT");
+  await page.unrouteAll({ behavior: "wait" });
+  await page.getByRole("button", { name: "Retry" }).click();
+  await expect(page.getByRole("listbox", { name: "Schedule items" }).getByRole("option")).toContainText("HT-01");
+  await expect(editor).toHaveText("@HT");
+});
+
 test("an image opens zoomable and a marked-up copy is sent as a reply, leaving the original as it was", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 960 });
   await page.goto(`/studioflow/projects/${sf.notesChat}`);
