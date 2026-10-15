@@ -164,18 +164,18 @@ test("P.8 a slide in a layout holds several images, on screen and on its printed
   await page.getByLabel("New board").fill("Layout board");
   await page.getByRole("button", { name: "Create board" }).click();
   await page.getByLabel("Board title").waitFor();
-  await page.getByRole("button", { name: "Slide baru", exact: true }).click();
+  await page.getByRole("button", { name: "New slide", exact: true }).click();
   await page.getByRole("button", { name: "Slide 1" }).waitFor();
   await page.getByRole("button", { name: "Grid 4" }).click();
   await expect(page.getByRole("button", { name: "Grid 4" })).toHaveAttribute("aria-pressed", "true");
   const boxInput = page.locator('input[type="file"]:not([multiple])');
   for (const [index, name] of ["a.jpg", "b.jpg"].entries()) {
-    await page.getByRole("button", { name: "Tambah gambar atau seret ke sini" }).first().click();
+    await page.getByRole("button", { name: "Add an image or drop one here" }).first().click();
     await boxInput.setInputFiles({ name, mimeType: "image/jpeg", buffer: await room(page) });
     await expect(page.locator('section[aria-label="Slide"] img')).toHaveCount(index + 1, { timeout: 30_000 });
   }
-  await page.getByLabel("Judul slide").fill("Area Display");
-  await page.getByLabel("Judul slide").blur();
+  await page.getByLabel("Slide title").fill("Area Display");
+  await page.getByLabel("Slide title").blur();
   await page.waitForLoadState("networkidle");
   await page.locator("main").first().screenshot({ path: `${SHOTS}/editor-grid-4.png` });
 

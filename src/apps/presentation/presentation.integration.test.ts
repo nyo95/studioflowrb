@@ -12,9 +12,11 @@ import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { createStudioFlowPresentationBridge } from "@/apps/studioflow/public/presentation-bridge";
 
 import { createPresentationService, type PresentationService } from "./service";
+import type { PresentationPorts } from "./shared";
 
 let testDb: TestDb;
 let presentation: PresentationService;
+let ports: PresentationPorts;
 let storage: FakeObjectStorage;
 let userId: string;
 let projectId: string;
@@ -34,7 +36,8 @@ before(async () => {
   testDb = await createTestDb(requireDisposableTestDatabaseUrl());
   storage = new FakeObjectStorage();
   const runTransaction = <T>(work: (tx: Parameters<Parameters<typeof testDb.prisma.$transaction>[0]>[0]) => Promise<T>) => testDb.prisma.$transaction((tx) => work(tx));
-  presentation = createPresentationService(testDb.prisma, { runTransaction, auditWriter: createAuditEventWriter(), storage, studioFlow: createStudioFlowPresentationBridge(testDb.prisma) });
+  ports = { runTransaction, auditWriter: createAuditEventWriter(), storage, studioFlow: createStudioFlowPresentationBridge(testDb.prisma) };
+  presentation = createPresentationService(testDb.prisma, ports);
 });
 
 beforeEach(async () => {
@@ -68,10 +71,51 @@ describe("Presentation extracted module", () => {
     assert.deepEqual(board.slides[0].images[0].annotations[0].scheduleEntry, { id: entry.id, code: "ST-01", productName: "Travertine" });
 
     await testDb.prisma.sfScheduleEntry.delete({ where: { id: entry.id } });
-    board = await presentation.getBoard({ ...read(), boardId: first.boardId });
-    assert.equal(board.slides[0].images[0].annotations[0].scheduleEntryId, null);
+    const beforeRead = await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: pin.annotationId } });
+    let writes = 0;
+    // Prisma delegates are proxies; use a guarded port instead of redefining their method descriptors.
+    const annotationPort = new Proxy(testDb.prisma.sfPresentationAnnotation, { get(delegate, key, receiver) {
+      if (["update", "updateMany", "delete", "deleteMany", "upsert", "create", "createMany"].includes(String(key))) return async () => { writes++; throw new Error("Viewing must not write annotations"); };
+      return Reflect.get(delegate, key, receiver);
+    } });
+    const readPort = new Proxy(testDb.prisma, { get(db, key, receiver) { return key === "sfPresentationAnnotation" ? annotationPort : Reflect.get(db, key, receiver); } });
+    const reader = createPresentationService(readPort, ports);
+    for (let n = 0; n < 2; n++) {
+      board = await reader.getBoard({ ...read(), grants: [P.access, P.projectRead], boardId: first.boardId });
+      assert.equal(board.slides[0].images[0].annotations[0].scheduleEntryId, null);
+      assert.equal(board.slides[0].images[0].annotations[0].scheduleEntry, null);
+    }
+    assert.equal(writes, 0);
+    assert.deepEqual(await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: pin.annotationId } }), beforeRead, "reads preserve the dangling stored ID and every other field");
+    await presentation.clearScheduleEntryLink(entry.id);
     assert.equal((await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: pin.annotationId } })).schedule_entry_id, null);
     assert.ok((await testDb.prisma.auditEvent.findMany({ where: { app_id: "presentation" } })).every((event) => event.action.startsWith("presentation.")));
+  });
+
+  it("moves a pin without changing its linked item, note, label side or order, and retains write gates", async () => {
+    const { boardId } = await presentation.createBoard({ ...command(), title: "Pin movement" });
+    await presentation.addSlides({ ...command(), boardId, files: [png()] });
+    const image = (await presentation.getBoard({ ...read(), boardId })).slides[0]!.images[0]!;
+    const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Tile", category_key: "tile", prefix: "HT", increment: 1, sort_order: 0 } });
+    const { annotationId } = await presentation.addAnnotation({ ...command(), imageId: image.id, pinX: 20, pinY: 30, scheduleEntryId: entry.id, labelSide: "left", note: "Keep this caption" });
+    const beforeMove = await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: annotationId } });
+    const metadata = (row: typeof beforeMove) => [row.image_id, row.schedule_entry_id, row.label_side, row.note, row.sort_order];
+    for (const [pinX, pinY] of [[0, 100], [100, 0], [41, 57]]) {
+      await presentation.updateAnnotation({ ...command(), annotationId, pinX, pinY });
+      const moved = await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: annotationId } });
+      assert.deepEqual([moved.pin_x, moved.pin_y], [pinX, pinY]);
+      assert.deepEqual(metadata(moved), metadata(beforeMove));
+    }
+    await rejectsWith(presentation.updateAnnotation({ ...command(), annotationId, pinX: -1 }), "PRESENTATION_PIN_INVALID");
+    await rejectsWith(presentation.updateAnnotation({ ...command(), annotationId, pinY: 101 }), "PRESENTATION_PIN_INVALID");
+    await rejectsWith(presentation.updateAnnotation({ ...command(), annotationId, pinX: 50, grants: [P.access, P.projectRead] }), "PERMISSION_DENIED");
+    const foreign = await testDb.prisma.sfProject.create({ data: { name: "Other pin project", pic_designer_id: userId, pic_drafter_id: userId, created_by_id: userId } });
+    await rejectsWith(presentation.updateAnnotation({ ...command(), projectId: foreign.id, annotationId, pinX: 50 }), "PRESENTATION_ANNOTATION_NOT_FOUND");
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date() } });
+    await rejectsWith(presentation.updateAnnotation({ ...command(), annotationId, pinX: 50 }), "PROJECT_ARCHIVED");
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: null, status: "COMPLETED" } });
+    await rejectsWith(presentation.updateAnnotation({ ...command(), annotationId, pinY: 50 }), "PROJECT_COMPLETED");
+    assert.deepEqual(metadata(await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: annotationId } })), metadata(beforeMove));
   });
 
   it("enforces PIC, permission, project scope, archive and completed gates", async () => {

@@ -228,8 +228,6 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
       const annotations = board.slides.flatMap((slide) => slide.images.flatMap((image) => image.annotations));
       const links = await ports.studioFlow.resolvePresentationScheduleLinks({ ...input, entryIds: annotations.flatMap((annotation) => annotation.schedule_entry_id ? [annotation.schedule_entry_id] : []) });
       const byId = new Map(links.map((entry) => [entry.entryId, entry]));
-      const missing = annotations.filter((annotation) => annotation.schedule_entry_id && !byId.has(annotation.schedule_entry_id)).map((annotation) => annotation.id);
-      if (missing.length) await db.sfPresentationAnnotation.updateMany({ where: { id: { in: missing } }, data: { schedule_entry_id: null } });
       const slots = (slideLayout: string) => layoutSpec(slideLayout).slots;
       return { id: board.id, projectId: board.project_id, title: board.title, slides: await Promise.all(board.slides.map(async (slide) => ({
         id: slide.id,

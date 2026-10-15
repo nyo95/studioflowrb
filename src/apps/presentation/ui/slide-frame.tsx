@@ -1,4 +1,4 @@
-import type { CSSProperties, MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent, ReactNode } from "react";
 
 import { layoutSpec } from "../layouts";
 
@@ -25,11 +25,17 @@ function frameStyle(image: FrameImage): CSSProperties {
   return { position: "absolute", width, height, left: `calc((100cqw - ${width}) * ${image.focusX / 100})`, top: `calc((100cqh - ${height}) * ${image.focusY / 100})` };
 }
 
-export function SlideImageBox({ image, pinClassName, onImageClick, onPinClick, children }: {
+export function SlideImageBox({ image, pinClassName, onImageClick, onPinClick, onPinPointerDown, onPinPointerMove, onPinPointerUp, onPinPointerCancel, onPinKeyDown, pinDisabled, children }: {
   image: FrameImage;
   pinClassName: string;
   onImageClick?: (event: ReactMouseEvent<HTMLDivElement>, image: FrameImage) => void;
   onPinClick?: (pinId: string) => void;
+  onPinPointerDown?: (event: PointerEvent<HTMLButtonElement>, pinId: string, frame: DOMRect) => void;
+  onPinPointerMove?: (event: PointerEvent<HTMLButtonElement>) => void;
+  onPinPointerUp?: (event: PointerEvent<HTMLButtonElement>) => void;
+  onPinPointerCancel?: (event: PointerEvent<HTMLButtonElement>) => void;
+  onPinKeyDown?: (event: KeyboardEvent<HTMLButtonElement>, pinId: string) => void;
+  pinDisabled?: boolean;
   children?: ReactNode;
 }) {
   const known = Boolean(image.imageRatio);
@@ -40,10 +46,19 @@ export function SlideImageBox({ image, pinClassName, onImageClick, onPinClick, c
           // A short-lived signed URL; next/image optimization would cache it.
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image.imageUrl} alt="" draggable={false} className={known ? "block h-full w-full" : "block h-auto w-auto"} style={known ? undefined : { maxWidth: "100cqw", maxHeight: "100cqh" }} />
-        ) : <div className="h-full w-full bg-neutral-200" />}
+        ) : <div className="h-full w-full bg-surface-muted" />}
         {image.pins.map((pin) => (
           onPinClick ? (
-            <button key={pin.id} type="button" aria-label={`Pin ${pin.number}`} onClick={(event) => { event.stopPropagation(); onPinClick(pin.id); }} style={{ left: `${pin.pinX}%`, top: `${pin.pinY}%` }} className={`${pinClassName} ${pin.selected ? "ring-2 ring-white outline outline-2 outline-action" : ""}`}>{pin.number}</button>
+            <button
+              key={pin.id} type="button" aria-label={`Pin ${pin.number}`} aria-pressed={pin.selected ?? false} disabled={pinDisabled} draggable={false}
+              onClick={(event) => { event.stopPropagation(); onPinClick(pin.id); }}
+              onDragStart={(event) => { event.preventDefault(); event.stopPropagation(); }}
+              onPointerDown={onPinPointerDown ? (event) => onPinPointerDown(event, pin.id, event.currentTarget.parentElement!.getBoundingClientRect()) : undefined}
+              onPointerMove={onPinPointerMove} onPointerUp={onPinPointerUp} onPointerCancel={onPinPointerCancel} onLostPointerCapture={onPinPointerCancel}
+              onKeyDown={onPinKeyDown ? (event) => onPinKeyDown(event, pin.id) : undefined}
+              style={{ left: `${pin.pinX}%`, top: `${pin.pinY}%` }}
+              className="absolute grid size-11 -translate-x-1/2 -translate-y-1/2 touch-none select-none place-items-center rounded-full p-0 leading-none cursor-grab active:cursor-grabbing disabled:cursor-wait"
+            ><span className={`${pinClassName} ${pin.selected ? "ring-2 ring-surface outline outline-2 outline-action" : ""}`}>{pin.number}</span></button>
           ) : (
             <span key={pin.id} style={{ left: `${pin.pinX}%`, top: `${pin.pinY}%` }} className={pinClassName}>{pin.number}</span>
           )
