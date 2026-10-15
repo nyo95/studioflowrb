@@ -32,10 +32,10 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ### [R9.64] A — Notes integrity, reader context and existing General edits
 - Surface: StudioFlow project Notes with workspace-board off; same records on Board when enabled
-- Fixture: WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A implemented after G1 approval; ACTIVE project, designer, drafter with only a different phase's rights, outsider; official text/image/file records, manual feedback, General text, linked Schedule item; two sessions
+- Fixture: WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A (R9.66) implemented; ACTIVE project, designer, drafter with only a different phase's rights, outsider; official text/image/file records, manual feedback, General text, linked Schedule item; two sessions
 - Viewport: desktop (default) and 375 px
 - Steps: 1. Edit an ordinary note in two sessions; save the first, then the stale second draft. 2. Remove its @CODE and reload the item's linked notes. 3. Attempt official record edit/delete in both views. 4. Filter by phase/tag/feedback/starred, scroll to an older note, then refresh through a phase action elsewhere. 5. With Board off edit an existing General note as an authorized project PIC; repeat without project-level rights. 6. Repeat mutation attempts on completed/archived projects.
-- Acceptance: approved G1 historical policy enforced server-side, no storage deletion on refusal; stale draft retained with clear conflict; removed link gone; filter and reading position retained with matching records; General edit follows existing rights and never enables the Board module; closed/archive refusals remain. This is future acceptance, not an R9.64 implementation claim.
+- Acceptance: official records stay editable/deletable with origin and phase labels locked (G1 kept, R9.65); stale draft retained with clear conflict; removed link gone; filter and reading position retained with matching records; General edit follows existing rights and never enables the Board module; closed/archive refusals remain. This is future acceptance, not an R9.64 implementation claim.
 - Status: PENDING
 
 ### [R9.64] B — @/# suggestions, inline item cards and composer

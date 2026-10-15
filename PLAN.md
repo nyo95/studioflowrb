@@ -1,19 +1,19 @@
 # Active Plan
 
 Plan ID: WO-SF-NOTES-PRESENTATION-IMAGE-01
-Scope: Run 1 study, audit and plan only; no application implementation
+Scope: Run 1 audit (R9.64) accepted by Lead; gates G1–G4 locked (R9.65); **slice A READY**, B/C/D DRAFT
 Module(s): studioflow (Notes and Schedule reads), presentation, shared platform UI Engine image patterns; workspace-board is an unchanged optional view of the same StudioFlow records
-Target revision: R9.64 documentation; later slice revisions allocated from CHANGELOG.md after Lead approval
-Status: DRAFT
+Target revision: slice A = **R9.66** (next unused after Lead docs R9.65); B/C/D allocated later from CHANGELOG.md
+Status: READY (slice A only); B, C, D remain DRAFT
 Priority: P1 recommended for A; P2 for B/C/D, subject to owner priorities
 Owner: Product Owner; Lead approves and locks each READY slice
-Last updated: 2026-10-15
+Last updated: 2026-10-15 (Lead review R9.65)
 
 ## Outcome
 
 This run delivers an evidenced audit and reviewable plan. Run 2 starts only after the Lead's OK and resolution of the decision gates. No fixes or Reviewer acceptance are claimed by R9.64.
 
-Proposed final outcome: official records preserve historical evidence; ordinary edits reject stale versions and keep Schedule links consistent; refreshing retains the reader's selected view; existing General notes can be edited under their established rights with Board off. Mentions open useful suggestions immediately. Presentation pins move without moving their image, destructive changes are confirmed, board reads do not write, and shared image previews agree with saved output for every consumer.
+Proposed final outcome: official records keep their locked origin/phase/round labels and stay editable (G1); ordinary edits reject stale versions and keep Schedule links consistent; refreshing retains the reader's selected view; existing General notes can be edited under their established rights with Board off. Mentions open useful suggestions immediately. Presentation pins move without moving their image, destructive changes are confirmed, board reads do not write, and shared image previews agree with saved output for every consumer.
 
 ## Context and Evidence
 
@@ -130,15 +130,14 @@ Search covered symbol references and image filenames across all src and tests/pu
 2. No new dependency, schema/migration source, business module, permission, cross-module internals or legacy use. No remote operations. One local revision per coherent later slice.
 3. Notes stay StudioFlow-owned; Board is a Developer switch, not a role permission. Presentation writes its own data and uses only StudioFlow public facts.
 4. Reuse established project/PIC/security gates, version column, ActionResult safe errors, confirmation, formatting dialect, upload/cleanup contracts and print geometry. Manual feedback and official workflow records are distinct.
+5. **G1 (owner, 2026-10-15: "harusnya bisa di edit dong, kalau typo gmn") — keep the existing policy.** Official workflow records stay correctable, starrable and deletable exactly as contract §6.1 and `service.integration.test.ts:3822` say; only origin and phase/round labels stay locked (`WORKSPACE_RECORD_LOCKED`). No immutability, no delete refusal, no contract amendment. A1 is closed as *by design*, not a defect. The owner did not ask to change deletion; it stays allowed.
+6. **G2 (owner) — Lead-owned prerequisite.** Caret/token-range/decoration hooks in the shared RichTextEditor, inline-token rendering in FormattedText and any interactive hover card are built by the Lead as a separate revision before slice B, with its own consumer matrix. The Executor never edits `rich-text-editor*.tsx`, `formatted-text.tsx` or shared overlays.
+7. **G3 (owner) — phase stays required for new notes.** No phase ×; no General-note creation from Notes. Editing/starring/deleting *existing* General notes under the existing project document right is in slice A (A5).
+8. **G4 (owner) — package approved.** English copy matching Notes/Product Schedule; ImageWorkspace opens in Pan (crop) mode; Presentation pin keyboard nudge 1%, Shift 5%. No new drawing tools, recents or chat search.
 
-### NEEDS LEAD/OWNER DECISION
+### Decision gates
 
-| Gate | Recommendation / alternatives | Dependency |
-| --- | --- | --- |
-| G1 official history | Recommend immutable official body/assets and ordinary-delete refusal, retaining starring and existing organizational metadata unless specified otherwise. Update contract §6.1 and intentional edit-allowed test. Explicitly preserve existing retention/admin-reset exceptions or specify changed rules. Editable history/soft delete/recovery UI needs separately approved schema/product scope and is forbidden here. Old lost content is not reconstructable from present audit metadata. | A |
-| G2 canonical editor scope | RE lacks caret/range/decoration hooks, FT lacks inline-token rendering. Recommend Lead-owned domain-neutral optional hooks and a canonical interactive hover/focus card if no overlay fits. These files are outside the owner's grant limited to shared image tools. Lead must implement the prerequisite separately or obtain explicit bounded authority extension before Executor B. No app-private formatter/editor substitute. Enumerate all additional editor/formatter consumers before changing them. | Full B |
-| G3 phase × | Removing a required phase creates a General note. Recommend keeping phase required until Lead/owner approves General creation, default/empty selection and image upload transport under existing document rights. A5 existing-General editing can proceed independently. No inert × or silent fallback phase. | B phase removal |
-| G4 polish choices | Approve bounded copy list (recommend English to match Notes/Product Schedule), initial Pan (crop-first), pin nudge 1%, Shift 5%. No new drawing tools/recents/chat search or persistent editable scribbles. | B/C/D |
+G1–G4 resolved 2026-10-15; see Locked Decisions 5–8. Nothing in slice A waits on the owner.
 
 ## Business Rules and Architecture Constraints
 
@@ -150,27 +149,49 @@ Search covered symbol references and image filenames across all src and tests/pu
 
 ## Backend Contract
 
-### Ordered slice A — reliable Notes
+### Ordered slice A — reliable Notes (READY, R9.66)
 
-One coherent implementation revision after G1. Files: W, A, N, PN; all phaseNoteAction/editPhaseNote/deletePhaseNote/setPhaseNoteFlags callers including dialogs/image actions; StudioFlow service/action/surface tests; approved contract amendment.
+One coherent revision. Module: studioflow. Files: W (`src/apps/studioflow/workspace/service.ts`), A (`src/app/(platform)/studioflow/actions.ts`), N, PN; StudioFlow service/integration tests. No schema, migration, dependency, shared UI Engine or contract-policy change (G1 keeps §6.1). A1 is **out of scope** (by design).
 
-- Central services refuse G1-protected mutation/deletion before text/metadata/link changes or storage cleanup, for both Notes and Board. Check Board bulk delete for clear refusal and unintended partial deletion. Preserve established retention/override behavior unless G1 explicitly changes it.
-- Require positive read-version for edit/flags/delete and update every caller. Include version in ChatNote, capture it on entering edit, never advance it under an old draft. Keep draft on WORKSPACE_CARD_STALE with explicit reload/retry and safe conflict copy.
-- One app-owned body resolver derives complete normalized item set for phase/General chat edits; validate exact codes, same project, duplicates/limits and apply atomically with body/tags/version. [] clears removed mentions. Unmatched/ambiguous codes remain plain per existing send behavior; failed lookup keeps draft unsaved rather than silently losing a relation. Preserve deliberate Board explicit link-set semantics unless Lead approves a full consumer update.
-- Add Notes transport for existing General-note mutations through the existing project gate; no fabricated phase or workspace-board gate bypass. Pass server-derived canEditGeneral. Keep phase-labelled writes under phase-specific rights.
-- Refresh selected filtered data/cursor coherently; do not briefly display unfiltered initial notes. Guard stale filter/project requests; retain non-bottom reading anchor. Add no new search feature.
+**A2 + A5 — one Notes mutation door that always names the version it read.**
+- In A add `noteAction` (strict discriminated union, `runSafeAction`, **no** `requireModuleEnabled(WORKSPACE_BOARD)`): `edit {projectId, noteId, version, body, tags?, itemEntryIds}`, `flags {projectId, noteId, version, starred?, clientFeedback?}`, `delete {projectId, noteId, version}`. `version` is the existing `Version` schema (positive int, required). No `phaseId` from the client: the service gates by the card's own stored label.
+- Route to the existing `studioFlow.workspace.updateWorkspaceCardText` / `setWorkspaceCardFlags` / `deleteWorkspaceCard` (W:476–488). These already require `version`, load the card by project and apply `writableScope(card.phase_id)`: phase-labelled → that phase's `phaseWork`+`transition`; unlabelled (General) → `phaseWork`+`document`; open ACTIVE unarchived project. Do not add a new gate, do not fabricate a phase, do not infer General rights from a writable phase. `refresh(projectId)` as today.
+- Remove the `edit`/`flags`/`delete` members of `PhaseNoteCommand` and their switch cases, and `editPhaseNote`/`setPhaseNoteFlags`/`deletePhaseNote` from `phaseNotes` if nothing else calls them (grep shows only N uses them; `post` stays for N, NC and phase-commands). Update tests that called the removed phase-note doors to call the workspace door instead.
+- N: add `version: number` to `ChatNote` (cardView already returns it, W:580). Capture the version when an edit begins and send *that* captured value on save, never a version refreshed while the draft was open. Flags/delete send the version of the note as rendered; album group actions send each note's own version.
+- On `WORKSPACE_CARD_STALE`: keep the editor open with the draft intact, show the safe message, and offer an explicit **Reload** that refetches the current view; the draft is never silently re-based. For star/feedback/delete, show the error and reload the view.
+- PN: compute `canEditGeneral = open && access.canEditDocuments` server-side (same rule as `project-workspace.tsx:58`) and pass it. N: `canEdit = note.phaseId ? writable.has(note.phaseId) : canEditGeneral`; `run` no longer bails out on a null phase. Composer visibility and posting rules are unchanged (G3).
 
-Tests to add: missing/stale transport version; sequential two-editor stale save; stale flags/delete; protected TEXT edit/delete and IMAGE/FILE deletion on both service doors with no object cleanup; manual feedback editable; remove/replace/duplicate/escaped/wrong-project mention sets and limits; Board explicit []/undefined semantics; General PIC/outsider/phase-only/closed/archived/Board-off cases; filter refresh and response ordering. Update the prior official-edit test only with approved G1.
+**A3 — edits resend the complete mention set.**
+- Extract the existing send-path resolution (N:446–457: find `@CODE` tokens, resolve via `searchNoteItemsAction`, keep exact matches) into one app-owned helper in N used by both post and edit. Edit always sends `itemEntryIds` = the de-duplicated resolved set of the edited body, `[]` when none remain, max 10.
+- Unmatched/ambiguous codes stay plain text, as on send. If a lookup call itself fails, do not save: keep the draft and show the error (never save with a partially resolved set).
+- Do not change service semantics of `itemEntryIds: undefined` (Board relies on it to keep explicit links).
+
+**A4 — keep the reader's view.**
+- When a fresh `initial` arrives from a page refresh, keep the current filter: if it is `all`, adopt `initial` as today; otherwise refetch the current filter instead of showing the unfiltered page. Reset the filter to `all` only when `projectId` changes.
+- Keep scroll position when the reader is not at the bottom (do not force `stickToBottom` on a background refresh); after the reader's own post, still scroll to the newest.
+- Guard request ordering: a response for a filter/project that is no longer current, or from an older request, is ignored (request counter or equivalent); `olderPage` also handles thrown errors (currently no catch) with the existing safe message.
+- No search feature.
+
+**Tests (integration on the guarded test DB; pure tests where natural).**
+1. `noteAction` contract: missing or non-positive version rejected by the schema.
+2. Two sequential editors on one note: first save passes, second with the old version → `WORKSPACE_CARD_STALE`, body unchanged. Same for flags and delete with a stale version.
+3. General note with Board **disabled**: project document PIC can edit/star/delete; a user with only a phase transition right and no document right is refused; outsider refused; completed/archived/non-ACTIVE project refused.
+4. A phase-labelled note through the new door still follows that phase's rule (writer of another phase refused).
+5. Official workflow record: body edit and delete still succeed; origin change still `WORKSPACE_RECORD_LOCKED` (pins the G1 behaviour).
+6. Edit that removes `@HT-01` with `itemEntryIds: []` clears the link; replacing HT-01→HT-02 swaps it; duplicates collapse; >10 → `NOTE_ITEM_LIMIT`; wrong-project id → `NOTE_ITEM_INVALID`; Board `updateCard` with `itemEntryIds` omitted still keeps links.
+7. If N's resolver/filter logic is extracted as a pure function, unit-test token extraction (punctuation, escaped Markdown, repeated codes) and the stale-response guard.
+
+**Executor verification (all required):** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Location kantor: load `.env.kantor`, set `STUDIOFLOW_LOCATION=kantor`, confirm both targets are the rebuild dev/test DBs before any DB command; no migration expected. Read the installed Next.js server-action docs before adding the action. Browser acceptance belongs to the Reviewer (group [R9.64] A, without the official-record lock step).
 
 ### Ordered slice B — @/# and sent mentions
 
-One independently useful interaction revision, after G2 prerequisites and G3 decision. Files: N/NC; W search/item view; A; existing Schedule targeting; e2e/notes-chat.spec.ts. Shared editor/formatter/overlay only by Lead or separate explicit grant, not current Executor authority.
+One independently useful interaction revision, after the Lead's G2 shared-editor revision lands. G3 locked: no phase ×. Files: N/NC; W search/item view; A; existing Schedule targeting; e2e/notes-chat.spec.ts. Shared editor/formatter/overlay only by Lead or separate explicit grant, not current Executor authority.
 
 - Empty query returns first 10 in stable Schedule order; partial normalized code OR name search retains exact full-code and final/active-option semantics. Expose entryId/name/location/code and signed thumbnail URL through app reads; link to that entry. No recency storage or long-lived URL persistence.
 - Canonical optional editor hooks report caret token/range/coordinates and transient highlight, replace exactly that range, preserve Markdown/IME/list/Shift/Enter behavior for all other consumers. Notes supplies domain content/query policy.
 - Open @/# popup immediately, above caret and within viewport; header, code/name/right location, initial highlight, scroll/keys/pointer/focus, loading/empty/error/retry. New query/close invalidates old responses. Lookup error prevents silent unresolved send/edit.
 - Inline resolved @CODE chips preserve formatted text; hover/focus opens thumbnail, CODE · Product Schedule, name/location and reachable Open item →. Missing/deleted image/entry degrades safely. No raw HTML/private formatter.
-- Retain reserved feedback/five-tag and existing reply/album/upload/PIC rules, polish round attach/send buttons. Phase × implementation follows G3; if G2/G3 is unresolved, this slice remains DRAFT rather than silently incomplete.
+- Retain reserved feedback/five-tag and existing reply/album/upload/PIC rules, polish round attach/send buttons. Phase stays required (G3); no ×.
 
 Tests: empty/prefix/exact/name/final-option/project scope; signed/missing image+ID; middle-text caret/punctuation/escaping/IME; stale result/Escape; Up/Down/Enter/Tab and focus; no results/error/retry; formatted chips/card link; # new/existing/feedback/limit; send/Shift/list Enter, attachments/album. G2 requires its separate complete shared-editor/formatter consumer matrix before implementation.
 
@@ -209,7 +230,7 @@ No Run 1 application changes; historical backfill, soft-delete/edit-history sche
 ## Acceptance Criteria
 
 1. Lead resolves G1–G4 and makes one vertical slice READY with next-unused revision; decisions are not implementation guesses.
-2. A protects approved historical evidence, rejects stale mutations, synchronizes edited-body links, preserves reader/draft state and supports existing General edits under unchanged rights with Board off.
+2. A rejects stale mutations (keeping the draft), synchronizes edited-body links, preserves reader/draft state and supports existing General edits under unchanged rights with Board off.
 3. B meets bare @/#, filtering/states/caret/highlight/keys/pointer/inline card/composer requirements, with phase-removal decision explicit.
 4. C moves pins without breaking image drag/click/print, confirms destruction, shows failures and makes reads pure.
 5. D makes preview/output agree and gestures/undo understandable, with every consumer verified.
@@ -236,16 +257,19 @@ A, B, C and D are independently useful acceptance/revert boundaries; no preparat
 ## Executor Prompt
 
 ```text
-ROLE: BACKEND EXECUTOR, with only the owner's expressly expanded UI lane.
-Location: kantor. Read AGENTS.md, docs/agent/EXECUTOR.md and PLAN.md
-WO-SF-NOTES-PRESENTATION-IMAGE-01. R9.64 is a DRAFT audit/plan, not execution
-authority. Start Run 2 only after the Lead's recorded OK/corrections and the
-selected slice's material decisions are resolved; normally A first. Allocate
-the next unused CHANGELOG revision. Shared editor/formatter/overlay work needs
-a Lead-owned prerequisite or separate explicit grant. Preserve module/PIC
-boundaries and owner test files; no new schema/migrations/dependencies, legacy
-or remote operations. Finish the entire READY vertical slice, required tests
-and checks, changelog and one local commit. Return only the Planner/Reviewer
-prompt with outcome, commit, checks, limitations, pending browser groups and
-complete remaining dirty files. Stop precisely for material contract conflict.
+ROLE: BACKEND EXECUTOR. Location: kantor (load .env.kantor, set
+STUDIOFLOW_LOCATION=kantor, verify rebuild-only dev/test targets).
+Read AGENTS.md, docs/agent/EXECUTOR.md and PLAN.md
+WO-SF-NOTES-PRESENTATION-IMAGE-01. Implement ONLY "Ordered slice A - reliable
+Notes (READY, R9.66)": Board-independent noteAction with required version,
+General-note edit/star/delete under the existing document right, draft kept on
+stale conflict, full mention set resent on edit, reader filter/scroll kept
+across refresh. G1 is locked as "keep existing policy": do NOT make official
+records immutable or undeletable and do not touch contract section 6.1. Do not
+edit shared rich-text editor/formatter/overlay files (G2 is Lead-owned), add no
+phase x (G3), no schema/migration/dependency, no legacy, no remote operations.
+Preserve untracked owner files under test/. Finish the slice with the listed
+tests and all checks, CHANGELOG R9.66, one local commit. Return only the
+Planner/Reviewer prompt: outcome, commit, checks, limitations, remaining dirty
+files. Stop with BLOCKED / CONFLICT if the plan contradicts the repository.
 ```

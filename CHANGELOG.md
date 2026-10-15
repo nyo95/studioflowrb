@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.65 | 2026-10-15 | review(plan): Lock Notes/Presentation/image gates and make slice A READY (Lead)
+
+- **Review of R9.64 (`3c2d706`):** audit accepted. Lead re-traced A1–A5 and B2 in source (workspace service card gates/version/link sync, chat transport, phase actions); findings hold. One design simplification: the Notes edit/flags/delete door reuses the existing version-required workspace card methods, which already gate by each card's own label, so stale-version (A2) and General-note editing with Board off (A5) close together without a new gate.
+- **Owner decisions 2026-10-15:** G1 keep existing policy — official records stay correctable/deletable ("harusnya bisa di edit dong, kalau typo gmn"); A1 closed as by design, the BLOCKED history-policy backlog entry removed, contract §6.1 unchanged, browser group A adjusted. G2 Lead builds shared editor/formatter hooks before slice B. G3 phase stays required, no ×. G4 English copy, Pan-first image editor, pin nudge 1%/Shift 5%.
+- **PLAN.md:** status READY for slice A (target R9.66) with exact files, contracts and tests; B/C/D stay DRAFT. Executor prompt replaced.
+- **Checks:** docs-only; whitespace check. No application code, schema or remote operation. Untracked owner files under `test/` preserved.
+
 ## R9.64 | 2026-10-15 | docs(plan): Audit Notes integrity, Presentation and shared image tools (Executor)
 
 - **Owner Work Order / scope:** Run 1 study, audit and plan only, with temporary UI scope expanded for Notes chat, Presentation and shared image patterns. Replaced PLAN.md with DRAFT **WO-SF-NOTES-PRESENTATION-IMAGE-01** in the plan template structure: per-item CONFIRMED / PARTIAL / NOT REPRODUCED findings with R9.63 file/line evidence, complete image consumer matrix, ordered independently useful A → B → C → D slices, test specifications, risks, boundaries and a copy-ready gated Executor prompt. No application source/test implementation.
