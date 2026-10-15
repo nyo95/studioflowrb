@@ -74,6 +74,9 @@ export function createAssetRetentionService(db: Db, ports: StudioFlowPorts) {
         await tx.sfDeliverable.deleteMany({ where: { project_id: project.id } });
         // Image and file elements are nothing without their object, so they go with it; text elements stay.
         await tx.sfWorkspaceCard.deleteMany({ where: { project_id: project.id, storage_key: { not: null } } });
+        const emptyThreads = await tx.sfWorkspaceThread.findMany({ where: { project_id: project.id, messages: { none: {} } }, select: { id: true } });
+        await tx.sfWorkspaceThread.deleteMany({ where: { id: { in: emptyThreads.map((thread) => thread.id) }, messages: { none: {} } } });
+        for (const thread of emptyThreads) await writeAudit(ports, tx, { action: "studioflow.workspace-thread.deleted", entityType: "workspace-thread", entityId: thread.id, actor, metadata: { projectId: project.id, messageCount: 0, reason: "asset-retention" } });
         await tx.sfMomImage.deleteMany({ where: { item: { document: { project_id: project.id } } } });
         await tx.sfScheduleOption.updateMany({ where: { entry: { project_id: project.id }, image_key: { not: null } }, data: { image_key: null } });
         const counts = { deliverables: deliverables.length, iterationImages: iterationImages.length, momImages: images.length, momSnapshotImages, optionPhotos: options.length, unparseableRevisions };

@@ -50,6 +50,7 @@ export type WorkspaceFileUpload = { body: Uint8Array; name: string };
 export type WorkspaceCardOrigin = "NOTE" | "CLIENT_ANSWER" | "SITE_VISIT";
 export type WorkspaceElementKind = "TEXT" | "IMAGE" | "FILE";
 export type WorkspaceTextStyle = "PLAIN" | "HEADING" | "STICKY";
+export type WorkspaceThreadSpec = { threadId: string } | { x: number; y: number } | { anchorCardId: string; offsetX: number; offsetY: number };
 export const WORKSPACE_TEXT_STYLES: readonly WorkspaceTextStyle[] = ["PLAIN", "HEADING", "STICKY"];
 /** Where an image added beside an element lands: to its right, each later one a little lower. */
 const BESIDE_GAP = 16;
@@ -76,7 +77,7 @@ function recordLocked(): AppError {
   return conflict("WORKSPACE_RECORD_LOCKED", "This was recorded by a phase step, so whether it is client feedback and its phase stay as recorded.");
 }
 
-/** Serialises the default section's creation and canvas batches for one project. */
+/** Serialises default-section creation, canvas batches and thread lifecycles for one project. */
 async function lockProject(tx: TxClient, projectId: string) {
   await tx.$queryRaw`SELECT id FROM studioflow.sf_project WHERE id = ${projectId} FOR UPDATE`;
 }
@@ -108,7 +109,7 @@ async function nextCardOrder(tx: TxClient, sectionId: string) {
  * or what was seen on site lands in the project's Workspace in the same transaction; those pass `workflowRecord`, which
  * fixes the element's origin and labels. Without `iterationId`, the phase's latest round labels it.
  */
-export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, input: { projectId: string; phaseId: string | null; iterationId?: string | null; body: string; origin: WorkspaceCardOrigin; workflowRecord?: boolean; pinned?: boolean; actor: AuditActor; at: Date; x?: number; y?: number; w?: number; kind?: WorkspaceElementKind; textStyle?: WorkspaceTextStyle; asset?: StoredAsset }) {
+export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, input: { projectId: string; phaseId: string | null; threadId?: string; iterationId?: string | null; body: string; origin: WorkspaceCardOrigin; workflowRecord?: boolean; pinned?: boolean; actor: AuditActor; at: Date; x?: number; y?: number; w?: number; kind?: WorkspaceElementKind; textStyle?: WorkspaceTextStyle; asset?: StoredAsset }) {
   const iterationId = input.iterationId !== undefined
     ? input.iterationId
     : input.phaseId ? (await tx.sfRevision.findFirst({ where: { phase_id: input.phaseId }, orderBy: { major: "desc" }, select: { id: true } }))?.id ?? null : null;
@@ -119,6 +120,7 @@ export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, 
       id: randomUUID(), project_id: input.projectId, section_id: sectionId, sort_order: sortOrder, phase_id: input.phaseId, iteration_id: iterationId,
       body: input.body, origin: input.origin, workflow_record: input.workflowRecord ?? false, is_pinned: input.pinned ?? false, author_id: input.actor.userId ?? null, author_name: input.actor.label, created_at: input.at,
       canvas_x: input.x, canvas_y: input.y, canvas_w: input.w,
+      thread_id: input.threadId,
       kind: input.kind ?? "TEXT", text_style: input.textStyle ?? "PLAIN", ...(input.asset ?? {}),
     },
     select: { id: true },
@@ -126,10 +128,11 @@ export async function insertWorkspaceCard(tx: TxClient, ports: StudioFlowPorts, 
 }
 
 type CardRow = {
+  thread_id: string | null;
   id: string; project_id: string; section_id: string; phase_id: string | null; iteration_id: string | null; body: string; is_pinned: boolean; origin: WorkspaceCardOrigin; workflow_record: boolean; version: number;
   kind: WorkspaceElementKind; storage_key: string | null; canvas_x: number | null; canvas_y: number | null; canvas_w: number | null;
 };
-const CARD_ROW_SELECT = { id: true, project_id: true, section_id: true, phase_id: true, iteration_id: true, body: true, is_pinned: true, origin: true, workflow_record: true, version: true, kind: true, storage_key: true, canvas_x: true, canvas_y: true, canvas_w: true } as const;
+const CARD_ROW_SELECT = { id: true, project_id: true, section_id: true, phase_id: true, iteration_id: true, body: true, is_pinned: true, origin: true, workflow_record: true, version: true, kind: true, storage_key: true, canvas_x: true, canvas_y: true, canvas_w: true, thread_id: true } as const;
 type ProjectInput = CommandContext & { projectId: string };
 type CardGeometry = { x: number; y: number; w: number };
 
@@ -198,7 +201,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     return card;
   }
 
-  async function audit(tx: TxClient, actor: AuditActor, entity: "workspace-card" | "workspace-section", action: string, entityId: string, metadata: Record<string, unknown>) {
+  async function audit(tx: TxClient, actor: AuditActor, entity: "workspace-card" | "workspace-section" | "workspace-thread", action: string, entityId: string, metadata: Record<string, unknown>) {
     await writeAudit(ports, tx, { action: `studioflow.${entity}.${action}`, entityType: entity, entityId, actor, metadata });
   }
 
@@ -275,29 +278,60 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     if (entries.length) await tx.sfNoteItemLink.createMany({ data: entries.map((entry) => ({ card_id: cardId, entry_id: entry.id, code_snapshot: scheduleCode(entry.prefix, entry.increment) })) });
   }
 
-  async function validateReply(tx: TxClient, projectId: string, replyToId: string | undefined) {
+  async function validateReply(tx: TxClient, projectId: string, replyToId: string | undefined, threadId?: string | null) {
     if (!replyToId) return null;
-    const target = await tx.sfWorkspaceCard.findFirst({ where: { id: replyToId, project_id: projectId }, select: { id: true } });
+    if (threadId === null) throw invalid("NOTE_REPLY_INVALID", "Reply to a message in this thread.");
+    const target = await tx.sfWorkspaceCard.findFirst({ where: { id: replyToId, project_id: projectId, ...(threadId ? { thread_id: threadId } : {}) }, select: { id: true } });
     if (!target) throw invalid("NOTE_REPLY_INVALID", "Reply to a note in this project.");
     return target.id;
   }
 
-  async function createCard(input: ProjectInput & { phaseId?: string | null; body: string | null; origin?: "NOTE" | "CLIENT_ANSWER"; textStyle?: string; x?: number; y?: number; w?: number; replyToId?: string; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }) {
+  /** Project lock serialises posting, marker movement and explicit deletes, including the first/last message. */
+  async function threadForPost(tx: TxClient, input: ProjectInput & { thread: WorkspaceThreadSpec }, create: boolean): Promise<string | null> {
+    const spec = input.thread;
+    if ("threadId" in spec) {
+      const thread = await tx.sfWorkspaceThread.findFirst({ where: { id: spec.threadId, project_id: input.projectId }, select: { id: true } });
+      if (!thread) throw notFound("workspace thread");
+      return thread.id;
+    }
+    let anchorCardId: string | null = null;
+    let offsetX: number | null = null;
+    let offsetY: number | null = null;
+    let x: number;
+    let y: number;
+    if ("anchorCardId" in spec) {
+      const anchor = await loadCard(tx, { ...input, cardId: spec.anchorCardId });
+      if (anchor.thread_id) throw invalid("WORKSPACE_THREAD_MESSAGE", "A thread message cannot anchor another thread.");
+      for (const value of [spec.offsetX, spec.offsetY]) if (!Number.isInteger(value) || value < -2_147_483_648 || value > 2_147_483_647) throw invalid("WORKSPACE_CANVAS_INVALID", "Thread offsets must be whole numbers.");
+      anchorCardId = anchor.id; offsetX = spec.offsetX; offsetY = spec.offsetY;
+      x = (anchor.canvas_x ?? 0) + offsetX; y = (anchor.canvas_y ?? 0) + offsetY;
+    } else { x = spec.x; y = spec.y; }
+    canvasInteger(x, 0, "Thread x"); canvasInteger(y, 0, "Thread y");
+    if (!create) return null;
+    const row = await tx.sfWorkspaceThread.create({ data: { project_id: input.projectId, x, y, anchor_card_id: anchorCardId, offset_x: offsetX, offset_y: offsetY, created_by_id: input.actor.userId, created_at: nowOf(ports) } });
+    await audit(tx, input.actor, "workspace-thread", "created", row.id, { projectId: input.projectId, anchorCardId, x, y });
+    return row.id;
+  }
+
+  async function createCard(input: ProjectInput & { phaseId?: string | null; thread?: WorkspaceThreadSpec; body: string | null; origin?: "NOTE" | "CLIENT_ANSWER"; textStyle?: string; x?: number; y?: number; w?: number; replyToId?: string; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }) {
+    if (input.thread && !input.phaseId) throw invalid("WORKSPACE_THREAD_PHASE_REQUIRED", "Choose a phase for this message.");
     const body = optionalText(input.body, PHASE_NOTE_MAX) ?? "";
     if (!body) throw invalid("PHASE_NOTE_EMPTY", "Write something.");
     const canvas = cardGeometry(input);
     const textStyle = textStyleOf(input.textStyle);
     return runTransaction(async (tx) => {
+      if (input.thread) await lockProject(tx, input.projectId);
       const phaseId = input.phaseId ?? null;
       await validatePhaseLabel(tx, input.projectId, phaseId);
       await writableScope(tx, input, phaseId);
-      const replyToId = await validateReply(tx, input.projectId, input.replyToId);
-      const card = await insertWorkspaceCard(tx, ports, { projectId: input.projectId, phaseId, body, origin: input.origin ?? "NOTE", textStyle, actor: input.actor, at: nowOf(ports), ...canvas });
+      const threadId = input.thread ? await threadForPost(tx, { ...input, thread: input.thread }, true) : undefined;
+      const replyToId = await validateReply(tx, input.projectId, input.replyToId, threadId);
+      const card = await insertWorkspaceCard(tx, ports, { projectId: input.projectId, phaseId, threadId: threadId ?? undefined, body, origin: input.origin ?? "NOTE", textStyle, actor: input.actor, at: nowOf(ports), ...(input.thread ? {} : canvas) });
       if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: card.id }, data: { reply_to_id: replyToId } });
       await syncTags(tx, card.id, input.projectId, input.tags);
       await syncItemLinks(tx, card.id, input.projectId, input.itemEntryIds);
       await audit(tx, input.actor, "workspace-card", "created", card.id, { projectId: input.projectId, phaseId });
-      return { cardId: card.id };
+      return { cardId: card.id, ...(threadId ? { threadId } : {}) };
     });
   }
 
@@ -354,11 +388,38 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
 
   async function deleteCard(input: ProjectInput & { cardId: string; version?: number }, phaseId?: string) {
     const result = await runTransaction(async (tx) => {
+      await lockProject(tx, input.projectId);
       const card = await writableCard(tx, input, phaseId);
       const keys = card.storage_key ? [card.storage_key] : [];
+      // Keep message labels stable from permission checks through the explicit cascade.
+      await tx.$queryRaw`SELECT c.id FROM studioflow.sf_workspace_card c
+        JOIN studioflow.sf_workspace_thread t ON t.id = c.thread_id
+        WHERE t.anchor_card_id = ${card.id} ORDER BY c.id FOR UPDATE OF c`;
+      const anchored = await tx.sfWorkspaceThread.findMany({ where: { anchor_card_id: card.id, project_id: input.projectId }, include: { messages: { select: CARD_ROW_SELECT } } });
+      const labels = new Set(anchored.flatMap((thread) => thread.messages.map((message) => message.phase_id)));
+      for (const label of labels) {
+        try { await writableScope(tx, input, label); }
+        catch (error) {
+          if (error instanceof AppError) throw conflict("WORKSPACE_THREAD_LOCKED", "You cannot delete this element because some attached messages are outside your write access.");
+          throw error;
+        }
+      }
+      for (const thread of anchored) {
+        for (const message of thread.messages) {
+          if (message.storage_key) keys.push(message.storage_key);
+          await tx.sfWorkspaceCard.delete({ where: { id: message.id } });
+          await audit(tx, input.actor, "workspace-card", "deleted", message.id, { projectId: input.projectId, phaseId: message.phase_id, kind: message.kind, threadId: thread.id });
+        }
+        await tx.sfWorkspaceThread.delete({ where: { id: thread.id } });
+        await audit(tx, input.actor, "workspace-thread", "deleted", thread.id, { projectId: input.projectId, messageCount: thread.messages.length, anchorCardId: card.id });
+      }
       const deleted = await tx.sfWorkspaceCard.deleteMany({ where: { id: card.id, version: card.version } });
       if (deleted.count === 0) throw staleCard();
       await audit(tx, input.actor, "workspace-card", "deleted", card.id, { projectId: input.projectId, phaseId: card.phase_id, kind: card.kind });
+      if (card.thread_id && await tx.sfWorkspaceCard.count({ where: { thread_id: card.thread_id } }) === 0) {
+        await tx.sfWorkspaceThread.delete({ where: { id: card.thread_id } });
+        await audit(tx, input.actor, "workspace-thread", "deleted", card.thread_id, { projectId: input.projectId, messageCount: 1 });
+      }
       return { cardId: card.id, keys: await enqueueUnreferencedCleanup(tx, keys) };
     });
     await discardObjects(db, ports.storage, result.keys);
@@ -421,7 +482,8 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
    * One image element, in one step: the image is its content. `labels` resolves its labels and place inside the write
    * transaction (beside another element, or a phase step's record); otherwise the caller's phase label and place.
    */
-  async function createImage(input: NewElementInput & { file: NoteImageUpload }, labels?: (tx: TxClient) => Promise<ElementLabels>) {
+  async function createImage(input: NewElementInput & { file: NoteImageUpload; thread?: WorkspaceThreadSpec }, labels?: (tx: TxClient) => Promise<ElementLabels>) {
+    if (input.thread && !input.phaseId) throw invalid("WORKSPACE_THREAD_PHASE_REQUIRED", "Choose a phase for this message.");
     requireCommand(input, P.phaseWork);
     const { extension, bytes } = checkedImage(input.file);
     const canvas = cardGeometry(input);
@@ -430,21 +492,30 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       return { phaseId: input.phaseId ?? null, origin: input.clientAnswer ? "CLIENT_ANSWER" : "NOTE", place: canvas };
     });
     // Scope and access are checked before touching storage, then again inside the write transaction.
-    await runTransaction(async (tx) => { await writableScope(tx, input, (await resolve(tx)).phaseId); });
+    await runTransaction(async (tx) => {
+      if (input.thread) await lockProject(tx, input.projectId);
+      await writableScope(tx, input, (await resolve(tx)).phaseId);
+      if (input.thread) {
+        const threadId = await threadForPost(tx, { ...input, thread: input.thread }, false);
+        await validateReply(tx, input.projectId, input.replyToId, threadId);
+      }
+    });
     const key = createPrivateObjectKey(`studioflow/notes/${input.projectId}`, extension);
     return storeThen(key, { contentType: input.file.contentType, bytes, body: input.file.body }, () => runTransaction(async (tx) => {
+      if (input.thread) await lockProject(tx, input.projectId);
       const resolved = await resolve(tx);
       await writableScope(tx, input, resolved.phaseId);
+      const threadId = input.thread ? await threadForPost(tx, { ...input, thread: input.thread }, true) : undefined;
       const element = await insertWorkspaceCard(tx, ports, {
-        projectId: input.projectId, phaseId: resolved.phaseId, iterationId: resolved.iterationId, body: "", origin: resolved.origin, workflowRecord: resolved.workflowRecord,
-        actor: input.actor, at: nowOf(ports), ...resolved.place,
+        projectId: input.projectId, phaseId: resolved.phaseId, threadId: threadId ?? undefined, iterationId: resolved.iterationId, body: "", origin: resolved.origin, workflowRecord: resolved.workflowRecord,
+        actor: input.actor, at: nowOf(ports), ...(input.thread ? {} : resolved.place),
         kind: "IMAGE", asset: { storage_key: key, content_type: input.file.contentType, bytes, uploaded_by_id: input.actor.userId ?? null, uploaded_by_name: input.actor.label },
       });
-      const replyToId = await validateReply(tx, input.projectId, input.replyToId);
+      const replyToId = await validateReply(tx, input.projectId, input.replyToId, threadId);
       if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: element.id }, data: { reply_to_id: replyToId } });
       await syncTags(tx, element.id, input.projectId, input.tags);
       await audit(tx, input.actor, "workspace-card", "created", element.id, { projectId: input.projectId, phaseId: resolved.phaseId, kind: "IMAGE", bytes });
-      return { cardId: element.id };
+      return { cardId: element.id, ...(threadId ? { threadId } : {}) };
     }));
   }
 
@@ -469,6 +540,34 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       return { cardId: element.id };
     }));
   }
+
+  type ThreadPostInput = ProjectInput & { thread: WorkspaceThreadSpec; phaseId: string; clientFeedback?: boolean; replyToId?: string; tags?: readonly NoteTagInput[] };
+  const threads = {
+    async postThreadMessage(input: ThreadPostInput & { body: string | null; itemEntryIds?: readonly string[] }) {
+      const result = await createCard({ ...input, origin: input.clientFeedback ? "CLIENT_ANSWER" : "NOTE" });
+      return { threadId: result.threadId!, noteId: result.cardId };
+    },
+    async postThreadImage(input: ThreadPostInput & { file: NoteImageUpload }) {
+      const result = await createImage({ ...input, clientAnswer: input.clientFeedback });
+      return { threadId: result.threadId!, imageId: result.cardId };
+    },
+    async moveThread(input: ProjectInput & { threadId: string; version: number; x: number; y: number }) {
+      const x = canvasInteger(input.x, 0, "Thread x");
+      const y = canvasInteger(input.y, 0, "Thread y");
+      return runTransaction(async (tx) => {
+        await lockProject(tx, input.projectId);
+        await writableProject(tx, input);
+        const thread = await tx.sfWorkspaceThread.findFirst({ where: { id: input.threadId, project_id: input.projectId } });
+        if (!thread) throw notFound("workspace thread");
+        if (thread.anchor_card_id) throw conflict("WORKSPACE_THREAD_ANCHORED", "An attached marker moves with its element.");
+        if (thread.version !== input.version) throw conflict("WORKSPACE_THREAD_STALE", "This thread moved in the meantime. Reload its latest position.");
+        const moved = await tx.sfWorkspaceThread.updateMany({ where: { id: thread.id, version: input.version }, data: { x, y, version: { increment: 1 } } });
+        if (!moved.count) throw conflict("WORKSPACE_THREAD_STALE", "This thread moved in the meantime. Reload its latest position.");
+        await audit(tx, input.actor, "workspace-thread", "moved", thread.id, { projectId: input.projectId, x, y });
+        return { threadId: thread.id, version: thread.version + 1 };
+      });
+    },
+  };
 
   const cards = {
     createWorkspaceCard: (input: ProjectInput & { phaseId?: string | null; body: string | null; clientAnswer?: boolean; textStyle?: string; x?: number; y?: number; w?: number; replyToId?: string; tags?: readonly NoteTagInput[]; itemEntryIds?: readonly string[] }) =>
@@ -524,8 +623,9 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         assertProjectWritable(project);
         if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing its notes.");
 
-        const cardRows = await tx.sfWorkspaceCard.findMany({ where: { id: { in: [...cardsById.keys()] }, project_id: input.projectId }, select: { id: true, phase_id: true } });
+        const cardRows = await tx.sfWorkspaceCard.findMany({ where: { id: { in: [...cardsById.keys()] }, project_id: input.projectId }, select: { id: true, phase_id: true, thread_id: true } });
         if (cardRows.length !== cardsById.size) throw cardNotFound();
+        if (cardRows.some((card) => card.thread_id)) throw invalid("WORKSPACE_THREAD_MESSAGE", "Thread messages cannot be placed on the board.");
         for (const card of cardRows) await writableScope(tx, input, card.phase_id);
         for (const card of cardRows) {
           const item = cardsById.get(card.id)!;
@@ -533,7 +633,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         }
 
         // The stored order follows the board top to bottom, for the phone's reading order.
-        const rows = await tx.sfWorkspaceCard.findMany({ where: { project_id: input.projectId }, select: { id: true, canvas_x: true, canvas_y: true, created_at: true, sort_order: true } });
+        const rows = await tx.sfWorkspaceCard.findMany({ where: { project_id: input.projectId, thread_id: null }, select: { id: true, canvas_x: true, canvas_y: true, created_at: true, sort_order: true } });
         rows.sort((a, b) => {
           const aPlaced = a.canvas_x !== null && a.canvas_y !== null;
           const bPlaced = b.canvas_x !== null && b.canvas_y !== null;
@@ -550,6 +650,8 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   // ── Reads ─────────────────────────────────────────────────────────────
 
   type CardReadRow = {
+    thread_id: string | null;
+    anchored_threads?: Array<{ _count: { messages: number } }>;
     id: string; body: string; is_pinned: boolean; origin: WorkspaceCardOrigin; workflow_record: boolean; author_id: string | null; author_name: string | null; created_at: Date; edited_at: Date | null; version: number;
     sort_order: number; phase_id: string | null; iteration_id: string | null; canvas_x: number | null; canvas_y: number | null; canvas_w: number | null;
     kind: WorkspaceElementKind; text_style: WorkspaceTextStyle; storage_key: string | null; content_type: string | null; bytes: number | null; file_name: string | null;
@@ -560,6 +662,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     note_item_links?: Array<{ code_snapshot: string; entry: { id: string; prefix: string; increment: number; section: string; location: string | null; active_index: number; options: Array<{ label: string; created_at: Date; is_final: boolean; product_name: string; image_key: string | null }> } }>;
   };
   const CARD_INCLUDE = {
+    anchored_threads: { select: { _count: { select: { messages: true } } } },
     iteration: { select: { id: true, major: true, name: true } },
     phase: { select: { id: true, name_snapshot: true, prefix_snapshot: true, iteration_kinds_snapshot: true } },
     reply_to: { select: { id: true, kind: true, body: true, file_name: true, author_name: true, origin: true } },
@@ -576,6 +679,8 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   async function cardView(row: CardReadRow) {
     return {
       id: row.id,
+      threadId: row.thread_id,
+      anchoredThreadMessages: (row.anchored_threads ?? []).reduce((sum, thread) => sum + thread._count.messages, 0),
       sortOrder: row.sort_order,
       version: row.version,
       body: row.body,
@@ -613,7 +718,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true } });
       if (!project) throw notFound("project");
       const rows = await db.sfWorkspaceCard.findMany({
-        where: { project_id: input.projectId, ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
+        where: { project_id: input.projectId, thread_id: null, ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
         orderBy: [{ sort_order: "asc" }, { id: "asc" }],
         include: CARD_INCLUDE,
       });
@@ -627,14 +732,21 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         .map((phase) => ({ id: phase.id, name: phase.name_snapshot }));
     },
 
-    async listProjectNotes(input: ReadContext & { projectId: string; phaseId?: string; clientFeedback?: boolean; starred?: boolean; tag?: string; entryId?: string; cursor?: string; limit?: number }) {
+    async listWorkspaceThreads(input: ReadContext & { projectId: string }) {
+      requireRead(input.grants);
+      if (!await db.sfProject.count({ where: { id: input.projectId } })) throw notFound("project");
+      const rows = await db.sfWorkspaceThread.findMany({ where: { project_id: input.projectId }, orderBy: [{ created_at: "asc" }, { id: "asc" }], include: { messages: { select: { origin: true, created_at: true }, orderBy: [{ created_at: "desc" }, { id: "desc" }] } } });
+      return rows.map((row) => ({ id: row.id, version: row.version, x: row.x, y: row.y, anchorCardId: row.anchor_card_id, offsetX: row.offset_x, offsetY: row.offset_y, messageCount: row.messages.length, clientFeedback: row.messages.some((message) => message.origin === "CLIENT_ANSWER"), lastMessageAt: row.messages[0]?.created_at ?? null }));
+    },
+
+    async listProjectNotes(input: ReadContext & { projectId: string; threadId?: string; inThreads?: true; phaseId?: string; clientFeedback?: boolean; starred?: boolean; tag?: string; entryId?: string; cursor?: string; limit?: number }) {
       requireRead(input.grants);
       const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true } });
       if (!project) throw notFound("project");
       const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
       const cursor = input.cursor ? (() => { try { return JSON.parse(Buffer.from(input.cursor, "base64url").toString("utf8")) as { createdAt: string; id: string }; } catch { throw invalid("NOTE_CURSOR_INVALID", "The notes cursor is invalid."); } })() : null;
       const rows = await db.sfWorkspaceCard.findMany({
-        where: { project_id: input.projectId, ...(input.phaseId ? { phase_id: input.phaseId } : {}), ...(input.clientFeedback === undefined ? {} : { origin: input.clientFeedback ? "CLIENT_ANSWER" : { not: "CLIENT_ANSWER" } }), ...(input.starred === undefined ? {} : { is_pinned: input.starred }), ...(input.tag ? { note_tag_links: { some: { tag: { key: input.tag.replace(/^#/, "").toLocaleLowerCase("id-ID") } } } } : {}), ...(input.entryId ? { note_item_links: { some: { entry_id: input.entryId } } } : {}), ...(cursor ? { OR: [{ created_at: { lt: new Date(cursor.createdAt) } }, { created_at: new Date(cursor.createdAt), id: { lt: cursor.id } }] } : {}) },
+        where: { project_id: input.projectId, ...(input.threadId ? { thread_id: input.threadId } : input.inThreads ? { thread_id: { not: null } } : {}), ...(input.phaseId ? { phase_id: input.phaseId } : {}), ...(input.clientFeedback === undefined ? {} : { origin: input.clientFeedback ? "CLIENT_ANSWER" : { not: "CLIENT_ANSWER" } }), ...(input.starred === undefined ? {} : { is_pinned: input.starred }), ...(input.tag ? { note_tag_links: { some: { tag: { key: input.tag.replace(/^#/, "").toLocaleLowerCase("id-ID") } } } } : {}), ...(input.entryId ? { note_item_links: { some: { entry_id: input.entryId } } } : {}), ...(cursor ? { OR: [{ created_at: { lt: new Date(cursor.createdAt) } }, { created_at: new Date(cursor.createdAt), id: { lt: cursor.id } }] } : {}) },
         orderBy: [{ created_at: "desc" }, { id: "desc" }], take: limit + 1, include: CARD_INCLUDE,
       });
       const page = rows.slice(0, limit);
@@ -777,7 +889,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     })));
   }
 
-  return { workspace: { ...cards, ...reads }, phaseNotes, readPhaseNotes };
+  return { workspace: { ...cards, ...threads, ...reads }, phaseNotes, readPhaseNotes };
 }
 
 export type WorkspaceService = ReturnType<typeof createWorkspaceService>["workspace"];

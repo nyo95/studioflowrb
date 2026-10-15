@@ -426,7 +426,7 @@ export async function setPhaseNoteTagsAction(input: z.infer<typeof NoteTagsInput
   });
 }
 
-const ProjectNotesQuery = z.strictObject({ projectId: Id, phaseId: Id.optional(), clientFeedback: z.boolean().optional(), starred: z.boolean().optional(), tag: z.string().max(32).optional(), entryId: Id.optional(), cursor: z.string().max(500).optional(), limit: z.number().int().min(1).max(100).optional() });
+const ProjectNotesQuery = z.strictObject({ projectId: Id, threadId: Id.optional(), inThreads: z.literal(true).optional(), phaseId: Id.optional(), clientFeedback: z.boolean().optional(), starred: z.boolean().optional(), tag: z.string().max(32).optional(), entryId: Id.optional(), cursor: z.string().max(500).optional(), limit: z.number().int().min(1).max(100).optional() });
 export async function listProjectNotesAction(input: z.infer<typeof ProjectNotesQuery>) {
   return runSafeAction(async () => studioFlow.workspace.listProjectNotes({ grants: (await context()).grants, ...parse(ProjectNotesQuery, input) }));
 }
@@ -461,6 +461,39 @@ const WorkspaceCommand = z.discriminatedUnion("command", [
   z.strictObject({ command: z.literal("deleteCard"), projectId: Id, cardId: Id, version: Version }),
 ]);
 export type WorkspaceCommandInput = z.infer<typeof WorkspaceCommand>;
+
+const ThreadOffset = z.number().int().min(-2_147_483_648).max(2_147_483_647);
+const ThreadSpec = z.union([
+  z.strictObject({ threadId: Id }),
+  z.strictObject({ x: CanvasCoordinate, y: CanvasCoordinate }),
+  z.strictObject({ anchorCardId: Id, offsetX: ThreadOffset, offsetY: ThreadOffset }),
+]);
+const ThreadCommand = z.discriminatedUnion("command", [
+  z.strictObject({ command: z.literal("post"), projectId: Id, thread: ThreadSpec, phaseId: Id, body: NoteBody, clientFeedback: z.boolean().optional(), replyToId: Id.optional(), tags: NoteTags.optional(), itemEntryIds: NoteItemEntryIds.optional() }),
+  z.strictObject({ command: z.literal("move"), projectId: Id, threadId: Id, version: Version, x: CanvasCoordinate, y: CanvasCoordinate }),
+]);
+export type ThreadCommandInput = z.infer<typeof ThreadCommand>;
+
+export async function threadCommandAction(input: ThreadCommandInput): Promise<ActionResult<{ threadId: string; noteId?: string; version?: number }>> {
+  return runSafeAction(async () => {
+    await requireModuleEnabled(WORKSPACE_BOARD);
+    const ctx = await context();
+    const data = parse(ThreadCommand, input);
+    const result = data.command === "post"
+      ? await studioFlow.workspace.postThreadMessage({ ...ctx, ...data })
+      : await studioFlow.workspace.moveThread({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+export async function listWorkspaceThreadsAction(projectId: string) {
+  return runSafeAction(async () => {
+    await requireModuleEnabled(WORKSPACE_BOARD);
+    const ctx = await context();
+    return studioFlow.workspace.listWorkspaceThreads({ grants: ctx.grants, projectId: parse(Id, projectId) });
+  });
+}
 
 export async function workspaceAction(input: WorkspaceCommandInput): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
@@ -498,6 +531,29 @@ function noteTagsFromForm(formData: FormData): string[] | undefined {
     if (error instanceof AppError) throw error;
     throw new AppError("VALIDATION", "NOTE_TAG_INVALID", "Tags must be a JSON list.");
   }
+}
+
+/** Thread image intake shares Notes image limits; its thread fields use the same exclusive spec as text. */
+export async function postThreadImageAction(formData: FormData): Promise<ActionResult<{ threadId: string; imageId: string }>> {
+  return runSafeAction(async () => {
+    await requireModuleEnabled(WORKSPACE_BOARD);
+    const ctx = await context();
+    const threadFields: Record<string, unknown> = {};
+    for (const [name, value] of formData.entries()) {
+      if (!["threadId", "x", "y", "anchorCardId", "offsetX", "offsetY"].includes(name)) continue;
+      if (name in threadFields) throw new AppError("VALIDATION", "WORKSPACE_THREAD_INVALID", "Provide one thread location.");
+      threadFields[name] = ["x", "y", "offsetX", "offsetY"].includes(name) && typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+    }
+    const data = parse(z.strictObject({ projectId: Id, phaseId: Id, thread: ThreadSpec, replyToId: OptionalFormId, clientFeedback: z.preprocess((value) => value === "true", z.boolean()) }), {
+      projectId: formData.get("projectId"), phaseId: formData.get("phaseId"), thread: threadFields, replyToId: formData.get("replyToId"), clientFeedback: formData.get("clientFeedback"),
+    });
+    const tags = noteTagsFromForm(formData);
+    const file = formData.get("file");
+    if (!(file instanceof File)) throw new AppError("VALIDATION", "NOTE_IMAGE_REQUIRED", "Choose an image.");
+    const result = await studioFlow.workspace.postThreadImage({ ...ctx, ...data, tags, file: { body: new Uint8Array(await file.arrayBuffer()), contentType: file.type } });
+    refresh(data.projectId);
+    return result;
+  });
 }
 const NewElementForm = z.strictObject({
   projectId: Id,

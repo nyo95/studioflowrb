@@ -152,6 +152,7 @@ model SfProject {
   external_schedule_placements SfExternalSchedulePlacement[]
   workspace_sections SfWorkspaceSection[]
   workspace_cards    SfWorkspaceCard[]
+  workspace_threads  SfWorkspaceThread[]
   note_tags          SfNoteTag[]
 
   @@index([status, archived_at])
@@ -302,9 +303,32 @@ model SfWorkspaceSection {
   @@schema("studioflow")
 }
 
-/// One element on a project's Workspace board (formerly a phase note, WO-SF-NOTEFEED-01; ids kept by WO-SF-WORKSPACE-01;
-/// standalone text / image / file elements since WO-SF-WORKSPACE-04, where card images became image elements keeping
-/// their ids). The phase and round are labels: they say where the element came from and never decide where it lives.
+/// A Board note thread, created with its first message. Absolute x/y remain the fallback when an anchor is purged.
+model SfWorkspaceThread {
+  id             String   @id @default(uuid())
+  project_id     String
+  x              Int
+  y              Int
+  anchor_card_id String?
+  offset_x       Int?
+  offset_y       Int?
+  created_by_id  String?
+  created_at     DateTime @default(now())
+  updated_at     DateTime @updatedAt
+  version        Int      @default(1)
+
+  project  SfProject        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  anchor   SfWorkspaceCard? @relation("SfWorkspaceThreadAnchor", fields: [anchor_card_id], references: [id], onDelete: SetNull)
+  messages SfWorkspaceCard[] @relation("SfWorkspaceThreadMessages")
+
+  @@index([project_id])
+  @@index([anchor_card_id])
+  @@map("sf_workspace_thread")
+  @@schema("studioflow")
+}
+
+/// One board element or ordinary note. Thread messages keep the same labels, content and version gates.
+/// The phase and round record where the element came from; a thread message has no canvas geometry.
 model SfWorkspaceCard {
   id           String                @id @default(uuid())
   project_id   String
@@ -344,6 +368,7 @@ model SfWorkspaceCard {
   /// Snapshot, so the name survives the person being renamed or removed.
   uploaded_by_name String?
   reply_to_id      String?
+  thread_id        String?
 
   project   SfProject              @relation(fields: [project_id], references: [id], onDelete: Cascade)
   section   SfWorkspaceSection     @relation(fields: [section_id], references: [id], onDelete: Restrict)
@@ -351,6 +376,8 @@ model SfWorkspaceCard {
   iteration SfRevision?            @relation(fields: [iteration_id], references: [id], onDelete: SetNull)
   reply_to  SfWorkspaceCard?       @relation("SfWorkspaceCardReplies", fields: [reply_to_id], references: [id], onDelete: SetNull)
   replies   SfWorkspaceCard[]      @relation("SfWorkspaceCardReplies")
+  thread    SfWorkspaceThread?     @relation("SfWorkspaceThreadMessages", fields: [thread_id], references: [id], onDelete: Cascade)
+  anchored_threads SfWorkspaceThread[] @relation("SfWorkspaceThreadAnchor")
   note_tag_links SfNoteTagLink[]
   note_item_links SfNoteItemLink[]
 
@@ -359,6 +386,7 @@ model SfWorkspaceCard {
   @@index([phase_id, created_at])
   @@index([iteration_id])
   @@index([reply_to_id])
+  @@index([thread_id])
   @@map("sf_workspace_card")
   @@schema("studioflow")
 }

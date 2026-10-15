@@ -9,7 +9,7 @@ import PresentationPrintPage from "./(document)/studioflow/print/projects/[proje
 import { createPresentationBoardAction } from "@/apps/presentation/public/actions";
 import { addWorkspaceImageToMoodboardAction } from "@/apps/presentation/public/image-actions";
 import { listIdeaCardsAction } from "@/apps/ideas/public/actions";
-import { createWorkspaceFileAction, createWorkspaceImageAction, workspaceAction } from "./(platform)/studioflow/actions";
+import { createWorkspaceFileAction, createWorkspaceImageAction, listWorkspaceThreadsAction, postThreadImageAction, threadCommandAction, workspaceAction } from "./(platform)/studioflow/actions";
 import IdeasPage from "./(platform)/studioflow/ideas/page";
 import PresentationPage from "./(platform)/studioflow/projects/[projectId]/presentation/page";
 import PresentationBoardPage from "./(platform)/studioflow/projects/[projectId]/presentation/[boardId]/page";
@@ -47,6 +47,18 @@ function isNotFound(error: unknown): boolean {
 }
 
 describe("disabled StudioFlow module gates", () => {
+  it("refuses text/image thread posts, moves and marker reads with MODULE_DISABLED before auth or validation", async () => {
+    const results = [
+      await threadCommandAction({ command: "post", projectId: "invalid", phaseId: "invalid", thread: { x: 0, y: 0 }, body: "Ignored" }),
+      await threadCommandAction({ command: "move", projectId: "invalid", threadId: "invalid", version: 1, x: 0, y: 0 }),
+      await postThreadImageAction(new FormData()),
+      await listWorkspaceThreadsAction("invalid"),
+    ];
+    for (const result of results) {
+      assert.equal(result.ok, false);
+      if (!result.ok) assert.equal(result.error.code, "MODULE_DISABLED");
+    }
+  });
   it("returns MODULE_DISABLED before auth or validation from every Ideas and Presentation action lane", async () => {
     const ideas = await listIdeaCardsAction();
     assert.equal(ideas.ok, false);

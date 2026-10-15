@@ -11,7 +11,7 @@ import { validationError } from "@platform/core/validation";
 
 const projectId = randomUUID();
 const noteId = randomUUID();
-type Actions = Record<"noteAction" | "phaseNoteAction" | "workspaceAction", (input: unknown) => Promise<ActionResult<{ noteId: string }>>>;
+type Actions = Record<"noteAction" | "phaseNoteAction" | "workspaceAction" | "threadCommandAction" | "postThreadImageAction" | "listWorkspaceThreadsAction" | "listProjectNotesAction", (input: unknown) => Promise<ActionResult<unknown>>>;
 
 /** Run the real action schemas/auth/dispatch/revalidation with Board explicitly unavailable. */
 function loadActions(failure?: AppError) {
@@ -22,9 +22,15 @@ function loadActions(failure?: AppError) {
   const refreshed: string[] = [];
   let moduleChecks = 0;
   let signedIn = true;
-  const workspace = Object.fromEntries(["updateWorkspaceCardText", "setWorkspaceCardFlags", "deleteWorkspaceCard"].map((method) => [method, async (input: Record<string, unknown>) => {
+  let boardEnabled = false;
+  const workspace = Object.fromEntries(["updateWorkspaceCardText", "setWorkspaceCardFlags", "deleteWorkspaceCard", "postThreadMessage", "postThreadImage", "moveThread", "listWorkspaceThreads", "listProjectNotes"].map((method) => [method, async (input: Record<string, unknown>) => {
     calls.push({ method, input });
     if (failure) throw failure;
+    if (method === "listProjectNotes") return { notes: [], cursor: null };
+    if (method === "listWorkspaceThreads") return [];
+    if (method === "postThreadMessage") return { threadId: noteId, noteId };
+    if (method === "postThreadImage") return { threadId: noteId, imageId: noteId };
+    if (method === "moveThread") return { threadId: input.threadId, version: Number(input.version) + 1 };
     return { cardId: input.cardId, version: 8 };
   }]));
   const dependencies: Record<string, unknown> = {
@@ -36,7 +42,7 @@ function loadActions(failure?: AppError) {
     } },
     "@platform/core/actions": { runSafeAction },
     "@platform/core/errors": { AppError },
-    "@platform/core/modules": { requireModuleEnabled: async () => { moduleChecks++; throw new AppError("CONFLICT", "MODULE_DISABLED", "Board is disabled."); } },
+    "@platform/core/modules": { requireModuleEnabled: async () => { moduleChecks++; if (!boardEnabled) throw new AppError("CONFLICT", "MODULE_DISABLED", "Board is disabled."); } },
     "@platform/core/validation": { validationError },
     "@/apps/presentation/public/lifecycle": {},
     "@/apps/ideas/public/lifecycle": {},
@@ -47,8 +53,71 @@ function loadActions(failure?: AppError) {
     assert.ok(id in dependencies, `unexpected dependency: ${id}`);
     return dependencies[id];
   }, actions);
-  return { actions, calls, refreshed, moduleChecks: () => moduleChecks, signOut: () => { signedIn = false; } };
+  return { actions, calls, refreshed, moduleChecks: () => moduleChecks, enableBoard: () => { boardEnabled = true; }, signOut: () => { signedIn = false; } };
 }
+
+it("thread transport authenticates and validates exclusive thread specs, required phase, bounds/version and dispatches posts/moves", async () => {
+  const test = loadActions(); test.enableBoard();
+  const base = { command: "post", projectId, phaseId: noteId, body: "Message" };
+  for (const thread of [{ threadId: noteId }, { x: 0, y: 100_000 }, { anchorCardId: noteId, offsetX: -2, offsetY: 3 }]) {
+    assert.deepEqual(await test.actions.threadCommandAction({ ...base, thread, tags: ["tile"], itemEntryIds: [noteId] }), { ok: true, data: { threadId: noteId, noteId } });
+    assert.deepEqual(test.calls.at(-1)!.input.thread, thread);
+  }
+  assert.deepEqual(await test.actions.threadCommandAction({ command: "move", projectId, threadId: noteId, version: 7, x: 10, y: 20 }), { ok: true, data: { threadId: noteId, version: 8 } });
+  const called = test.calls.length;
+  for (const thread of [{}, { threadId: noteId, x: 0, y: 0 }, { x: -1, y: 0 }, { x: 1.5, y: 0 }, { anchorCardId: noteId, offsetX: 0 }, { x: 0, y: 0, extra: true }]) assert.equal((await test.actions.threadCommandAction({ ...base, thread })).ok, false);
+  assert.equal((await test.actions.threadCommandAction({ ...base, phaseId: undefined, thread: { x: 0, y: 0 } })).ok, false);
+  assert.equal((await test.actions.threadCommandAction({ command: "move", projectId, threadId: noteId, version: 0, x: 0, y: 0 })).ok, false);
+  assert.equal(test.calls.length, called);
+  assert.equal(test.refreshed.length, 8);
+  test.signOut();
+  assert.equal((await test.actions.threadCommandAction({ ...base, thread: { x: 0, y: 0 } })).ok, false);
+  assert.equal(test.calls.length, called);
+});
+
+it("thread image FormData uses the same exclusive spec, requires a file, parses tags and preserves safe refusal", async () => {
+  const test = loadActions(); test.enableBoard();
+  const form = () => {
+    const data = new FormData();
+    data.set("projectId", projectId); data.set("phaseId", noteId); data.set("x", "0"); data.set("y", "100000");
+    data.set("tags", '["photos"]'); data.set("clientFeedback", "true");
+    data.set("file", new File([new Uint8Array([1, 2, 3])], "photo.png", { type: "image/png" }));
+    return data;
+  };
+  assert.deepEqual(await test.actions.postThreadImageAction(form()), { ok: true, data: { threadId: noteId, imageId: noteId } });
+  assert.deepEqual(test.calls[0].input.thread, { x: 0, y: 100_000 });
+  assert.deepEqual(test.calls[0].input.tags, ["photos"]);
+  assert.equal(test.calls[0].input.clientFeedback, true);
+  for (const modify of [
+    (data: FormData) => data.set("threadId", noteId),
+    (data: FormData) => data.set("x", ""),
+    (data: FormData) => data.delete("phaseId"),
+    (data: FormData) => data.delete("file"),
+    (data: FormData) => data.append("x", "20"),
+    (data: FormData) => data.set("tags", "broken"),
+  ]) { const data = form(); modify(data); assert.equal((await test.actions.postThreadImageAction(data)).ok, false); }
+  assert.equal(test.calls.length, 1);
+  const failed = loadActions(new AppError("CONFLICT", "WORKSPACE_THREAD_LOCKED", "Safe refusal")); failed.enableBoard();
+  const result = await failed.actions.threadCommandAction({ command: "post", projectId, phaseId: noteId, body: "No", thread: { x: 0, y: 0 } });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.error.safeMessage, "Safe refusal");
+  assert.equal(failed.refreshed.length, 0);
+});
+
+it("thread marker reads remain gated but thread-filtered Notes reads and existing-message mutations work with Board off", async () => {
+  const test = loadActions();
+  assert.deepEqual(await test.actions.listProjectNotesAction({ projectId, threadId: noteId, inThreads: true }), { ok: true, data: { notes: [], cursor: null } });
+  assert.equal(test.moduleChecks(), 0);
+  assert.equal(test.calls[0].input.threadId, noteId);
+  assert.equal(test.calls[0].input.inThreads, true);
+  assert.equal((await test.actions.noteAction({ command: "delete", projectId, noteId, version: 1 })).ok, true);
+  const result = await test.actions.listWorkspaceThreadsAction(projectId);
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.error.code, "MODULE_DISABLED");
+  test.enableBoard();
+  assert.deepEqual(await test.actions.listWorkspaceThreadsAction(projectId), { ok: true, data: [] });
+  assert.equal(test.calls.at(-1)!.input.projectId, projectId);
+});
 
 it("noteAction requires a positive integer read version on edit, flags and delete before dispatch", async () => {
   const { actions, calls, refreshed } = loadActions();

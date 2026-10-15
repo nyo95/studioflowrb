@@ -4051,6 +4051,217 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
   });
 });
 
+describe("WO-SF-BOARD-THREADS-01", () => {
+  const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+  const image = { body: PNG, contentType: "image/png" };
+  afterEach(() => storage.objects.clear());
+  async function setup() {
+    const { projectId } = await newProject("Board threads");
+    const phase = await phaseOf(projectId, "moodboard");
+    const base = { ...as(designer), projectId, phaseId: phase.id };
+    const anchor = await sf.workspace.createWorkspaceCard({ ...base, body: "Anchor", x: 100, y: 200, w: 240 });
+    return { projectId, phase, base, anchorId: anchor.cardId };
+  }
+  async function remove(projectId: string, cardId: string, actor = as(designer)) {
+    return sf.workspace.deleteWorkspaceCard({ ...actor, projectId, cardId, version: await noteVersion(cardId) });
+  }
+
+  it("creates a thread only with its first text, supports free/placed/unplaced anchors and preserves Notes metadata and filters", async () => {
+    const { projectId, base, anchorId } = await setup();
+    const loose = await sf.workspace.createWorkspaceCard({ ...base, body: "Unplaced" });
+    const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Tile", category_key: "TILE", prefix: "HT", increment: 1, sort_order: 0 } });
+    const first = await sf.workspace.postThreadMessage({ ...base, thread: { x: 0, y: 100_000 }, body: "First @HT-01", tags: ["tile"], itemEntryIds: [entry.id] });
+    clock = new Date(clock.getTime() + 1000);
+    const reply = await sf.workspace.postThreadMessage({ ...base, thread: { threadId: first.threadId }, body: "Reply", replyToId: first.noteId, clientFeedback: true });
+    const anchored = await sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: anchorId, offsetX: 20, offsetY: -10 }, body: "Attached" });
+    const unplaced = await sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: loose.cardId, offsetX: 12, offsetY: 13 }, body: "Unplaced attached" });
+    const rows = await sf.workspace.listWorkspaceThreads({ grants: ALL, projectId });
+    assert.equal(rows.length, 3);
+    assert.deepEqual(rows.find((row) => row.id === first.threadId), { id: first.threadId, version: 1, x: 0, y: 100_000, anchorCardId: null, offsetX: null, offsetY: null, messageCount: 2, clientFeedback: true, lastMessageAt: clock });
+    assert.deepEqual(rows.filter((row) => row.anchorCardId).map((row) => [row.x, row.y]).sort((a, b) => a[0] - b[0]), [[12, 13], [120, 190]]);
+    const board = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    assert.deepEqual(board.map((row) => row.id).sort(), [anchorId, loose.cardId].sort());
+    assert.equal(board.find((row) => row.id === anchorId)!.anchoredThreadMessages, 1);
+    const all = await sf.workspace.listProjectNotes({ grants: ALL, projectId });
+    assert.equal(all.notes.length, 6);
+    assert.equal(all.notes.find((row) => row.id === first.noteId)!.threadId, first.threadId);
+    assert.deepEqual(all.notes.find((row) => row.id === first.noteId)!.tags, ["tile"]);
+    assert.equal(all.notes.find((row) => row.id === first.noteId)!.items[0].entryId, entry.id);
+    assert.equal(all.notes.find((row) => row.id === reply.noteId)!.replyTo?.id, first.noteId);
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, threadId: first.threadId })).notes.map((row) => row.id), [reply.noteId, first.noteId]);
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId, inThreads: true })).notes.length, 4);
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId, inThreads: true, clientFeedback: true })).notes[0].id, reply.noteId);
+    const stored = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: unplaced.noteId } });
+    assert.deepEqual([stored.canvas_x, stored.canvas_y, stored.canvas_w], [null, null, null]);
+    await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: first.noteId, x: 1, y: 2, w: 240 }] }), "WORKSPACE_THREAD_MESSAGE");
+    await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { x: 4, y: 5 }, body: "" }), "PHASE_NOTE_EMPTY");
+    await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { x: 4, y: 5 }, body: "Bad tags", tags: ["feedback"] }), "NOTE_TAG_RESERVED");
+    await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { x: 4, y: 5 }, body: "Bad item", itemEntryIds: [randomUUID()] }), "NOTE_ITEM_INVALID");
+    await rejectsWith(sf.workspace.postThreadMessage({ ...base, phaseId: "", thread: { x: 4, y: 5 }, body: "No phase" }), "WORKSPACE_THREAD_PHASE_REQUIRED");
+    assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { project_id: projectId } }), 3, "failed posts leave no empty thread");
+    assert.ok(anchored.threadId);
+  });
+
+  it("creates the first image atomically in all three spec forms and cleans objects after a failed transaction", async () => {
+    const { projectId, base, anchorId } = await setup();
+    const first = await sf.workspace.postThreadImage({ ...base, thread: { x: 20, y: 30 }, file: image, tags: ["photos"], clientFeedback: true });
+    const attached = await sf.workspace.postThreadImage({ ...base, thread: { anchorCardId: anchorId, offsetX: 3, offsetY: 4 }, file: image });
+    const reply = await sf.workspace.postThreadImage({ ...base, thread: { threadId: first.threadId }, file: image, replyToId: first.imageId });
+    const loose = await sf.workspace.createWorkspaceCard({ ...base, body: "Loose image anchor" });
+    await sf.workspace.postThreadImage({ ...base, thread: { anchorCardId: loose.cardId, offsetX: 5, offsetY: 6 }, file: image });
+    assert.equal(reply.threadId, first.threadId);
+    const notes = (await sf.workspace.listProjectNotes({ grants: ALL, projectId, inThreads: true })).notes;
+    assert.equal(notes.length, 4);
+    assert.equal(notes.find((note) => note.id === first.imageId)!.origin, "CLIENT_ANSWER");
+    assert.deepEqual(notes.find((note) => note.id === first.imageId)!.tags, ["photos"]);
+    assert.equal(notes.find((note) => note.id === reply.imageId)!.replyTo?.id, first.imageId);
+    const objects = storage.objects.size;
+    await rejectsWith(sf.workspace.postThreadImage({ ...base, thread: { x: 1, y: 2 }, file: image, tags: ["feedback"] }), "NOTE_TAG_RESERVED");
+    assert.equal(storage.objects.size, objects);
+    assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { project_id: projectId } }), 3);
+    await rejectsWith(sf.workspace.postThreadImage({ ...base, thread: { x: 1, y: 2 }, file: { ...image, body: new Uint8Array() } }), "NOTE_IMAGE_SIZE");
+    assert.equal(storage.objects.size, objects);
+    assert.ok(attached.threadId);
+  });
+
+  it("rejects foreign/message anchors and replies outside the selected thread without leaving threads or images", async () => {
+    const { projectId, base, anchorId } = await setup();
+    const other = await newProject("Foreign thread");
+    const phase = await phaseOf(other.projectId, "moodboard");
+    const foreign = await sf.workspace.postThreadMessage({ ...as(designer), projectId: other.projectId, phaseId: phase.id, thread: { x: 1, y: 2 }, body: "Foreign" });
+    const own = await sf.workspace.postThreadMessage({ ...base, thread: { x: 3, y: 4 }, body: "Own" });
+    const foreignAnchor = await sf.workspace.createWorkspaceCard({ ...as(designer), projectId: other.projectId, body: "Foreign anchor" });
+    await assert.rejects(sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: foreignAnchor.cardId, offsetX: 1, offsetY: 2 }, body: "No" }));
+    await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: own.noteId, offsetX: 1, offsetY: 2 }, body: "No" }), "WORKSPACE_THREAD_MESSAGE");
+    await assert.rejects(sf.workspace.postThreadImage({ ...base, thread: { threadId: foreign.threadId }, file: image }));
+    for (const replyToId of [anchorId, foreign.noteId]) {
+      await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { threadId: own.threadId }, body: "No", replyToId }), "NOTE_REPLY_INVALID");
+      await rejectsWith(sf.workspace.postThreadImage({ ...base, thread: { threadId: own.threadId }, file: image, replyToId }), "NOTE_REPLY_INVALID");
+    }
+    await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { x: 8, y: 9 }, body: "New thread reply", replyToId: own.noteId }), "NOTE_REPLY_INVALID");
+    await rejectsWith(sf.workspace.postThreadImage({ ...base, thread: { x: 8, y: 9 }, file: image, replyToId: own.noteId }), "NOTE_REPLY_INVALID");
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId, threadId: foreign.threadId })).notes.length, 0);
+    assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { project_id: projectId } }), 1);
+    assert.equal(storage.objects.size, 0);
+  });
+
+  it("keeps phase/PIC/status gates for text and image posts and project document access for free moves", async () => {
+    const { projectId, phase, base } = await setup();
+    const outsider = await seedUser("Outsider", [P.access, P.projectRead, P.phaseWork]);
+    const thread = await sf.workspace.postThreadMessage({ ...base, thread: { x: 1, y: 2 }, body: "Original" });
+    for (const actor of [as(drafter, DRAFTER_GRANTS), as(outsider, [P.access, P.projectRead, P.phaseWork]), as(designer, [P.access, P.projectRead])]) {
+      await rejectsWith(sf.workspace.postThreadMessage({ ...actor, projectId, phaseId: phase.id, thread: { x: 1, y: 2 }, body: "No" }), "PERMISSION_DENIED");
+      await rejectsWith(sf.workspace.postThreadImage({ ...actor, projectId, phaseId: phase.id, thread: { threadId: thread.threadId }, file: image }), "PERMISSION_DENIED");
+    }
+    await rejectsWith(sf.workspace.moveThread({ ...as(outsider, [P.access, P.projectRead, P.phaseWork]), projectId, threadId: thread.threadId, version: 1, x: 3, y: 4 }), "PERMISSION_DENIED");
+    await sf.workspace.moveThread({ ...as(drafter, DRAFTER_GRANTS), projectId, threadId: thread.threadId, version: 1, x: 3, y: 4 });
+    for (const [data, error] of [[{ status: "COMPLETED" as const }, "PROJECT_COMPLETED"], [{ status: "ON_HOLD" as const }, "PROJECT_NOT_ACTIVE"], [{ status: "ACTIVE" as const, archived_at: clock }, "PROJECT_ARCHIVED"]] as const) {
+      await testDb.prisma.sfProject.update({ where: { id: projectId }, data });
+      await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { x: 1, y: 2 }, body: "No" }), error);
+      await rejectsWith(sf.workspace.postThreadImage({ ...base, thread: { threadId: thread.threadId }, file: image }), error);
+      await rejectsWith(sf.workspace.moveThread({ ...base, threadId: thread.threadId, version: 2, x: 5, y: 6 }), error);
+    }
+    assert.equal(storage.objects.size, 0);
+    assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { project_id: projectId } }), 1);
+  });
+
+  it("moves only free threads with optimistic versions and bounded integer points", async () => {
+    const { projectId, base, anchorId } = await setup();
+    const free = await sf.workspace.postThreadMessage({ ...base, thread: { x: 1, y: 2 }, body: "Free" });
+    const anchored = await sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: anchorId, offsetX: 1, offsetY: 2 }, body: "Anchored" });
+    assert.deepEqual(await sf.workspace.moveThread({ ...base, threadId: free.threadId, version: 1, x: 100_000, y: 0 }), { threadId: free.threadId, version: 2 });
+    await rejectsWith(sf.workspace.moveThread({ ...base, threadId: free.threadId, version: 1, x: 3, y: 4 }), "WORKSPACE_THREAD_STALE");
+    await rejectsWith(sf.workspace.moveThread({ ...base, threadId: anchored.threadId, version: 1, x: 3, y: 4 }), "WORKSPACE_THREAD_ANCHORED");
+    for (const x of [-1, 100_001, 1.2, NaN]) {
+      await rejectsWith(sf.workspace.moveThread({ ...base, threadId: free.threadId, version: 2, x, y: 0 }), "WORKSPACE_CANVAS_INVALID");
+      await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { x, y: 0 }, body: "Bad point" }), "WORKSPACE_CANVAS_INVALID");
+    }
+    assert.equal((await sf.workspace.listWorkspaceThreads({ grants: ALL, projectId })).find((row) => row.id === free.threadId)!.x, 100_000);
+    assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { project_id: projectId } }), 2);
+  });
+
+  it("removes the last single/album message's thread and queues failed image cleanup durably", async () => {
+    const { projectId, base } = await setup();
+    const single = await sf.workspace.postThreadMessage({ ...base, thread: { x: 1, y: 2 }, body: "Single" });
+    await sf.workspace.updateWorkspaceCardText({ ...base, cardId: single.noteId, version: 1, body: "Edited in Notes", itemEntryIds: [] });
+    await sf.workspace.setWorkspaceCardFlags({ ...base, cardId: single.noteId, version: 2, pinned: true });
+    await remove(projectId, single.noteId);
+    assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { id: single.threadId } }), 0);
+    const first = await sf.workspace.postThreadImage({ ...base, thread: { x: 3, y: 4 }, file: image });
+    const second = await sf.workspace.postThreadImage({ ...base, thread: { threadId: first.threadId }, file: image });
+    await remove(projectId, first.imageId);
+    assert.equal((await sf.workspace.listWorkspaceThreads({ grants: ALL, projectId }))[0].messageCount, 1);
+    const row = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: second.imageId } });
+    const failedDelete = mock.method(storage, "remove", async () => { throw Error("storage unavailable"); });
+    try { await remove(projectId, second.imageId); } finally { failedDelete.mock.restore(); }
+    assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { id: first.threadId } }), 0);
+    const queued = await testDb.prisma.sfAssetCleanupFailure.findUniqueOrThrow({ where: { storage_key: row.storage_key! } });
+    assert.equal(queued.resolved_at, null);
+    assert.ok(queued.attempts >= 1);
+  });
+
+  it("refuses an anchor cascade across message labels atomically, then permits the full authorized cascade and storage cleanup", async () => {
+    const { projectId, base } = await setup();
+    const anchor = await sf.workspace.createWorkspaceCard({ ...as(drafter, DRAFTER_GRANTS), projectId, body: "General anchor" });
+    const cd = await phaseOf(projectId, "cd");
+    const first = await sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: anchor.cardId, offsetX: 1, offsetY: 2 }, body: "Designer label" });
+    const second = await sf.workspace.postThreadImage({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, thread: { threadId: first.threadId }, file: image });
+    await testDb.prisma.sfWorkspaceCard.update({ where: { id: first.noteId }, data: { workflow_record: true } });
+    const more = await sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: anchor.cardId, offsetX: 8, offsetY: 9 }, body: "Second thread" });
+    const auditCount = await testDb.prisma.auditEvent.count();
+    await rejectsWith(remove(projectId, anchor.cardId, as(drafter, DRAFTER_GRANTS)), "WORKSPACE_THREAD_LOCKED");
+    assert.equal(await testDb.prisma.auditEvent.count(), auditCount, "refusal writes no audit or deletion");
+    assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { id: { in: [anchor.cardId, first.noteId, second.imageId, more.noteId] } } }), 4);
+    assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { anchor_card_id: anchor.cardId } }), 2);
+    assert.equal(storage.objects.size, 1);
+    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((row) => row.id === anchor.cardId)!.anchoredThreadMessages, 3);
+    await rejectsWith(sf.workspace.deleteWorkspaceCard({ ...base, cardId: anchor.cardId, version: 99 }), "WORKSPACE_CARD_STALE");
+    await remove(projectId, anchor.cardId);
+    assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { id: { in: [anchor.cardId, first.noteId, second.imageId, more.noteId] } } }), 0);
+    assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { anchor_card_id: anchor.cardId } }), 0);
+    assert.equal(storage.objects.size, 0);
+    const audit = await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.workspace-thread.deleted" } });
+    assert.equal(audit.length, 2);
+    assert.deepEqual(audit.map((row) => (row.metadata as { messageCount: number }).messageCount).sort(), [1, 2]);
+  });
+
+  it("serialises a last-message delete against a new post without an empty or resurrected thread", async () => {
+    const { projectId, base } = await setup();
+    const first = await sf.workspace.postThreadMessage({ ...base, thread: { x: 1, y: 2 }, body: "First" });
+    const results = await Promise.allSettled([
+      remove(projectId, first.noteId),
+      sf.workspace.postThreadMessage({ ...base, thread: { threadId: first.threadId }, body: "Concurrent" }),
+    ]);
+    assert.equal(results[0].status, "fulfilled");
+    const threads = await sf.workspace.listWorkspaceThreads({ grants: ALL, projectId });
+    assert.equal(threads.length, results[1].status === "fulfilled" ? 1 : 0);
+    assert.ok(threads.every((row) => row.messageCount > 0));
+  });
+
+  it("retention detaches deleted image anchors, keeps text/absolute fallback points and removes only emptied threads", async () => {
+    const { projectId, base } = await setup();
+    const photo = await sf.workspace.createWorkspaceImage({ ...base, file: image, x: 100, y: 200, w: 240 });
+    const attached = await sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: photo.cardId, offsetX: 5, offsetY: 6 }, body: "Keep text" });
+    const onlyImage = await sf.workspace.postThreadImage({ ...base, thread: { x: 10, y: 20 }, file: image });
+    const mixed = await sf.workspace.postThreadMessage({ ...base, thread: { x: 30, y: 40 }, body: "Keep mixed text" });
+    await sf.workspace.postThreadImage({ ...base, thread: { threadId: mixed.threadId }, file: image });
+    const other = await newProject("Unexpired thread");
+    const otherPhase = await phaseOf(other.projectId, "moodboard");
+    const untouched = await sf.workspace.postThreadImage({ ...as(designer), projectId: other.projectId, phaseId: otherPhase.id, thread: { x: 1, y: 2 }, file: image });
+    await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date(clock.getTime() - 91 * 86_400_000) } });
+    const db = testDb.prisma;
+    const retention = createAssetRetentionService(db, { runTransaction: (work) => runSerializableTransaction(db, work), auditWriter: createAuditEventWriter(), people: createPeopleDirectory(db), storage, masterData: createMasterDataPublicRead(db), now: () => clock });
+    await retention.purgeExpiredArchivedAssets({}, async () => ({ presentationSlides: 0 }));
+    const row = await db.sfWorkspaceThread.findUniqueOrThrow({ where: { id: attached.threadId } });
+    assert.deepEqual([row.anchor_card_id, row.offset_x, row.offset_y, row.x, row.y], [null, null, null, 105, 206]);
+    assert.equal(await db.sfWorkspaceThread.count({ where: { id: onlyImage.threadId } }), 0);
+    assert.equal(await db.sfWorkspaceCard.count({ where: { thread_id: mixed.threadId } }), 1);
+    assert.equal(await db.sfWorkspaceCard.count({ where: { id: attached.noteId } }), 1);
+    assert.equal(await db.sfWorkspaceThread.count({ where: { id: untouched.threadId } }), 1);
+    assert.equal(storage.objects.size, 1, "only the other project's object remains");
+  });
+});
+
 describe("WO-SF-NOTES-PRESENTATION-IMAGE-01 slice B", () => {
   it("searches bare/partial codes OR any option name in project scope, exact first then Schedule order, capped at ten", async () => {
     const { projectId } = await newProject("Suggestion search");
