@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.83 | 2026-10-15 | docs(plan): WO-BRAND-BY-ROLE-01 — contractor and consultant brands by area, READY (Lead)
+
+- **Owner 2026-10-15:** two brandings, each locked to one role: "kontraktor=A; konsultan=B … BQ, Masterdata -> A; studioflow -> B"; branding only (legal split unknown), no data separation; the top-left mark switches per area ("gonta ganti better"); every printable document whose template needs a logo carries its brand.
+- **Finding:** A already exists as BQ's quotation letterhead (`BqQuotationSettings`, R9.x 2026-10-14); StudioFlow has no identity and its MOM, schedule and presentation prints show no company name or logo; the shell shows one platform mark everywhere.
+- **PLAN.md:** replaced the completed WO-SF-SUPERVISION-HANDOVER-01 (history `46f49fb:PLAN.md`; browser group [R9.80] pending) with WO-BRAND-BY-ROLE-01: StudioFlow-owned document identity on `SfSettings` (additive migration), public reads for StudioFlow and BQ identities, plain settings page — Executor READY as R9.84; prints and per-area shell mark by the Lead as R9.85. Docs-only; whitespace check.
+
 ## R9.82 | 2026-10-15 | perf(presentation,storage): Presentation editor changes show at once and save quietly; stable picture links (Lead)
 
 - **Owner 2026-10-15:** "knp dia sepertinya tiap action lgsg update database? itu boros banget? … jadi smooth kayak deck google" → "Ya, kerjakan: tetap simpan otomatis tapi layar langsung berubah, tidak muat ulang seluruh papan, link gambar tidak berganti-ganti, dan perubahan beruntun digabung jadi satu simpan."
