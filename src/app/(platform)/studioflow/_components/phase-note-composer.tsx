@@ -4,7 +4,7 @@ import { ImagePlus, Send, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-import { Button, Checkbox, IconButton, InlineError, RichTextEditor, Text, shrinkImageFile, useFileIntake } from "@/platform/ui_engine";
+import { Button, Checkbox, IconButton, InlineError, RichTextEditor, Text, shrinkImageFile, useFileIntake, type RichTextEditorProps } from "@/platform/ui_engine";
 
 import { phaseNoteAction, postPhaseImageAction } from "../actions";
 
@@ -87,11 +87,11 @@ export function useNoteDraft(disabled = false) {
 export type NoteDraft = ReturnType<typeof useNoteDraft>;
 
 /** The editor, the waiting images and "Add images" of one draft. Paste or drop an image anywhere on it. */
-export function NoteDraftFields({ draft, label, placeholder, disabled = false, autoFocus = false, onSubmit, footer, hint = "Or paste (Ctrl+V) or drop them here." }: { draft: NoteDraft; label: string; placeholder?: string; disabled?: boolean; autoFocus?: boolean; onSubmit?: () => void; footer?: ReactNode; hint?: ReactNode }) {
+export function NoteDraftFields({ draft, label, placeholder, disabled = false, autoFocus = false, onSubmit, footer, hint = "Or paste (Ctrl+V) or drop them here.", roundAttach = false, ...tokenProps }: { draft: NoteDraft; label: string; placeholder?: string; disabled?: boolean; autoFocus?: boolean; onSubmit?: () => void; footer?: ReactNode; hint?: ReactNode; roundAttach?: boolean } & Pick<RichTextEditorProps, "tokenTriggers" | "onTokenChange" | "highlightPattern" | "listboxId" | "activeOptionId">) {
   const pickerRef = useRef<HTMLInputElement>(null);
   return (
     <div className={`grid gap-2 rounded-control ${draft.intake.active ? "outline-2 outline-dashed outline-offset-4 outline-line-focus" : ""}`} {...draft.intake.target}>
-      <RichTextEditor compact aria-label={label} placeholder={placeholder} maxLength={NOTE_MAX} value={draft.text} disabled={disabled} autoFocus={autoFocus} onChange={draft.setText} onSubmit={onSubmit} />
+      <RichTextEditor compact aria-label={label} placeholder={placeholder} maxLength={NOTE_MAX} value={draft.text} disabled={disabled} autoFocus={autoFocus} onChange={draft.setText} onSubmit={onSubmit} {...tokenProps} />
       {draft.attachments.length > 0 ? (
         <ul className="m-0 flex list-none flex-wrap gap-2 p-0" aria-label="Images to send">
           {draft.attachments.map((item, index) => (
@@ -106,7 +106,9 @@ export function NoteDraftFields({ draft, label, placeholder, disabled = false, a
       ) : null}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" size="sm" variant="ghost" leadingIcon={<ImagePlus className="h-3.5 w-3.5" />} disabled={disabled || draft.attachments.length >= NOTE_IMAGE_LIMIT} onClick={() => pickerRef.current?.click()}>Add images</Button>
+          {roundAttach
+            ? <IconButton type="button" variant="ghost" label="Add images" icon={<ImagePlus />} disabled={disabled || draft.attachments.length >= NOTE_IMAGE_LIMIT} onClick={() => pickerRef.current?.click()} className="!h-11 !min-h-11 !w-11 !rounded-full !p-0" />
+            : <Button type="button" size="sm" variant="ghost" leadingIcon={<ImagePlus className="h-3.5 w-3.5" />} disabled={disabled || draft.attachments.length >= NOTE_IMAGE_LIMIT} onClick={() => pickerRef.current?.click()}>Add images</Button>}
           <input ref={pickerRef} type="file" accept={ACCEPTED.join(",")} multiple hidden onChange={(event) => { const files = Array.from(event.target.files ?? []); event.target.value = ""; draft.add(files.filter((file) => ACCEPTED.includes(file.type)), files.filter((file) => !ACCEPTED.includes(file.type))); }} />
           {hint ? <Text size="sm" tone="tertiary">{hint}</Text> : null}
         </div>

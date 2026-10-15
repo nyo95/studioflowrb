@@ -21,18 +21,52 @@ test("the project notes chat tags, links, replies and groups an album", async ({
 
   // # and @ open suggestions; the picked item is linked and the topic tag is stored.
   const editor = page.getByRole("textbox", { name: "New note" });
+  for (const name of ["Add images", "Send"]) {
+    const button = await page.getByRole("button", { name, exact: true }).boundingBox();
+    expect(button?.width).toBe(44);
+    expect(button?.height).toBe(44);
+  }
   await editor.click();
-  await page.keyboard.type("Lantai pantry pakai @HO1");
+  await page.keyboard.type("#");
+  const tags = page.getByRole("listbox", { name: "Tags" });
+  await expect(tags).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tags).toBeHidden();
+  await expect(editor).toHaveText("#");
+  await page.keyboard.press("Backspace");
+  await page.keyboard.type("Lantai pantry pakai  untuk area #pantry");
+  await expect(tags).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(tags).toBeHidden();
+  await page.keyboard.press("Control+Home");
+  for (let index = 0; index < "Lantai pantry pakai ".length; index++) await page.keyboard.press("ArrowRight");
+  await page.keyboard.type("@");
   const items = page.getByRole("listbox", { name: "Schedule items" });
+  await expect(items).toBeVisible();
+  await expect(items.getByRole("option")).not.toHaveCount(0);
+  await expect(items).toContainText("HT-01");
+  await expect(editor).toHaveAttribute("aria-controls", await items.getAttribute("id") as string);
+  const caretToken = await editor.locator(".rte-token-active").boundingBox();
+  const popup = await items.locator("..").boundingBox();
+  expect(popup && caretToken && popup.y + popup.height).toBeLessThan(caretToken!.y);
+  expect(popup!.x).toBeGreaterThanOrEqual(0);
+  expect(popup!.x + popup!.width).toBeLessThanOrEqual(1440);
+  await page.keyboard.type("HT");
   await expect(items.getByRole("option")).toHaveCount(1);
+  await expect(items.getByRole("option")).toContainText("HT-01");
+  await expect(editor).toHaveAttribute("aria-activedescendant", await items.getByRole("option").getAttribute("id") as string);
   await page.keyboard.press("Enter");
-  await page.keyboard.type("untuk area #pantry");
-  await expect(page.getByRole("listbox", { name: "Tags" })).toBeVisible();
+  await expect(editor).toContainText("Lantai pantry pakai @HT-01 untuk area #pantry");
+  await expect(items).toBeHidden();
+  await page.keyboard.press("Control+End");
+  await expect(tags).toBeVisible();
   await page.keyboard.press("Escape");
   await page.keyboard.press("Enter");
   const first = log.getByRole("article").filter({ hasText: "Lantai pantry" });
   await expect(first).toBeVisible();
-  await expect(first.getByRole("list", { name: "Linked schedule items" })).toContainText("HO-01");
+  const chip = first.getByRole("button", { name: "@HT-01", exact: true });
+  await expect(chip).toBeVisible();
+  await expect(first.getByRole("list", { name: "Linked schedule items" })).toHaveCount(0);
   await expect(first.getByRole("button", { name: "#pantry" })).toBeVisible();
 
   // Reply to it, as client feedback.
@@ -63,4 +97,24 @@ test("the project notes chat tags, links, replies and groups an album", async ({
   // The page does not grow with the notes: the stream scrolls inside its own box.
   const box = await log.boundingBox();
   expect(box && box.y + box.height).toBeLessThanOrEqual(900);
+
+  // Hover/focus previews stay inline; Enter engages the card and its deep link opens the actual entry.
+  await chip.hover();
+  const preview = page.getByRole("dialog", { name: "HT-01 · Product Schedule" });
+  await expect(preview).toBeVisible();
+  await expect(preview).toContainText("ZZ-Test Teraso abu");
+  await page.keyboard.press("Escape");
+  await chip.focus();
+  await expect(preview).toBeVisible();
+  await chip.press("Enter");
+  const openItem = preview.getByRole("link", { name: "Open item →" });
+  await expect(openItem).toBeFocused();
+  const href = await openItem.getAttribute("href");
+  expect(href).toMatch(/\/schedule\?entry=.+/);
+  await openItem.click();
+  await expect(page).toHaveURL(href!);
+  await expect(page.getByRole("dialog").filter({ hasText: "HT-01" })).toBeVisible();
+  await page.goto(`/studioflow/projects/${sf.notesChat}/schedule?entry=deleted-item`);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Product Schedule", exact: true })).toBeVisible();
 });

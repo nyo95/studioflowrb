@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.73] Notes suggestions and item cards using the R9.72 editor API
+- Surface: StudioFlow Notes composer/bubbles and Schedule entry deep link; supplements [R9.64] B, WO-SF-NOTES-PRESENTATION-IMAGE-01 slice B
+- Fixture: ACTIVE editable project with 12+ Schedule entries, HT code variants, final/active photos, reserved entries and explicit Board links; controlled slow/failed search and unavailable image; read-only account
+- Viewport: desktop, narrow tablet and 375 px; light/dark; mouse, keyboard and touch
+- Steps: 1. Type bare @/#, partial codes/names and unmatched input; verify Loading/results/empty/error plus Retry, then change the token/close while an older response is pending. 2. Insert mid-text using arrows/Enter/Tab and pointer; keep prefix/suffix/formatting, editor focus and active option association; Escape preserves text and IME never picks or sends. 3. Inspect the popup above the caret at both horizontal edges, long text and after resize; active rows scroll internally. 4. Send escaped/formatted/repeated/unknown codes and inspect inline chips versus explicit links; hover/focus previews, engage by Enter/tap, Open item opens the correct entry, unknown/deleted entry links open Schedule normally. Check missing/failed images and final/active metadata. 5. Check required phase, five-tag rule, feedback/reply/album behavior, Enter/Shift+Enter/list behavior and round 44 px attach/send; refused lookup keeps the draft and displays its safe message. Repeat under read-only rights.
+- Acceptance: all slice B interactions remain usable with no shared editor/formatter change; stale results cannot reopen the popup or replace the current list; chip cards and deep links work by keyboard/touch; screenshots/contrast, native touch/IME and subjective layout acceptance remain Reviewer/owner work. Automated Notes and viewport evidence is recorded separately in CHANGELOG.md.
+- Status: PENDING
+
 ### [R9.70] Shared image crop parity, gestures and all consumers
 - Surface: ImageWorkspace in Schedule photo/change, existing-option photo, new-option photo and MOM; ImageGallery in Notes/Workspace/Ideas; supplements [R9.64] D and E, WO-SF-NOTES-PRESENTATION-IMAGE-01 slice D
 - Fixture: coloured-quadrant landscape/portrait/square images; 1600×900 at 4:3; transparent PNG, large JPEG, corrupt/refused file; default omitted-aspect/PNG workspace; controlled callback/upload failure; device with two-pointer touch

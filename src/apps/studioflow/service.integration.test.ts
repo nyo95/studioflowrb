@@ -4051,6 +4051,69 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
   });
 });
 
+describe("WO-SF-NOTES-PRESENTATION-IMAGE-01 slice B", () => {
+  it("searches bare/partial codes OR any option name in project scope, exact first then Schedule order, capped at ten", async () => {
+    const { projectId } = await newProject("Suggestion search");
+    const other = await newProject("Other suggestion project");
+    const db = testDb.prisma;
+    const make = (increment: number, sort_order: number, prefix = "HT", section: "MATERIAL" | "FIXTURE" = "MATERIAL", target = projectId) => db.sfScheduleEntry.create({ data: { project_id: target, section, category: "Tile", category_key: "tile", prefix, increment, sort_order } });
+    const fixture = await make(1, 0, "FX", "FIXTURE");
+    const ten = await make(10, 0);
+    const reserved = await make(2, 1); // No options: must appear on an empty query.
+    const one = await make(1, 2);
+    const named = await make(1, 3, "ZZ");
+    await db.sfScheduleOption.createMany({ data: [
+      { entry_id: one.id, label: "A", product_name: "Teraso abu", search_key: "teraso" },
+      { entry_id: named.id, label: "A", product_name: "HT1 alternate name", search_key: "ht1" },
+      { entry_id: named.id, label: "B", product_name: "Chosen product", search_key: "chosen" },
+    ] });
+    await db.sfScheduleEntry.update({ where: { id: named.id }, data: { active_index: 1 } });
+    const foreign = await make(1, 0, "HT", "MATERIAL", other.projectId);
+    const search = (query: string) => sf.workspace.searchNoteItems({ grants: ALL, projectId, query });
+    for (const query of ["HT", "ht", "H", "HT0", "@ HT-"]) assert.deepEqual((await search(query)).map((item) => item.entryId), [ten.id, reserved.id, one.id, ...(["HT", "ht", "H"].includes(query) ? [named.id] : [])], query);
+    for (const query of ["HT1", "HT-01", "ht 01"]) assert.deepEqual((await search(query)).map((item) => item.entryId), query === "HT1" ? [one.id, ten.id, named.id] : [one.id, ten.id], query);
+    assert.deepEqual((await search("TERASO")).map((item) => item.entryId), [one.id]);
+    assert.equal((await search("HT1")).find((item) => item.entryId === named.id)!.name, "Chosen product", "name matching includes inactive options but shows the active one");
+    const blank = await search("  ");
+    assert.deepEqual(blank.map((item) => item.entryId), [ten.id, reserved.id, one.id, named.id, fixture.id], "Schedule section enum order is preserved");
+    assert.equal(blank.find((item) => item.entryId === reserved.id)!.name, null);
+    assert.equal(blank.find((item) => item.entryId === reserved.id)!.thumbnailUrl, null);
+    assert.ok(!blank.some((item) => item.entryId === foreign.id));
+    for (let index = 3; index < 14; index++) if (index !== 10) await make(index, index + 3);
+    assert.equal((await search("")).length, 10);
+    assert.deepEqual(await search("@"), await search(""));
+    assert.equal((await search("HT")).length, 10);
+    assert.equal((await search("HT-01"))[0].entryId, one.id, "exact survives the ten-result bound");
+    assert.deepEqual(await search("no matching product"), []);
+  });
+
+  it("signs the final-else-active image for search and note item views without persisting URLs", async () => {
+    const { projectId } = await newProject("Suggestion thumbnails");
+    const phase = await phaseOf(projectId, "moodboard");
+    const db = testDb.prisma;
+    const entry = await db.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Tile", category_key: "tile", prefix: "HT", increment: 1, sort_order: 0, active_index: 0 } });
+    for (const key of ["notes/active", "notes/final"]) await storage.put({ key, body: new Uint8Array([1]), contentType: "image/png", bytes: 1 });
+    await db.sfScheduleOption.createMany({ data: [
+      { entry_id: entry.id, label: "A2", product_name: "Final name", search_key: "final", image_key: "notes/final", is_final: true },
+      { entry_id: entry.id, label: "A10", product_name: "Active name", search_key: "active", image_key: "notes/active" },
+    ] });
+    const note = await sf.workspace.createWorkspaceCard({ ...as(designer), projectId, phaseId: phase.id, body: "Use @HT-01", itemEntryIds: [entry.id] });
+    const search = () => sf.workspace.searchNoteItems({ grants: ALL, projectId, query: "HT" });
+    const read = async () => (await sf.workspace.listProjectNotes({ grants: ALL, projectId })).notes.find((item) => item.id === note.cardId)!.items[0];
+    assert.equal((await search())[0].name, "Final name");
+    assert.match((await search())[0].thumbnailUrl!, /notes%2Ffinal\?expires=900$/);
+    assert.equal((await read()).entryId, entry.id);
+    assert.equal((await read()).thumbnailUrl, (await search())[0].thumbnailUrl);
+    await db.sfScheduleOption.updateMany({ where: { entry_id: entry.id }, data: { is_final: false } });
+    assert.equal((await search())[0].name, "Active name", "the canonical option order determines active index");
+    assert.match((await read()).thumbnailUrl!, /notes%2Factive\?expires=900$/);
+    await storage.remove("notes/active");
+    assert.equal((await search())[0].thumbnailUrl, null, "a storage failure stays local to the thumbnail");
+    assert.equal((await read()).thumbnailUrl, null);
+    assert.deepEqual((await db.sfScheduleOption.findMany({ where: { entry_id: entry.id }, orderBy: { label: "asc" } })).map((item) => item.image_key), ["notes/active", "notes/final"]);
+  });
+});
+
 describe("WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A", () => {
   it("refuses sequential stale edits, flags and deletion of a phase note without changing the first save", async () => {
     const { projectId } = await newProject("Versioned phase Notes");

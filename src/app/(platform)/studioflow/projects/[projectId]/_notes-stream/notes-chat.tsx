@@ -2,18 +2,19 @@
 
 import { FileText, Send, Star, X } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { currentDateOnly, formatInstant } from "@platform/utilities/date";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { Button, FormattedInstant, FormattedText, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, Select, Text, useConfirm } from "@/platform/ui_engine";
+import { Button, FormattedInstant, FormattedText, HoverCard, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, Select, Text, useConfirm, type EditorToken } from "@/platform/ui_engine";
 
 import { listNoteTagsAction, listProjectNotesAction, noteAction, phaseNoteAction, searchNoteItemsAction, type NoteCommandInput } from "../../../actions";
 import { NOTE_MAX, NoteDraftFields, uploadPhaseImages, useNoteDraft, type NoteImage } from "../../../_components/phase-note-composer";
 import { NoteImageActions } from "../round-labels";
 import { plainNoteText as plain, noteCodeKey as codeKey, resolveNoteItemIds } from "./note-mentions";
 import { createNoteReadSequence } from "./note-read-sequence";
+import { inlineNoteItem, NOTE_CODE_PATTERN, remainingNoteItems, suggestionPosition, suggestionState, type Suggestion } from "./note-suggestions";
 
 export type ChatNote = {
   id: string;
@@ -33,7 +34,7 @@ export type ChatNote = {
   file: { url: string | null; name: string; contentType: string; bytes: number } | null;
   replyTo: { id: string; kind: "TEXT" | "IMAGE" | "FILE"; excerpt: string; authorName: string | null; clientFeedback: boolean } | null;
   tags: readonly string[];
-  items: readonly { code: string; name: string | null; location: string | null }[];
+  items: readonly { entryId: string; code: string; name: string | null; location: string | null; thumbnailUrl: string | null }[];
 };
 
 export type ChatPhase = { id: string; label: string; iteration: string | null };
@@ -71,7 +72,7 @@ function formatBytes(bytes: number): string {
 }
 
 const TAG = /(?:^|\s)#([A-Za-z0-9_-]{1,32})(?=$|[\s.,!?;:)])/g;
-const TRAILING = /(?:^|\s)([#@])([A-Za-z0-9_-]{0,32})$/;
+const TOKEN_TRIGGERS = ["@", "#"];
 
 /**
  * The project's notes as one chat to yourself (owner 2026-10-14, mockup "Notes — gaya chat"): every phase in one
@@ -393,7 +394,10 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
               viewerActions={(image) => note.phaseId ? <NoteImageActions image={image} projectId={projectId} projectName={projectName} phaseId={note.phaseId} canUseIdeas={canUseIdeas} canUsePresentation={canUsePresentation} /> : null}
             />
           ) : null}
-          {note.body ? <FormattedText text={note.body} className="text-sm" /> : null}
+          {note.body ? <FormattedText text={note.body} className="text-sm" tokens={{ pattern: NOTE_CODE_PATTERN, render: (match, key) => {
+            const item = inlineNoteItem(match, note.items);
+            return item ? <NoteItemChip key={key} projectId={projectId} item={item} /> : match;
+          } }} /> : null}
           {note.file ? (
             <div className="flex items-center gap-3">
               <FileText aria-hidden="true" className="h-5 w-5 shrink-0 text-ink-secondary" />
@@ -404,16 +408,9 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
               {note.file.url ? <a href={note.file.url} download={note.file.name} className="inline-flex h-8 shrink-0 items-center rounded-action bg-action px-3 text-xs font-medium text-action-ink hover:bg-action-hover">Open</a> : <Text size="sm" tone="tertiary">Unavailable</Text>}
             </div>
           ) : null}
-          {note.items.length > 0 ? (
+          {remainingNoteItems(note.body, note.items).length > 0 ? (
             <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label="Linked schedule items">
-              {note.items.map((item) => (
-                <li key={item.code}>
-                  <Link href={STUDIOFLOW_ROUTES.projectSchedule(projectId)} prefetch={false} title={[item.name, item.location].filter(Boolean).join(" · ")} className="inline-flex max-w-[16rem] items-center gap-1.5 rounded-action border border-line-subtle bg-surface-raised px-1.5 py-0.5 text-xs text-ink no-underline hover:border-line-strong">
-                    <span className="rounded-[5px] bg-action px-1 font-semibold text-action-ink">{item.code}</span>
-                    <span className="truncate">{item.name ?? "Item"}</span>
-                  </Link>
-                </li>
-              ))}
+              {remainingNoteItems(note.body, note.items).map((item) => <li key={item.entryId}><NoteItemChip projectId={projectId} item={item} /></li>)}
             </ul>
           ) : null}
         </>
@@ -445,10 +442,34 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
   );
 }
 
-type Suggestion = { key: string; label: string; detail: string | null; insert: string; entryId?: string };
+function ItemThumbnail({ url }: { url: string | null }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  return url && failedUrl !== url
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <img src={url} alt="" className="h-16 w-16 shrink-0 rounded-control bg-surface-muted object-cover" onError={() => setFailedUrl(url)} />
+    : <span aria-label="No product image" className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-control bg-surface-muted text-ink-secondary"><FileText aria-hidden="true" /></span>;
+}
+
+function NoteItemChip({ projectId, item }: { projectId: string; item: ChatNote["items"][number] }) {
+  return <HoverCard label={`${item.code} · Product Schedule`} content={
+    <div className="grid gap-3">
+      <div className="flex items-start gap-3">
+        <ItemThumbnail url={item.thumbnailUrl} />
+        <div className="grid min-w-0 gap-1">
+          <span className="text-xs font-semibold">{item.code} · Product Schedule</span>
+          <span>{item.name || "No product name yet"}</span>
+          {item.location ? <span className="text-xs text-ink-secondary">{item.location}</span> : null}
+        </div>
+      </div>
+      <Link href={STUDIOFLOW_ROUTES.projectSchedule(projectId, item.entryId)} prefetch={false} className="inline-flex min-h-11 items-center font-semibold text-ink underline">Open item →</Link>
+    </div>
+  }>
+    <button type="button" className="relative inline-flex min-h-6 items-center rounded-action bg-action px-1.5 text-xs font-semibold text-action-ink before:absolute before:-inset-y-2.5 before:inset-x-0 before:min-h-11">@{item.code}</button>
+  </HoverCard>;
+}
 
 /**
- * Enter sends. The phase tag is set here and shown above the box; `#` and `@` typed at the end of the text open
+ * Enter sends. The phase tag is set here and shown above the box; `#` and `@` under the caret open
  * suggestions (topic tags of this project, Product Schedule items by code or name). A typed `@HT1` that was not
  * picked from the list is still linked when exactly one item has that code.
  */
@@ -465,46 +486,65 @@ function ChatComposer({ projectId, phases, defaultPhaseId, replyTo, onCancelRepl
   const [chosenPhaseId, setPhaseId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState(false);
   const [picked, setPicked] = useState<ReadonlyMap<string, string>>(new Map());
-  const [found, setFound] = useState<{ token: string; list: readonly Suggestion[] }>({ token: "", list: [] });
+  const [token, setToken] = useState<EditorToken | null>(null);
+  const [popup, dispatch] = useReducer(suggestionState, { request: 0, status: "closed", list: [] });
+  const request = useRef(0);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  const [position, setPosition] = useState({ left: 8, bottom: 0 });
+  const listboxId = useId();
   const [highlight, setHighlight] = useState(0);
   const [sending, setSending] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const phase = phases.find((item) => item.id === (chosenPhaseId ?? defaultPhaseId)) ?? phases[0]!;
 
-  // Suggestions follow the token being typed at the end of the text.
-  const trailing = TRAILING.exec(plain(draft.text));
-  const token = trailing && !/\s$/.test(draft.text) ? { sign: trailing[1] as "#" | "@", query: trailing[2] ?? "" } : null;
-  const tokenKey = token ? `${token.sign}${token.query}` : "";
-  const suggestions = token && found.token === tokenKey ? found.list : [];
-  const setSuggestions = (list: readonly Suggestion[]) => setFound({ token: tokenKey, list });
+  const suggestions = popup.status === "results" ? popup.list : [];
+  const closeSuggestions = () => {
+    setToken(null);
+    dispatch({ type: "close", request: ++request.current });
+  };
+  const onTokenChange = useCallback((next: EditorToken | null) => {
+    setToken(next);
+    setHighlight(0);
+    dispatch({ type: next ? "start" : "close", request: ++request.current });
+    const wrapper = wrapperRef.current?.getBoundingClientRect();
+    if (next && wrapper) setPosition(suggestionPosition(next.caret, wrapper, Math.min(352, wrapper.width - 16)));
+  }, []);
+  const requestId = popup.request;
   useEffect(() => {
     if (!token) return;
     let live = true;
     const timer = setTimeout(async () => {
-      if (token.sign === "#") {
-        const result = await listNoteTagsAction(projectId, token.query || undefined);
-        if (!live || !result.ok) return;
-        const known: Suggestion[] = result.data.map((tag) => ({ key: tag.name, label: `#${tag.name}`, detail: `${tag.count} note${tag.count === 1 ? "" : "s"}`, insert: `#${tag.name}` }));
-        const fresh = token.query && !known.some((tag) => tag.key.toLowerCase() === token.query.toLowerCase()) && token.query.toLowerCase() !== "feedback"
-          ? [{ key: `new:${token.query}`, label: `#${token.query}`, detail: "New tag", insert: `#${token.query}` }] : [];
-        const special = "feedback".startsWith(token.query.toLowerCase()) ? [{ key: "feedback", label: "#feedback", detail: "Client feedback", insert: "#feedback" }] : [];
-        setFound({ token: tokenKey, list: [...special, ...known, ...fresh].slice(0, 8) }); setHighlight(0);
-      } else {
-        if (!token.query) { setFound({ token: tokenKey, list: [] }); return; }
-        const result = await searchNoteItemsAction(projectId, token.query);
-        if (!live || !result.ok) return;
-        setFound({ token: tokenKey, list: result.data.map((item) => ({ key: item.entryId, label: item.code, detail: [item.name, item.location].filter(Boolean).join(" · ") || null, insert: `@${item.code}`, entryId: item.entryId })) });
-        setHighlight(0);
-      }
+      const loaded = (list: readonly Suggestion[]) => { if (live) dispatch({ type: "loaded", request: requestId, list }); };
+      const failed = (error: string) => { if (live) dispatch({ type: "failed", request: requestId, error }); };
+      try {
+        if (token.trigger === "#") {
+          const result = await listNoteTagsAction(projectId, token.query || undefined);
+          if (!result.ok) { failed(result.error.safeMessage); return; }
+          const known: Suggestion[] = result.data.map((tag) => ({ key: tag.name, label: `#${tag.name}`, detail: `${tag.count} note${tag.count === 1 ? "" : "s"}`, insert: `#${tag.name}` }));
+          const fresh = token.query && !known.some((tag) => tag.key.toLowerCase() === token.query.toLowerCase()) && token.query.toLowerCase() !== "feedback"
+            ? [{ key: `new:${token.query}`, label: `#${token.query}`, detail: "New tag", insert: `#${token.query}` }] : [];
+          const special = "feedback".startsWith(token.query.toLowerCase()) ? [{ key: "feedback", label: "#feedback", detail: "Client feedback", insert: "#feedback" }] : [];
+          loaded([...special, ...known, ...fresh].slice(0, 8));
+        } else {
+          const result = await searchNoteItemsAction(projectId, token.query);
+          if (!result.ok) { failed(result.error.safeMessage); return; }
+          loaded(result.data.map((item) => ({ key: item.entryId, label: item.code, detail: item.name, location: item.location, thumbnailUrl: item.thumbnailUrl, insert: `@${item.code}`, entryId: item.entryId })));
+        }
+      } catch { failed("Suggestions could not be loaded. Please try again."); }
     }, 150);
     return () => { live = false; clearTimeout(timer); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tokenKey, projectId]);
+  }, [token, requestId, projectId]);
+
+  useEffect(() => {
+    listRef.current?.querySelector<HTMLElement>(`[id="${listboxId}-${highlight}"]`)?.scrollIntoView({ block: "nearest" });
+  }, [highlight, popup.status, listboxId]);
 
   const pick = (suggestion: Suggestion) => {
-    draft.setText(draft.text.replace(/([#@])[A-Za-z0-9_\\-]*$/, `${suggestion.insert} `));
+    if (!token || sending) return;
+    token.replace(suggestion.insert);
     if (suggestion.entryId) setPicked((current) => new Map(current).set(codeKey(suggestion.insert), suggestion.entryId!));
-    setSuggestions([]);
+    closeSuggestions();
   };
 
   const send = async () => {
@@ -513,9 +553,11 @@ function ChatComposer({ projectId, phases, defaultPhaseId, replyTo, onCancelRepl
     const text = plain(body);
     const tags = tagsOf(text);
     const clientFeedback = feedback || /(?:^|\s)#feedback\b/i.test(text);
-    setSending(true); setErrors([]);
+    setSending(true); setErrors([]); closeSuggestions();
     try {
-      const entryIds = await resolveNoteItemIds(body, (query) => searchNoteItemsAction(projectId, query), picked);
+      let entryIds: string[];
+      try { entryIds = await resolveNoteItemIds(body, (query) => searchNoteItemsAction(projectId, query), picked); }
+      catch (cause) { setErrors([cause instanceof Error ? cause.message : "Schedule items could not be loaded. Please try again."]); return; }
       if (body) {
         const posted = await phaseNoteAction({ command: "post", projectId, phaseId: phase.id, body, clientFeedback, replyToId: replyTo?.id, tags, itemEntryIds: entryIds });
         if (!posted.ok) { setErrors([posted.error.safeMessage]); return; }
@@ -533,26 +575,33 @@ function ChatComposer({ projectId, phases, defaultPhaseId, replyTo, onCancelRepl
   };
 
   return (
-    <div className="relative shrink-0 border-t border-line-subtle bg-surface px-4 py-2.5"
+    <div ref={wrapperRef} className="relative shrink-0 border-t border-line-subtle bg-surface px-4 py-2.5"
       onKeyDownCapture={(event) => {
+        if (event.nativeEvent.isComposing || sending) return;
+        if (event.key === "Escape" && popup.status !== "closed") { event.preventDefault(); event.stopPropagation(); closeSuggestions(); return; }
         if (!suggestions.length) return;
         if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); event.stopPropagation(); setHighlight((index) => (index + (event.key === "ArrowDown" ? 1 : suggestions.length - 1)) % suggestions.length); }
-        if (event.key === "Enter" || event.key === "Tab") { event.preventDefault(); event.stopPropagation(); pick(suggestions[highlight]!); }
-        if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setSuggestions([]); }
+        if ((event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey) || event.key === "Tab") { event.preventDefault(); event.stopPropagation(); pick(suggestions[highlight]!); }
       }}
     >
-      {suggestions.length > 0 ? (
-        <ul role="listbox" aria-label={token?.sign === "@" ? "Schedule items" : "Tags"} className="absolute bottom-full left-4 z-20 m-0 mb-1 grid w-[22rem] max-w-[calc(100%-2rem)] list-none gap-0.5 rounded-control border border-line-subtle bg-surface p-1 shadow-over">
-          <li className="px-2 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary">{token?.sign === "@" ? "Product Schedule" : "Tags"}</li>
+      {popup.status !== "closed" ? (
+        <div style={position} className="absolute z-20 w-[22rem] max-w-[calc(100%-16px)] rounded-control border border-line-subtle bg-surface p-1 shadow-over">
+          <div className="px-2 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-wide text-ink-secondary">{token?.trigger === "@" ? "PRODUCT SCHEDULE" : "TAGS"}</div>
+          {popup.status === "loading" ? <div role="status" className="px-2 py-3 text-sm text-ink-secondary">Loading…</div> : null}
+          {popup.status === "empty" ? <div role="status" className="px-2 py-3 text-sm text-ink-secondary">No suggestions found.</div> : null}
+          {popup.status === "error" ? <div className="grid gap-1 px-2 py-2"><InlineError>{popup.error}</InlineError><Button size="sm" variant="ghost" onMouseDown={(event) => event.preventDefault()} onClick={() => dispatch({ type: "start", request: ++request.current })}>Retry</Button></div> : null}
+        <ul ref={listRef} id={listboxId} role="listbox" aria-label={token?.trigger === "@" ? "Schedule items" : "Tags"} aria-busy={popup.status === "loading"} className="m-0 grid max-h-72 list-none gap-0.5 overflow-y-auto p-0">
           {suggestions.map((suggestion, index) => (
-            <li key={suggestion.key} role="option" aria-selected={index === highlight}>
-              <button type="button" onMouseDown={(event) => { event.preventDefault(); pick(suggestion); }} onMouseEnter={() => setHighlight(index)} className={`flex w-full items-center gap-2 rounded-action px-2 py-1.5 text-left text-sm ${index === highlight ? "bg-surface-muted" : ""}`}>
-                {token?.sign === "@" ? <span className="rounded-[5px] bg-action px-1 text-xs font-semibold text-action-ink">{suggestion.label}</span> : <span className="font-medium text-ink">{suggestion.label}</span>}
-                {suggestion.detail ? <span className="min-w-0 flex-1 truncate text-xs text-ink-tertiary">{suggestion.detail}</span> : null}
+            <li key={suggestion.key} id={`${listboxId}-${index}`} role="option" aria-selected={index === highlight}>
+              <button type="button" tabIndex={-1} onMouseDown={(event) => { event.preventDefault(); pick(suggestion); }} onMouseEnter={() => setHighlight(index)} className={`flex min-h-11 w-full items-center gap-2 rounded-action px-2 py-1.5 text-left text-sm ${index === highlight ? "bg-surface-muted" : ""}`}>
+                {token?.trigger === "@" ? <span className="shrink-0 rounded-[5px] bg-action px-1 text-xs font-semibold text-action-ink">{suggestion.label}</span> : <span className="font-medium text-ink">{suggestion.label}</span>}
+                <span className="min-w-0 flex-1 truncate text-xs text-ink">{suggestion.detail ?? "No product name yet"}</span>
+                {suggestion.location ? <span className="ml-auto max-w-[35%] truncate text-right text-xs text-ink-secondary">{suggestion.location}</span> : null}
               </button>
             </li>
           ))}
         </ul>
+        </div>
       ) : null}
 
       {replyTo ? (
@@ -578,9 +627,15 @@ function ChatComposer({ projectId, phases, defaultPhaseId, replyTo, onCancelRepl
         label="New note"
         placeholder="Write a note…"
         disabled={sending}
-        onSubmit={() => { if (!suggestions.length) void send(); }}
+        onSubmit={() => void send()}
+        tokenTriggers={TOKEN_TRIGGERS}
+        onTokenChange={onTokenChange}
+        highlightPattern={NOTE_CODE_PATTERN}
+        listboxId={popup.status === "closed" ? undefined : listboxId}
+        activeOptionId={suggestions.length ? `${listboxId}-${highlight}` : undefined}
+        roundAttach
         hint={null}
-        footer={<Button type="button" size="sm" variant="primary" leadingIcon={<Send className="h-3.5 w-3.5" />} pending={sending} disabled={draft.empty} onClick={() => void send()}>Send</Button>}
+        footer={<IconButton type="button" variant="primary" label="Send" icon={<Send />} pending={sending} disabled={draft.empty} onClick={() => void send()} className="!h-11 !min-h-11 !w-11 !rounded-full !p-0" />}
       />
       {errors.length > 0 ? <InlineError>{errors.join(" ")}</InlineError> : null}
     </div>

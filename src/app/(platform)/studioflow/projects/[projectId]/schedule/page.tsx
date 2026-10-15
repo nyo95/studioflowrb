@@ -12,8 +12,9 @@ import { ScheduleBoard } from "./schedule-board";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProjectSchedulePage({ params }: { params: Promise<{ projectId: string }> }) {
+export default async function ProjectSchedulePage({ params, searchParams }: { params: Promise<{ projectId: string }>; searchParams: Promise<{ entry?: string | string[] }> }) {
   const { projectId } = await params;
+  const { entry } = await searchParams;
   const { grants } = await pageSession();
   const [project, entries, brands, categoryChoices, access] = await Promise.all([
     studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
@@ -32,6 +33,7 @@ export default async function ProjectSchedulePage({ params }: { params: Promise<
     {project.archivedAt === null && !access.completed && !access.canEditDocuments ? <ReadOnlyNotice scope="project" className="mb-3" /> : null}
     <SectionCard title="Product Schedule" description="Materials and fixtures specified for this project, each with its options and the chosen final one." count={entries.length} padded={false}>
       <ScheduleBoard
+        initialOpenId={typeof entry === "string" && entries.some((item) => item.id === entry) ? entry : null}
         projectId={projectId}
         entries={entries}
         brands={brands}

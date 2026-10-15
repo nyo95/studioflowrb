@@ -381,6 +381,7 @@ function BoardView({
                   ] : []}
                 >
                 <article
+                  id={`schedule-entry-${entry.id}`}
                   draggable={reorderEnabled}
                   onDragStart={start(entry.id)}
                   onDragEnd={end}
@@ -432,6 +433,7 @@ function BoardView({
 }
 
 export function ScheduleBoard({
+  initialOpenId = null,
   projectId,
   entries,
   brands,
@@ -440,6 +442,7 @@ export function ScheduleBoard({
   canManageTemplates,
   templatesHref,
 }: {
+  initialOpenId?: string | null;
   projectId: string;
   entries: readonly ScheduleEntryView[];
   brands: readonly Brand[];
@@ -453,10 +456,16 @@ export function ScheduleBoard({
   const command = useCommand();
   const { run, error } = command;
   const confirm = useConfirm();
-  const [section, setSection] = useState<Section>(() => (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
+  const [section, setSection] = useState<Section>(() => entries.find((entry) => entry.id === initialOpenId)?.section ?? (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
   const [viewMode, setViewMode] = useState<"list" | "board">("board");
   const [filter, setFilter] = useState<ScheduleFilter>("all");
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpenId);
+  const scrolledInitial = useRef(false);
+  useEffect(() => {
+    if (scrolledInitial.current || !initialOpenId) return;
+    scrolledInitial.current = true;
+    document.getElementById(`schedule-entry-${initialOpenId}`)?.scrollIntoView({ block: "nearest" });
+  }, [initialOpenId]);
   const [autoPhotoOptionId, setAutoPhotoOptionId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -661,6 +670,7 @@ export function ScheduleBoard({
                         return (
                           <li
                             key={entry.id}
+                            id={`schedule-entry-${entry.id}`}
                             draggable={canEdit && filter === "all"}
                             onDragStart={listDrag.start(entry.id)}
                             onDragEnd={listDrag.end}
