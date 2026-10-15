@@ -52,6 +52,8 @@ describe("UI Engine foundation", () => {
       "Drawer",
       "ConfirmDialog",
       "Tooltip",
+      // G2 (WO-SF-NOTES-PRESENTATION-IMAGE-01): interactive preview card for inline elements; first consumer Notes @CODE chips.
+      "HoverCard",
       "AppShell",
       "NavItem",
       "PageShell",

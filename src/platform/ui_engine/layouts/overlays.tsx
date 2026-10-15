@@ -1,8 +1,8 @@
 "use client";
 
 import { CircleHelp, X } from "lucide-react";
-import { AlertDialog as RAlertDialog,Dialog as RDialog,Tooltip as RTooltip } from "radix-ui";
-import { cloneElement,isValidElement,useId,useRef,useState,type CSSProperties,type ReactElement,type ReactNode } from "react";
+import { AlertDialog as RAlertDialog,Dialog as RDialog,Popover as RPopover,Tooltip as RTooltip } from "radix-ui";
+import { cloneElement,isValidElement,useEffect,useId,useRef,useState,type CSSProperties,type ReactElement,type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 import { Button,Heading,IconButton,Input,Text } from "../primitives";
@@ -278,6 +278,82 @@ export function Tooltip({ content, children, side = "top", delayDuration = 350 }
         </RTooltip.Portal>
       </RTooltip.Root>
     </RTooltip.Provider>
+  );
+}
+
+export type HoverCardProps = {
+  /** The element that opens the card. Use a button: a link would navigate on Enter instead of opening the card. */
+  children: ReactElement;
+  /** The card's content; it may hold links and buttons. */
+  content: ReactNode;
+  /** Accessible name of the card. */
+  label: string;
+  side?: "top" | "right" | "bottom" | "left";
+  align?: "start" | "center" | "end";
+  openDelay?: number;
+  closeDelay?: number;
+};
+
+/**
+ * A preview card for an inline element (e.g. an item code in a note). Unlike `Tooltip` it is interactive: pointing or
+ * focusing shows it without taking focus; clicking, tapping or Enter opens it with focus inside, so its links are
+ * reachable by keyboard and touch. Escape or leaving closes it.
+ */
+export function HoverCard({ children, content, label, side = "top", align = "start", openDelay = 300, closeDelay = 150 }: HoverCardProps) {
+  const [open, setOpen] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const contentRef = useRef<HTMLDivElement>(null);
+  // Opened by click/tap/Enter: focus goes into the card and returns to the trigger when it closes.
+  const engaged = useRef(false);
+  const returnFocus = useRef(false);
+  const close = () => { returnFocus.current = engaged.current; engaged.current = false; setOpen(false); };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const later = (next: boolean, delay: number) => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => { if (next) setOpen(true); else close(); }, delay);
+  };
+  const leavingTo = (target: EventTarget | null) => !(target instanceof Node && contentRef.current?.contains(target));
+  return (
+    <RPopover.Root open={open} onOpenChange={(next) => { clearTimeout(timer.current); if (next) setOpen(true); else close(); }}>
+      <RPopover.Trigger
+        asChild
+        onPointerEnter={(event) => { if (event.pointerType === "mouse") later(true, openDelay); }}
+        onPointerLeave={(event) => { if (event.pointerType === "mouse" && !engaged.current) later(false, closeDelay); }}
+        onFocus={() => { if (!open) later(true, 0); }}
+        onBlur={(event) => { if (leavingTo(event.relatedTarget) && !engaged.current) later(false, closeDelay); }}
+        onClick={(event) => {
+          event.preventDefault();
+          clearTimeout(timer.current);
+          engaged.current = true;
+          setOpen(true);
+          requestAnimationFrame(() => {
+            const card = contentRef.current;
+            (card?.querySelector<HTMLElement>("a[href],button:not([disabled]),[tabindex]:not([tabindex='-1'])") ?? card)?.focus();
+          });
+        }}
+      >
+        {children}
+      </RPopover.Trigger>
+      <RPopover.Portal>
+        <RPopover.Content
+          ref={contentRef}
+          role="dialog"
+          aria-label={label}
+          tabIndex={-1}
+          side={side}
+          align={align}
+          sideOffset={6}
+          collisionPadding={16}
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => { if (!returnFocus.current) event.preventDefault(); }}
+          onPointerEnter={(event) => { if (event.pointerType === "mouse") clearTimeout(timer.current); }}
+          onPointerLeave={(event) => { if (event.pointerType === "mouse" && !engaged.current) later(false, closeDelay); }}
+          className="z-[70] w-72 max-w-[calc(100vw-32px)] rounded-control border border-line-subtle bg-surface p-3 text-sm text-ink shadow-over outline-none"
+        >
+          {content}
+        </RPopover.Content>
+      </RPopover.Portal>
+    </RPopover.Root>
   );
 }
 

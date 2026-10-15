@@ -1,13 +1,13 @@
 # Active Plan
 
 Plan ID: WO-SF-NOTES-PRESENTATION-IMAGE-01
-Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66/R9.67); slice C **PASS** (R9.68/R9.69); slice D **PASS** (R9.70/R9.71); remaining: Lead G2 shared-editor revision, then slice B
+Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66/R9.67); slice C **PASS** (R9.68/R9.69); slice D **PASS** (R9.70/R9.71); G2 shared editor hooks built by the Lead (R9.72); **slice B READY**
 Module(s): studioflow (Notes and Schedule reads), presentation, shared platform UI Engine image patterns; workspace-board is an unchanged optional view of the same StudioFlow records
-Target revision: Lead G2 and slice B allocated from CHANGELOG.md when started (next unused after R9.71)
-Status: A, C, D PASS (code + automated checks; browser pending). No Executor slice READY: next is the Lead-owned G2 revision, then B.
+Target revision: slice B = **R9.73** (next unused after Lead G2 R9.72)
+Status: READY (slice B only); A, C, D PASS (browser pending); G2 prerequisite landed in R9.72
 Priority: P1 recommended for A; P2 for B/C/D, subject to owner priorities
 Owner: Product Owner; Lead approves and locks each READY slice
-Last updated: 2026-10-15 (Lead review R9.71)
+Last updated: 2026-10-15 (Lead G2 R9.72)
 
 ## Outcome
 
@@ -183,17 +183,48 @@ One coherent revision. Module: studioflow. Files: W (`src/apps/studioflow/worksp
 
 **Executor verification (all required):** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Location kantor: load `.env.kantor`, set `STUDIOFLOW_LOCATION=kantor`, confirm both targets are the rebuild dev/test DBs before any DB command; no migration expected. Read the installed Next.js server-action docs before adding the action. Browser acceptance belongs to the Reviewer (group [R9.64] A, without the official-record lock step).
 
-### Ordered slice B — @/# and sent mentions
+### G2 prerequisite — shared editor, formatter and hover card (DONE by Lead, R9.72)
 
-One independently useful interaction revision, after the Lead's G2 shared-editor revision lands. G3 locked: no phase ×. Files: N/NC; W search/item view; A; existing Schedule targeting; e2e/notes-chat.spec.ts. Shared editor/formatter/overlay only by Lead or separate explicit grant, not current Executor authority.
+Domain-neutral, optional, no behaviour change for any consumer that does not pass the new props (RichTextEditor: Notes edit, Notes composer via `NoteDraftFields`, Workspace canvas and card, MOM editor; FormattedText: Notes, Workspace card, phase-notes dialog, MOM print). Contract the Executor uses — do **not** modify these files in slice B:
+- `RichTextEditor` new props: `tokenTriggers` (e.g. `["@", "#"]`), `onTokenChange(token | null)` where `token = { trigger, query, caret: {left, top, bottom} (viewport px), replace(text) }` — `replace` swaps exactly that token wherever it sits (mid-text too) and adds one space unless one follows; never reported while an IME composes; reported `null` on blur. `highlightPattern` (RegExp) paints matching text as a dark token chip while writing; the caret's token gets a light underline highlight. `listboxId` / `activeOptionId` wire `aria-controls` / `aria-activedescendant` / `aria-autocomplete="list"` on the text box. Key handling stays with the caller (the existing `onKeyDownCapture` on the composer wrapper keeps working: capture runs before the editor).
+- `FormattedText` new prop `tokens = { pattern, render(match, key) }`: matches are found in unescaped text (so `@HT\-01` matches), inside bold/italic and lists; the caller renders the element.
+- `HoverCard` (UI Engine overlays): `<HoverCard label content side align><button>…</button></HoverCard>` — hover/focus shows it without taking focus; click/tap/Enter opens it with focus inside (links reachable); Escape/leave closes and returns focus when engaged.
+- Pure helpers in `patterns/rich-text-tokens.ts` (`tokenAtCaret`, `tokenRanges`, `tokenReplacement`) with tests.
 
-- Empty query returns first 10 in stable Schedule order; partial normalized code OR name search retains exact full-code and final/active-option semantics. Expose entryId/name/location/code and signed thumbnail URL through app reads; link to that entry. No recency storage or long-lived URL persistence.
-- Canonical optional editor hooks report caret token/range/coordinates and transient highlight, replace exactly that range, preserve Markdown/IME/list/Shift/Enter behavior for all other consumers. Notes supplies domain content/query policy.
-- Open @/# popup immediately, above caret and within viewport; header, code/name/right location, initial highlight, scroll/keys/pointer/focus, loading/empty/error/retry. New query/close invalidates old responses. Lookup error prevents silent unresolved send/edit.
-- Inline resolved @CODE chips preserve formatted text; hover/focus opens thumbnail, CODE · Product Schedule, name/location and reachable Open item →. Missing/deleted image/entry degrades safely. No raw HTML/private formatter.
-- Retain reserved feedback/five-tag and existing reply/album/upload/PIC rules, polish round attach/send buttons. Phase stays required (G3); no ×.
+### Ordered slice B — @/# suggestions, inline item chips and composer (READY, R9.73)
 
-Tests: empty/prefix/exact/name/final-option/project scope; signed/missing image+ID; middle-text caret/punctuation/escaping/IME; stale result/Escape; Up/Down/Enter/Tab and focus; no results/error/retry; formatted chips/card link; # new/existing/feedback/limit; send/Shift/list Enter, attachments/album. G2 requires its separate complete shared-editor/formatter consumer matrix before implementation.
+One coherent revision. Module: studioflow. Files: N `notes-chat.tsx`, NC `src/app/(platform)/studioflow/_components/phase-note-composer.tsx` (`NoteDraftFields` pass-through + round buttons), W `src/apps/studioflow/workspace/service.ts` (`searchNoteItems`, note item view), A only for the search action's input/output types, the Schedule page `src/app/(platform)/studioflow/projects/[projectId]/schedule/page.tsx` + `schedule-board.tsx` for the deep link, `src/apps/studioflow/public/nav.ts` (optional `entryId` on `projectSchedule`), StudioFlow tests and `e2e/notes-chat.spec.ts`. No schema, migration, dependency or shared UI Engine change (use the G2 API as is; if it is insufficient, stop with BLOCKED and describe the gap). G3: phase stays required, no ×.
+
+**B1/B2 — search (backend).** `searchNoteItems(projectId, query)`:
+- Empty/blank query (or bare `@`) → the first 10 entries of the project in Schedule order (`section`, `sort_order`), including entries without options (name `null`).
+- Otherwise match **partial code OR name**: normalise the query (drop `@`, spaces, `-`; uppercase); letters `L` + optional digits `D` (leading zeros dropped) match entries whose prefix starts with `L` and, when `D` is present, whose increment's decimal string starts with `D` (so `HT`, `ht`, `H`, `HT0`, `HT1`, `HT-01` all work); in addition any option `product_name` containing the raw trimmed query (case-insensitive). An exact full-code match is listed first, then Schedule order; max 10; project scope only. Keep final-option-else-active naming.
+- Each result also returns `thumbnailUrl`: a short-lived signed URL (existing `signedUrl` helper/storage port) for the image of the final option, else the active option, else `null`. Never persist URLs.
+- The note view's `items` (W:601) gain `entryId` and `thumbnailUrl` the same way; keep `code`, `name`, `location`. Update `ChatNote` accordingly.
+
+**B3/B4/B5/B6 — composer popup (UI).**
+- `NoteDraftFields` passes through optional `tokenTriggers`, `onTokenChange`, `highlightPattern`, `listboxId`, `activeOptionId` to its `RichTextEditor` (other callers unchanged).
+- `ChatComposer` drops the trailing-text `TRAILING` regex and uses `onTokenChange` (`["@", "#"]`). State machine per token: `loading` → `results` | `empty` | `error`; closed when the token is null or Escape is pressed (Escape keeps the typed text; typing a new token reopens). Popup opens **immediately** on a bare trigger (shows "Loading…" until results). Debounce 150 ms; a request counter drops responses for an older token/closed popup. Error state shows a safe message and a **Retry** button.
+- Placement: absolutely positioned inside the composer's `relative` wrapper, **above the caret**: `left = clamp(token.caret.left − wrapperRect.left, 8, wrapperWidth − popupWidth − 8)`, `bottom = wrapperRect.bottom − token.caret.top + 6`; width `min(22rem, 100% − 16px)`, max-height ≈ 18rem with internal scroll; the active row scrolls into view (`block: "nearest"`).
+- Rows: header **PRODUCT SCHEDULE** (or **TAGS**); `@` rows = dark code chip, product name, and the location right-aligned in `text-ink-secondary` (not tertiary — E5 contrast); `#` rows as today (feedback/known/new tag, five-tag rule). First row active. Each option has `id = ${listboxId}-${index}`; pass `listboxId` and `activeOptionId` to the editor. Rows ≥ 44 px tall on touch (`min-h-11`), compact visual.
+- Keys (existing capture handler): only in `results` state Up/Down move, Enter/Tab pick; Escape closes in any open state; in `loading`/`empty`/`error` Enter is not swallowed (sends as usual). Pointer: hover sets active, mousedown (preventDefault) picks.
+- Pick = `token.replace(insert)` (exact range, works mid-text) and record `picked` code → entryId as today. Highlight while writing: `highlightPattern` = the code pattern `(?<=^|\s)@[A-Za-z]{1,4}-?\d{1,3}(?=$|[\s.,!?;:)])`.
+- Send keeps the shared resolver (`resolveNoteItemIds`, lookup failure blocks send with its message — show the resolver's message instead of the generic one).
+
+**B7 — sent mentions (UI).**
+- Bubble text uses `FormattedText tokens` with the same code pattern. A match whose `codeKey` equals one of `note.items` renders a `HoverCard` whose trigger is a dark inline chip button `@CODE` (`bg-action text-action-ink`, rounded, semibold, ≥ 24 px tall inline with a 44 px hit region via padding/negative margin that does not shift line height); unmatched codes stay plain text.
+- Card content: thumbnail (`img` 64×64 object-cover; on missing URL or load error a neutral placeholder), `CODE · Product Schedule`, name (or "No product name yet"), location, and a link **Open item →** to `STUDIOFLOW_ROUTES.projectSchedule(projectId, entryId)`.
+- The separate items row under the bubble (N:407–411) shows only items **not** mentioned inline (e.g. Board explicit links), each with the same HoverCard.
+- Deep link: `projectSchedule(projectId, entryId?)` adds `?entry=<id>`; the Schedule page reads it (read the installed Next.js docs on `searchParams` for this version first), passes `initialOpenId` to `ScheduleBoard` (`useState(initialOpenId)`), and scrolls that entry into view once. Unknown/deleted id: page opens normally.
+
+**B8 — composer polish.** Attach and Send become round 44 px controls (`IconButton`/`Button` with explicit local size; keep labels for assistive tech, Send keeps its pending state). Keep Enter/Shift+Enter/list rules, reply, album upload, `#feedback` toggle, phase Select (no ×), PIC rules. Copy stays English.
+
+**Tests.**
+1. Integration (`service.integration.test.ts`): empty query → first 10 in Schedule order incl. an entry without options; `HT`, `ht`, `H`, `HT0`, `HT1`, `HT-01`; name search; exact code listed first; other project's entries never returned; final vs active option naming; `thumbnailUrl` present for an option image and `null` without one; note view items carry `entryId`/`thumbnailUrl`.
+2. Unit (pure, next to N): popup state transitions incl. stale response ignored after token change/close, retry, placement clamp math; code-chip matching via `codeKey` (escaped hyphen, unmatched code plain).
+3. e2e `notes-chat.spec.ts` (run it; if the e2e environment is unavailable report that precisely, it is not a pass): bare `@` shows ≥ 1 item immediately; `HT` filters; insert a code in the middle of text with keyboard; send; hover/focus the sent chip shows the card; Enter on the chip then **Open item →** lands on Schedule with that entry open; `#` popup shows Tags; Escape closes.
+4. Existing notes/workspace/MOM/formatted-text/ui-engine tests stay green.
+
+**Executor verification:** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace, plus the e2e above. Kantor env; no migration expected. Browser acceptance: Reviewer/owner group [R9.64] B.
 
 ### Ordered slice C — Presentation pin movement and safe actions (PASS: R9.68 `0907c7d`, Lead review R9.69)
 
@@ -305,4 +336,25 @@ A, B, C and D are independently useful acceptance/revert boundaries; no preparat
 
 ## Executor Prompt
 
-No Executor slice is READY. The next step is the Lead-owned G2 revision (shared RichTextEditor caret/token-range/decoration hooks, FormattedText inline tokens, interactive item card, with a full consumer matrix). After the Lead commits it, slice B gets its own READY section and prompt here.
+```text
+ROLE: BACKEND EXECUTOR with the owner's expanded UI lane for Notes.
+Location: kantor (load .env.kantor, set STUDIOFLOW_LOCATION=kantor, verify
+rebuild-only dev/test targets). Read AGENTS.md, docs/agent/EXECUTOR.md and
+PLAN.md WO-SF-NOTES-PRESENTATION-IMAGE-01. Implement ONLY "Ordered slice B -
+@/# suggestions, inline item chips and composer (READY, R9.73)" using the
+Lead's G2 API from R9.72 exactly as documented (RichTextEditor tokenTriggers/
+onTokenChange/highlightPattern/listboxId/activeOptionId, FormattedText tokens,
+HoverCard). Do NOT edit rich-text-editor*.tsx, rich-text-tokens.ts,
+formatted-text.tsx or layouts/overlays.tsx; if the API is insufficient, stop
+with BLOCKED and describe the gap. Search: empty -> first 10 in Schedule order,
+partial code OR name, exact code first, signed thumbnails; caret-anchored
+popup with loading/results/empty/error+retry and stale-response guard; exact
+mid-text replacement; inline @CODE chips with HoverCard and Open item deep link
+to the Schedule entry; round 44px attach/send. Phase stays required (no x).
+No schema, migration, dependency or legacy; no remote operations. Preserve
+untracked owner files under test/. Finish with the listed tests (including the
+notes-chat e2e) and all checks, CHANGELOG R9.73, one local commit. Return only
+the Planner/Reviewer prompt: outcome, commit, checks, limitations, remaining
+dirty files. Stop with BLOCKED / CONFLICT if the plan contradicts the
+repository.
+```

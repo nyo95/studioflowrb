@@ -9,7 +9,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 import { IconButton } from "../primitives";
-import type { RichTextEditorProps } from "./rich-text-editor";
+import type { EditorToken, RichTextEditorProps } from "./rich-text-editor";
+import { activeToken, InlineTokens, LEAF, optionsOf, patternKey, TOKEN_KEY } from "./rich-text-token-plugin";
+import { tokenReplacement } from "./rich-text-tokens";
 
 /** Only what `FormattedText` can show back: bold, italic, headings, bullet, numbered and check lists. */
 const EXTENSIONS = [
@@ -41,12 +43,14 @@ const SLASH_ITEMS: SlashItem[] = [
 
 type Slash = { from: number; left: number; top: number; index: number };
 
-export default function RichTextEditorImpl({ value, onChange, maxLength, disabled, autoFocus, placeholder, "aria-label": ariaLabel, className, onSubmit, compact = false, bare = false, slashMenu = false, onBlur }: RichTextEditorProps) {
+export default function RichTextEditorImpl({ value, onChange, maxLength, disabled, autoFocus, placeholder, "aria-label": ariaLabel, className, onSubmit, compact = false, bare = false, slashMenu = false, onBlur, tokenTriggers, onTokenChange, highlightPattern, listboxId, activeOptionId }: RichTextEditorProps) {
   // The last text we reported: the parent echoing it back is not a replacement, so typing is never reset.
   const reported = useRef(value);
   const submitRef = useRef(onSubmit);
   const blurRef = useRef(onBlur);
-  useEffect(() => { submitRef.current = onSubmit; blurRef.current = onBlur; });
+  const tokenChangeRef = useRef(onTokenChange);
+  useEffect(() => { submitRef.current = onSubmit; blurRef.current = onBlur; tokenChangeRef.current = onTokenChange; });
+  const reportedToken = useRef("");
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [slash, setSlash] = useState<Slash | null>(null);
   const slashRef = useRef<Slash | null>(null);
@@ -63,6 +67,37 @@ export default function RichTextEditorImpl({ value, onChange, maxLength, disable
     const box = wrapperRef.current?.getBoundingClientRect();
     setSlash((open) => ({ from: $from.pos - 1, left: caret.left - (box?.left ?? 0), top: caret.bottom - (box?.top ?? 0) + 4, index: open?.index ?? 0 }));
   };
+  /** Tells the caller which token the caret is in, once per change; never while an IME is still composing. */
+  const readToken = (current: Editor) => {
+    const report = tokenChangeRef.current;
+    if (!report) return;
+    const active = current.view.composing ? null : activeToken(current.state, optionsOf(current.state).triggers);
+    const key = active ? `${active.fromPos}:${active.text}:${active.query}` : "";
+    if (key === reportedToken.current) return;
+    reportedToken.current = key;
+    if (!active) { report(null); return; }
+    const caret = current.view.coordsAtPos(current.state.selection.from);
+    const token: EditorToken = {
+      trigger: active.trigger,
+      query: active.query,
+      caret: { left: caret.left, top: caret.top, bottom: caret.bottom },
+      replace: (text) => {
+        const live = editorRef.current;
+        if (!live) return;
+        // The caret's token now, else the reported one if its text is still there; never a range that moved on.
+        const now = activeToken(live.state, optionsOf(live.state).triggers);
+        const range = now ?? (active.toPos <= live.state.doc.content.size && live.state.doc.textBetween(active.fromPos, active.toPos, undefined, LEAF) === active.text ? active : null);
+        if (!range) return;
+        live.chain().focus().insertContentAt({ from: range.fromPos, to: range.toPos }, { type: "text", text: tokenReplacement(text, range.after) }).run();
+      },
+    };
+    report(token);
+  };
+  const clearToken = () => {
+    if (!reportedToken.current) return;
+    reportedToken.current = "";
+    tokenChangeRef.current?.(null);
+  };
   const choose = (item: SlashItem) => {
     const editor = editorRef.current;
     const open = slashRef.current;
@@ -73,7 +108,7 @@ export default function RichTextEditorImpl({ value, onChange, maxLength, disable
   };
 
   const editor = useEditor({
-    extensions: EXTENSIONS,
+    extensions: [...EXTENSIONS, InlineTokens],
     content: value,
     contentType: "markdown",
     editable: !disabled,
@@ -117,16 +152,36 @@ export default function RichTextEditorImpl({ value, onChange, maxLength, disable
       reported.current = next;
       onChange(next);
       readSlash(current);
+      readToken(current);
     },
-    onSelectionUpdate: ({ editor: current }) => readSlash(current),
+    onSelectionUpdate: ({ editor: current }) => { readSlash(current); readToken(current); },
     onBlur: ({ event }) => {
       // Choosing from the "/" menu or the toolbar keeps the editor; anything else outside it is leaving.
       if (event.relatedTarget instanceof Node && wrapperRef.current?.contains(event.relatedTarget)) return;
       setSlash(null);
+      clearToken();
       blurRef.current?.();
     },
   });
   useEffect(() => { editorRef.current = editor; }, [editor]);
+
+  // New triggers or highlight pattern go to the plugin in one transaction (compared by value, not identity).
+  const triggerKey = (tokenTriggers ?? []).join("");
+  const highlightKey = patternKey(highlightPattern);
+  useEffect(() => {
+    if (editor && !editor.isDestroyed) editor.view.dispatch(editor.state.tr.setMeta(TOKEN_KEY, { triggers: tokenTriggers ?? [], highlight: highlightPattern }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by value so a fresh RegExp each render is not a change
+  }, [editor, triggerKey, highlightKey]);
+
+  // The caller's suggestion list, announced from the text box itself.
+  useEffect(() => {
+    if (!editor || editor.isDestroyed) return;
+    const dom = editor.view.dom;
+    const set = (name: string, next: string | undefined) => { if (next) dom.setAttribute(name, next); else dom.removeAttribute(name); };
+    set("aria-autocomplete", tokenTriggers?.length ? "list" : undefined);
+    set("aria-controls", listboxId);
+    set("aria-activedescendant", listboxId ? activeOptionId : undefined);
+  }, [editor, triggerKey, tokenTriggers?.length, listboxId, activeOptionId]);
 
   // The parent can replace the text (e.g. cancel, or open another note): follow it without echoing our own typing.
   useEffect(() => {
@@ -168,6 +223,8 @@ export default function RichTextEditorImpl({ value, onChange, maxLength, disable
           "[&_.ProseMirror_ul[data-type=taskList]_li]:flex [&_.ProseMirror_ul[data-type=taskList]_li]:items-start [&_.ProseMirror_ul[data-type=taskList]_li]:gap-2",
           "[&_.ProseMirror_ul[data-type=taskList]_li>label]:mt-0.5 [&_.ProseMirror_ul[data-type=taskList]_li>div]:min-w-0 [&_.ProseMirror_ul[data-type=taskList]_li>div]:flex-1",
           "[&_.ProseMirror_li[data-checked=true]>div]:text-ink-tertiary [&_.ProseMirror_li[data-checked=true]>div]:line-through",
+          "[&_.rte-token]:rounded-[4px] [&_.rte-token]:bg-action [&_.rte-token]:font-semibold [&_.rte-token]:text-action-ink",
+          "[&_.rte-token-active]:rounded-[4px] [&_.rte-token-active]:bg-surface-muted [&_.rte-token-active]:underline [&_.rte-token-active]:decoration-line-focus [&_.rte-token-active]:underline-offset-2",
         )}
       />
       </div>

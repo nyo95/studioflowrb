@@ -47,19 +47,52 @@ function blocksOf(text: string): Block[] {
 const ESCAPED = /\\([\\`*_{}[\]()#+\-.!>~|])/g;
 const unescape = (text: string) => text.replace(ESCAPED, "$1");
 
+/** Inline tokens the caller draws itself (e.g. `@CODE` chips); everything around them stays plain text. */
+export type FormattedTextTokens = {
+  pattern: RegExp;
+  render: (match: string, key: string) => ReactNode;
+};
+
+/** Plain text with every token match handed to the caller's renderer. Runs on unescaped text, so `@HT\-01` matches. */
+function withTokens(text: string, tokens: FormattedTextTokens | undefined, key: string): ReactNode[] {
+  if (!tokens || !text) return text ? [text] : [];
+  const pattern = new RegExp(tokens.pattern.source, tokens.pattern.flags.includes("g") ? tokens.pattern.flags : `${tokens.pattern.flags}g`);
+  const parts: ReactNode[] = [];
+  let cursor = 0;
+  for (const match of text.matchAll(pattern)) {
+    const index = match.index ?? 0;
+    if (!match[0]) continue;
+    if (index > cursor) parts.push(text.slice(cursor, index));
+    parts.push(<Fragment key={`${key}:${index}`}>{tokens.render(match[0], `${key}:${index}`)}</Fragment>);
+    cursor = index + match[0].length;
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return parts;
+}
+
 /** `**bold**` and `*italic*` inside one line; anything else is shown as typed, escapes removed. Never renders HTML. */
-function inline(text: string): ReactNode[] {
+function inline(text: string, tokens?: FormattedTextTokens, key = ""): ReactNode[] {
   const parts: ReactNode[] = [];
   // An escaped character is matched first, so `\*` is a literal star and never opens emphasis.
   const pattern = /\\([\\`*_{}[\]()#+\-.!>~|])|\*\*(.+?)\*\*|\*(?!\s)(.+?)(?<!\s)\*/g;
   let cursor = 0;
+  // Plain text (escapes already removed) waits here, so a token split by an escape still reads as one.
+  let plainText = "";
+  const flush = () => { parts.push(...withTokens(plainText, tokens, `${key}p${parts.length}`)); plainText = ""; };
   for (const match of text.matchAll(pattern)) {
     const index = match.index ?? 0;
-    if (index > cursor) parts.push(text.slice(cursor, index));
-    parts.push(match[1] !== undefined ? match[1] : match[2] !== undefined ? <strong key={index} className="font-semibold">{unescape(match[2])}</strong> : <em key={index}>{unescape(match[3]!)}</em>);
+    if (index > cursor) plainText += text.slice(cursor, index);
+    if (match[1] !== undefined) plainText += match[1];
+    else {
+      flush();
+      parts.push(match[2] !== undefined
+        ? <strong key={`${key}s${index}`} className="font-semibold">{withTokens(unescape(match[2]), tokens, `${key}s${index}`)}</strong>
+        : <em key={`${key}e${index}`}>{withTokens(unescape(match[3]!), tokens, `${key}e${index}`)}</em>);
+    }
     cursor = index + match[0].length;
   }
-  if (cursor < text.length) parts.push(text.slice(cursor));
+  if (cursor < text.length) plainText += text.slice(cursor);
+  flush();
   return parts;
 }
 
@@ -79,17 +112,19 @@ export function toggleCheckItem(text: string, index: number): string {
  * Shows text written with `SimpleTextEditor`: bold, italic, bullet and numbered lists, line breaks kept.
  * Plain text without marks reads exactly as before, so it is safe on every existing note.
  */
-export function FormattedText({ text, className, onToggleCheck }: {
+export function FormattedText({ text, className, onToggleCheck, tokens }: {
   text: string;
   className?: string;
   /** Makes check items tickable in place; receives the item's position among all check items of the text. */
   onToggleCheck?: (index: number) => void;
+  /** Draws matching inline tokens (e.g. item codes) with the caller's element; without it, text shows as before. */
+  tokens?: FormattedTextTokens;
 }) {
   let checkIndex = 0;
   return (
     <div className={cx("grid gap-1 [overflow-wrap:anywhere]", className)}>
       {blocksOf(text).map((block, index) => {
-        if (block.kind === "heading") return <p key={index} className="m-0 font-semibold">{inline(block.text)}</p>;
+        if (block.kind === "heading") return <p key={index} className="m-0 font-semibold">{inline(block.text, tokens, `h${index}`)}</p>;
         if (block.kind === "checks") {
           return <ul key={index} className="m-0 grid list-none gap-0.5 p-0">{block.items.map((item, i) => {
             const position = checkIndex++;
@@ -98,20 +133,20 @@ export function FormattedText({ text, className, onToggleCheck }: {
                 {onToggleCheck
                   ? <input type="checkbox" checked={item.done} onChange={() => onToggleCheck(position)} aria-label={item.done ? "Mark as not done" : "Mark as done"} className="mt-1 cursor-pointer accent-[var(--ui-action-primary)]" />
                   : <input type="checkbox" checked={item.done} readOnly tabIndex={-1} aria-label={item.done ? "Done" : "Not done"} className="mt-1" />}
-                <span className={item.done ? "text-ink-tertiary line-through" : undefined}>{inline(item.text)}</span>
+                <span className={item.done ? "text-ink-tertiary line-through" : undefined}>{inline(item.text, tokens, `c${index}-${i}`)}</span>
               </li>
             );
           })}</ul>;
         }
         if (block.kind === "bullets") {
-          return <ul key={index} className="m-0 grid list-disc gap-0.5 pl-5">{block.items.map((item, i) => <li key={i}>{inline(item)}</li>)}</ul>;
+          return <ul key={index} className="m-0 grid list-disc gap-0.5 pl-5">{block.items.map((item, i) => <li key={i}>{inline(item, tokens, `b${index}-${i}`)}</li>)}</ul>;
         }
         if (block.kind === "numbers") {
-          return <ol key={index} start={block.start} className="m-0 grid list-decimal gap-0.5 pl-5">{block.items.map((item, i) => <li key={i}>{inline(item)}</li>)}</ol>;
+          return <ol key={index} start={block.start} className="m-0 grid list-decimal gap-0.5 pl-5">{block.items.map((item, i) => <li key={i}>{inline(item, tokens, `n${index}-${i}`)}</li>)}</ol>;
         }
         return (
           <p key={index} className="m-0">
-            {block.lines.map((line, i) => <Fragment key={i}>{i > 0 ? <br /> : null}{inline(line)}</Fragment>)}
+            {block.lines.map((line, i) => <Fragment key={i}>{i > 0 ? <br /> : null}{inline(line, tokens, `t${index}-${i}`)}</Fragment>)}
           </p>
         );
       })}

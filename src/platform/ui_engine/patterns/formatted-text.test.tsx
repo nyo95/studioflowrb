@@ -61,4 +61,13 @@ describe("FormattedText", () => {
     assert.match(out, /\[TES\] warna lantai \*bukan miring\* <strong class="font-semibold">\[tebal\]<\/strong>/);
     assert.doesNotMatch(out, /\\/);
   });
+
+  it("hands inline tokens to the caller, inside emphasis and across escapes, and leaves text unchanged without it", () => {
+    const tokens = { pattern: /@[A-Za-z]{1,4}-?\d{1,3}/, render: (match: string) => <mark>{match}</mark> };
+    const out = renderToStaticMarkup(<FormattedText text={"Use @HT\\-01 and **@CL2** here\n- check @HT1."} tokens={tokens} />);
+    assert.match(out, /Use <mark>@HT-01<\/mark> and <strong class="font-semibold"><mark>@CL2<\/mark><\/strong> here/);
+    assert.match(out, /<li>check <mark>@HT1<\/mark>\.<\/li>/);
+    assert.doesNotMatch(html("Use @HT1"), /<mark/);
+    assert.match(html("Use @HT1"), /Use @HT1/);
+  });
 });

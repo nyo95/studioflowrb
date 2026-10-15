@@ -30,6 +30,28 @@ export type RichTextEditorProps = {
   slashMenu?: boolean;
   /** Focus left the editor (not into its own menu). */
   onBlur?: () => void;
+  /**
+   * Single characters (e.g. "@", "#") that start an inline token at the start of a line or after a space. With
+   * `onTokenChange`, the editor reports the token under the caret so the caller can show its own suggestions.
+   */
+  tokenTriggers?: readonly string[];
+  /** The token under the caret changed; `null` when the caret is not in one (or while an IME is composing). */
+  onTokenChange?: (token: EditorToken | null) => void;
+  /** Text matching this pattern is shown as a highlighted token while writing (e.g. codes the caller recognises). */
+  highlightPattern?: RegExp;
+  /** The suggestion list the caller renders for the current token, and its active option, for assistive technology. */
+  listboxId?: string;
+  activeOptionId?: string;
+};
+
+export type EditorToken = {
+  trigger: string;
+  /** What was typed between the trigger and the caret. */
+  query: string;
+  /** The caret's position on screen (viewport pixels), to anchor a suggestion list. */
+  caret: { left: number; top: number; bottom: number };
+  /** Replaces exactly this token (wherever it sits in the text) and puts the caret after it. */
+  replace: (text: string) => void;
 };
 
 /**

@@ -900,7 +900,7 @@ The UI contract is broader than the code required today. Public code is added by
 - `DescriptionList`, `DescriptionItem`;
 - `StatusBadge`, `Notice`, `LoadingState`, `EmptyState`, `ErrorState`, `InlineError`.
 
-- `Dialog`, `Drawer`, `ConfirmDialog`, `Tooltip`;
+- `Dialog`, `Drawer`, `ConfirmDialog`, `Tooltip`, `HoverCard` (R9.72: an interactive preview card for an inline element; hover/focus shows it, click/tap/Enter opens it with focus inside so its links are reachable);
 - `AppShell`, `PageShell`, `PageHeader`;
 - `DirectoryShell`, `DetailShell`, `SettingsShell`;
 - `Tabs`.
@@ -973,6 +973,15 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   `onSubmit` it sends chat-style (R8.446): Enter submits, Shift+Enter starts a
   new line, Enter inside a list adds the next item, Ctrl/Cmd+Enter always
   submits. `compact` gives a short composer box that grows with its text.
+  Inline tokens (R9.72): `tokenTriggers` + `onTokenChange` report the token
+  under the caret (trigger, typed query, caret position, and a `replace` that
+  swaps exactly that token, mid-text too; nothing while an IME composes) so the
+  consumer renders its own suggestion list and owns its data and keys;
+  `highlightPattern` paints matching text as a token chip while writing;
+  `listboxId`/`activeOptionId` announce the consumer's list from the text box.
+  Without these props the editor behaves exactly as before. `FormattedText`
+  takes `tokens = { pattern, render }` to draw the same tokens in shown text
+  (matched after escapes are removed, inside emphasis and lists).
 - `ImageWorkspace` owns browser selection (picker, drop, paste, or an
   `initialFile` handed over by the consumer), preview, crop through zoom/focus
   (optionally locked to an `aspect`), freehand annotation, PNG or JPEG output
