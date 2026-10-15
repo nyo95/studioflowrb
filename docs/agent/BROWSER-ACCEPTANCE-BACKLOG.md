@@ -30,6 +30,46 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.64] A — Notes integrity, reader context and existing General edits
+- Surface: StudioFlow project Notes with workspace-board off; same records on Board when enabled
+- Fixture: WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A implemented after G1 approval; ACTIVE project, designer, drafter with only a different phase's rights, outsider; official text/image/file records, manual feedback, General text, linked Schedule item; two sessions
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Edit an ordinary note in two sessions; save the first, then the stale second draft. 2. Remove its @CODE and reload the item's linked notes. 3. Attempt official record edit/delete in both views. 4. Filter by phase/tag/feedback/starred, scroll to an older note, then refresh through a phase action elsewhere. 5. With Board off edit an existing General note as an authorized project PIC; repeat without project-level rights. 6. Repeat mutation attempts on completed/archived projects.
+- Acceptance: approved G1 historical policy enforced server-side, no storage deletion on refusal; stale draft retained with clear conflict; removed link gone; filter and reading position retained with matching records; General edit follows existing rights and never enables the Board module; closed/archive refusals remain. This is future acceptance, not an R9.64 implementation claim.
+- Status: PENDING
+
+### [R9.64] B — @/# suggestions, inline item cards and composer
+- Surface: StudioFlow Notes composer and sent bubbles
+- Fixture: slice B implemented with G2 prerequisite/authority and G3 phase-removal decision recorded; project with at least 12 Schedule items including HT1/HT2, distinct names/locations, one thumbnail, missing thumbnail and topic tags; controlled lookup failure
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Type bare @ then HT, a name and an unmatched value. 2. Exercise loading/failure/retry and fast query changes. 3. Insert in mid-text; use arrows, Enter/Tab, Esc, hover/click and IME. 4. Send formatted text with @CODE and focus/hover its chip, then Open item. 5. Repeat # known/new/feedback/no-match/failure states. 6. Exercise attach/send, Shift/list Enter, reply, album and the recorded phase-tag behavior.
+- Acceptance: immediately visible caret-anchored popup above composer, clamped to viewport; header/code/name/right location and first selection; clear pending/empty/error states; stale requests cannot reopen/replace results; token highlight and exact replacement preserve formatting; item card/link usable by keyboard/touch with safe missing-image handling; established feedback/tag/permissions and send behavior survive. No unapproved General creation.
+- Status: PENDING
+
+### [R9.64] C — Presentation pin drag, confirmation and print
+- Surface: Presentation board list/editor and print
+- Fixture: slice C implemented, board with six layouts, cover/contain images and numbered linked pins; editable/read-only staff; controlled action refusal
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Select/add a pin, drag it to each edge in cropped and whole images, cancel a gesture and reload. 2. Use approved keyboard nudges. 3. Drag the image to another occupied/empty box. 4. Cancel then confirm picker/drop replacement and pin/image/slide/board deletion. 5. Cause pin-add/create/delete failure. 6. Open print and compare positions, numbering and legend. 7. View a stale Schedule-linked board as read-only.
+- Acceptance: pin saves once in image coordinates on release; cancellation/failure restores position; pin drag never adds a pin or moves the image, image drag preserves associated pins; every destructive path is confirmed and cancel does no upload/write; errors stay visible, failed delete does not navigate; printing and read-only views remain correct. Read-side nonmutation additionally needs automated persistence evidence.
+- Status: PENDING
+
+### [R9.64] D — Shared crop, gestures and drawing state
+- Surface: UI Engine ImageWorkspace through Schedule and MOM
+- Fixture: slice D implemented; known colored-quadrant landscape/portrait photos, large JPEG, transparent PNG, unsupported/corrupt image; physical or instrumented two-pointer touch
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Compare crop preview/export at default and edge focus for Schedule 4:5 and MOM 4:3, plus public no-aspect fixture. 2. Wheel near each corner, pinch around different midpoints, drag Pan to bounds and cancel a gesture. 3. Use sliders and Reset crop/Fit. 4. Change Pan/Draw/subtools, draw several strokes, undo one, clear all and choose another file. 5. Check pending/disabled preparation and saved output colors/size.
+- Acceptance: preview/export match, zoom anchors and pan feel direct without blank edges, fixed frame stays visible, gestures cancel cleanly and never become accidental strokes; active state is clear, undo and clear are distinct; existing crop-space annotation bake/quality/format/dimension/byte/fallback contracts preserved. Subjective feel requires Reviewer assessment.
+- Status: PENDING
+
+### [R9.64] E — Every image consumer, theme, focus and viewport
+- Surface: all production consumers in PLAN.md image matrix; touched Notes and Presentation screens
+- Fixture: A–D implemented as applicable; Schedule photo/change, option photo, new-option photo, MOM photo; Notes single/5-image album, Board image viewer, Ideas square image; fitting/oversized images, signed/missing URLs and consumer actions
+- Viewport: 375, 640, 839, 840, 841 px and desktop; light/dark themes
+- Steps: 1. At every matrix call site exercise its existing picker/drop/paste and successful/error callback. 2. Verify gallery fill/square/album +N, arrows, focus return, viewer actions and removal where offered. 3. Tab all touched controls, inspect focus/selected contrast and measured hit regions. 4. Check reader/popup/editor layout for page-level horizontal overflow and run the screen-size suite when affected. 5. Confirm simple upload consumers did not acquire an extra drawing/crop step.
+- Acceptance: every existing consumer retains behavior/limits/options, visible focus and adequate local hit areas; semantic colors/contrast in both themes; no clipped popup/action or sideways page scroll; no unintended global density change. This consumer matrix is coverage, not a pre-implementation no-regression assertion.
+- Status: PENDING
+
 ### [R9.31] Workspace image reaches Moodboard without Ideas
 - Surface: project Phases page, Notes stream and optional Workspace board image viewer
 - Fixture: a person with Presentation manage access; one project note/Workspace image; Presentation enabled and Ideas disabled
