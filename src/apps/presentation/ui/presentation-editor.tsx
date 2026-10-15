@@ -64,6 +64,9 @@ export function PresentationEditor({ projectId, board, scheduleEntries, canEdit 
   const pinKeys = useRef<PinKeys | null>(null);
   const suppressClick = useRef(false);
   const previews = useRef<Record<string, PinPosition>>({});
+  // A failed save may start a route refresh that completes after a successful pin retry.
+  // Keep acknowledged new pins visible when that older server copy arrives.
+  const [acknowledgedPins, setAcknowledgedPins] = useState<Record<string, { imageId: string; pin: Annotation }>>({});
   const [previewPins, setPreviewPins] = useState<Record<string, PinPosition>>({});
   const [pinMoving, setPinMoving] = useState(false);
   const newSlidesInput = useRef<HTMLInputElement>(null);
@@ -81,8 +84,20 @@ export function PresentationEditor({ projectId, board, scheduleEntries, canEdit 
   const [slides, setSlides] = useState<Slide[]>(board.slides);
   const [served, setServed] = useState(board);
   const [saveState, setSaveState] = useState<{ waiting: number; heavy: number }>({ waiting: 0, heavy: 0 });
-  if (served !== board && saveState.waiting === 0) { setServed(board); setSlides(board.slides); setTitle(board.title); }
-  const fail = useCallback((message: string) => { setError(message); router.refresh(); }, [router]);
+  if (served !== board && saveState.waiting === 0) {
+    setServed(board);
+    setSlides(board.slides.map((slide) => ({
+      ...slide,
+      images: slide.images.map((image) => ({
+        ...image,
+        annotations: [...image.annotations, ...Object.values(acknowledgedPins)
+          .filter(({ imageId, pin }) => imageId === image.id && !image.annotations.some((serverPin) => serverPin.id === pin.id))
+          .map(({ pin }) => pin)],
+      })),
+    })));
+    setTitle(board.title);
+  }
+  const fail = useCallback((message: string) => { setError(message); router.refresh(); }, [router, setError]);
   const [saves] = useState<SaveQueue>(() => createSaveQueue({
     onChange: (waiting, heavy) => setSaveState({ waiting, heavy }),
     onFail: (message) => fail(message),
@@ -258,7 +273,9 @@ export function PresentationEditor({ projectId, board, scheduleEntries, canEdit 
     const pinX = Math.max(0, Math.min(100, ((event.clientX - rect.left) / rect.width) * 100));
     const pinY = Math.max(0, Math.min(100, ((event.clientY - rect.top) / rect.height) * 100));
     act(() => addPresentationAnnotationAction({ projectId, imageId: image.id, pinX, pinY }), { heavy: false, after: (data) => {
-      patchImages((current) => (current.id === image.id ? { ...current, annotations: [...current.annotations, { id: data.annotationId, pinX, pinY, scheduleEntryId: null, labelSide: "auto", note: null, scheduleEntry: null }] } : current));
+      const pin: Annotation = { id: data.annotationId, pinX, pinY, scheduleEntryId: null, labelSide: "auto", note: null, scheduleEntry: null };
+      setAcknowledgedPins((current) => ({ ...current, [pin.id]: { imageId: image.id, pin } }));
+      patchImages((current) => (current.id === image.id && !current.annotations.some((item) => item.id === pin.id) ? { ...current, annotations: [...current.annotations, pin] } : current));
       setSelectedPinId(data.annotationId);
     } });
   };
@@ -383,7 +400,7 @@ export function PresentationEditor({ projectId, board, scheduleEntries, canEdit 
             <Field label="Product Schedule"><Select name="scheduleEntryId" defaultValue={selectedPin.scheduleEntryId ?? ""} disabled={!canEdit || locked}><option value="">No linked item</option>{scheduleEntries.map((entry) => <option key={entry.id} value={entry.id}>{entry.code}{entry.productName ? ` — ${entry.productName}` : ""}</option>)}</Select></Field>
             <Field label="Label position"><Select name="labelSide" defaultValue={selectedPin.labelSide} disabled={!canEdit || locked}><option value="auto">Automatic</option><option value="left">Left</option><option value="right">Right</option></Select></Field>
             <Field label="Note"><Textarea name="note" defaultValue={selectedPin.note ?? ""} disabled={!canEdit || locked} /></Field>
-            {canEdit ? <><Button type="submit" pending={busy} disabled={pinMoving}>Save pin</Button><Button type="button" variant="danger" pending={busy} disabled={pinMoving} onClick={() => { const pinId = selectedPin.id; void destructive(pinConfirmation(pinNumbers.get(pinId) ?? 0), () => deletePresentationAnnotationAction({ projectId, annotationId: pinId }), () => setSelectedPinId(null), () => patchPin(pinId, () => null)); }}><Trash2 size={16} /> Delete pin</Button></> : null}
+            {canEdit ? <><Button type="submit" pending={busy} disabled={pinMoving}>Save pin</Button><Button type="button" variant="danger" pending={busy} disabled={pinMoving} onClick={() => { const pinId = selectedPin.id; void destructive(pinConfirmation(pinNumbers.get(pinId) ?? 0), () => deletePresentationAnnotationAction({ projectId, annotationId: pinId }), () => setSelectedPinId(null), () => { setAcknowledgedPins((current) => { const next = { ...current }; delete next[pinId]; return next; }); patchPin(pinId, () => null); }); }}><Trash2 size={16} /> Delete pin</Button></> : null}
             {canEdit ? <p className="m-0 text-xs text-ink-secondary">Drag the pin to move it, or use arrow keys (Shift for 5%).</p> : null}
             <Button type="button" variant="ghost" disabled={locked} onClick={() => setSelectedPinId(null)}>Back to image</Button>
           </form>

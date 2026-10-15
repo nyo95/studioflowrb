@@ -88,6 +88,25 @@ test("access terminology distinguishes Platform Owner from Developer", async ({ 
   await expect(ownerRow.getByRole("button", { name: /Actions for/ })).toHaveCount(0);
 });
 
+test("shell route transitions do not hydrate against a different rail", async ({ page }) => {
+  const mismatches: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydrat|server rendered html|server rendered.*client/i.test(message.text())) mismatches.push(`${page.url()}: ${message.text()}`);
+  });
+  page.on("pageerror", (error) => {
+    if (/hydrat|server rendered html|server rendered.*client/i.test(error.message)) mismatches.push(`${page.url()}: ${error.message}`);
+  });
+  await page.goto("/");
+  for (const route of ["/studioflow/settings/phases", "/settings/general", "/account", "/system", "/studioflow/settings/schedule", "/settings/access/users"]) {
+    await page.goto(route);
+    await page.waitForLoadState("networkidle");
+    await page.goBack();
+    await page.goForward();
+    await page.waitForLoadState("networkidle");
+  }
+  expect(mismatches).toEqual([]);
+});
+
 test("Role matrix follows the Developer module ceiling without hiding core apps", async ({ page }) => {
   const connectionString = process.env.PLATFORM_TEST_DATABASE_URL;
   if (!connectionString) throw new Error("PLATFORM_TEST_DATABASE_URL is required.");

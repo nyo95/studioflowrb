@@ -128,12 +128,13 @@ test("Presentation creation, pin, and board deletion refusals stay visible and r
   await expect(page.getByRole("alert").filter({ hasText: "The change could not be saved. Please try again." }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Pin 1", exact: true })).toHaveCount(0);
   await release();
-  await page.reload();
   await page.waitForLoadState("networkidle");
   await image.click();
   await expect(page.getByRole("button", { name: "Replace image" })).toBeVisible();
   await image.click();
   await expect(page.getByRole("button", { name: "Pin 1", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Pin 1", exact: true })).toHaveCount(1);
 
   release = await refuseNextAction(page);
   await page.getByRole("button", { name: "Delete board" }).click();
