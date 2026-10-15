@@ -1,14 +1,16 @@
 "use client";
 
-import { Minus, MousePointer2, Plus, StickyNote, Type, Upload, X } from "lucide-react";
+import { MessageSquare, Minus, MousePointer2, Plus, StickyNote, Type, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type CSSProperties, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 
 import { Button, EmptyState, IconButton, InlineError, Notice, RichTextEditor, Text, useConfirm, useFileIntake } from "@/platform/ui_engine";
 
-import type { WorkspaceCommandInput } from "../../../actions";
+import { threadCommandAction, type WorkspaceCommandInput } from "../../../actions";
 import { NOTE_MAX } from "../../../_components/phase-note-composer";
 import { CardComposer, WORKSPACE_FILE_ACCEPT, WorkspaceCard, runWorkspaceCommand, uploadBoardFiles, type LabelChoices, type PhaseOption, type RunCommand, type WorkspaceCardView } from "./card";
+import type { ChatPhase } from "../_notes-stream/notes-chat";
+import { AllThreadNotes, ThreadMarker, ThreadWindow, type BoardThread, type OpenThread, type ThreadChatProps } from "./threads";
 import { DEFAULT_CARD_W, ESTIMATED_CARD_H, MIN_CARD_W, boardExtent, layoutElements, snapMove, snapToGrid, type CardSlot, type Rect } from "./geometry";
 
 type Filter = "all" | "general" | "phase" | "starred" | "feedback";
@@ -37,8 +39,12 @@ const isEditable = (target: EventTarget | null) => target instanceof HTMLElement
  * (or middle-click, or Space + drag) to move around; zoom only enlarges, and the overview map jumps anywhere.
  * Layout is last-write-wins and never makes someone's text edit stale. Below 768 px the elements read top to bottom.
  */
-export function WorkspaceCanvas({ projectId, projectName, elements: board, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, canUsePresentation, drawingList }: {
+export function WorkspaceCanvas({ projectId, projectName, elements: board, threads: serverThreads, chatPhases, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, canUsePresentation, drawingList }: {
   projectId: string;
+  /** Note threads on the board (WO-SF-BOARD-THREADS-01); their messages are project notes, never board elements. */
+  threads: readonly BoardThread[];
+  /** The phases as the Notes chat names them, for the thread windows. */
+  chatPhases: readonly ChatPhase[];
   projectName: string;
   elements: WorkspaceCardView[];
   phases: readonly PhaseOption[];
@@ -61,6 +67,13 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
   const [overrides, setOverrides] = useState<Record<string, CardSlot>>({});
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
   if (received !== board) { setReceived(board); setOverrides({}); setHidden(new Set()); }
+  // Threads follow the same rule: an optimistic marker move lasts until the server sends the threads again.
+  const [receivedThreads, setReceivedThreads] = useState(serverThreads);
+  const [threadMoves, setThreadMoves] = useState<Record<string, { x: number; y: number }>>({});
+  if (receivedThreads !== serverThreads) { setReceivedThreads(serverThreads); setThreadMoves({}); }
+  const [openThread, setOpenThread] = useState<OpenThread | null>(null);
+  const [allNotes, setAllNotes] = useState(false);
+  const threadSeq = useRef(0);
 
   const [heights, setHeights] = useState<ReadonlyMap<string, number>>(new Map());
   const [view, setView] = useState<View>(DEFAULT_VIEW);
@@ -96,6 +109,10 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
   const canCreate = canEditGeneral || labelChoices.phases.length > 0;
   const limited = !readOnlyReason && !canEditGeneral && labelChoices.phases.length > 0;
   const newBlockPhase = selectedPhase && labelChoices.phases.some((phase) => phase.id === selectedPhase.id) ? selectedPhase.id : labelChoices.allowNone ? null : labelChoices.phases[0]?.id ?? null;
+  // A board note is a Notes message: it needs a phase this person may write (G3); moving a free marker is project-level.
+  const canThread = labelChoices.phases.length > 0;
+  const canMoveThreads = canEditGeneral;
+  const chat: ThreadChatProps = { projectId, projectName, phases: chatPhases, writablePhaseIds, canEditGeneral, defaultPhaseId: selectedPhase?.id ?? null, canUseIdeas, canUsePresentation };
 
   // ── View (pan and zoom are personal: this browser only) ─────────────
   const viewKey = `studioflow.workspace.view.${projectId}`;
@@ -295,10 +312,71 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
     startPan(event);
   };
 
+  // ── Board notes (threads): double-click opens one; its first message creates it ──
+  const threadTitle = (card: WorkspaceCardView | undefined) => !card ? "Board note" : card.kind === "IMAGE" ? "Note on image" : card.kind === "FILE" ? `Note on ${card.file?.name ?? "file"}` : "Note on text";
+  const openNewThread = (spec: OpenThread["spec"], title: string, world: { x: number; y: number }) => setOpenThread({ key: `new:${++threadSeq.current}`, spec, title, world });
+  const openAnchored = (card: WorkspaceCardView, point: { x: number; y: number }) => {
+    const slot = layout.get(card.id)!;
+    const offsetX = Math.round(point.x - slot.x), offsetY = Math.round(point.y - slot.y);
+    openNewThread({ anchorCardId: card.id, offsetX, offsetY }, threadTitle(card), { x: slot.x + offsetX, y: slot.y + offsetY });
+  };
+  const threadPoint = (thread: BoardThread, shift?: { ids: ReadonlySet<string>; dx: number; dy: number }) => {
+    const moved = threadMoves[thread.id];
+    if (moved) return moved;
+    const slot = thread.anchorCardId ? layout.get(thread.anchorCardId) : undefined;
+    if (!slot || thread.offsetX === null || thread.offsetY === null) return { x: thread.x, y: thread.y };
+    const extra = shift && shift.ids.has(thread.anchorCardId!) ? { x: shift.dx, y: shift.dy } : { x: 0, y: 0 };
+    return { x: slot.x + thread.offsetX + extra.x, y: slot.y + thread.offsetY + extra.y };
+  };
+  const openExisting = (thread: BoardThread) => setOpenThread({ key: thread.id, spec: { threadId: thread.id }, title: thread.anchorCardId ? threadTitle(byId.get(thread.anchorCardId)) : "Board note", world: threadPoint(thread) });
+  const onThreadCreated = (threadId: string) => setOpenThread((current) => (current ? { ...current, spec: { threadId } } : current));
+
+  /** Double-click: a note on that spot. On an image or file it sticks to the element; a text is written in on click instead. */
   const onBoardDoubleClick = (event: ReactMouseEvent) => {
     if (!event.currentTarget.contains(event.target as Node)) return;
-    if (!canCreate || (event.target as HTMLElement).closest("article, [data-board-ui]")) return;
-    setDraft({ ...spotAt(event.clientX, event.clientY), textStyle: "PLAIN" });
+    const target = event.target as HTMLElement;
+    if (!canThread || target.closest("[data-board-ui]")) return;
+    const point = toWorld(event.clientX, event.clientY);
+    const article = target.closest<HTMLElement>("article[data-card-id]");
+    if (article) {
+      const card = byId.get(article.dataset.cardId ?? "");
+      if (card && card.kind !== "TEXT") openAnchored(card, point);
+      return;
+    }
+    const at = { x: Math.max(0, Math.round(point.x)), y: Math.max(0, Math.round(point.y)) };
+    openNewThread(at, "Board note", at);
+  };
+
+  /** A free marker follows the pointer and saves once; a press without movement opens it. */
+  const startThreadMove = (thread: BoardThread) => (event: ReactPointerEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (event.button !== 0) return;
+    const origin = threadPoint(thread);
+    const start = { x: event.clientX, y: event.clientY };
+    let moved = false;
+    let at = origin;
+    const onMove = (e: PointerEvent) => {
+      if (!moved && Math.abs(e.clientX - start.x) + Math.abs(e.clientY - start.y) < 4) return;
+      moved = true;
+      const zoom = viewRef.current.zoom;
+      at = { x: Math.max(0, Math.round(origin.x + (e.clientX - start.x) / zoom)), y: Math.max(0, Math.round(origin.y + (e.clientY - start.y) / zoom)) };
+      setThreadMoves((current) => ({ ...current, [thread.id]: at }));
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onUp);
+      if (!moved) return;
+      ignoreClick.current = true;
+      window.setTimeout(() => { ignoreClick.current = false; }, 0);
+      void threadCommandAction({ command: "move", projectId, threadId: thread.id, version: thread.version, x: at.x, y: at.y }).then((result) => {
+        if (result.ok) return;
+        setError(result.error.safeMessage);
+        setThreadMoves((current) => { const next = { ...current }; delete next[thread.id]; return next; });
+        router.refresh();
+      }, () => setError("The note could not be moved. Please try again."));
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
   };
 
   // Wheel moves around (Shift + wheel sideways); Ctrl/Cmd + wheel, or a trackpad pinch, enlarges.
@@ -432,9 +510,10 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
     const targets = cards.filter(canWriteCard);
     if (targets.length === 0) return;
     const one = targets.length === 1;
+    const attached = targets.reduce((sum, card) => sum + (card.anchoredThreadMessages ?? 0), 0);
     const ok = await confirm.confirm({
       title: one ? "Delete this element?" : `Delete ${targets.length} elements?`,
-      description: "This cannot be undone.",
+      description: attached ? `The ${attached} board note${attached === 1 ? "" : "s"} attached to ${one ? "it" : "them"} will be deleted too. This cannot be undone.` : "This cannot be undone.",
       confirmLabel: one ? "Delete" : `Delete ${targets.length}`,
       tone: "danger",
     });
@@ -502,7 +581,7 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
         selected={board && selection.has(item.id)}
         style={style}
         measureRef={board ? measurements.get(item.id) : undefined}
-        menuExtra={[]}
+        menuExtra={board && canThread ? [{ label: "Add a note", onSelect: () => { const slot = layout.get(item.id)!; openAnchored(item, { x: slot.x + slot.w - 28, y: slot.y + 28 }); } }] : []}
         run={run}
         onDelete={(target) => void removeCards([target])}
         onPress={board ? pressElement(item) : undefined}
@@ -543,6 +622,7 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
             </div>
           ) : null}
           <span className="flex-1" />
+          <Button size="sm" variant="secondary" leadingIcon={<MessageSquare className="h-3.5 w-3.5" />} onClick={() => setAllNotes(true)}>All notes · {serverThreads.reduce((sum, thread) => sum + thread.messageCount, 0)}</Button>
           {canCreate ? <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setComposer(true)}>Quick note</Button> : null}
         </>
       ) : null}
@@ -587,6 +667,7 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
             </div>
           </>
         )}
+        <AllThreadNotes open={allNotes} onOpenChange={setAllNotes} chat={chat} />
         {confirm.dialog}
       </section>
     );
@@ -607,7 +688,7 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
   };
   const selected = [...selection].map((id) => byId.get(id)).filter((card): card is WorkspaceCardView => !!card);
   const hints: Record<Tool, string> = {
-    select: "Drag empty board to move around · Shift + click to select several · Paste or drop images and files anywhere",
+    select: "Double-click to write a note there · Drag empty board to move around · Shift + click to select several · Paste or drop files",
     text: "Click the board to write there",
     sticky: "Click the board to place a sticky note",
   };
@@ -642,6 +723,12 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
             const offset = moving && movingIds.has(item.id) ? { x: moving.dx, y: moving.dy } : { x: 0, y: 0 };
             return element(item, { position: "absolute", left: slot.x + offset.x, top: slot.y + offset.y, width: w, zIndex: selection.has(item.id) ? 5 : undefined }, true);
           })}
+          {serverThreads.map((thread) => {
+            const point = threadPoint(thread, moving ? { ids: movingIds, dx: moving.dx, dy: moving.dy } : undefined);
+            const active = !!openThread && "threadId" in openThread.spec && openThread.spec.threadId === thread.id;
+            return <ThreadMarker key={thread.id} thread={thread} x={point.x} y={point.y} active={active} movable={canMoveThreads && !thread.anchorCardId} onOpen={() => { if (!ignoreClick.current) openExisting(thread); }} onMoveStart={startThreadMove(thread)} />;
+          })}
+          {openThread && !("threadId" in openThread.spec) ? <span aria-hidden="true" className="pointer-events-none absolute z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-surface bg-action shadow-float" style={{ left: openThread.world.x, top: openThread.world.y }} /> : null}
           {draft ? <DraftText draft={draft} onDone={(text) => { setDraft(null); void createText(text, draft, draft.textStyle); }} onCancel={() => setDraft(null)} /> : null}
           {moving?.guideX != null ? <div aria-hidden="true" className="pointer-events-none absolute -top-[5000px] h-[10000px] w-px bg-line-focus opacity-40" style={{ left: moving.guideX }} /> : null}
           {moving?.guideY != null ? <div aria-hidden="true" className="pointer-events-none absolute -left-[5000px] h-px w-[10000px] bg-line-focus opacity-40" style={{ top: moving.guideY }} /> : null}
@@ -649,7 +736,7 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
 
         {elements.length === 0 && !draft ? (
           <div className="pointer-events-none absolute inset-0 grid place-items-center p-6">
-            <EmptyState title="Start the project's Workspace" description="Double-click to write, or paste and drop photos and files anywhere on the board." />
+            <EmptyState title="Start the project's Workspace" description="Double-click to leave a note, use Text (T) to write on the board, or paste and drop photos and files anywhere." />
           </div>
         ) : null}
 
@@ -663,6 +750,20 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
         ) : null}
 
         {composerPanel}
+
+        {openThread ? (
+          <ThreadWindow
+            key={openThread.key}
+            open={openThread}
+            chat={chat}
+            onClose={() => setOpenThread(null)}
+            onCreated={onThreadCreated}
+            style={{
+              left: Math.max(8, Math.min(view.x + openThread.world.x * view.zoom + 20, boardWidth - 388)),
+              top: Math.max(8, Math.min(view.y + openThread.world.y * view.zoom - 48, boardHeight - 448)),
+            }}
+          />
+        ) : null}
 
         <div data-board-ui="" className="absolute bottom-3 left-3 z-20 flex items-center gap-0.5 rounded-control bg-surface p-0.5 shadow-float">
           <IconButton size="sm" variant="ghost" label="Zoom out" icon={<Minus aria-hidden="true" />} disabled={view.zoom <= MIN_ZOOM} onClick={() => zoomBy(0.9)} />
@@ -700,6 +801,14 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, phase
           </div>
         </div>
       </div>
+      <AllThreadNotes open={allNotes} onOpenChange={setAllNotes} chat={chat} onLocate={(note) => {
+        const thread = serverThreads.find((item) => item.id === note.threadId);
+        if (!thread) return;
+        const point = threadPoint(thread);
+        setAllNotes(false);
+        setView((current) => ({ ...current, x: boardWidth / 2 - point.x * current.zoom, y: boardHeight / 2 - point.y * current.zoom }));
+        openExisting(thread);
+      }} />
       {confirm.dialog}
     </section>
   );

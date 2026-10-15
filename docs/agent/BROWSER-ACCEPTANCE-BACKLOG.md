@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.78] Workspace board note threads
+- Surface: StudioFlow project Phases page with the `workspace-board` module on; the Notes stream with it off
+- Fixture: ACTIVE project with an image, a file and a text element on the board; designer of one phase, drafter of another; a second session
+- Viewport: desktop 1440 px (the board); 375 px for the All notes list
+- Steps: 1. Double-click empty board: a "Board note" window opens with a dot; send a text, then a photo; the marker shows 2. 2. Double-click an image and a file: "Note on image/file" windows; the marker sticks to the element when you drag the element. 3. Text element: its menu "Add a note" opens a note (double-click on a text still writes in it). 4. Drag a free marker, reload: it stays; an attached marker cannot be dragged. 5. Mark a message as client feedback: the marker turns amber. 6. "All notes · N" lists every board note; "Show on board" pans to it and opens it. 7. Delete an image that has notes: the confirmation names the count; as the drafter, try deleting a designer-noted image (refused, nothing deleted). 8. Delete the last message of a thread: the marker disappears. 9. Switch the module off: the messages are in the Notes stream; switch it on again: markers are back. 10. Text tool (T) and click still writes a text on the board.
+- Acceptance: notes behave like the Notes chat (replies, @/# suggestions, photos, edit/star/delete); no empty markers; no thread message appears as a loose board card; permissions and confirmations as described; nothing is lost when the board is off.
+- Status: PENDING
+
 ### [R9.73] Notes suggestions and item cards using the R9.72 editor API
 - Surface: StudioFlow Notes composer/bubbles and Schedule entry deep link; supplements [R9.64] B, WO-SF-NOTES-PRESENTATION-IMAGE-01 slice B
 - Fixture: ACTIVE editable project with 12+ Schedule entries, HT code variants, final/active photos, reserved entries and explicit Board links; controlled slow/failed search and unavailable image; read-only account

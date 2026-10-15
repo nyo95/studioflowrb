@@ -24,11 +24,12 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
   status: string;
 }) {
   const { grants } = await pageSession();
-  const [elements, phases, access, phaseList] = await Promise.all([
+  const [elements, phases, access, phaseList, threads] = await Promise.all([
     studioFlow.workspace.readWorkspace({ grants, projectId }),
     studioFlow.workspace.listWorkspacePhaseLabels({ grants, projectId }),
     pageProjectAccess(projectId),
     studioFlow.phases.listProjectPhases({ grants, projectId }),
+    studioFlow.workspace.listWorkspaceThreads({ grants, projectId }),
   ]);
   const caps = studioFlow.phases.capabilities(grants);
   const writable = !archived && status === "ACTIVE" && caps.work;
@@ -60,6 +61,8 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
       canUseIdeas={hasPermission(grants, P.ideasManage)}
       canUsePresentation={hasPermission(grants, P.presentationManage)}
       drawingList={drawingList}
+      threads={threads.map((thread) => ({ id: thread.id, version: thread.version, x: thread.x, y: thread.y, anchorCardId: thread.anchorCardId, offsetX: thread.offsetX, offsetY: thread.offsetY, messageCount: thread.messageCount, clientFeedback: thread.clientFeedback }))}
+      chatPhases={phaseList.map((phase) => ({ id: phase.id, label: phase.label, iteration: phase.iterationShortName ?? null }))}
       elements={elements.map((card) => ({
         id: card.id,
         version: card.version,
@@ -79,6 +82,7 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
         textStyle: card.textStyle,
         file: card.file,
         canvas: card.canvas,
+        anchoredThreadMessages: card.anchoredThreadMessages,
       }))}
     />
   );

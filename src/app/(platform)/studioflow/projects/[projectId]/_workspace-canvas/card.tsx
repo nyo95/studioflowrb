@@ -30,6 +30,8 @@ export type WorkspaceCardView = {
   textStyle: "PLAIN" | "HEADING" | "STICKY";
   file: { url: string | null; name: string; contentType: string; bytes: number } | null;
   canvas: { x: number; y: number; w: number } | null;
+  /** Messages in board threads attached to this element; deleting it deletes them too. */
+  anchoredThreadMessages?: number;
 };
 
 export type PhaseOption = { id: string; name: string };

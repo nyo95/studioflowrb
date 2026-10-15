@@ -10,7 +10,7 @@ import { phaseNoteAction, postPhaseImageAction } from "../actions";
 
 /** Mirrors the server limits (WO-SF-NOTEFEED-01); the server stays the authority. */
 export const NOTE_MAX = 4000;
-const NOTE_IMAGE_BYTES = 3 * 1024 * 1024;
+export const NOTE_IMAGE_BYTES = 3 * 1024 * 1024;
 const NOTE_IMAGE_LIMIT = 12;
 const ACCEPTED = ["image/png", "image/jpeg", "image/webp"];
 

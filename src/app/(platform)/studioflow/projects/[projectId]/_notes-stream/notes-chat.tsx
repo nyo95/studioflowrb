@@ -2,7 +2,7 @@
 
 import { FileText, Send, Star, X } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useReducer, useRef, useState, type ReactNode } from "react";
 
 import { currentDateOnly, formatInstant } from "@platform/utilities/date";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
@@ -35,7 +35,32 @@ export type ChatNote = {
   replyTo: { id: string; kind: "TEXT" | "IMAGE" | "FILE"; excerpt: string; authorName: string | null; clientFeedback: boolean } | null;
   tags: readonly string[];
   items: readonly { entryId: string; code: string; name: string | null; location: string | null; thumbnailUrl: string | null }[];
+  /** Set on a message of a Workspace board thread (WO-SF-BOARD-THREADS-01). */
+  threadId?: string | null;
+  /** Messages in board threads attached to this element; deleting it deletes them too. */
+  anchoredThreadMessages?: number;
 };
+
+/** Which notes this chat shows: a board thread (`null` before its first message exists) or every thread's messages. */
+export type NoteScope = { threadId: string | null } | { inThreads: true };
+type PostedText = { phaseId: string; body: string; clientFeedback: boolean; replyToId?: string; tags: string[]; itemEntryIds: string[] };
+type PostedImages = { phaseId: string; clientFeedback: boolean; replyToId?: string; tags: string[] };
+/** Where the composer sends: the project Notes stream by default, or a board thread. */
+export type NotePoster = {
+  text: (input: PostedText) => Promise<{ ok: true } | { ok: false; message: string }>;
+  images: (input: PostedImages, files: readonly File[]) => Promise<{ problems: string[]; failed: File[] }>;
+};
+const scopeQuery = (scope: NoteScope | undefined): { threadId?: string; inThreads?: true } =>
+  !scope ? {} : "inThreads" in scope ? { inThreads: true } : scope.threadId ? { threadId: scope.threadId } : {};
+function notesPoster(projectId: string): NotePoster {
+  return {
+    text: async (input) => {
+      const posted = await phaseNoteAction({ command: "post", projectId, ...input });
+      return posted.ok ? { ok: true } : { ok: false, message: posted.error.safeMessage };
+    },
+    images: (input, files) => uploadPhaseImages({ projectId, ...input }, files),
+  };
+}
 
 export type ChatPhase = { id: string; label: string; iteration: string | null };
 
@@ -80,7 +105,7 @@ const TOKEN_TRIGGERS = ["@", "#"];
  * topic (the phase tag comes from the composer), `@HT1` links a Product Schedule item. Writing follows each phase's
  * rule, so the composer offers only the phases this person may write.
  */
-export function NotesChat({ projectId, projectName, phases, writablePhaseIds, canEditGeneral, defaultPhaseId, initial, canUseIdeas, canUsePresentation }: {
+export function NotesChat({ projectId, projectName, phases, writablePhaseIds, canEditGeneral, defaultPhaseId, initial, canUseIdeas, canUsePresentation, scopeOf, poster, header, composer = true, emptyText, onLocate }: {
   projectId: string;
   projectName: string;
   phases: readonly ChatPhase[];
@@ -90,6 +115,15 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
   initial: { notes: readonly ChatNote[]; cursor: string | null };
   canUseIdeas: boolean;
   canUsePresentation: boolean;
+  /** Read at request time, so a thread created by the first message is followed at once. Without it: every note. */
+  scopeOf?: () => NoteScope;
+  poster?: NotePoster;
+  /** Replaces the title and filters (a board thread window has its own header). */
+  header?: ReactNode;
+  composer?: boolean;
+  emptyText?: string;
+  /** Offers "Show on board" on board-thread messages. */
+  onLocate?: (note: ChatNote) => void;
 }) {
   const confirm = useConfirm();
   const { locale, timezone } = useDisplaySettings();
@@ -107,7 +141,10 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
   const position = useRef<{ top: number; anchorId?: string; offset?: number } | null>(null);
   const writable = useMemo(() => new Set(writablePhaseIds), [writablePhaseIds]);
 
+  const scopeRef = useRef(scopeOf);
+  useEffect(() => { scopeRef.current = scopeOf; });
   const query = useCallback((target: Filter) => ({
+    ...scopeQuery(scopeRef.current?.()),
     projectId,
     ...(target.kind === "phase" ? { phaseId: target.id } : {}),
     ...(target.kind === "feedback" ? { clientFeedback: true } : {}),
@@ -131,6 +168,8 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
 
   const reload = useCallback(async (target: Filter = view.current.filter, options: { keepError?: boolean; newest?: boolean; firstPage?: boolean } = {}) => {
     const current = readSequence.current.begin();
+    const scope = scopeRef.current?.();
+    if (scope && "threadId" in scope && !scope.threadId) { replacePage({ notes: [], cursor: null }); return true; }
     setLoading(true);
     try {
       // Keep enough authoritative pages for a reader who has already loaded older notes.
@@ -160,6 +199,11 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
     sequence.resume();
     return () => sequence.dispose();
   }, []);
+
+  // A board thread or the all-threads stream has no server-rendered first page: read it once mounted.
+  useEffect(() => {
+    if (scopeRef.current) void reload(undefined, { newest: true, firstPage: true });
+  }, [reload]);
 
   const served = useRef(initial);
   useEffect(() => {
@@ -234,7 +278,8 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
   };
   const remove = async (group: readonly ChatNote[]) => {
     const what = group.length > 1 ? `these ${group.length} images` : group[0]!.kind === "IMAGE" ? "this image" : group[0]!.kind === "FILE" ? "this file" : "this note";
-    const ok = await confirm.confirm({ title: `Delete ${what}?`, description: "This cannot be undone.", confirmLabel: "Delete", tone: "danger" });
+    const attached = group.reduce((sum, note) => sum + (note.anchoredThreadMessages ?? 0), 0);
+    const ok = await confirm.confirm({ title: `Delete ${what}?`, description: attached ? `The ${attached} board note${attached === 1 ? "" : "s"} attached to it will be deleted too. This cannot be undone.` : "This cannot be undone.", confirmLabel: "Delete", tone: "danger" });
     if (ok) await runAll(`delete:${group[0]!.id}`, group, (note) => ({ command: "delete", noteId: note.id, version: note.version }));
   };
 
@@ -244,7 +289,7 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
 
   return (
     <section aria-label="Project notes" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-card border border-line-subtle bg-surface">
-      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-subtle px-4 py-2.5">
+      {header ?? <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-subtle px-4 py-2.5">
         <h2 className="m-0 text-[15px] font-semibold text-ink">Notes</h2>
         <PillTabs
           label="Show notes"
@@ -257,12 +302,12 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
             ...(filter.kind === "tag" ? [{ key: "tag", label: `#${filter.name}`, active: true, onSelect: () => choose({ kind: "all" }) }] : []),
           ]}
         />
-      </div>
+      </div>}
 
       <div ref={streamRef} role="log" aria-label="Notes" aria-busy={loading} onScroll={(event) => { const stream = event.currentTarget; stickToBottom.current = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 32; }} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-surface-raised px-4 py-3 sm:px-6">
         {cursor ? <Button size="sm" variant="ghost" className="self-center" pending={loading} onClick={() => void olderPage()}>Show older notes</Button> : null}
         {entries.length === 0 ? (
-          <Text as="p" size="sm" tone="tertiary" className="m-auto text-center">{filter.kind === "all" ? "Nothing here yet. Write what you learn about this project below: info, client feedback, photos." : "No notes match this view."}</Text>
+          <Text as="p" size="sm" tone="tertiary" className="m-auto text-center">{filter.kind !== "all" ? "No notes match this view." : emptyText ?? "Nothing here yet. Write what you learn about this project below: info, client feedback, photos."}</Text>
         ) : entries.map((entry) => {
           const first = entry.notes[0]!;
           const day = currentDateOnly({ now: new Date(first.createdAt), timeZone: timezone });
@@ -295,6 +340,7 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
                   return result;
                 }}
                 onReload={() => reload(undefined, { keepError: true })}
+                onLocate={onLocate}
                 onDelete={(group) => void remove(group)}
               />
             </div>
@@ -303,8 +349,9 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
       </div>
 
       {error ? <div className="shrink-0 px-4 pt-2"><InlineError>{error}</InlineError></div> : null}
-      {writablePhaseIds.length > 0 ? (
+      {!composer ? null : writablePhaseIds.length > 0 ? (
         <ChatComposer
+          poster={poster ?? notesPoster(projectId)}
           projectId={projectId}
           phases={phases.filter((phase) => writable.has(phase.id))}
           defaultPhaseId={defaultPhaseId && writable.has(defaultPhaseId) ? defaultPhaseId : writablePhaseIds[0]!}
@@ -324,7 +371,7 @@ function tagsOf(text: string) {
   return [...new Set([...plain(text).matchAll(TAG)].map((match) => match[1]!).filter((name) => name.toLowerCase() !== "feedback"))].slice(0, 5);
 }
 
-function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onReload, onDelete }: {
+function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onReload, onLocate, onDelete }: {
   group: readonly ChatNote[];
   projectId: string;
   projectName: string;
@@ -340,6 +387,7 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
   onFeedback: (group: readonly ChatNote[]) => void;
   onEdit: (note: ChatNote, body: string | null, version: number) => Promise<NoteChange>;
   onReload: () => Promise<boolean>;
+  onLocate?: (note: ChatNote) => void;
   onDelete: (group: readonly ChatNote[]) => void;
 }) {
   const note = group[0]!;
@@ -421,6 +469,7 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
         {feedback ? <span className="rounded-pill border border-warning/40 bg-warning/10 px-1.5 py-px text-warning">#feedback</span> : null}
         {note.origin === "SITE_VISIT" ? <span className="rounded-pill bg-surface-muted px-1.5 py-px text-ink-secondary">Site visit</span> : null}
         {note.tags.map((tag) => <button key={tag} type="button" onClick={() => onTag(tag)} className="rounded-pill bg-surface-muted px-1.5 py-px text-ink-secondary hover:text-ink">#{tag}</button>)}
+        {onLocate && note.threadId ? <button type="button" onClick={() => onLocate(note)} className="rounded-pill px-1.5 py-px font-medium text-ink-secondary underline hover:text-ink">Show on board</button> : null}
         <span className="ml-auto flex items-center gap-1 pl-2">
           {album ? `${group.length} images · ` : ""}
           <FormattedInstant value={last.createdAt} locale={locale} timeZone={timezone} style="time" />{note.editedAt ? " · edited" : ""}
@@ -473,7 +522,8 @@ function NoteItemChip({ projectId, item }: { projectId: string; item: ChatNote["
  * suggestions (topic tags of this project, Product Schedule items by code or name). A typed `@HT1` that was not
  * picked from the list is still linked when exactly one item has that code.
  */
-function ChatComposer({ projectId, phases, defaultPhaseId, replyTo, onCancelReply, onSent }: {
+function ChatComposer({ poster, projectId, phases, defaultPhaseId, replyTo, onCancelReply, onSent }: {
+  poster: NotePoster;
   projectId: string;
   phases: readonly ChatPhase[];
   defaultPhaseId: string;
@@ -559,10 +609,10 @@ function ChatComposer({ projectId, phases, defaultPhaseId, replyTo, onCancelRepl
       try { entryIds = await resolveNoteItemIds(body, (query) => searchNoteItemsAction(projectId, query), picked); }
       catch (cause) { setErrors([cause instanceof Error ? cause.message : "Schedule items could not be loaded. Please try again."]); return; }
       if (body) {
-        const posted = await phaseNoteAction({ command: "post", projectId, phaseId: phase.id, body, clientFeedback, replyToId: replyTo?.id, tags, itemEntryIds: entryIds });
-        if (!posted.ok) { setErrors([posted.error.safeMessage]); return; }
+        const posted = await poster.text({ phaseId: phase.id, body, clientFeedback, replyToId: replyTo?.id, tags, itemEntryIds: entryIds });
+        if (!posted.ok) { setErrors([posted.message]); return; }
       }
-      const { problems, failed } = await uploadPhaseImages({ projectId, phaseId: phase.id, clientFeedback, replyToId: body ? undefined : replyTo?.id, tags }, draft.files);
+      const { problems, failed } = await poster.images({ phaseId: phase.id, clientFeedback, replyToId: body ? undefined : replyTo?.id, tags }, draft.files);
       draft.keepOnly(failed);
       if (failed.length === 0) { setFeedback(false); setPicked(new Map()); }
       setErrors(problems);

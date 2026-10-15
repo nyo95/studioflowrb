@@ -217,8 +217,8 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
   messages are ordinary notes with `thread_id`; deleting the anchor element
   deletes its threads and messages (owner) only when the actor may delete every
   message; free markers can be dragged; double-click replaces "new text" (text
-  via + Text); board off shows messages in Notes. Backend READY as R9.76, Lead
-  UI R9.77.
+  via + Text); board off shows messages in Notes. Backend R9.76, board UI R9.78
+  (Lead). Remove this item after the owner's browser check ([R9.78] group).
 
 - [ ] [PLANNED][P2] Ideas board (owner, 2026-10-08): a personal page where a
   user drops any image (Ctrl+V screenshot, a dropped download, picked files)

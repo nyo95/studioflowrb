@@ -83,9 +83,10 @@ test("the Workspace board writes, autosaves in order, takes images, and keeps a 
 async function boardJourney(page: Page) {
   const board = await openBoard(page);
 
-  // 1. Double-click empty board to write a text there; leaving it creates the element.
+  // 1. The Text tool, then a click on empty board, writes a text there (double-click now opens a note, R9.78).
   const box = (await board.boundingBox())!;
-  await page.mouse.dblclick(box.x + 120, box.y + 80);
+  await page.getByRole("toolbar", { name: "Board tools" }).getByRole("button", { name: /^Text/ }).click();
+  await page.mouse.click(box.x + 120, box.y + 80);
   const draft = page.getByRole("textbox", { name: "New text" });
   // The editor loads on demand: type only once it holds the caret.
   await expect(draft).toBeFocused();
@@ -149,4 +150,24 @@ async function boardJourney(page: Page) {
   await manual.getByRole("button", { name: "Element actions" }).click();
   await expect(page.getByRole("menuitem", { name: "Not client feedback" })).toBeVisible();
   await page.keyboard.press("Escape");
+
+  // 6. Double-click empty board (WO-SF-BOARD-THREADS-01): a note window opens there; the first message leaves a
+  // marker with its count, never a board element, and "All notes" lists it.
+  const area = (await board.boundingBox())!;
+  await page.mouse.dblclick(area.x + area.width - 460, area.y + 140);
+  const thread = page.getByRole("dialog", { name: "Board note" });
+  await expect(thread).toBeVisible();
+  await thread.getByRole("textbox", { name: "New note" }).click();
+  await page.keyboard.type("E2E board thread note");
+  await page.keyboard.press("Enter");
+  await expect(thread.getByText("E2E board thread note")).toBeVisible();
+  await expect(page.getByRole("button", { name: "1 note" })).toBeVisible();
+  await expect(board.locator("article[data-card-id]").filter({ hasText: "E2E board thread note" })).toHaveCount(0);
+  await thread.getByRole("button", { name: "Close" }).click();
+  await expect(thread).toHaveCount(0);
+  await page.getByRole("button", { name: "1 note" }).click();
+  await expect(page.getByRole("dialog", { name: "Board note" }).getByText("E2E board thread note")).toBeVisible();
+  await page.getByRole("dialog", { name: "Board note" }).getByRole("button", { name: "Close" }).click();
+  await page.getByRole("button", { name: /^All notes · 1/ }).click();
+  await expect(page.getByRole("dialog", { name: "All board notes" }).getByText("E2E board thread note")).toBeVisible();
 }
