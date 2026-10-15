@@ -969,6 +969,13 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   Previous/Next and the arrow keys, and an optional remove button per image.
   It takes consumer URLs (often short-lived signed links) and owns no storage
   or removal policy.
+  Its viewer zooms (wheel at the cursor, pinch, +/−, double-click, keys) and
+  pans without changing the picture (R9.81, `ZoomableImage` inside).
+- `ImageMarkup` (R9.81) marks up a copy of a picture: view-only zoom and pan,
+  pen/arrow/box/circle in five colours, undo and clear; marks are kept in
+  picture coordinates and the saved file is always the whole picture with
+  every mark (JPEG/PNG, bounded size). The original is never changed; where the
+  copy goes (e.g. a Notes reply) is the consumer's.
 - `RichTextEditor` keeps notes in the `FormattedText` dialect. With
   `onSubmit` it sends chat-style (R8.446): Enter submits, Shift+Enter starts a
   new line, Enter inside a list adds the next item, Ctrl/Cmd+Enter always

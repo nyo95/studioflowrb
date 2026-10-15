@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import { cx } from "../internal/cx";
 import { Dialog } from "../layouts/overlays";
 import { Button, IconButton, Text } from "../primitives";
+import { ZoomableImage } from "./zoomable-image";
 
 export type GalleryImage = { id: string; url: string | null };
 
@@ -62,8 +63,8 @@ export function ImageGallery({ images, onRemove, removingId, viewerActions, labe
         <Dialog open onOpenChange={(value) => { if (!value) setOpenIndex(null); }} title={`Image ${openIndex! + 1} of ${images.length}`} size="lg">
           <div className="grid gap-3" tabIndex={-1} onKeyDown={(event) => { if (event.key === "ArrowRight") step(1); if (event.key === "ArrowLeft") step(-1); }}>
             {open.url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={open.url} alt={`Image ${openIndex! + 1}`} className="max-h-[70vh] w-full rounded-control object-contain" />
+              // Zoom to read details (scroll, pinch, +/−, double-click); the picture itself never changes.
+              <ZoomableImage key={open.id} src={open.url} alt={`Image ${openIndex! + 1}`} className="h-[min(70vh,720px)] w-full" />
             ) : <Text tone="secondary">This image could not be loaded.</Text>}
             {viewerActions && open.url ? <div className="flex flex-wrap gap-2">{viewerActions(open)}</div> : null}
             {images.length > 1 ? (

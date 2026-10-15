@@ -7,10 +7,10 @@ import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useReducer, us
 import { currentDateOnly, formatInstant } from "@platform/utilities/date";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { Button, FormattedInstant, FormattedText, HoverCard, IconButton, ImageGallery, InlineError, PillTabs, RichTextEditor, RowActionMenu, Select, Text, useConfirm, type EditorToken } from "@/platform/ui_engine";
+import { Button, Dialog, FormattedInstant, FormattedText, HoverCard, IconButton, ImageGallery, ImageMarkup, InlineError, PillTabs, RichTextEditor, RowActionMenu, Select, Text, useConfirm, type EditorToken } from "@/platform/ui_engine";
 
-import { listNoteTagsAction, listProjectNotesAction, noteAction, phaseNoteAction, searchNoteItemsAction, type NoteCommandInput } from "../../../actions";
-import { NOTE_MAX, NoteDraftFields, uploadPhaseImages, useNoteDraft, type NoteImage } from "../../../_components/phase-note-composer";
+import { listNoteTagsAction, listProjectNotesAction, noteAction, phaseNoteAction, postThreadImageAction, searchNoteItemsAction, type NoteCommandInput } from "../../../actions";
+import { NOTE_IMAGE_BYTES, NOTE_MAX, NoteDraftFields, uploadPhaseImages, useNoteDraft, type NoteImage } from "../../../_components/phase-note-composer";
 import { NoteImageActions } from "../round-labels";
 import { plainNoteText as plain, noteCodeKey as codeKey, resolveNoteItemIds } from "./note-mentions";
 import { createNoteReadSequence } from "./note-read-sequence";
@@ -134,6 +134,7 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [replyTo, setReplyTo] = useState<ChatNote | null>(null);
+  const [markup, setMarkup] = useState<{ note: ChatNote; url: string } | null>(null);
   const streamRef = useRef<HTMLDivElement>(null);
   const stickToBottom = useRef(true);
   const readSequence = useRef(createNoteReadSequence());
@@ -283,6 +284,27 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
     if (ok) await runAll(`delete:${group[0]!.id}`, group, (note) => ({ command: "delete", noteId: note.id, version: note.version }));
   };
 
+  // A marked-up copy is a new image replying to the original (owner 2026-10-15); the original is never changed.
+  const replyPhase = (note: ChatNote) => (note.phaseId && writable.has(note.phaseId) ? note.phaseId : defaultPhaseId && writable.has(defaultPhaseId) ? defaultPhaseId : writablePhaseIds[0] ?? null);
+  const postMarkup = async (note: ChatNote, file: File) => {
+    const phaseId = replyPhase(note);
+    if (!phaseId) { setError("You can read these notes but not reply to them."); return; }
+    if (note.threadId) {
+      const form = new FormData();
+      form.set("projectId", projectId); form.set("phaseId", phaseId); form.set("threadId", note.threadId);
+      form.set("replyToId", note.id); form.set("clientFeedback", "false"); form.set("file", file);
+      const result = await postThreadImageAction(form);
+      // With the board switched off a board note is still a project note: reply in the Notes stream instead.
+      if (!result.ok && result.error.code !== "MODULE_DISABLED") { setError(result.error.safeMessage); return; }
+      if (result.ok) { setMarkup(null); stickToBottom.current = true; await reload(undefined, { newest: true }); return; }
+    }
+    const { problems } = await uploadPhaseImages({ projectId, phaseId, clientFeedback: false, replyToId: note.id }, [file]);
+    if (problems.length) { setError(problems.join(" ")); return; }
+    setMarkup(null);
+    stickToBottom.current = true;
+    await reload(undefined, { newest: true });
+  };
+
   const today = currentDateOnly({ timeZone: timezone });
   let lastDay: string | null = null;
   const active = (target: Filter) => JSON.stringify(target) === JSON.stringify(filter);
@@ -341,6 +363,7 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
                 }}
                 onReload={() => reload(undefined, { keepError: true })}
                 onLocate={onLocate}
+                onMarkup={writablePhaseIds.length > 0 ? (note, url) => { setError(null); setMarkup({ note, url }); } : undefined}
                 onDelete={(group) => void remove(group)}
               />
             </div>
@@ -362,6 +385,12 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
       ) : (
         <Text as="p" size="sm" tone="secondary" className="shrink-0 border-t border-line-subtle px-4 py-3">You can read these notes. Only a phase&apos;s designer or drafter can write them.</Text>
       )}
+      {markup ? (
+        <Dialog open onOpenChange={(open) => { if (!open) setMarkup(null); }} title="Mark up a copy" description="Zoom in and draw on the picture. The marked copy is sent as a reply; the original stays as it was." size="xl">
+          <ImageMarkup src={markup.url} fileName="marked-up" maxBytes={NOTE_IMAGE_BYTES} saveLabel="Send as reply" onCancel={() => setMarkup(null)} onSave={(file) => postMarkup(markup.note, file)} />
+          {error ? <InlineError>{error}</InlineError> : null}
+        </Dialog>
+      ) : null}
       {confirm.dialog}
     </section>
   );
@@ -371,7 +400,7 @@ function tagsOf(text: string) {
   return [...new Set([...plain(text).matchAll(TAG)].map((match) => match[1]!).filter((name) => name.toLowerCase() !== "feedback"))].slice(0, 5);
 }
 
-function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onReload, onLocate, onDelete }: {
+function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onReload, onLocate, onMarkup, onDelete }: {
   group: readonly ChatNote[];
   projectId: string;
   projectName: string;
@@ -388,6 +417,8 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
   onEdit: (note: ChatNote, body: string | null, version: number) => Promise<NoteChange>;
   onReload: () => Promise<boolean>;
   onLocate?: (note: ChatNote) => void;
+  /** Offers "Mark up" in the image viewer; the marked copy becomes a reply. */
+  onMarkup?: (note: ChatNote, url: string) => void;
   onDelete: (group: readonly ChatNote[]) => void;
 }) {
   const note = group[0]!;
@@ -439,7 +470,13 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
               images={images}
               size={album ? "album" : "fill"}
               className={album ? "w-[14rem]" : "w-[16rem] [&_img]:max-h-72 [&_img]:object-cover"}
-              viewerActions={(image) => note.phaseId ? <NoteImageActions image={image} projectId={projectId} projectName={projectName} phaseId={note.phaseId} canUseIdeas={canUseIdeas} canUsePresentation={canUsePresentation} /> : null}
+              viewerActions={(image) => {
+                const owner = group.find((item) => item.images.some((candidate) => candidate.id === image.id)) ?? note;
+                return <>
+                  {onMarkup && image.url ? <Button size="sm" variant="primary" onClick={() => onMarkup(owner, image.url!)}>Mark up</Button> : null}
+                  {note.phaseId ? <NoteImageActions image={image} projectId={projectId} projectName={projectName} phaseId={note.phaseId} canUseIdeas={canUseIdeas} canUsePresentation={canUsePresentation} /> : null}
+                </>;
+              }}
             />
           ) : null}
           {note.body ? <FormattedText text={note.body} className="text-sm" tokens={{ pattern: NOTE_CODE_PATTERN, render: (match, key) => {

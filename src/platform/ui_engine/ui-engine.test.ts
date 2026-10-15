@@ -96,6 +96,8 @@ describe("UI Engine foundation", () => {
       "ImageWorkspace",
       // Thumbnails that open large; first consumers are the StudioFlow phase notes (WO-SF-NOTEFEED-01).
       "ImageGallery",
+      // Zoom in and mark up a copy of a picture; first consumer the Notes image viewer (owner 2026-10-15).
+      "ImageMarkup",
       "useDebouncedValue",
       "useOptionOverlay",
       "useConfirm",

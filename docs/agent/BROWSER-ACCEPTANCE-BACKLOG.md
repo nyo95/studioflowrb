@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.81] Zoom a note image and send a marked-up copy as a reply
+- Surface: Notes stream image viewer; the same viewer inside a board note window; Ideas/Workspace image viewers (zoom only)
+- Fixture: a large drawing (e.g. a floor plan) posted as a note image, a board note image, an album
+- Viewport: desktop 1440 px; a touch device for pinch
+- Steps: 1. Open the image: scroll, pinch, +/−, double-click and the keys zoom; drag pans; Fit returns; Previous/Next still work in an album. 2. "Mark up": zoom in on a detail, draw with Pen/Arrow/Box/Circle in a few colours on several spots, use Pan, Undo last mark and Clear marks. 3. "Send as reply". 4. Repeat on a board note image (thread) and with the board switched off.
+- Acceptance: the reply is a new image quoting the original, showing the whole picture with every mark where it was drawn, readable; the original image is unchanged; on a board note the reply stays in that thread (in Notes when the board is off); people who cannot write any phase see no Mark up.
+- Status: PENDING
+
 ### [R9.80] Supervision: Done (handover) without an open visit
 - Surface: project card and the Supervision phase panel
 - Fixture: ACTIVE project whose Supervision phase is active

@@ -4,6 +4,7 @@ import { it, type TestContext } from "node:test";
 import ts from "typescript";
 import * as adjustments from "./image-adjust";
 import * as geometry from "./image-crop";
+import * as strokes from "./image-strokes";
 
 type Props = Record<string, unknown>;
 type Element = { type: string; props: Props };
@@ -78,7 +79,7 @@ function workspace(t: TestContext, options: Options = {}, cropRect = geometry.cr
     react, "react/jsx-runtime": { jsx: (type: string, props: Props) => ({ type, props }), jsxs: (type: string, props: Props) => ({ type, props }) },
     "next/image": { default: "img" }, "../primitives/actions": { Button: "button" }, "../primitives/forms": { Input: "input" },
     "./file-intake": { useFileIntake: (value: Props) => { intake = value; return { active: false, target: {} }; } },
-    "./image-adjust": adjustments, "./image-crop": { ...geometry, cropRect },
+    "./image-adjust": adjustments, "./image-crop": { ...geometry, cropRect }, "./image-strokes": strokes,
   };
   const exports = {} as { ImageWorkspace: (props: Props) => Element };
   new Function("require", "exports", compiled)((name: string) => { assert.ok(name in dependencies, name); return dependencies[name]; }, exports);

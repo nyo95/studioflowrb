@@ -118,3 +118,34 @@ test("the project notes chat tags, links, replies and groups an album", async ({
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Product Schedule", exact: true })).toBeVisible();
 });
+
+test("an image opens zoomable and a marked-up copy is sent as a reply, leaving the original as it was", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 960 });
+  await page.goto(`/studioflow/projects/${sf.notesChat}`);
+  await page.waitForLoadState("networkidle");
+  const log = page.getByRole("log", { name: "Notes" });
+  // Its own picture, so the test does not depend on the previous one.
+  await page.locator('input[type="file"][accept="image/png,image/jpeg,image/webp"]').last().setInputFiles({ name: "plan.png", mimeType: "image/png", buffer: PNG });
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  const images = log.locator("img");
+  await expect.poll(() => images.count()).toBeGreaterThan(0);
+  const before = await images.count();
+  await log.getByRole("button", { name: /^Open image 1/ }).last().click();
+  const viewer = page.getByRole("dialog", { name: /^Image 1 of/ });
+  await viewer.getByRole("button", { name: "Zoom in" }).click();
+  await expect(viewer.getByText("125%")).toBeVisible();
+
+  await viewer.getByRole("button", { name: "Mark up" }).click();
+  const markup = page.getByRole("dialog", { name: "Mark up a copy" });
+  const picture = markup.getByRole("group", { name: /^Picture to mark up/ });
+  const box = (await picture.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2 - 60, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 60, box.y + box.height / 2 + 30, { steps: 5 });
+  await page.mouse.up();
+  await markup.getByRole("button", { name: "Send as reply" }).click();
+  await expect(markup).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect.poll(() => images.count()).toBeGreaterThan(before);
+  await expect(log.getByText(/Replying to|^Image$/).first()).toBeVisible();
+});

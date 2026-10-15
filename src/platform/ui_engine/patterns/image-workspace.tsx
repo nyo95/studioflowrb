@@ -8,20 +8,12 @@ import { Input } from "../primitives/forms";
 import { useFileIntake } from "./file-intake";
 import { ADJUST_LIMITS, colorFilter, compressionSteps, formatSize, isNeutral, NEUTRAL_ADJUST, type ColorAdjust } from "./image-adjust";
 import { cropPreview, cropRect, panCrop, pinchCrop, zoomCrop, type CropPosition } from "./image-crop";
+import { DRAW_TOOLS, drawStrokes, STROKE_COLORS, type DrawTool, type Point, type Stroke } from "./image-strokes";
 
-type Point = { x: number; y: number };
-type DrawTool = "pen" | "arrow" | "rect" | "ellipse";
 type Tool = DrawTool | "pan";
-type Stroke = { tool: DrawTool; color: string; points: Point[] };
 
-const TOOLS: { value: Tool; label: string }[] = [
-  { value: "pen", label: "Pen" },
-  { value: "arrow", label: "Arrow" },
-  { value: "rect", label: "Box" },
-  { value: "ellipse", label: "Circle" },
-];
-
-const COLORS = ["#dc2626", "#2563eb", "#16a34a", "#f59e0b", "#111827"];
+const TOOLS: { value: Tool; label: string }[] = DRAW_TOOLS;
+const COLORS = STROKE_COLORS;
 
 export type ImageWorkspaceProps = {
   label: string;
@@ -74,56 +66,6 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /** Draws every stroke onto a 2D context at the given pixel size, shared by the live preview and the final bake so the two never drift apart. */
-function drawStrokes(context: CanvasRenderingContext2D, strokes: readonly Stroke[], width: number, height: number, lineWidth: number) {
-  context.lineCap = "round";
-  context.lineJoin = "round";
-  for (const stroke of strokes) {
-    if (stroke.points.length < 1) continue;
-    context.strokeStyle = stroke.color;
-    context.fillStyle = stroke.color;
-    context.lineWidth = lineWidth;
-    const px = (point: Point) => point.x * width;
-    const py = (point: Point) => point.y * height;
-    if (stroke.tool === "pen") {
-      if (stroke.points.length < 2) continue;
-      context.beginPath();
-      context.moveTo(px(stroke.points[0]), py(stroke.points[0]));
-      for (const point of stroke.points.slice(1)) context.lineTo(px(point), py(point));
-      context.stroke();
-      continue;
-    }
-    const start = stroke.points[0];
-    const end = stroke.points[stroke.points.length - 1];
-    if (stroke.tool === "rect") {
-      context.strokeRect(Math.min(px(start), px(end)), Math.min(py(start), py(end)), Math.abs(px(end) - px(start)), Math.abs(py(end) - py(start)));
-      continue;
-    }
-    if (stroke.tool === "ellipse") {
-      const cx = (px(start) + px(end)) / 2;
-      const cy = (py(start) + py(end)) / 2;
-      const rx = Math.abs(px(end) - px(start)) / 2;
-      const ry = Math.abs(py(end) - py(start)) / 2;
-      context.beginPath();
-      context.ellipse(cx, cy, Math.max(rx, 0.01), Math.max(ry, 0.01), 0, 0, Math.PI * 2);
-      context.stroke();
-      continue;
-    }
-    // arrow
-    context.beginPath();
-    context.moveTo(px(start), py(start));
-    context.lineTo(px(end), py(end));
-    context.stroke();
-    const angle = Math.atan2(py(end) - py(start), px(end) - px(start));
-    const headLength = Math.max(8, lineWidth * 4);
-    context.beginPath();
-    context.moveTo(px(end), py(end));
-    context.lineTo(px(end) - headLength * Math.cos(angle - Math.PI / 6), py(end) - headLength * Math.sin(angle - Math.PI / 6));
-    context.lineTo(px(end) - headLength * Math.cos(angle + Math.PI / 6), py(end) - headLength * Math.sin(angle + Math.PI / 6));
-    context.closePath();
-    context.fill();
-  }
-}
-
 /** Browser image preparation only; storage and consumer policy stay outside. */
 export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false, openOnMount = false, initialFile = null, pasteFromPage = false }: ImageWorkspaceProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
