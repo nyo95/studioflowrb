@@ -1,13 +1,13 @@
 # Active Plan
 
 Plan ID: WO-SF-NOTES-PRESENTATION-IMAGE-01
-Scope: Run 1 audit (R9.64) accepted by Lead; gates G1–G4 locked (R9.65); **slice A READY**, B/C/D DRAFT
+Scope: audit R9.64 accepted; gates locked R9.65; slice A **PASS** (R9.66, Lead review R9.67); **slice C READY**; B waits for the Lead's G2 editor revision; D DRAFT
 Module(s): studioflow (Notes and Schedule reads), presentation, shared platform UI Engine image patterns; workspace-board is an unchanged optional view of the same StudioFlow records
-Target revision: slice A = **R9.66** (next unused after Lead docs R9.65); B/C/D allocated later from CHANGELOG.md
-Status: READY (slice A only); B, C, D remain DRAFT
+Target revision: slice C = **R9.68** (next unused after Lead review R9.67); B/D allocated later from CHANGELOG.md
+Status: READY (slice C only); A PASS; B, D remain DRAFT
 Priority: P1 recommended for A; P2 for B/C/D, subject to owner priorities
 Owner: Product Owner; Lead approves and locks each READY slice
-Last updated: 2026-10-15 (Lead review R9.65)
+Last updated: 2026-10-15 (Lead review R9.67)
 
 ## Outcome
 
@@ -149,7 +149,7 @@ G1–G4 resolved 2026-10-15; see Locked Decisions 5–8. Nothing in slice A wait
 
 ## Backend Contract
 
-### Ordered slice A — reliable Notes (READY, R9.66)
+### Ordered slice A — reliable Notes (PASS: R9.66 `f88a592`, Lead review R9.67)
 
 One coherent revision. Module: studioflow. Files: W (`src/apps/studioflow/workspace/service.ts`), A (`src/app/(platform)/studioflow/actions.ts`), N, PN; StudioFlow service/integration tests. No schema, migration, dependency, shared UI Engine or contract-policy change (G1 keeps §6.1). A1 is **out of scope** (by design).
 
@@ -195,17 +195,44 @@ One independently useful interaction revision, after the Lead's G2 shared-editor
 
 Tests: empty/prefix/exact/name/final-option/project scope; signed/missing image+ID; middle-text caret/punctuation/escaping/IME; stale result/Escape; Up/Down/Enter/Tab and focus; no results/error/retry; formatted chips/card link; # new/existing/feedback/limit; send/Shift/list Enter, attachments/album. G2 requires its separate complete shared-editor/formatter consumer matrix before implementation.
 
-### Ordered slice C — Presentation pin movement and safe actions
+### Ordered slice C — Presentation pin movement and safe actions (READY, R9.68)
 
-One independent Presentation revision. Files: PE/PF/PL/PS; PA only for necessary bounded validation; presentation.integration.test.ts; e2e/presentation-upload.spec.ts and presentation-print.spec.ts; existing lifecycle/composition tests.
+One coherent revision. Module: presentation. Files: PE `src/apps/presentation/ui/presentation-editor.tsx`, PF `src/apps/presentation/ui/slide-frame.tsx`, PL `src/apps/presentation/ui/presentation-board-list.tsx`, PS `src/apps/presentation/service.ts`; PA `src/apps/presentation/actions.ts` only if a test proves a validation gap; `src/apps/presentation/presentation.integration.test.ts`; print page only to confirm it still renders. No schema, migration, dependency, shared UI Engine or StudioFlow change. The owner's expanded UI lane covers this slice.
 
-- Keep PF server-renderable for print. Editor callbacks capture full image-frame bounds including cropped overflow, preview/clamp percentages locally, save once on pointer release, revert on failure/cancel/lost capture. Suppress image-ancestor HTML drag and accidental select/add click after dragging pin. Current image selection/click-add/swap remains.
-- Keyboard nudge through existing updateAnnotation and approved G4 steps; existing project/permission/archive gates and labels preserved.
-- useConfirm for replace (picker/drop), remove image, delete pin/slide/board with actual affected counts. Cancel does not upload/write. Empty placement/swap is harmless. Pending prevents duplicates; failures surface and preserve state. Board navigation occurs only after successful deletion; board-create and pin-add errors visible.
-- getBoard is read-only, projecting unresolved links null. Existing explicit public lifecycle cleanup after Schedule deletion remains the write path. Test it separately, not through getBoard. Failed best-effort cleanup may leave a harmless stale stored ID; do not add implicit viewing writes, background retry product behavior or cross-schema relations.
-- Apply approved label list and existing semantic tokens to affected chrome, selected/empty/read-only hints. No slide/free-canvas/layout redesign.
+**C3 — viewing never writes (do first; backend).**
+- PS `getBoard` (PS:223–232): delete the `updateMany` that nulls unresolved `schedule_entry_id`. Project an annotation whose stored entry no longer resolves as unlinked in the returned view (`scheduleEntry: null`, and whatever field the editor uses for the Select default becomes `null`) without touching storage. Saving that pin later with "No linked item" clears it through the normal write.
+- Explicit cleanup stays where it is: `clearScheduleEntryLink` (PS:426) via `presentation/public/lifecycle.ts`, called when a Schedule entry is deleted. Do not add cleanup elsewhere, no background job.
+- Update `presentation.integration.test.ts:71–73` (which expects the read-side repair): reading a board with a dangling link returns it unlinked and the stored id is unchanged; repeated reads do not write (use a db/port whose annotation write delegates throw, or compare `updated_at`/row state); `clearScheduleEntryLink` still clears it.
 
-Tests: partial coordinate update preserves note/item/side/order, boundary/project rights; missing-link/repeated reads with write delegates throwing; explicit lifecycle cleanup ownership; drag edges/capture/cancel/one-save/revert/nudge; click-add/select/image swap with pins; every confirm/cancel/error and deletion navigation; print coordinates/numbers/legend/six layouts.
+**C1 — drag a pin (UI).**
+- PF stays hook-free (print renders it). Add optional props only: `onPinPointerDown?(event, pinId, frameRect)` and a way to render a pin at a preview position (e.g. `previewPins?: Record<string,{x:number;y:number}>` or the editor passing already-overridden coordinates). The frame element whose rect is used is the inner image frame (`frameStyle`), so percentages include cropped overflow exactly like click-to-add (PE onImageClick uses `event.currentTarget` = that frame).
+- PE: on pointerdown on a pin (canEdit only) call `setPointerCapture`, `stopPropagation`, `preventDefault`; on pointermove compute x/y = clamp 0–100 of (client − frameRect) / frameRect size, keep as local preview; movement under 3 px is a click (select pin as today). On pointerup after a real move: one `updatePresentationAnnotationAction({ projectId, annotationId, pinX, pinY })` with no other fields (service treats undefined as keep — test proves note/item/side/order survive). On failure revert preview and show the safe error. `pointercancel`/lost capture/Escape revert with no write.
+- While a pin drag is active or just ended: the image box `draggable` wrapper must not start an HTML drag (set `draggable={canEdit && !pinDragging}` or stop dragstart from the pin), and the trailing click must not select/add a pin on the image. Image click-select, second-click add, image drag between boxes and swap keep working.
+- Keyboard (G4): focused selected pin, Arrow keys move 1%, Shift+Arrow 5%, clamped; save debounced once per burst (≈400 ms after last key) through the same action; revert on failure.
+- Pin hit area ≥ 44 px (E3) while the visible dot stays `size-7`: transparent padding/pseudo-element around the dot, centred on the same point. Add `touch-action: none` on pins so touch drags work.
+
+**C2 — confirm destructive actions (UI).** Use UI Engine `useConfirm` (`patterns/hooks.tsx:66`), tone danger, cancel = no upload, no write:
+- Replace an occupied box by file picker ("Replace image") or by dropping a file on an occupied box: "Replace this image? Its N pins will be deleted." (N = that image's annotations). Dropping onto an empty box, and moving an existing image between boxes, need no confirmation.
+- "Remove from slide": "Remove this image? Its N pins will be deleted."
+- Delete pin: "Delete pin N?"
+- Delete slide: "Delete this slide? Its N images and M pins will be deleted."
+- Delete board: "Delete this board? Its N slides will be deleted." Navigate to the board list **only** when the action returned ok; otherwise show the error and stay.
+- Prepare/compress the file only after the confirm resolves true.
+
+**C4 — visible failures, pending, copy and tokens (UI).**
+- Every action surfaces its safe error: pin add (PE:116 currently ignores), board delete (PE:140), board create in PL (currently drops the error; show InlineError and keep the typed title). `pending` disables the triggering control; no duplicate submissions.
+- G4 copy is English. Replace every Indonesian string in PE/PL with: Slide baru→New slide; Tata letak slide→Slide layout; Seret gambar ke kotak · klik gambar terpilih untuk pasang pin→Drag images into boxes · click the selected image to add a pin; Judul slide / Judul slide (boleh kosong)→Slide title / Title (optional); Gambar → slide baru→Images → new slides; Tambah gambar atau seret ke sini→Add an image or drop one here; Keterangan slide / Keterangan (boleh kosong)→Slide caption / Caption (optional); Naikkan slide→Move slide up; Turunkan slide→Move slide down; Hapus slide→Delete slide; Hapus pin→Delete pin; Kembali ke gambar→Back to image; Gambar terpilih→Selected image; Kotak N→Box N; Cara isi kotak→Fill; Penuh (crop) / Utuh→Crop to fill / Show whole; Gambar lama ini selalu tampil utuh; ganti gambarnya untuk memakai crop.→This older image always shows whole; replace it to crop.; Posisi potongan→Crop position; Kiri ↔ kanan→Left ↔ right; Atas ↕ bawah→Top ↕ bottom; Pin di gambar ini→Pins on this image; Klik gambar sekali lagi untuk memasang pin.→Click the image again to add a pin. Drag a pin to move it.; Pin tanpa keterangan→Pin without a note; Ganti gambar→Replace image; Keluarkan dari slide→Remove from slide; the two empty-panel hints→"Click an image to set how it fills its box and to add pins." / "Empty box: click to choose an image, or drop one from your computer. Drag an image to another box to move it."; Tambahkan slide baru atau gambar untuk memulai presentasi ini.→Add a slide or images to start this presentation.; Presentasi ini belum punya slide.→This presentation has no slides yet. Any other Indonesian string found in these two files: translate in the same plain style and list it in the changelog.
+- E2: PE:172 layout glyph uses non-existent `--ui-ink*` tokens with literal fallbacks — use existing semantic classes/tokens (e.g. `text-ink` / `text-ink-tertiary`, selected state on `bg-action text-action-ink`) so active contrast is ≥ 4.5:1 in both themes. PF:43 `bg-neutral-200` → `bg-surface-muted`; PF:46 `ring-white` → a theme token ring (e.g. `ring-surface`). Print output must still look the same on paper.
+- E3 locally: layout buttons (PE:172, 40 px) and fit buttons (PE:237, 32 px) get ≥ 44 px hit area; no global density change.
+- No new layouts, modes or editor structure.
+
+**Tests.**
+1. Integration: `getBoard` with a dangling entry → unlinked view, stored id unchanged, zero annotation writes over two reads; `clearScheduleEntryLink` still clears.
+2. Integration: `updateAnnotation` with only pinX/pinY keeps note, schedule link, label side and sort order; 0/100 bounds accepted, out-of-range refused by the action schema; archived/other-project/read-only refused as today.
+3. Pure unit test for the pin geometry helper (client point + frame rect → clamped percent; click-vs-drag threshold; keyboard step 1/5 with clamping), placed next to the editor.
+4. If confirm-text builders are extracted, unit-test the counts. Existing presentation lifecycle/composition/print tests stay green.
+
+**Executor verification:** `npm test`, typecheck, full lint, `check:boundaries`, `check:legacy-runtime`, production build, staged/unstaged whitespace. Kantor env as before; no migration expected. Browser acceptance: Reviewer, group [R9.64] C.
 
 ### Ordered slice D — shared image geometry/gestures
 
@@ -257,19 +284,19 @@ A, B, C and D are independently useful acceptance/revert boundaries; no preparat
 ## Executor Prompt
 
 ```text
-ROLE: BACKEND EXECUTOR. Location: kantor (load .env.kantor, set
-STUDIOFLOW_LOCATION=kantor, verify rebuild-only dev/test targets).
-Read AGENTS.md, docs/agent/EXECUTOR.md and PLAN.md
-WO-SF-NOTES-PRESENTATION-IMAGE-01. Implement ONLY "Ordered slice A - reliable
-Notes (READY, R9.66)": Board-independent noteAction with required version,
-General-note edit/star/delete under the existing document right, draft kept on
-stale conflict, full mention set resent on edit, reader filter/scroll kept
-across refresh. G1 is locked as "keep existing policy": do NOT make official
-records immutable or undeletable and do not touch contract section 6.1. Do not
-edit shared rich-text editor/formatter/overlay files (G2 is Lead-owned), add no
-phase x (G3), no schema/migration/dependency, no legacy, no remote operations.
-Preserve untracked owner files under test/. Finish the slice with the listed
-tests and all checks, CHANGELOG R9.66, one local commit. Return only the
+ROLE: BACKEND EXECUTOR with the owner's expanded UI lane for Presentation.
+Location: kantor (load .env.kantor, set STUDIOFLOW_LOCATION=kantor, verify
+rebuild-only dev/test targets). Read AGENTS.md, docs/agent/EXECUTOR.md and
+PLAN.md WO-SF-NOTES-PRESENTATION-IMAGE-01. Implement ONLY "Ordered slice C -
+Presentation pin movement and safe actions (READY, R9.68)": getBoard becomes
+read-only (dangling links projected as unlinked, explicit lifecycle cleanup
+unchanged), pins drag with pointer capture and keyboard nudge 1%/Shift 5% saved
+once, every destructive action confirmed with counts and navigation only on
+success, visible errors, the listed English copy, local token/contrast and 44px
+hit-area fixes. Keep slide-frame.tsx hook-free for print. No schema, migration,
+dependency, shared UI Engine or StudioFlow change; no legacy; no remote
+operations. Preserve untracked owner files under test/. Finish with the listed
+tests and all checks, CHANGELOG R9.68, one local commit. Return only the
 Planner/Reviewer prompt: outcome, commit, checks, limitations, remaining dirty
 files. Stop with BLOCKED / CONFLICT if the plan contradicts the repository.
 ```

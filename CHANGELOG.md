@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.67 | 2026-10-15 | review(studioflow): WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A PASS; slice C READY (Lead)
+
+- **Verdict R9.66 (`f88a592`): PASS (code review + automated checks).** Inspected the full diff against the R9.65 contract: `noteAction` is strict, version-required, Board-independent and delegates to the existing label-gated workspace card methods; the optional-version phase-note mutation doors are gone with all callers migrated; `ChatNote.version` is captured at edit start and kept through refresh; a stale save keeps the draft, offers Reload and shows the latest saved body beside it; General notes use server-derived `open && access.canEditDocuments`; one resolver serves post and edit, sends `[]` when mentions are removed and refuses on lookup failure; refresh keeps filter, loaded depth and reading anchor, a request sequence drops obsolete reads, `key={projectId}` resets on project change. G1 respected (official text still editable/deletable, labels locked). Shared editor/formatter untouched.
+- **Lead re-ran:** `npm test` **1131/1131** (0 failed/skipped/cancelled), typecheck, full lint, `check:boundaries` PASS on the kantor rebuild test DB.
+- **Non-blocking notes (no correction):** Save without changes now always bumps the card version (edit always sends the full link set) — harmless; composer lookup failure shows the generic "could not be sent" message instead of the resolver's text — acceptable; a stale editor recovers by Cancel + Edit, by design ("never silently re-base").
+- **Browser:** not run by the Lead — owner's standing preference is to test in the browser themselves. Groups [R9.64] A and [R9.66] stay PENDING; BACKLOG A2–A5 marked fixed-pending-browser, not closed.
+- **Next:** PLAN.md slice C (Presentation: read-only getBoard, pin drag + keyboard nudge, confirmations with counts, visible errors, English copy, local token/hit-area fixes) READY as R9.68. Slice B waits for the Lead's G2 shared-editor revision; D stays DRAFT.
+
 ## R9.66 | 2026-10-15 | fix(studioflow): Make Notes mutations versioned and retain reader context (Executor)
 
 - **WO-SF-NOTES-PRESENTATION-IMAGE-01, slice A only:** implemented the R9.65 READY contract on `main` from `f5fd866` (published baseline `origin/main` R9.63 `ed169fb`). Pre-edit dirty files were only the owner's untracked `test/BOQ TEST.xlsx` and `test/BOQ TEST 2 - PDF.pdf`; both preserved. B/C/D remain unimplemented and PLAN.md is unchanged for Lead review.
