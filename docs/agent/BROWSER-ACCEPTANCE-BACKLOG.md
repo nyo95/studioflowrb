@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.118] BQ treats Subsection as optional organization
+- Surface: BQ Project → Struktur rail
+- Fixture: editable active BQ project with a Section that has direct Work Items and another Section with Subsections
+- Viewport: desktop (default) and 375 px
+- Steps: 1. At rest, inspect a Section with no persistent Subsection action. 2. Hover and keyboard-focus it, use Add Subsection, name it, and save. 3. Confirm the direct-Work-Item and Subsection paths remain reachable under their parent rules. 4. At 375 px, confirm the fallback can still name a Subsection.
+- Acceptance: Subsection reads as optional organization rather than a required level; its desktop creation action is only visible during intentional Section interaction, accessible by keyboard, and does not compete with Work Item actions.
+- Status: PENDING
+
 ### [R9.117] BQ Work Item creation lives in Struktur
 - Surface: BQ Project → Struktur rail and Section canvas
 - Fixture: editable active BQ project with one Section without Subsections and one Section with at least one Subsection

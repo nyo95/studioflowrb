@@ -563,6 +563,15 @@ tidak menyediakan tombol atau baris tambah Work Item, supaya tetap menjadi tempa
 membaca dan mengedit biaya. Tidak ada tempel dari Excel: pekerjaan dari workbook
 dikonversi manual.
 
+**Tambah Subsection (owner 2026-10-17).** Subsection bersifat opsional dan
+menata Work Item di bawah Section; ia bukan Component Group dan tidak mengubah
+harga. Jalur biasa adalah Section → Work Item. Bila Section sengaja dipecah
+menjadi Subsection, Work Item baru masuk ke salah satu Subsection agar cara
+menatanya tidak bercampur sebagai kebiasaan baru. Karena itu, pada desktop aksi
+Tambah Subsection berupa `+` yang tampil saat Section di-hover atau difokuskan,
+bukan tombol permanen di bawah daftar. Pada layar sempit, fallback ringkas tetap
+terlihat karena panel Struktur disembunyikan.
+
 *Penyisipan* Cost Component tetap punya afordansnya sendiri, karena memilih sumber bukan
 mengubah nilai: "Baris custom" langsung membuat baris kosong yang siap diketik,
 sedangkan "Impor" membuka picker pencarian Master Data dan BQ Library. Picker itu

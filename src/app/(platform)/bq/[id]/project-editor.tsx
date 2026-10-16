@@ -498,8 +498,9 @@ function SectionOutline({
               >
                 {section.name}
               </a>
-              {editable && (section.items.length > 0 || section.subsections.length === 0) ? (
-                <span className="opacity-0 transition-opacity group-hover/outline:opacity-100 group-focus-within/outline:opacity-100">
+              {editable ? (
+                <div className="flex items-center opacity-0 transition-opacity group-hover/outline:opacity-100 group-focus-within/outline:opacity-100">
+                  {(section.items.length > 0 || section.subsections.length === 0) ? (
                   <IconButton
                     size="sm"
                     variant="ghost"
@@ -512,7 +513,16 @@ function SectionOutline({
                       onAddWorkItem({ sectionId: section.id, where: section.name });
                     }}
                   />
-                </span>
+                  ) : null}
+                  <AddRow
+                    label="Subsection"
+                    placeholder="Nama Subsection"
+                    compact
+                    iconOnly
+                    disabled={pending}
+                    onAdd={(name) => onAddSubsection(section.id, name)}
+                  />
+                </div>
               ) : null}
               {tail(count)}
             </div>
@@ -570,17 +580,6 @@ function SectionOutline({
                 {itemsOpen.has(subsection.id) ? <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-11" editable={editable} pending={pending} onReorder={onReorder} onDelete={onDeleteWorkItem} /> : null}
               </div>
             ))}
-            {editable ? (
-              <div className="pl-4">
-                <AddRow
-                  label="Subsection"
-                  placeholder="Nama Subsection"
-                  compact
-                  disabled={pending}
-                  onAdd={(name) => onAddSubsection(section.id, name)}
-                />
-              </div>
-            ) : null}
             </>}
           </div>
         );
@@ -1849,6 +1848,7 @@ function AddRow({
   placeholder,
   disabled,
   compact = false,
+  iconOnly = false,
   onAdd,
 }: {
   label: string;
@@ -1856,12 +1856,17 @@ function AddRow({
   disabled: boolean;
   /** A narrower input, for the Struktur panel. */
   compact?: boolean;
+  /** For optional child layers: reveal the compact action only with its parent. */
+  iconOnly?: boolean;
   onAdd: (name: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
 
   if (!open) {
+    if (iconOnly) {
+      return <IconButton size="sm" variant="ghost" label={`Tambah ${label}`} icon={<Plus aria-hidden="true" />} disabled={disabled} onClick={() => setOpen(true)} />;
+    }
     return (
       <Button size="sm" variant="ghost" leadingIcon={<Plus aria-hidden="true" />} disabled={disabled} onClick={() => setOpen(true)}>
         {label}

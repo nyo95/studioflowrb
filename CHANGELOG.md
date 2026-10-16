@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.118 | 2026-10-17 | fix(bq): Make Subsection optional in Struktur (Lead)
+
+- **Structure hierarchy:** removed the permanently visible Add Subsection row. A Section now reveals its accessible `+` action only on hover or keyboard focus, retaining the existing inline naming flow. The narrow-screen fallback remains because Struktur is hidden there.
+- **Product rule:** recorded the default path as Section → Work Item. Subsection is optional organization, not a required level or a Component Group; when a Section is deliberately split into Subsections, new Work Items continue inside those Subsections to avoid a confusing mixed default.
+- **Verification:** typecheck, full-repository lint, production build, and whitespace checks passed. Browser acceptance is queued in `BROWSER-ACCEPTANCE-BACKLOG.md` because the local in-app browser denied this session inspection authority. No schema, migration, dependency, permission, remote action, or push.
+
 ## R9.117 | 2026-10-17 | fix(bq): Create Work Items from Struktur (Lead)
 
 - **Structure entry:** on desktop, a Section or Subsection reveals an accessible Add Work Item action on hover or keyboard focus. It reuses the complete existing Work Item form, including Assembly selection, and preserves the parent rules: a Section with only Subsections does not also accept direct Work Items.

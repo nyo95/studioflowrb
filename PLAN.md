@@ -1,9 +1,9 @@
 # Active Plan
 
-Plan ID: WO-BQ-STRUCTURE-WORK-ITEM-ENTRY-01
-Scope: Work Item entry location and BQ hierarchy wording
+Plan ID: WO-BQ-OPTIONAL-SUBSECTION-ENTRY-01
+Scope: Optional Subsection entry in Structure
 Module(s): bq
-Target revision: R9.117
+Target revision: R9.118
 Status: READY
 Priority: P2
 Owner: Product Owner
@@ -11,38 +11,34 @@ Last updated: 2026-10-17
 
 ## Outcome
 
-An estimator creates Work Items from Struktur, at the Section or Subsection
-where the work belongs, while the estimating canvas remains for reading and
-editing the selected Work Item's cost breakdown.
+An estimator sees Subsection as an optional way to organize a Section, not as a
+required next step. Its creation action appears with the other Section actions
+only when that Section is being intentionally interacted with.
 
 ## Locked Decisions
 
-- The customer-facing hierarchy is `Section → Subsection → Work Item →
-  Component Group → Cost Component`. “Item” alone is not a level name.
-- Add Work Item lives in Struktur on desktop. A Section receives it only when
-  it has no Subsections or already has direct Work Items; each Subsection has
-  its own action. The existing complete Work Item dialog, including Assembly,
-  is reused.
-- At widths where Struktur is intentionally hidden, a compact canvas fallback
-  preserves the same dialog and parent rule. It is a responsive fallback, not
-  a second desktop workflow.
-- Cost Component stays inside an expanded Work Item. Its source-picker flow is
-  not a structural action and must not appear in Struktur.
+- Subsection remains optional. It is an organizational child of a Section, not
+  a Component Group and not a prerequisite for Work Items.
+- The normal entry path is Section → Work Item. When a Section is deliberately
+  split into Subsections, new Work Items go into a Subsection so the two
+  organizational approaches do not become a confusing mixed default.
+- On desktop, Add Subsection is a hover/focus-visible `+` action on its parent
+  Section. Its existing inline naming flow remains the only creation flow.
+- At widths where Struktur is intentionally hidden, the compact canvas
+  fallback remains visible so this structural action is not lost.
 
 ## Boundaries and Non-goals
 
 - EXTEND BQ editor composition and its durable UI contract only. No schema,
-  service, calculation, permission, import source, Component Group behavior,
+  service, calculation, permission, Work Item entry, Component Group behavior,
   or deletion behavior changes.
 
 ## Acceptance Criteria
 
-- Desktop Struktur exposes an unobtrusive, hover/focus-visible Add Work Item
-  action at valid Section/Subsection parents, opening the existing form.
-- Desktop canvas has no Work Item entry rows.
-- Cost Component creation remains available only from its expanded Work Item or
-  Component Group context.
-- Narrow screens retain a reachable Work Item entry action.
+- Desktop Struktur has no persistent Add Subsection row.
+- Hovering or keyboard-focusing a Section exposes an accessible Add Subsection
+  action and retains the existing inline naming flow.
+- Narrow screens retain a reachable Subsection action.
 
 ## Verification
 
@@ -50,12 +46,12 @@ editing the selected Work Item's cost breakdown.
 
 ## Reviewer Acceptance
 
-- At desktop, create from a Section and a Subsection and confirm the new row
-  appears at that parent. Confirm canvas contains no Work Item add row.
-- At 375 px, confirm the compact fallback opens the same dialog.
+- At desktop, confirm the action is hidden at rest, visible on hover/focus,
+  creates a named Subsection, and does not obstruct Work Item actions.
+- At 375 px, confirm the compact fallback remains reachable.
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: rumah. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this READY `PLAN.md`, then implement the entire
-READY outcome, run required checks, update the changelog, and create R9.117.
+READY outcome, run required checks, update the changelog, and create R9.118.
