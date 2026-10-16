@@ -52,7 +52,7 @@ One price per **SKU × Vendor** pair. No separate `code` field — the pair itse
 | `supplier_vendor_id` | FK → Vendor | **Required (NOT NULL)**. Who is selling. Factory/manufacturer is registered as a Vendor |
 | `amount` | Decimal(16,2) | Price amount. Must be non-negative |
 | `currency` | String | Required. Uppercase 3-letter code (e.g. IDR, USD) |
-| `unit_id` | FK → Unit | Required. Must match SKU's purchase unit (or base unit when no purchase unit set) |
+| `unit_id` | FK → Unit | Required active purchase unit for this supplier's quote; independent of the SKU and other suppliers |
 | `source_link_id` | FK → BrandLink? | Optional. Provenance link; must belong to the SKU's Brand when set |
 | `notes` | String? | Optional notes |
 | `created_at` | DateTime | |
@@ -68,28 +68,15 @@ One price per **SKU × Vendor** pair. No separate `code` field — the pair itse
 - **No `is_current` / `valid_from` / `valid_to`** — one live row per pair at any time.
 - **Vendor required** — manufacturer's own list price is recorded by registering the manufacturer as a Vendor.
 
-### 2.3.1 SKU measurement and BQ conversion
+### 2.3.1 SKU dimensions and supplier purchase units (owner, 2026-10-15)
 
-Material pricing distinguishes three unit meanings:
-
-- **dimension Unit** measures structured geometry, for example `MM`;
-- **base Unit** is the normalized consumption/comparison Unit, for example `M2`;
-- **purchase Unit** is the Unit quoted by the supplier, for example `SHEET`.
-
-An area-based sheet SKU may store positive decimal `dimension_length` and
-`dimension_width`, optional `dimension_thickness`, `dimension_unit_id`, and a
-derived `purchase_to_base_factor`. The server derives the factor with exact
-decimal arithmetic. Example: `1200 × 2400 MM`, base `M2`, purchase `SHEET`
-produces `1 SHEET = 2.88 M2`. Thickness may be displayed as part of the SKU
-specification but is excluded from area calculation.
-
-Geometry is optional for materials that do not have meaningful rectangular
-dimensions. When geometry is supplied, length, width, and dimension Unit are
-all required; base Unit must be `M2`; and purchase Unit must be explicit. The
-browser preview is advisory only and the service always recalculates the
-persisted factor. When a live material price already exists for the SKU, the
-measurement layout is locked so later edits cannot silently change the meaning
-of recorded prices.
+SKU dimensions are optional information about the product. When present,
+positive length and width and an active dimension Unit are required; thickness
+is optional. No area or purchase-to-base conversion is calculated. Each
+material-price row requires its own active purchase Unit, so suppliers can
+quote the same SKU per SHEET, BOX, or another unit. BQ snapshots the chosen
+price and unit; its estimator supplies quantity and coefficient without
+automatic dimension conversion. Historical conversion fields remain inert.
 
 ### 2.4 Vendor eligibility
 
@@ -99,10 +86,10 @@ Supplier must be a live Vendor with `can_supply_material = true` on at least one
 
 - `amount` must be a valid decimal, non-negative, max 14 whole digits + 2 decimal places
 - `currency` must be uppercase 3-letter code
-- `unit_id` must match SKU's purchase unit (or base unit when no purchase unit is set)
+- `unit_id` must reference an active Unit; it may differ between suppliers
 - `source_link_id` when set must reference a live BrandLink belonging to the SKU's own Brand
 - `source_link_id` cannot be set when the SKU has no Brand
-- When a live PriceMaterial exists for the SKU, the SKU's measurement layout is locked; base unit, purchase unit, dimension unit, and rectangular dimensions cannot be changed until the live price is cleared
+- SKU dimensions may be corrected while prices exist; each price's selected unit changes only through an audited price update
 - SKU must not be archived
 - exact live SKU × Vendor match opens/targets the existing row for update; creating
   a second live row is blocked by the pair constraint
@@ -439,7 +426,8 @@ vendor selector, amount, currency, source link, notes) or a new-SKU form (the
 SKU fields from the Master Data contract plus the first capability-filtered
 vendor offer). Both paths create a `PriceMaterial`; the new-SKU path is
 atomic. The new-SKU path also provides optional structured rectangular
-dimensions and shows `1 <purchase unit> = <factor> <base unit>` before save.
+dimensions as SKU information. Both paths require a purchase Unit on each
+supplier-price row; they show no calculated area or BQ conversion.
 
 **Material+Labor / Labor modal:** Name, category selector (WORK categories only), vendor selector (capability-filtered: `can_supply_labor`), amount, currency, unit, scope note (ML only), spec, dimension display, notes.
 
@@ -472,12 +460,11 @@ Two reads return this shape, from one shared projection so they cannot drift:
 Neither read ranks by cheapest, newest, or preferred. Ordering is for reading
 only; the consumer selects one price explicitly.
 
-Each option also exposes the SKU measurement snapshot source: base Unit,
-purchase Unit, structured dimensions, dimension Unit, and nullable
-`purchaseToBaseFactor`. A downstream BQ consumer that uses normalized base-unit
-costing computes `amount / purchaseToBaseFactor` and persists the selected
-amount, Units, and factor in its own snapshot. It must not reread current Master
-Data values for an existing BQ line.
+Each option exposes the selected supplier price's Unit and the SKU's optional
+structured dimensions. BQ snapshots the selected amount and its actual price
+Unit, then sets its own quantity and coefficient. No base-unit costing or
+dimension conversion is performed. It must not reread current Master Data
+values for an existing BQ line.
 
 ### 12.2 PriceWorkRead
 

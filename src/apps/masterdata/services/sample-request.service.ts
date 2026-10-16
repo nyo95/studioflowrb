@@ -315,7 +315,7 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
     },
 
     /** Copies a complete sample quote to the matching SKU/supplier material price in one audited operation. */
-    async syncSampleQuoteToPrice(input: { grants: PermissionGrants; actor: AuditActor; intakeId: string }) {
+    async syncSampleQuoteToPrice(input: { grants: PermissionGrants; actor: AuditActor; intakeId: string; unitId?: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
@@ -345,12 +345,13 @@ export function createSampleRequestService(db: PrismaClient, ports: MasterDataSe
           where: { sku_id: current.sku_id!, supplier_vendor_id: current.vendor_id!, deleted_at: null },
           select: { id: true, notes: true },
         });
+        if (!existing && !input.unitId) throw new AppError("VALIDATION", "PRICE_UNIT_REQUIRED", "Choose the purchase unit before adding this quote to the price list.");
         const pricing = createPricingService(tx as PrismaClient, { ...ports, runTransaction: async (work) => work(tx) });
         const note = samplePriceNote(current);
         const action = existing ? "updated" as const : "created" as const;
         const priceMaterialId = existing
           ? (await pricing.updatePriceMaterial({ grants: input.grants, actor: input.actor, priceMaterialId: existing.id, amount: amount.toString(), currency, notes: appendNote(existing.notes, note) })).priceMaterialId
-          : (await pricing.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: current.sku_id!, supplierVendorId: current.vendor_id!, amount: amount.toString(), currency, notes: note })).priceMaterialId;
+          : (await pricing.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: current.sku_id!, supplierVendorId: current.vendor_id!, unitId: input.unitId!, amount: amount.toString(), currency, notes: note })).priceMaterialId;
         const row = await tx.sampleRequestIntake.update({ where: { id: current.id }, data: { price_material_id: priceMaterialId } });
         await writeAudit(ports, tx, {
           action: "masterdata.sample-request.price-synced", entityType: ENTITY, entityId: row.id, actor: input.actor,

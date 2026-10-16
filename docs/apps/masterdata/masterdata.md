@@ -88,12 +88,12 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - SKU creation is entered from Pricing → Material, not from the standalone SKU
   directory. The flow atomically creates the SKU and its first `PriceMaterial`.
 - Create accepts an optional active Brand and requires at least one of `code` or `name`, exactly one
-  active PRODUCT `categoryId`, Unit, and at least one `PriceMaterial`; a live SKU must retain
+  active PRODUCT `categoryId`, and at least one `PriceMaterial`; a live SKU must retain
   at least one live `PriceMaterial`.
 - **One exception (owner, 2026-10-07): the sample shelf.** A physical sample often arrives
   before any price, so the shelf's quick "New SKU" (`createSkuForSampleShelf`, permission
   `masterdata.sample.manage`) creates a SKU with no `PriceMaterial`, under the same
-  identity, category, unit and brand rules; its `sku.created` audit carries
+  identity, category and brand rules; its `sku.created` audit carries
   `origin: "sample-shelf"`. Every other entry point still requires a price. Such a SKU
   gets its first price on Pricing when a supplier quotes it.
 - `code` and `name` are stored separately and may both be present. When only
@@ -102,16 +102,15 @@ refer only to the R1.05 Git snapshot and define what must not be reintroduced.
 - SKU may store optional rectangular geometry as positive decimal length and
   width, optional thickness, and a required dimension Unit when geometry is
   present. Geometry is structured data, not Notes or display-only text.
-- When live material prices exist on a SKU, its measurement layout and
-  base/purchase Unit pairing are locked so price semantics do not shift
-  silently.
-- Dimension Unit, base Unit, and purchase Unit are distinct meanings. For a
-  sheet measured in millimetres and consumed by area, `MM` is the dimension
-  Unit, `M2` is the base/BQ Unit, and `SHEET` is the purchase Unit.
-- When rectangular geometry is present, Master Data calculates and persists
-  `purchase_to_base_factor` server-side with exact decimal arithmetic. The
-  approved area rule is `length × width`, converted to square metres; thickness
-  is descriptive and does not contribute to area.
+- Dimensions are informational SKU facts, not a pricing or BQ conversion.
+  The purchase unit is required on each supplier's `PriceMaterial`, independent
+  of other suppliers. For example, one 1220 × 2440 × 12 MM HPL SKU may have
+  a price per SHEET and another per BOX. Correcting dimensions does not rewrite
+  existing price units or BQ snapshots.
+- Historical `base_unit_id`, `purchase_unit_id`, and `purchase_to_base_factor`
+  columns remain only to preserve existing records. New SKU writes leave them
+  null; Master Data and BQ do not derive or use them. The shared pure area
+  utility remains available only if a future owner decision needs it.
 - Each SKU has exactly one active PRODUCT category. The junction table remains
   the storage boundary for compatibility, but its database uniqueness constraint
   prevents a SKU from receiving a second category. Archiving a SKU archives its
@@ -166,12 +165,11 @@ The following remain deferred and must not be inferred during implementation:
 - BQ snapshots the selected commercial facts at project time. A later Master Data
   edit, archive, restore, or permanent deletion must not rewrite historical BQ
   meaning.
-- For material pricing, those commercial facts include base Unit, purchase Unit,
-  and `purchase_to_base_factor`. BQ snapshots the factor for display context only
-  (`purchase_to_base_factor_snapshot` is display-only and does not enter the BQ
-  calculation formula — see `bq-contract.md` K-03 and §7.4 for the authoritative
-  engine rule). The estimator sets the koefisien independently; the factor is
-  informational.
+- For material pricing, the selected supplier price and its own purchase Unit
+  are the commercial facts BQ snapshots. Dimensions remain SKU information;
+  no base Unit or conversion factor enters new BQ lines. The estimator sets
+  quantity and koefisien independently. Historical snapshot fields remain
+  stored but are not shown as a conversion hint.
 - No cheapest, newest, preferred, or manufacturer fallback is inferred. When
   several eligible prices exist, the consumer selects one explicitly.
 

@@ -67,7 +67,6 @@ export default async function SkusPage({ searchParams }: { searchParams: Promise
           dimension_length: sku.dimension_length?.toString() ?? null,
           dimension_width: sku.dimension_width?.toString() ?? null,
           dimension_thickness: sku.dimension_thickness?.toString() ?? null,
-          purchase_to_base_factor: sku.purchase_to_base_factor?.toString() ?? null,
           material_prices: sku.material_prices.map((price) => ({
             ...price,
             amount: price.amount.toString(),

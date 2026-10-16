@@ -5,7 +5,7 @@ import { hasPermission } from "@platform/core/rbac";
 import { ErrorState, PageHeader, SectionCard } from "@/platform/ui_engine";
 
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
-import { masterDataService } from "@/apps/masterdata/runtime";
+import { masterDataPublicRead, masterDataService } from "@/apps/masterdata/runtime";
 import { sampleRequestCoordinator } from "@/app/sample-request-runtime";
 
 import { SampleRequestDirectory } from "./sample-request-directory";
@@ -31,13 +31,14 @@ export default async function SampleRequestsPage() {
   const canManageVendors = hasPermission(grants, MASTERDATA_PERMISSIONS.vendorManage);
   // Putting a request on the shelf needs the shelf permission as well (WO-MD-SAMPLE-01 decision 9).
   const canShelve = hasPermission(grants, MASTERDATA_PERMISSIONS.sampleManage);
-  const [queue, vendors, vendorTypes, skus, racks, skuRefs] = await Promise.all([
+  const [queue, vendors, vendorTypes, skus, racks, skuRefs, units] = await Promise.all([
     sampleRequestCoordinator.listQueue({ grants, includeFinished: true }),
     masterDataService.listSampleRequestVendorChoices({ grants }),
     canManageVendors ? masterDataService.listVendorTypesForAssignment({ grants }) : [],
     masterDataService.listSampleRequestSkuChoices({ grants }),
     canShelve && hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRead) ? masterDataService.listSampleRacks({ grants }) : [],
     canShelve ? masterDataService.listSampleSkuFormRefs({ grants }) : null,
+    hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage) ? masterDataPublicRead.listUnits() : [],
   ]);
 
   return (
@@ -47,6 +48,7 @@ export default async function SampleRequestsPage() {
         rows={queue}
         vendors={vendors}
         skus={skus}
+        units={units}
         canPrice={hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage)}
         canManageVendors={canManageVendors}
         canShelve={canShelve}

@@ -13,6 +13,7 @@ type ExistingSkuRow = {
   kind: "existing";
   skuId: string;
   vendorId: string;
+  unitId: string;
   amount: string;
   notes?: string | null;
 };
@@ -22,8 +23,7 @@ type NewSkuRow = {
   name?: string | null;
   code?: string | null;
   brandId?: string | null;
-  baseUnitId: string;
-  purchaseUnitId?: string | null;
+  unitId: string;
   dimensionLength?: string | null;
   dimensionWidth?: string | null;
   dimensionThickness?: string | null;
@@ -45,8 +45,6 @@ type NewSkuDefinition = {
   name?: string | null;
   code?: string | null;
   brandId: string | null;
-  baseUnitId: string;
-  purchaseUnitId: string | null;
   dimensionLength: string | null;
   dimensionWidth: string | null;
   dimensionThickness: string | null;
@@ -64,8 +62,6 @@ function definition(row: NewSkuRow): NewSkuDefinition {
     name: row.name,
     code: row.code,
     brandId: optionalText(row.brandId),
-    baseUnitId: row.baseUnitId,
-    purchaseUnitId: optionalText(row.purchaseUnitId),
     dimensionLength: optionalText(row.dimensionLength),
     dimensionWidth: optionalText(row.dimensionWidth),
     dimensionThickness: optionalText(row.dimensionThickness),
@@ -85,8 +81,6 @@ function definitionKey(value: NewSkuDefinition): string {
     identity: value.identity.slug,
     code: value.identity.code,
     brandId: value.brandId,
-    baseUnitId: value.baseUnitId,
-    purchaseUnitId: value.purchaseUnitId,
     dimensionLength: value.dimensionLength,
     dimensionWidth: value.dimensionWidth,
     dimensionThickness: value.dimensionThickness,
@@ -142,7 +136,7 @@ export function createMaterialSkuPriceBulkService(
         if (initiallyRejected.has(index)) continue;
         if (row.kind === "existing") {
           try {
-            const result = await pricingService.createMaterialPriceRows({ grants: input.grants, actor: input.actor, currency: input.currency, onInvalid: "save-valid", writeBatchAudit: false, rows: [{ skuId: row.skuId, vendorId: row.vendorId, amount: row.amount, notes: row.notes }] });
+            const result = await pricingService.createMaterialPriceRows({ grants: input.grants, actor: input.actor, currency: input.currency, onInvalid: "save-valid", writeBatchAudit: false, rows: [{ skuId: row.skuId, vendorId: row.vendorId, unitId: row.unitId, amount: row.amount, notes: row.notes }] });
             ids.push(...result.ids);
           } catch (error) {
             const rows = error instanceof AppError && error.code === "BULK_ROWS_INVALID" ? (error.details?.rows as Array<{ code: string; message: string }> | undefined) : undefined;
@@ -175,20 +169,18 @@ export function createMaterialSkuPriceBulkService(
               name: group.definition.name,
               code: group.definition.code,
               brandId: group.definition.brandId,
-              baseUnitId: group.definition.baseUnitId,
-              purchaseUnitId: group.definition.purchaseUnitId ?? undefined,
               dimensionLength: group.definition.dimensionLength ?? undefined,
               dimensionWidth: group.definition.dimensionWidth ?? undefined,
               dimensionThickness: group.definition.dimensionThickness ?? undefined,
               dimensionUnitId: group.definition.dimensionUnitId ?? undefined,
               categoryId: group.definition.categoryId,
-              priceMaterials: [{ supplierVendorId: row.vendorId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined }],
+              priceMaterials: [{ supplierVendorId: row.vendorId, unitId: row.unitId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined }],
             });
             group.skuId = created.skuId;
             createdSkuIds.push(created.skuId);
             ids.push(...created.priceMaterialIds);
           } else {
-            const result = await pricingService.createMaterialPriceRows({ grants: input.grants, actor: input.actor, currency: input.currency, onInvalid: "save-valid", writeBatchAudit: false, rows: [{ skuId: group.skuId, vendorId: row.vendorId, amount: row.amount, notes: row.notes }] });
+            const result = await pricingService.createMaterialPriceRows({ grants: input.grants, actor: input.actor, currency: input.currency, onInvalid: "save-valid", writeBatchAudit: false, rows: [{ skuId: group.skuId, vendorId: row.vendorId, unitId: row.unitId, amount: row.amount, notes: row.notes }] });
             ids.push(...result.ids);
           }
         } catch (error) {

@@ -32,7 +32,9 @@ function roundedDecimal(numerator: bigint, denominator: bigint, precision: numbe
 /**
  * Calculates rectangular area in square metres using exact decimal arithmetic.
  * The caller supplies the domain-owned length-to-metre factor, so Utilities do
- * not own or infer a Unit dictionary.
+ * not own or infer a Unit dictionary. Kept as a pure shared utility in case a
+ * future owner-approved workflow needs area math; Master Data and BQ do not
+ * call this for SKU pricing or quantity conversion.
  */
 export function calculateRectangleAreaSquareMeters(input: {
   length: string;

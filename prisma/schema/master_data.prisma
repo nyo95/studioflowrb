@@ -283,7 +283,7 @@ model Sku {
   code                    String?
   name                    String?
   slug                    String
-  base_unit_id            String
+  base_unit_id            String?
   purchase_unit_id        String?
   dimension_length        Decimal?  @db.Decimal(12, 3)
   dimension_width         Decimal?  @db.Decimal(12, 3)
@@ -296,7 +296,7 @@ model Sku {
   deleted_at              DateTime?
 
   brand            Brand?                @relation(fields: [brand_id], references: [id], onDelete: Restrict)
-  base_unit        Unit                  @relation("SkuBaseUnit", fields: [base_unit_id], references: [id], onDelete: Restrict)
+  base_unit        Unit?                 @relation("SkuBaseUnit", fields: [base_unit_id], references: [id], onDelete: Restrict)
   purchase_unit    Unit?                 @relation("SkuPurchaseUnit", fields: [purchase_unit_id], references: [id], onDelete: Restrict)
   dimension_unit   Unit?                 @relation("SkuDimensionUnit", fields: [dimension_unit_id], references: [id], onDelete: Restrict)
   categories       SkuCategory[]

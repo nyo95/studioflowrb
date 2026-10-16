@@ -9,7 +9,6 @@ import { normalizeText } from "@platform/utilities/normalization";
 import { toSlug } from "@platform/utilities/slug";
 import { lowerCaseText, titleCaseWords } from "@platform/utilities/text-case";
 import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
-import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
 import { MASTERDATA_ARCHIVE_ENTITY_TYPES, MASTERDATA_DELETION_TARGET_TYPES, type MasterDataArchiveEntityType, type MasterDataDeletionTargetType } from "./polymorphic-registry";
 import { parsePriceAmount } from "../domain/price-amount";
 
@@ -120,19 +119,18 @@ export function resolveSkuIdentity(nameValue?: string | null, codeValue?: string
 }
 
 type SkuMeasurementInput = { dimensionLength?: string | null; dimensionWidth?: string | null; dimensionThickness?: string | null; dimensionUnitId?: string | null; };
-const LENGTH_TO_METRE: Readonly<Record<string, string>> = { MM: "0.001", CM: "0.01", M: "1" };
-
-export async function resolveSkuMeasurement(tx: TxClient | PrismaClient, input: SkuMeasurementInput, baseUnit: { code: string }, purchaseUnit: { code: string; status: string } | null) {
+export async function resolveSkuMeasurement(tx: TxClient | PrismaClient, input: SkuMeasurementInput) {
   const length = input.dimensionLength?.trim() || null; const width = input.dimensionWidth?.trim() || null; const thickness = input.dimensionThickness?.trim() || null; const dimensionUnitId = input.dimensionUnitId?.trim() || null;
-  if (!length && !width && !thickness && !dimensionUnitId) return { dimension_length: null, dimension_width: null, dimension_thickness: null, dimension_unit_id: null, purchase_to_base_factor: null };
+  if (!length && !width && !thickness && !dimensionUnitId) return { dimension_length: null, dimension_width: null, dimension_thickness: null, dimension_unit_id: null };
   if (!length || !width || !dimensionUnitId) throw new AppError("VALIDATION", "SKU_DIMENSION_INCOMPLETE", "Length, width, and dimension unit must be filled together.");
-  if (!purchaseUnit) throw new AppError("VALIDATION", "SKU_DIMENSION_PURCHASE_UNIT_REQUIRED", "A purchase unit is required when dimensions define a conversion.");
-  if (baseUnit.code.toUpperCase() !== "M2") throw new AppError("VALIDATION", "SKU_DIMENSION_BASE_UNIT_INVALID", "Rectangular dimensions require M2 as the base measurement unit.");
   const dimensionUnit = await tx.unit.findUniqueOrThrow({ where: { id: dimensionUnitId } });
   if (dimensionUnit.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_DIMENSION_UNIT_INACTIVE", "Dimension unit must be active.");
-  const lengthToMeterFactor = LENGTH_TO_METRE[dimensionUnit.code.toUpperCase()];
-  if (!lengthToMeterFactor) throw new AppError("VALIDATION", "SKU_DIMENSION_UNIT_INVALID", "Dimension unit must be MM, CM, or M.");
-  try { const purchaseToBaseFactor = calculateRectangleAreaSquareMeters({ length, width, lengthToMeterFactor }); const normalizedThickness = thickness ? toDecimalString(thickness) : null; if (normalizedThickness?.startsWith("-") || normalizedThickness === "0") throw new Error("invalid thickness"); return { dimension_length: toDecimalString(length), dimension_width: toDecimalString(width), dimension_thickness: normalizedThickness, dimension_unit_id: dimensionUnit.id, purchase_to_base_factor: purchaseToBaseFactor }; } catch { throw new AppError("VALIDATION", "SKU_DIMENSION_INVALID", "Dimensions must be positive decimal values."); }
+  if (!["MM", "CM", "M"].includes(dimensionUnit.code.toUpperCase())) throw new AppError("VALIDATION", "SKU_DIMENSION_UNIT_INVALID", "Dimension unit must be MM, CM, or M.");
+  try {
+    const normalized = [length, width, thickness].map((value) => value ? toDecimalString(value) : null);
+    if (normalized.some((value) => value && (value.startsWith("-") || value === "0"))) throw new Error("invalid dimension");
+    return { dimension_length: normalized[0], dimension_width: normalized[1], dimension_thickness: normalized[2], dimension_unit_id: dimensionUnit.id };
+  } catch { throw new AppError("VALIDATION", "SKU_DIMENSION_INVALID", "Dimensions must be positive decimal values."); }
 }
 
 export function normalizeHashtags(hashtags: readonly string[]): Array<{ label: string; normalized: string }> {
@@ -289,9 +287,9 @@ export async function assertLiveProductCategories(tx: TxClient, categoryIds: rea
 
 export async function assertSkuRestorable(tx: TxClient, skuId: string): Promise<void> {
   const sku = await tx.sku.findUniqueOrThrow({ where: { id: skuId } });
-  const [brand, baseUnit, purchaseUnit, categories, identityConflict] = await Promise.all([sku.brand_id ? tx.brand.findUniqueOrThrow({ where: { id: sku.brand_id } }) : null, tx.unit.findUniqueOrThrow({ where: { id: sku.base_unit_id } }), sku.purchase_unit_id ? tx.unit.findUniqueOrThrow({ where: { id: sku.purchase_unit_id } }) : null, tx.skuCategory.findMany({ where: { sku_id: skuId }, include: { category: true } }), tx.sku.findFirst({ where: { id: { not: skuId }, brand_id: sku.brand_id, slug: sku.slug, deleted_at: null }, select: { id: true } })]);
+  const [brand, baseUnit, purchaseUnit, categories, identityConflict] = await Promise.all([sku.brand_id ? tx.brand.findUniqueOrThrow({ where: { id: sku.brand_id } }) : null, sku.base_unit_id ? tx.unit.findUniqueOrThrow({ where: { id: sku.base_unit_id } }) : null, sku.purchase_unit_id ? tx.unit.findUniqueOrThrow({ where: { id: sku.purchase_unit_id } }) : null, tx.skuCategory.findMany({ where: { sku_id: skuId }, include: { category: true } }), tx.sku.findFirst({ where: { id: { not: skuId }, brand_id: sku.brand_id, slug: sku.slug, deleted_at: null }, select: { id: true } })]);
   if (brand?.deleted_at) throw new AppError("CONFLICT", "SKU_BRAND_ARCHIVED", "SKU cannot be restored while its Brand is archived.");
-  if (baseUnit.status !== "ACTIVE" || purchaseUnit?.status === "ARCHIVED") throw new AppError("CONFLICT", "SKU_UNIT_INACTIVE", "SKU cannot be restored while one of its Units is archived.");
+  if (baseUnit?.status === "ARCHIVED" || purchaseUnit?.status === "ARCHIVED") throw new AppError("CONFLICT", "SKU_UNIT_INACTIVE", "SKU cannot be restored while one of its historical Units is archived.");
   if (categories.length === 0 || categories.some((row) => row.category.status !== "ACTIVE")) throw new AppError("CONFLICT", "SKU_CATEGORY_INACTIVE", "SKU cannot be restored without active Categories.");
   if (identityConflict) throw new AppError("CONFLICT", "SKU_IDENTITY_CONFLICT", "A live SKU already uses this identity.");
   const candidatePriceCauses = await tx.archiveCause.findMany({

@@ -55,15 +55,14 @@ export function createSampleService(db: PrismaClient, ports: MasterDataServicePo
       const rows = await db.sku.findMany({ where: { deleted_at: null }, orderBy: [{ name: "asc" }, { code: "asc" }], select: { id: true, name: true, code: true, brand: { select: { name: true } } } });
       return rows.map((sku) => ({ id: sku.id, name: sku.name, code: sku.code, brandName: sku.brand?.name ?? null }));
     },
-    /** Choices for the shelf's quick "New SKU": active product categories, active units and live brands. */
+    /** Choices for the shelf's quick "New SKU": active product categories and live brands. */
     async listSampleSkuFormRefs(input: { grants: PermissionGrants }) {
       manage(input.grants);
-      const [categories, units, brands] = await Promise.all([
+      const [categories, brands] = await Promise.all([
         db.category.findMany({ where: { kind: "PRODUCT", status: "ACTIVE" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
-        db.unit.findMany({ where: { status: "ACTIVE" }, orderBy: { code: "asc" }, select: { id: true, code: true, name: true } }),
         db.brand.findMany({ where: { deleted_at: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
       ]);
-      return { categories, units, brands };
+      return { categories, brands };
     },
     async getSampleHistory(input: { grants: PermissionGrants; sampleId: string }) { read(input.grants); return db.sampleMovement.findMany({ where: { sample_id: input.sampleId }, orderBy: [{ created_at: "desc" }, { id: "desc" }] }); },
     async createSample(input: { grants: PermissionGrants; actor: AuditActor; skuId: string; rack: string; box: string; quantity?: number; locationNote?: string | null; notes?: string | null }) { manage(input.grants); actorIsUsable(input.actor); return write(async (tx) => { await sku(tx, input.skuId); const row = await tx.sample.create({ data: { id: randomUUID(), sku_id: input.skuId, rack: place(input.rack, "RACK"), box: place(input.box, "BOX"), quantity: qty(input.quantity), location_note: optional(input.locationNote, 200, "SAMPLE_LOCATION_NOTE_INVALID"), notes: optional(input.notes, 1000, "SAMPLE_NOTES_INVALID") } }); await movement(tx, row, "IN", input.actor, { toRack: row.rack, toBox: row.box }); await writeAudit(ports, tx, { action: "masterdata.sample.created", entityType: "sample", entityId: row.id, actor: input.actor }); return row; }); },

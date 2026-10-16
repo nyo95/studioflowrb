@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 
-import { Button, CreatableSearch, DraftDialog, Field, FormActions, InlineError, Input, Select, Text } from "@/platform/ui_engine";
+import { Button, CreatableSearch, DraftDialog, Field, FormActions, InlineError, Input, Text } from "@/platform/ui_engine";
 
 import { createShelfSkuAction } from "./actions";
 
 export type ShelfSkuRefs = {
   categories: ReadonlyArray<{ id: string; name: string }>;
-  units: ReadonlyArray<{ id: string; code: string; name: string }>;
   brands: ReadonlyArray<{ id: string; name: string }>;
 };
 
@@ -67,23 +66,21 @@ export function ShelfSkuDialog({ refs, initialName, onCreated, onCancel }: { ref
   const [code, setCode] = useState("");
   const [brandId, setBrandId] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  // Most samples are counted in pieces; preselect it when the studio has that unit.
-  const [baseUnitId, setBaseUnitId] = useState(() => refs.units.find((unit) => unit.code.toLowerCase() === "pcs")?.id ?? "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const valid = Boolean((name.trim() || code.trim()) && categoryId && baseUnitId);
+  const valid = Boolean((name.trim() || code.trim()) && categoryId);
 
   const submit = async () => {
     setPending(true);
     setError(null);
-    const result = await createShelfSkuAction({ name: name.trim() || undefined, code: code.trim() || undefined, brandId: brandId || undefined, categoryId, baseUnitId });
+    const result = await createShelfSkuAction({ name: name.trim() || undefined, code: code.trim() || undefined, brandId: brandId || undefined, categoryId });
     setPending(false);
     if (!result.ok) { setError(result.error.safeMessage); return; }
     onCreated({ id: result.data.skuId, name: name.trim() || null, code: code.trim() || null, brandName: refs.brands.find((brand) => brand.id === brandId)?.name ?? null });
   };
 
   return (
-    <DraftDialog open onOpenChange={(open) => { if (!open) onCancel(); }} title="New SKU for this sample" description="Created without a price. Add the price on Pricing once a supplier quotes it." pending={pending} watchedValue={JSON.stringify({ name, code, brandId, categoryId, baseUnitId })}>
+    <DraftDialog open onOpenChange={(open) => { if (!open) onCancel(); }} title="New SKU for this sample" description="Created without a price or purchase unit. Add both on Pricing once a supplier quotes it." pending={pending} watchedValue={JSON.stringify({ name, code, brandId, categoryId })}>
       <form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); if (valid) void submit(); }}>
         {error ? <InlineError>{error}</InlineError> : null}
         <div className="grid grid-cols-[1fr_9rem] gap-3">
@@ -94,17 +91,9 @@ export function ShelfSkuDialog({ refs, initialName, onCreated, onCancel }: { ref
         <Field label="Brand" description="Optional.">
           <CreatableSearch label="Brand" options={refs.brands.map((brand) => ({ id: brand.id, label: brand.name }))} value={brandId} onValueChange={setBrandId} placeholder="No brand" searchPlaceholder="Search brands…" emptyLabel="No brand matches." allowClear clearLabel="No brand" className="w-full" />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Product category" required>
-            <CreatableSearch label="Product category" options={refs.categories.map((category) => ({ id: category.id, label: category.name }))} value={categoryId} onValueChange={setCategoryId} placeholder="Pick a category" searchPlaceholder="Search categories…" emptyLabel="No category matches." className="w-full" />
-          </Field>
-          <Field label="Unit" required>
-            <Select value={baseUnitId} onChange={(event) => setBaseUnitId(event.target.value)}>
-              <option value="">Pick a unit</option>
-              {refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} · {unit.name}</option>)}
-            </Select>
-          </Field>
-        </div>
+        <Field label="Product category" required>
+          <CreatableSearch label="Product category" options={refs.categories.map((category) => ({ id: category.id, label: category.name }))} value={categoryId} onValueChange={setCategoryId} placeholder="Pick a category" searchPlaceholder="Search categories…" emptyLabel="No category matches." className="w-full" />
+        </Field>
         <FormActions>
           <Button type="button" variant="ghost" data-dialog-cancel disabled={pending}>Cancel</Button>
           <Button type="submit" variant="primary" pending={pending} disabled={!valid}>Create SKU</Button>

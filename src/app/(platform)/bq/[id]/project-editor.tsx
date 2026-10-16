@@ -1543,10 +1543,6 @@ function LineItemRow({ item, line, depth, ctx, selected }: {
                 <Text tone="tertiary" size="sm">{line.sourceType === "MASTERDATA" ? "Master Data" : "BQ Library"}</Text>
               ) : null}
               {isOne(line.koefisien) ? null : <Text tone="tertiary" size="sm">koef {line.koefisien}</Text>}
-              {/* bq-contract K-03: the factor is context for setting a coefficient, never a term in the formula. */}
-              {line.purchaseToBaseFactorSnapshot && line.baseUnitSnapshot ? (
-                <Text tone="tertiary" size="sm">1 {line.purchaseUnitSnapshot} = {line.purchaseToBaseFactorSnapshot} {line.baseUnitSnapshot}</Text>
-              ) : null}
               {line.sourcePriceSnapshot !== null && line.hargaSnapshot !== line.sourcePriceSnapshot ? (
                 <>
                   <Badge tone="warning">Harga diubah</Badge>
@@ -1707,7 +1703,7 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
         {line.sourceType !== "CUSTOM" ? <Text tone="tertiary" size="sm">{line.sourceType === "MASTERDATA" ? "Salinan harga Master Data" : "Salinan harga BQ Library"}</Text> : null}
       </div>
       {number("Jumlah", line.qty, updateLineItemAction, line.id, "qty")}
-      <PanelField label="Satuan" hint={line.purchaseToBaseFactorSnapshot && line.baseUnitSnapshot ? `1 ${line.purchaseUnitSnapshot} = ${line.purchaseToBaseFactorSnapshot} ${line.baseUnitSnapshot}` : undefined}>
+      <PanelField label="Satuan">
         <InlineEdit label="Satuan" value={line.purchaseUnitSnapshot} disabled={!editable} commitOnBlur onCommit={commit(updateLineItemAction, line.id, "purchaseUnitSnapshot")} />
       </PanelField>
       {number("Koefisien", line.koefisien, updateLineItemAction, line.id, "koefisien")}

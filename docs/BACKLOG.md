@@ -184,7 +184,6 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
 - [ ] [PLANNED][P3] BQ and Excel (owner, 2026-10-08; confirmed 2026-10-14): do not build an importer or a paste for the estimator's own workbook; work from a workbook is converted by hand, and the BQ screen follows the workbook's columns (R9.41). XLSX *output* for the client stays in the list above, waiting for the estimator.
 - [ ] [PLANNED] Rate Library after enough project-line evidence exists.
 - [ ] [PLANNED] Formal StudioFlow linking through a stable external reference.
-- [ ] [PLANNED] A unit-conversion helper for `purchase_to_base_factor`.
 
 ## StudioFlow
 

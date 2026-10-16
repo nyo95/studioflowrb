@@ -15,15 +15,15 @@ const material = {
   amount: "100",
   amountLabel: null,
   currency: "IDR",
-  unit: { id: "unit-1", code: "PCS", name: "Pieces" },
+  unit: { id: "unit-1", code: "SHEET", name: "Sheet" },
   measurement: {
-    baseUnit: { id: "unit-1", code: "PCS", name: "Pieces" },
+    baseUnit: { id: "unit-2", code: "M2", name: "Square meter" },
     purchaseUnit: null,
     dimensionLength: null,
     dimensionWidth: null,
     dimensionThickness: null,
     dimensionUnit: null,
-    purchaseToBaseFactor: null,
+    purchaseToBaseFactor: "2.88",
   },
   sourceLink: null,
 };
@@ -60,6 +60,9 @@ describe("snapshotFromMasterData", () => {
     const snapshot = await snapshotFromMasterData({ grants: [MASTERDATA_PERMISSIONS.priceMaterialRead], sourceKind: "material", sourceRefId: material.id, read });
     assert.equal(snapshot.titleSnapshot, "Board");
     assert.equal(snapshot.currencySnapshot, "IDR");
+    assert.equal(snapshot.purchaseUnitSnapshot, "SHEET");
+    assert.equal(snapshot.baseUnitSnapshot, null);
+    assert.equal(snapshot.purchaseToBaseFactorSnapshot, null);
     assert.equal(materialReads, 1);
   });
 

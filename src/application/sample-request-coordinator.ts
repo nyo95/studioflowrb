@@ -25,7 +25,7 @@ type SampleRequestCoordinatorDependencies = {
     startSampleRequestIntake(input: { grants: PermissionGrants; actor: Actor; snapshot: SampleRequestSnapshot }): Promise<SampleRequestIntakeRead>;
     recordSampleQuote(input: { grants: PermissionGrants; actor: Actor; intakeId: string } & SampleQuoteInput): Promise<SampleRequestIntakeRead>;
     markSampleRequestPriced(input: { grants: PermissionGrants; actor: Actor; intakeId: string } & SampleQuoteInput): Promise<SampleRequestIntakeRead>;
-    syncSampleQuoteToPrice(input: { grants: PermissionGrants; actor: Actor; intakeId: string }): Promise<SampleRequestIntakeRead>;
+    syncSampleQuoteToPrice(input: { grants: PermissionGrants; actor: Actor; intakeId: string; unitId?: string }): Promise<SampleRequestIntakeRead>;
     declineSampleRequest(input: { grants: PermissionGrants; actor: Actor; intakeId: string; reason: string }): Promise<SampleRequestIntakeRead>;
     listSampleRequestIntakes(input: { grants: PermissionGrants; status?: SampleRequestIntakeStatus; sourceRequestIds?: readonly string[]; limit?: number }): Promise<SampleRequestIntakeRead[]>;
     shelveSampleFromIntake(input: { grants: PermissionGrants; actor: Actor; intakeId: string; skuId: string; rack: string; box: string; quantity?: number; locationNote?: string | null }): Promise<{ id: string; rack: string; box: string }>;
@@ -160,7 +160,7 @@ export function createSampleRequestCoordinator(deps: SampleRequestCoordinatorDep
     decline(input: { grants: PermissionGrants; actor: Actor; intakeId: string; reason: string }) {
       return deps.masterData.declineSampleRequest(input);
     },
-    syncPrice(input: { grants: PermissionGrants; actor: Actor; intakeId: string }) {
+    syncPrice(input: { grants: PermissionGrants; actor: Actor; intakeId: string; unitId?: string }) {
       return deps.masterData.syncSampleQuoteToPrice(input);
     },
     async shelve(input: { grants: PermissionGrants; actor: Actor; sourceRequestId: string; skuId: string; rack: string; box: string; quantity?: number; locationNote?: string | null }) {

@@ -26,7 +26,7 @@ Dua cakupan yang di-cover:
 ```
 Master Data (R4.13)
   PriceMaterial / PriceMaterialLabor / PriceLabor
-  + purchase_to_base_factor (R4.12)
+  + supplier-specific PriceMaterial unit
         │
         │  public/ read contract — satu arah, hanya baca
         ▼
@@ -110,7 +110,7 @@ Waste, minimum order, rounding increment dihapus. Satu angka: koefisien.
 - `koefisien > 0` (boleh > 1 jika butuh lebih dari 1 purchase unit)
 - Default: `1.0`
 - `waste = 1 − koefisien` → konsep saja, belum ada tracking. **Deferred.**
-- `purchase_to_base_factor` (1 SHEET = 2,88 M²) ditampilkan sebagai konteks untuk membantu estimator set koefisien. **Tidak masuk rumus.**
+- Dimensi SKU hanya informasi. BQ tidak menampilkan atau menghitung konversi ukuran menjadi satuan dasar; estimator menetapkan koefisien sendiri.
 
 ---
 
@@ -224,9 +224,9 @@ Semua tipe = snapshot. `source_type` hanya untuk traceability.
 | Field snapshot | Sumber | Catatan |
 |---|---|---|
 | `title_snapshot` | SKU.name / price.title | |
-| `purchase_unit_snapshot` | purchase_unit | |
-| `base_unit_snapshot` | base_unit | |
-| `purchase_to_base_factor_snapshot` | Sku.purchase_to_base_factor | nullable, display only |
+| `purchase_unit_snapshot` | PriceMaterial.unit | Satuan penawaran supplier yang dipilih |
+| `base_unit_snapshot` | NULL pada impor Master Data baru | Kolom historis, tidak dipakai untuk konversi |
+| `purchase_to_base_factor_snapshot` | NULL pada impor Master Data baru | Kolom historis, tidak ditampilkan/dihitung |
 | `source_price_snapshot` | price.amount saat import | **Immutable baseline** — tidak pernah berubah setelah import |
 | `harga_snapshot` | price.amount (working value) | Editable oleh estimator; awalnya sama dengan source |
 | `currency_snapshot` | price.currency | |
@@ -598,7 +598,7 @@ yang eksplisit direkam.
 |---|---|
 | K-01 | Koefisien = satu-satunya pengali efisiensi. Waste/min-order/rounding dihapus. |
 | K-02 | qty L3 dalam purchase unit (SHEET/roll/pcs). Estimator tidak berpikir dalam M². |
-| K-03 | `purchase_to_base_factor` di-snapshot untuk display saja — tidak masuk rumus. |
+| K-03 | Impor harga Master Data menyimpan satuan harga supplier tanpa konversi dimensi. Kolom faktor lama tidak ditampilkan dan tidak masuk rumus. |
 | K-04 | Markup ada di L1 dan L2. L2 markup hanya untuk L3-nya. L1 markup untuk semua subtotal di bawahnya. Compound. |
 | K-05 | Semua field L3 snapshot + overrideable per baris per project. |
 | K-06 | BQ Library global, bukan per-project. |

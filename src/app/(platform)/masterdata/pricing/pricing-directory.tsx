@@ -8,21 +8,20 @@ import { getPaginationSlice } from "@platform/utilities/pagination";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
 
-import { Badge,Button,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,PrefixedInput,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar,PillTabPanels,Text,Tooltip,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
+import { Badge,Button,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,PrefixedInput,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar,PillTabPanels,Text,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
 import { blurDisplay, readTypedAmount, shouldShowAmountPrefix, storedAmountText } from "./amount-format";
 import { PriceMatrixDialog } from "./price-matrix-dialog";
 import { PriceEntryModes, type PriceEntry } from "./price-entry-modes";
-import { formatDecimal,type DecimalString } from "@platform/utilities/decimal";
-import { calculateRectangleAreaSquareMeters } from "@platform/utilities/measurement";
+import { formatDecimal } from "@platform/utilities/decimal";
 import { createMoney,currencyPrefix,formatMoney } from "@platform/utilities/money";
 import Link from "next/link";
-import { CircleHelp, Plus, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { useEffect,useRef,useState,useTransition,type FormEvent,type ReactNode } from "react";
 import { archivePriceAction,saveBulkWorkPricesAction,saveMaterialSkuPricesBulkAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
-type SkuRef = { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; base_unit: { id: string; code: string; name: string } | null; purchase_unit: { id: string; code: string; name: string } | null; dimension_length: string | null; dimension_width: string | null; dimension_thickness: string | null; dimension_unit: { id: string; code: string; name: string } | null; purchase_to_base_factor: string | null };
+type SkuRef = { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; dimension_length: string | null; dimension_width: string | null; dimension_thickness: string | null; dimension_unit: { id: string; code: string; name: string } | null };
 type MaterialRow = { id: string; amount_label?: string | null; sku: { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; categories: Array<{ id: string; name: string }>; size: string }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
 type WorkRow = { id: string; name: string; category: { id: string; name: string }; vendor: { id: string; name: string }; amount: string; amount_label?: string | null; currency: string; unit: { id: string; code: string; name: string }; scope_note?: string | null; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
 type Target = { kind: Kind; id: string; name: string };
@@ -232,11 +231,11 @@ type BulkRow = { key: number; name: string; unitId: string; amountDisplay: strin
 type BulkRowProblem = { rowIndex: number; message: string };
 /** A SKU typed in a row that does not exist yet (WO-MD-SKUBULK-01): saved with its first price in the same submit. */
 type NewSkuDraft = { name: string; categoryId: string; size: string };
-type MaterialBulkRow = { key: number; skuId: string; newSku: NewSkuDraft | null; vendorId: string; amountDisplay: string; amount: string; notes: string };
-function emptyMaterialRow(key: number, vendorId: string): MaterialBulkRow { return { key, skuId: "", newSku: null, vendorId, amountDisplay: "", amount: "", notes: "" }; }
+type MaterialBulkRow = { key: number; skuId: string; newSku: NewSkuDraft | null; vendorId: string; unitId: string; amountDisplay: string; amount: string; notes: string };
+function emptyMaterialRow(key: number, vendorId: string): MaterialBulkRow { return { key, skuId: "", newSku: null, vendorId, unitId: "", amountDisplay: "", amount: "", notes: "" }; }
 /** "1220 × 2440 × 0.7" → length, width, thickness (decimal comma accepted). */
 function sizeParts(text: string): [string, string, string] {
-  const [length = "", width = "", thickness = ""] = text.split(/\s*[x×*]\s*/i).map((part) => part.trim().replace(",", ".")).filter(Boolean);
+  const [length = "", width = "", thickness = ""] = text.split(/\s*[x×*]\s*/i).map((part) => part.trim().replace(",", "."));
   return [length, width, thickness];
 }
 function emptyBulkRow(key: number, unitId: string): BulkRow { return { key, name: "", unitId, amountDisplay: "", amount: "", notes: "", scopeNote: "" }; }
@@ -258,18 +257,14 @@ type PriceEditorRefs = {
 
 function SkuMeasurementSummary({ sku }: { sku: SkuRef }) {
   const dimensions = sku.dimension_length && sku.dimension_width && sku.dimension_unit
-    ? `${formatDecimal(sku.dimension_length)} x ${formatDecimal(sku.dimension_width)} ${sku.dimension_unit.code}`
+    ? `${formatDecimal(sku.dimension_length)} × ${formatDecimal(sku.dimension_width)}${sku.dimension_thickness ? ` × ${formatDecimal(sku.dimension_thickness)}` : ""} ${sku.dimension_unit.code}`
     : null;
   return (
     <SectionCard>
       <div className="flex items-center gap-2">
-        <Text weight="semibold">Measurement and BQ conversion</Text>
-        <Tooltip content="These values belong to the selected SKU. The price is quoted per purchase unit and can be compared in the SKU's BQ base unit.">
-          <IconButton label="About SKU measurement and BQ conversion" icon={<CircleHelp size={14} />} size="sm" className="!h-5 !w-5 !min-h-5 !border-0 !bg-transparent !p-0 !text-ink-tertiary hover:!bg-transparent hover:!text-ink" />
-        </Tooltip>
+        <Text weight="semibold">SKU dimensions</Text>
       </div>
-      {dimensions ? <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-secondary"><span>{dimensions}</span><span>Base: {sku.base_unit ? `${sku.base_unit.code} (${sku.base_unit.name})` : "Not set"}</span><span>Purchase: {sku.purchase_unit ? `${sku.purchase_unit.code} (${sku.purchase_unit.name})` : "Same as base"}</span></div> : <Text size="sm" tone="secondary" className="mt-2">No rectangular dimensions are stored for this SKU.</Text>}
-      {sku.purchase_to_base_factor && sku.purchase_unit && sku.base_unit ? <Text size="sm" tone="secondary" className="mt-1">1 {sku.purchase_unit.code} = {formatDecimal(sku.purchase_to_base_factor)} {sku.base_unit.code}</Text> : null}
+      {dimensions ? <Text size="sm" tone="secondary" className="mt-2">{dimensions}. Informational only; choose the unit for each supplier price below.</Text> : <Text size="sm" tone="secondary" className="mt-2">No rectangular dimensions are stored for this SKU.</Text>}
     </SectionCard>
   );
 }
@@ -487,17 +482,13 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const [mRows, setMRows] = useState<MaterialBulkRow[]>(() => [emptyMaterialRow(0, "")]);
   const [newSkuCategoryId, setNewSkuCategoryId] = useState("");
   const unitCoded = (code: string) => refs.units.find((unit) => unit.code.toUpperCase() === code);
-  /**
-   * A new SKU's units (owner, 2026-10-08): pcs by default; with a size the base is M² and the supplier quotes per
-   * sheet, the size in mm. The server applies the same M² rule and computes the factor.
-   */
   const newSkuShape = (draft: NewSkuDraft) => {
     const [length, width, thickness] = sizeParts(draft.size);
-    const pcs = unitCoded("PCS");
-    if (!length || !width) return { baseUnit: pcs, purchaseUnit: null, length: null, width: null, thickness: null, dimensionUnit: null, area: null };
-    let area: string | null = null;
-    try { area = calculateRectangleAreaSquareMeters({ length, width, lengthToMeterFactor: "0.001" }); } catch { area = null; }
-    return { baseUnit: unitCoded("M2"), purchaseUnit: unitCoded("SHEET") ?? pcs, length, width, thickness: thickness || null, dimensionUnit: unitCoded("MM"), area };
+    if (!draft.size.trim()) return { length: null, width: null, thickness: null, dimensionUnit: null, valid: true };
+    const parts = draft.size.split(/\s*[x×*]\s*/i);
+    const positive = (value: string) => /^\d+(?:[.,]\d+)?$/.test(value) && Number(value.replace(",", ".")) > 0;
+    const valid = parts.length >= 2 && parts.length <= 3 && positive(length) && positive(width) && (!thickness || positive(thickness));
+    return { length: length || null, width: width || null, thickness: thickness || null, dimensionUnit: unitCoded("MM"), valid };
   };
 
   const [materialBrandFilter, setMaterialBrandFilter] = useState("ALL");
@@ -538,8 +529,8 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
       const missingM: Record<number, string> = {};
       filledMRows.forEach((entry) => {
         const lacks = entry.newSku
-          ? [!entry.newSku.name.trim() && "SKU name", !entry.newSku.categoryId && "category", !entry.vendorId && "supplier", !entry.amount && "amount", Boolean(entry.newSku.size.trim()) && !newSkuShape(entry.newSku).area && "a size like 1220 × 2440"].filter(Boolean)
-          : [!entry.skuId && "SKU", !entry.vendorId && "supplier", !entry.amount && "amount"].filter(Boolean);
+          ? [!entry.newSku.name.trim() && "SKU name", !entry.newSku.categoryId && "category", !entry.vendorId && "supplier", !entry.unitId && "purchase unit", !entry.amount && "amount", !newSkuShape(entry.newSku).valid && "a size like 1220 × 2440"].filter(Boolean)
+          : [!entry.skuId && "SKU", !entry.vendorId && "supplier", !entry.unitId && "purchase unit", !entry.amount && "amount"].filter(Boolean);
         if (lacks.length > 0) missingM[entry.key] = `Needs ${lacks.join(", ")}.`;
       });
       // Complete rows are saved even when others are not: an incomplete row stays in the table with what it lacks.
@@ -549,15 +540,14 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
       try {
         const result = await saveMaterialSkuPricesBulkAction({ currency, rows: sendRows.map((entry) => {
           const notes = entry.notes.trim() || null;
-          if (!entry.newSku) return { kind: "existing" as const, skuId: entry.skuId, vendorId: entry.vendorId, amount: entry.amount, notes };
+          if (!entry.newSku) return { kind: "existing" as const, skuId: entry.skuId, vendorId: entry.vendorId, unitId: entry.unitId, amount: entry.amount, notes };
           const shape = newSkuShape(entry.newSku);
           return {
             kind: "new" as const,
             name: entry.newSku.name.trim(),
             // The brand is the one chosen above the table; no brand when it is on All brands.
             brandId: filterBrand?.id ?? null,
-            baseUnitId: shape.baseUnit?.id ?? "",
-            purchaseUnitId: shape.purchaseUnit?.id ?? null,
+            unitId: entry.unitId,
             dimensionLength: shape.length,
             dimensionWidth: shape.width,
             dimensionThickness: shape.thickness,
@@ -715,7 +705,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           <Text weight="semibold">Items</Text>
           <Text size="sm" tone="secondary">{filledMRows.length} filled</Text>
         </div>
-        <div className="hidden gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-tertiary sm:grid sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)_4rem_8rem_minmax(0,2fr)_2rem]">
+        <div className="hidden gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-ink-tertiary lg:grid lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)_6rem_8rem_minmax(0,2fr)_2rem]">
           <span>SKU</span><span>Supplier</span><span>Unit</span><span>Amount ({currency})</span><span>Notes</span><span />
         </div>
         {mRows.map((entry, index) => {
@@ -726,7 +716,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           const match = existingMatch[entry.key] ? refs.skus.find((candidate) => candidate.id === existingMatch[entry.key]) : undefined;
           return (
             <div key={entry.key} className="grid gap-1">
-              <div className="grid items-start gap-2 sm:grid-cols-[minmax(0,3fr)_minmax(0,2fr)_4rem_8rem_minmax(0,2fr)_2rem]">
+              <div className="grid items-start gap-2 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)_6rem_8rem_minmax(0,2fr)_2rem]">
                 {draft ? (
                   <div className="flex items-start gap-1">
                     <Input aria-label={`New SKU name, row ${index + 1}`} density="compact" textCase="title" maxLength={128} value={draft.name} onChange={(event) => patchMRow(entry.key, { newSku: { ...draft, name: event.target.value } })} invalid={Boolean(rowProblems[entry.key])} />
@@ -758,7 +748,10 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
                   emptyLabel="No supplier matches this search."
                   className="w-full"
                 />
-                <div className="flex min-h-(--ui-control-height-sm) items-center px-1 font-ui-mono text-sm text-ink-secondary">{sku ? (sku.purchase_unit ?? sku.base_unit)?.code ?? "–" : shape ? (shape.purchaseUnit ?? shape.baseUnit)?.code ?? "–" : "–"}</div>
+                <Select aria-label={`Purchase unit, row ${index + 1}`} value={entry.unitId} onChange={(event) => patchMRow(entry.key, { unitId: event.target.value })} required>
+                  <option value="">Unit</option>
+                  {refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}
+                </Select>
                 <PrefixedInput prefix={currencyPrefix(currency)} prefixVisible={shouldShowAmountPrefix(entry.amount, entry.amountDisplay)} aria-label={`Amount, row ${index + 1}`} density="compact" inputMode="text" placeholder={`15.000 or "text"`} className="tabular-nums" value={entry.amountDisplay}
                   onChange={(event) => { const read = readTypedAmount(event.target.value); if (read === null) return; patchMRow(entry.key, { amount: read.value, amountDisplay: read.display }); }}
                   onBlur={() => patchMRow(entry.key, { amountDisplay: blurDisplay(entry.amount) })}
@@ -787,7 +780,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
                   <Input aria-label={`Size of the new SKU, row ${index + 1} (optional)`} density="compact" inputMode="text" autoComplete="off" placeholder="Size, optional: 1220 × 2440 × 0.7" value={draft.size} onChange={(event) => patchMRow(entry.key, { newSku: { ...draft, size: event.target.value } })} />
                   <div className="text-xs text-ink-secondary sm:col-span-3">
                     {filterBrand ? `Brand ${filterBrand.name} (from the filter above). ` : "No brand: choose a brand above the table to give it one. "}
-                    {shape.area ? `Priced per ${shape.purchaseUnit?.code ?? "sheet"}; 1 ${shape.purchaseUnit?.code ?? "sheet"} = ${formatDecimal(shape.area as DecimalString)} M² (size in mm).` : draft.size.trim() ? <span className="text-danger">Write the size as length × width in mm, e.g. 1220 × 2440.</span> : `Unit ${shape.baseUnit?.code ?? "pcs"}. Add a size for sheet materials priced per sheet.`}
+                    {draft.size.trim() ? shape.valid ? "Size is SKU information only (mm); it does not convert the supplier's price." : <span className="text-danger">Write the size as length × width in mm, e.g. 1220 × 2440.</span> : "Size is optional. Choose the supplier's purchase unit in the price row."}
                   </div>
                   {productCategoryCreateError ? <InlineError>{productCategoryCreateError}</InlineError> : null}
                 </div>
@@ -825,7 +818,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
     <Dialog open size={anyBulk ? "xl" : "md"} dismissible={!pending && !bulkPending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={edit ? `Edit ${priceLabel}` : "New price"} description={material && edit ? "SKU and supplier identity are read-only." : edit ? "Choose only active and eligible catalog references." : material ? "One row per SKU and supplier, saved together." : "One supplier and category, one row per item, saved together."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={anyBulk ? submitBulk : onSubmit}>
       {modes ? modes((next) => void draftGuard.requestDiscard(() => onSwitch(next))) : null}
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
-      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Unit" description="Unit and size follow the SKU."><Input value={`${materialRow!.unit.name} (${materialRow!.unit.code})`} readOnly /></Field>{refs.canManageSkus ? <div><Link href={`/masterdata/skus?edit=${materialRow!.sku.id}`} className="text-sm text-accent underline">Edit SKU (size, unit)</Link></div> : null}</> : <>{materialTable}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
+      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Purchase unit" description="This supplier's quoted unit; changing it does not change the SKU or other suppliers' prices." required><Select name="unitId" defaultValue={materialRow!.unit.id} required>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{refs.canManageSkus ? <div><Link href={`/masterdata/skus?edit=${materialRow!.sku.id}`} className="text-sm text-accent underline">Edit SKU dimensions</Link></div> : null}</> : <>{materialTable}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
       {!anyBulk && <><input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
       <Field label="Amount" description={`${currency} default currency. Use quotation marks for text, e.g. "call sales".`} required><PrefixedInput prefix={currencyPrefix(currency)} prefixVisible={shouldShowAmountPrefix(amount, amountDisplay)} aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(blurDisplay(amount))} inputMode="text" placeholder={`15.000 or "call sales"`} className="tabular-nums" required /></Field><Field label="Notes"><SimpleTextEditor name="notes" defaultValue={row?.notes ?? ""} placeholder="Additional pricing context..." maxLength={1000} rows={3} /></Field></>}{anyBulk && bulkError ? <div role="alert" className="text-sm text-danger">{bulkError}</div> : null}<FormActions><Button type="button" variant="ghost" disabled={pending} onClick={() => void draftGuard.requestDiscard(onCancel)}>Cancel</Button><Button type="submit" variant="primary" pending={pending || bulkPending}>{edit ? "Save changes" : anyBulk ? `Create ${filledCount || ""} ${filledCount === 1 ? "price" : "prices"}`.replace("  ", " ") : "Create price"}</Button></FormActions>
     </form></Dialog>

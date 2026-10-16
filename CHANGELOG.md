@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.99 | 2026-10-16 | fix(masterdata): Keep SKU dimensions informational and price units per supplier (Executor)
+
+- **Scope:** WO-MD-SKU-INFORMATION-01. New SKUs carry optional dimensions but no base/BQ or purchase unit; every material price has its own required supplier purchase unit. Pricing, SKU, shelf, sample-quote sync, workbook import/export and BQ public reads now follow that separation. A priced HPL SKU can therefore have one supplier per sheet and another per box without an m² conversion. Existing SKU base/purchase/factor values and existing BQ snapshots remain stored but inert; the pure rectangle-area utility remains available only if a future owner decision calls for it. Removed the superseded unit-conversion helper plan from BACKLOG.
+- **UI:** curated the affected CRUD controls with the frontend design skill: supplier unit lives beside amount, SKU dimensions have a quieter informational section, and narrow SKU forms stack. No general Master Data redesign or new UI dependency. The historical workbook column names remain accepted on import for compatibility; new exports use `Price unit` per row.
+- **Migration:** relaxed the SKU base-unit and dimension-factor constraints; applied to the verified office rebuild development and disposable test databases and regenerated Prisma. No historical data rewrite or new dependency. Root `test/` was untouched; no remote action.
+- **Checks:** `npm test` 1205/1205 PASS; post-final-regression focused Master Data tests 129/129 PASS; typecheck, boundary and legacy-runtime checks PASS; full lint PASS; production build PASS; whitespace check PASS. Browser journeys for Pricing/Add SKU and sample-shelf SKU are queued for independent Reviewer acceptance, not claimed as PASS.
+
 ## R9.98 | 2026-10-15 | fix(presentation): Keep a retried pin visible across an older refresh (Reviewer partial)
 
 - **Scope:** diagnosed the R9.96 in-page retry: the successful pin was stored, but a route refresh started by the prior failed request could replace the editor's newer local copy. The editor now retains server-acknowledged new pins when adopting an older board response and avoids duplicate display. The refusal regression verifies immediate visibility without a manual reload and one persisted pin after reload; three repeated browser runs passed. This closes the Presentation read-write/silent-failure `[BUG]` together with R9.68/R9.96 evidence, while wider Presentation movement/permission/print acceptance remains queued.

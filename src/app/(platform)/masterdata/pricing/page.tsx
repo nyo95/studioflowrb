@@ -173,7 +173,6 @@ export default async function PricingPage({ searchParams }: { searchParams: Prom
           dimension_length: sku.dimension_length?.toString() ?? null,
           dimension_width: sku.dimension_width?.toString() ?? null,
           dimension_thickness: sku.dimension_thickness?.toString() ?? null,
-          purchase_to_base_factor: sku.purchase_to_base_factor?.toString() ?? null,
         }))}
         vendors={[...new Map([...(materialRefs?.vendors ?? []), ...(workRefs?.vendors ?? [])].map((vendor) => [vendor.id, { id: vendor.id, name: vendor.name }] as const)).values()].sort((left, right) => left.name.localeCompare(right.name, "id"))}
         materialVendors={materialRefs?.vendors ?? []}

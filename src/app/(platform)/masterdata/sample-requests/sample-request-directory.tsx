@@ -18,6 +18,7 @@ import {
   Pagination,
   RowActionMenu,
   SearchField,
+  Select,
   StatusBadge,
   Switch,
   TableBody,
@@ -97,17 +98,20 @@ function readyForPriceList(row: SampleQueueRow): boolean {
   return Boolean(intake && intake.vendorId && intake.skuId && intake.quotedAmount && intake.quotedCurrency);
 }
 
-export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManageVendors, vendorTypes, canShelve = false, racks = [], skuRefs = null }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[]; skus: readonly SkuChoice[]; canPrice: boolean; canManageVendors: boolean; vendorTypes: readonly VendorTypeOption[]; canShelve?: boolean; racks?: readonly string[]; skuRefs?: ShelfSkuRefs | null }) {
+export function SampleRequestDirectory({ rows, vendors, skus, units, canPrice, canManageVendors, vendorTypes, canShelve = false, racks = [], skuRefs = null }: { rows: SampleQueueRow[]; vendors: readonly { id: string; name: string }[]; skus: readonly SkuChoice[]; units: readonly { id: string; code: string; name: string }[]; canPrice: boolean; canManageVendors: boolean; vendorTypes: readonly VendorTypeOption[]; canShelve?: boolean; racks?: readonly string[]; skuRefs?: ShelfSkuRefs | null }) {
   const [shelveTarget, setShelveTarget] = useState<SampleQueueRow | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [showFinished, setShowFinished] = useState(false);
   const [detail, setDetail] = useState<SampleQueueRow | null>(null);
   const [quoteTarget, setQuoteTarget] = useState<SampleQueueRow | null>(null);
+  const [syncTarget, setSyncTarget] = useState<SampleQueueRow | null>(null);
+  const [syncUnitId, setSyncUnitId] = useState("");
   const [quoteAmount, setQuoteAmount] = useState("");
   const [quoteCurrency, setQuoteCurrency] = useState("IDR");
   const [quoteVendorId, setQuoteVendorId] = useState("");
   const [quoteSkuId, setQuoteSkuId] = useState("");
+  const [quoteUnitId, setQuoteUnitId] = useState("");
   const [quoteNote, setQuoteNote] = useState("");
   const [createdVendors, setCreatedVendors] = useState<Array<{ id: string; name: string }>>([]);
   const [quickOpen, setQuickOpen] = useState(false);
@@ -182,6 +186,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
     setQuoteCurrency(row.intake?.quotedCurrency ?? "IDR");
     setQuoteVendorId(row.intake?.vendorId ?? "");
     setQuoteSkuId(row.intake?.skuId ?? "");
+    setQuoteUnitId("");
     setQuoteNote(row.intake?.staffNote ?? "");
     setQuoteTarget(row);
   }
@@ -219,7 +224,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
               const stateItems = row.state === "NEW"
                 ? [{ label: "Take", onSelect: () => run(row.sourceRequestId, () => takeSampleRequestAction(row.sourceRequestId)), disabled: busy, danger: false, separatorBefore: false }]
                 : row.state === "PRICED" && canPrice && readyForPriceList(row) && !row.intake?.priceMaterialId
-                  ? [{ label: "Add to price list", onSelect: () => run(row.sourceRequestId, () => syncSampleQuoteToPriceAction(row.intake!.id)), disabled: busy, danger: false, separatorBefore: false }]
+                  ? [{ label: "Add to price list", onSelect: () => { setSyncUnitId(""); setSyncTarget(row); }, disabled: busy, danger: false, separatorBefore: false }]
                 : row.state === "IN_PROGRESS"
                   ? [
                       { label: "Record quote", onSelect: () => openQuote(row), disabled: busy, danger: false, separatorBefore: false },
@@ -289,6 +294,24 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
         </DraftDialog>
       ) : null}
 
+      {syncTarget ? (
+        <DraftDialog open onOpenChange={(open) => !open && setSyncTarget(null)} title="Add quote to price list" description={syncTarget.product.name}>
+          <div className="grid gap-4">
+            {rowError ? <InlineError>{rowError}</InlineError> : null}
+            <Field label="Purchase unit for a new price" description="A price already listed for this SKU and supplier keeps its saved unit." required>
+              <Select value={syncUnitId} onChange={(event) => setSyncUnitId(event.target.value)} required>
+                <option value="">Choose unit</option>
+                {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}
+              </Select>
+            </Field>
+            <FormActions>
+              <Button variant="ghost" onClick={() => setSyncTarget(null)}>Cancel</Button>
+              <Button variant="primary" disabled={pendingId !== null || !syncUnitId} onClick={() => { const target = syncTarget; run(target.sourceRequestId, () => syncSampleQuoteToPriceAction(target.intake!.id, syncUnitId), () => setSyncTarget(null)); }}>Add to price list</Button>
+            </FormActions>
+          </div>
+        </DraftDialog>
+      ) : null}
+
       {quoteTarget ? (
         <DraftDialog open onOpenChange={(open) => !open && setQuoteTarget(null)} title="Record the vendor's quote" description={quoteTarget.product.name}>
           <div className="grid gap-4">
@@ -326,6 +349,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
               <p className="text-xs text-ink-secondary">Pick the SKU to add this price to the price list. Not there yet? Create the SKU first in SKUs.</p>
               </div>
             </Field>
+            {canPrice ? <Field label="Purchase unit for a new price" description="Required when this SKU and supplier do not yet have a price. An existing price keeps its saved unit."><Select value={quoteUnitId} onChange={(event) => setQuoteUnitId(event.target.value)}><option value="">Choose unit</option>{units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code} — {unit.name}</option>)}</Select></Field> : null}
             <Field label="Staff note" description="Optional context for this quote."><Textarea value={quoteNote} onChange={(event) => setQuoteNote(event.target.value)} /></Field>
             <FormActions>
               <Button data-dialog-cancel variant="ghost" onClick={() => setQuoteTarget(null)}>Cancel</Button>
@@ -343,14 +367,14 @@ export function SampleRequestDirectory({ rows, vendors, skus, canPrice, canManag
               {canPrice ? (
                 <Button
                   variant="secondary"
-                  disabled={pendingId !== null || !quoteVendorId || !quoteSkuId || !quoteAmount.trim() || !quoteCurrency.trim()}
+                  disabled={pendingId !== null || !quoteVendorId || !quoteSkuId || !quoteUnitId || !quoteAmount.trim() || !quoteCurrency.trim()}
                   onClick={() => {
                     const target = quoteTarget;
                     const input = { vendorId: quoteVendorId || null, skuId: quoteSkuId || null, quotedAmount: quoteAmount || null, quotedCurrency: quoteCurrency || null, staffNote: quoteNote || null };
                     run(target.sourceRequestId, async () => {
                       const saved = await recordSampleQuoteAction(target.intake!.id, input);
                       if (!saved.ok) return saved;
-                      return syncSampleQuoteToPriceAction(target.intake!.id);
+                      return syncSampleQuoteToPriceAction(target.intake!.id, quoteUnitId);
                     }, () => setQuoteTarget(null));
                   }}
                 >

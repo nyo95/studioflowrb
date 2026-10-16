@@ -119,7 +119,7 @@ export async function savePriceAction(kind: PriceKind, formData: FormData): Prom
     if (!parsed.success) throw validationError(parsed.error);
     const value = parsed.data; const ctx = await context();
     if (parsedKind === "material" && !value.id) {
-      const required = z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid() }).safeParse(raw);
+      const required = z.object({ skuId: z.string().uuid(), vendorId: z.string().uuid(), unitId: z.string().uuid() }).safeParse(raw);
       if (!required.success) throw validationError(required.error);
     }
     if (parsedKind !== "material") {
@@ -128,7 +128,7 @@ export async function savePriceAction(kind: PriceKind, formData: FormData): Prom
     }
     const result = parsedKind === "material" ? value.id
       ? await masterDataService.updatePriceMaterial({ ...ctx, priceMaterialId: value.id, amount: value.amount, currency: value.currency, unitId: value.unitId, notes: value.notes })
-      : await masterDataService.createPriceMaterial({ ...ctx, skuId: value.skuId!, supplierVendorId: value.vendorId!, amount: value.amount, currency: value.currency, notes: value.notes })
+      : await masterDataService.createPriceMaterial({ ...ctx, skuId: value.skuId!, supplierVendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, notes: value.notes })
       : parsedKind === "material-labor" ? value.id
         ? await masterDataService.updatePriceMaterialLabor({ ...ctx, priceMaterialLaborId: value.id, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, scopeNote: value.scopeNote, notes: value.notes })
         : await masterDataService.createPriceMaterialLabor({ ...ctx, name: value.name!, categoryId: value.categoryId!, vendorId: value.vendorId!, unitId: value.unitId!, amount: value.amount, currency: value.currency, scopeNote: value.scopeNote, notes: value.notes })
@@ -241,14 +241,13 @@ export async function saveWorkPriceMatrixAction(input: unknown): Promise<ActionR
 }
 
 const mixedMaterialRowInput = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("existing"), skuId: z.string().uuid(), vendorId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes }),
+  z.object({ kind: z.literal("existing"), skuId: z.string().uuid(), vendorId: z.string().uuid(), unitId: z.string().uuid(), amount: z.string().min(1).max(AMOUNT_TEXT_MAX), notes: bulkRowNotes }),
   z.object({
     kind: z.literal("new"),
     name: z.string().max(128).optional().nullable(),
     code: z.string().max(32).optional().nullable(),
     brandId: z.string().uuid().optional().nullable(),
-    baseUnitId: z.string().uuid(),
-    purchaseUnitId: z.string().uuid().optional().nullable(),
+    unitId: z.string().uuid(),
     dimensionLength: z.string().max(32).optional().nullable(),
     dimensionWidth: z.string().max(32).optional().nullable(),
     dimensionThickness: z.string().max(32).optional().nullable(),

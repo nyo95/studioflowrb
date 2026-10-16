@@ -41,6 +41,7 @@ test("2.1 material price links a new supplier to the Brand", async ({ page }) =>
   await chooseSearch(page, "SKU, row 1", "ZZ-Test SKU 1");
   await chooseSearch(page, "Supplier, row 1", "ZZ-Test Mat B");
   await expect(page.getByText("This supplier will be added as a supplier of ZZ-Test Brand when you save.")).toBeVisible();
+  await page.getByLabel("Purchase unit, row 1").selectOption({ label: "pcs" });
   await page.getByLabel("Amount, row 1").fill("12000");
   await page.getByRole("button", { name: /Create 1 price/ }).click();
   await expect(page.getByRole("dialog", { name: "New price" })).toBeHidden();
@@ -58,6 +59,7 @@ test("2.3 quoted text material amount saves as text", async ({ page }) => {
   // SKU 3 keeps this spec independent: 2.4 later prices SKU 2 from Mat B and must find it free.
   await chooseSearch(page, "SKU, row 1", "ZZ-Test SKU 3");
   await chooseSearch(page, "Supplier, row 1", "ZZ-Test Mat B");
+  await page.getByLabel("Purchase unit, row 1").selectOption({ label: "pcs" });
   await page.getByLabel("Amount, row 1").fill('"By Request"');
   await page.getByRole("button", { name: /Create 1 price/ }).click();
   await expect(page.getByText("By Request", { exact: true })).toBeVisible();
@@ -69,14 +71,17 @@ test("2.4 valid material rows save while incomplete and duplicate rows remain", 
   await chooseSearch(page, "Brand", "ZZ-Test Brand");
   await chooseSearch(page, "SKU, row 1", "ZZ-Test SKU 2");
   await chooseSearch(page, "Supplier, row 1", "ZZ-Test Mat B");
+  await page.getByLabel("Purchase unit, row 1").selectOption({ label: "pcs" });
   await page.getByLabel("Amount, row 1").fill("13000");
   await page.getByRole("button", { name: "Add row" }).click();
   await chooseSearch(page, "SKU, row 2", "ZZ-Test SKU 2");
   await chooseSearch(page, "Supplier, row 2", "ZZ-Test Both");
+  await page.getByLabel("Purchase unit, row 2").selectOption({ label: "pcs" });
   await page.getByLabel("Amount, row 2").fill("14000");
   await page.getByRole("button", { name: "Add row" }).click();
   await chooseSearch(page, "SKU, row 3", "ZZ-Test SKU 1");
   await chooseSearch(page, "Supplier, row 3", "ZZ-Test Mat A");
+  await page.getByLabel("Purchase unit, row 3").selectOption({ label: "pcs" });
   await page.getByLabel("Amount, row 3").fill("10000");
   await page.getByRole("button", { name: "Add row" }).click();
   await chooseSearch(page, "SKU, row 4", "ZZ-Test SKU 1");

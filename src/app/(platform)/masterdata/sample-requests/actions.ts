@@ -93,12 +93,15 @@ export async function declineSampleRequestAction(intakeId: string, reason: strin
 }
 
 /** Copies the recorded quote to the material price list for the linked SKU and supplier. */
-export async function syncSampleQuoteToPriceAction(intakeId: string): Promise<ActionResult<unknown>> {
+export async function syncSampleQuoteToPriceAction(intakeId: string, unitId?: string): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const parsed = z.string().uuid().safeParse(intakeId);
     if (!parsed.success) throw validationError(parsed.error);
-    const result = await sampleRequestCoordinator.syncPrice({ grants, actor: actorOf(principal), intakeId: parsed.data });
+    const parsedUnit = unitId ? z.string().uuid().safeParse(unitId) : null;
+    if (parsedUnit && !parsedUnit.success) throw validationError(parsedUnit.error);
+    const unit = parsedUnit?.data;
+    const result = await sampleRequestCoordinator.syncPrice({ grants, actor: actorOf(principal), intakeId: parsed.data, unitId: unit });
     revalidateSampleRequests();
     revalidatePath("/masterdata/pricing");
     return result;

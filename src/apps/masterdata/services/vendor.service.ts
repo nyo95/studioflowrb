@@ -59,7 +59,7 @@ export function createVendorService(db: PrismaClient, ports: MasterDataServicePo
     async listPricingMaterialRefs(input: { grants: PermissionGrants }) {
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceMaterialRead, MASTERDATA_PERMISSIONS.priceMaterialManage], "You do not have permission to view material price references.");
       const [skus, brands, units, productCategories, vendors] = await Promise.all([
-        db.sku.findMany({ where: { deleted_at: null }, orderBy: { name: "asc" }, select: { id: true, name: true, code: true, brand: { select: { id: true, name: true } }, base_unit: { select: { id: true, code: true, name: true } }, purchase_unit: { select: { id: true, code: true, name: true } }, dimension_length: true, dimension_width: true, dimension_thickness: true, dimension_unit: { select: { id: true, code: true, name: true } }, purchase_to_base_factor: true } }),
+        db.sku.findMany({ where: { deleted_at: null }, orderBy: { name: "asc" }, select: { id: true, name: true, code: true, brand: { select: { id: true, name: true } }, dimension_length: true, dimension_width: true, dimension_thickness: true, dimension_unit: { select: { id: true, code: true, name: true } } } }),
         db.brand.findMany({ where: { deleted_at: null }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
         db.unit.findMany({ where: { status: "ACTIVE" }, orderBy: [{ name: "asc" }, { code: "asc" }], select: { id: true, code: true, name: true } }),
         db.category.findMany({ where: { status: "ACTIVE", kind: "PRODUCT" }, orderBy: { name: "asc" }, select: { id: true, name: true } }),

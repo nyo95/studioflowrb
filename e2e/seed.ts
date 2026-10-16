@@ -101,17 +101,17 @@ async function main() {
     const pcs = await db.unit.findUniqueOrThrow({ where: { code: "pcs" } });
     // The office uses "ls" (lump sum), "unit" and "point" too; contractor BOQs (e2e/bq-boq-walk.spec.ts) need them.
     for (const [code, name] of [["ls", "Lump sum"], ["unit", "Unit"], ["point", "Point"]] as const) await db.unit.upsert({ where: { code }, create: { code, name }, update: {} });
-    const sku1 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 1", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "10000", currency: "IDR" }] });
-    const sku2 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 2", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
-    const sku3 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 3", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
+    const sku1 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 1", brandId: brand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: matA.vendorId, amount: "10000", currency: "IDR" }] });
+    const sku2 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 2", brandId: brand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
+    const sku3 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 3", brandId: brand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
     const guardBrand = await masterData.createBrand({ grants: masterDataGrants, actor, name: "ZZ-Test Guard Brand", ownerVendorId: matA.vendorId, suppliers: [{ vendorId: matA.vendorId }, { vendorId: matB.vendorId }] });
-    await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test Guard SKU", brandId: guardBrand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: matB.vendorId, amount: "15000", currency: "IDR" }] });
+    await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test Guard SKU", brandId: guardBrand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: matB.vendorId, amount: "15000", currency: "IDR" }] });
     await masterData.createPriceMaterialLabor({ grants: masterDataGrants, actor, name: "ZZ-Test Existing Matrix", categoryId: workCategory.categoryId, vendorId: labor.vendorId, unitId: pcs.id, amount: "9000", currency: "IDR" });
 
     const createCascadeFixture = async (step: string) => {
       const supplier = await masterData.createVendor({ grants: masterDataGrants, actor, name: `ZZ-Test ${step} Supplier`, vendorTypeIds: [materialType.vendorTypeId] });
       const ownedBrand = await masterData.createBrand({ grants: masterDataGrants, actor, name: `ZZ-Test ${step} Owned Brand`, ownerVendorId: supplier.vendorId, suppliers: [{ vendorId: supplier.vendorId }] });
-      const sku = await masterData.createSku({ grants: masterDataGrants, actor, name: `ZZ-Test ${step} Owned SKU`, brandId: ownedBrand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id, priceMaterials: [{ supplierVendorId: supplier.vendorId, amount: "51000", currency: "IDR" }] });
+      const sku = await masterData.createSku({ grants: masterDataGrants, actor, name: `ZZ-Test ${step} Owned SKU`, brandId: ownedBrand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: supplier.vendorId, amount: "51000", currency: "IDR" }] });
       const linkedBrand = await masterData.createBrand({ grants: masterDataGrants, actor, name: `ZZ-Test ${step} Linked Brand`, suppliers: [{ vendorId: supplier.vendorId }] });
       return { supplier, ownedBrand, sku, linkedBrand };
     };
@@ -128,12 +128,12 @@ async function main() {
     await masterData.archiveBrand({ grants: masterDataGrants, actor, brandId: conflictArchived.brandId });
     await masterData.createBrand({ grants: masterDataGrants, actor, name: "ZZ-Test 5.5 Conflict Brand" });
 
-    const priceLess62 = await masterData.createSkuForSampleShelf({ grants: masterDataGrants, actor, name: "ZZ-Test 6.2 Price-less SKU", code: "ZZ62", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id });
+    const priceLess62 = await masterData.createSkuForSampleShelf({ grants: masterDataGrants, actor, name: "ZZ-Test 6.2 Price-less SKU", code: "ZZ62", brandId: brand.brandId, categoryId: productCategory.categoryId, });
     const priceLess63Brand = await masterData.createBrand({ grants: masterDataGrants, actor, name: "ZZ-Test 6.3 Price-less Brand" });
-    const priceLess63 = await masterData.createSkuForSampleShelf({ grants: masterDataGrants, actor, name: "ZZ-Test 6.3 Price-less SKU", code: "ZZ63", brandId: priceLess63Brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id });
-    const sampleSkus = await Promise.all(["Main", "Lost", "Discard", "Held"].map((kind, index) => masterData.createSkuForSampleShelf({ grants: masterDataGrants, actor, name: `ZZ-Test 6.4 ${kind} Sample`, code: `ZZ64${index + 1}`, brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id })));
+    const priceLess63 = await masterData.createSkuForSampleShelf({ grants: masterDataGrants, actor, name: "ZZ-Test 6.3 Price-less SKU", code: "ZZ63", brandId: priceLess63Brand.brandId, categoryId: productCategory.categoryId, });
+    const sampleSkus = await Promise.all(["Main", "Lost", "Discard", "Held"].map((kind, index) => masterData.createSkuForSampleShelf({ grants: masterDataGrants, actor, name: `ZZ-Test 6.4 ${kind} Sample`, code: `ZZ64${index + 1}`, brandId: brand.brandId, categoryId: productCategory.categoryId, })));
     const samples64 = await Promise.all(sampleSkus.map((sku, index) => masterData.createSample({ grants: masterDataGrants, actor, skuId: sku.skuId, rack: "S2", box: String(index + 1) })));
-    const requestSku = await masterData.createSkuForSampleShelf({ grants: masterDataGrants, actor, name: "ZZ-Test 6.5 Requested SKU", code: "ZZ65", brandId: brand.brandId, categoryId: productCategory.categoryId, baseUnitId: pcs.id });
+    const requestSku = await masterData.createSkuForSampleShelf({ grants: masterDataGrants, actor, name: "ZZ-Test 6.5 Requested SKU", code: "ZZ65", brandId: brand.brandId, categoryId: productCategory.categoryId, });
     const project = await sf.projects.createProject({
       grants: registry.permissions,
       actor,

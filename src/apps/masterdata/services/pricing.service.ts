@@ -50,10 +50,10 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
 
     async getPriceMaterial(input: { grants: PermissionGrants; priceMaterialId: string }) {
       requireAnyPermission(input.grants, [MASTERDATA_PERMISSIONS.priceMaterialRead, MASTERDATA_PERMISSIONS.priceMaterialManage], "You do not have permission to view material prices.");
-      return db.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId }, include: { sku: { include: { brand: { select: { id: true, name: true, slug: true, links: true } }, base_unit: true, purchase_unit: true } }, supplier_vendor: true, unit: true, source_link: true } });
+      return db.priceMaterial.findUniqueOrThrow({ where: { id: input.priceMaterialId }, include: { sku: { include: { brand: { select: { id: true, name: true, slug: true, links: true } } } }, supplier_vendor: true, unit: true, source_link: true } });
     },
 
-    async createPriceMaterial(input: { grants: PermissionGrants; actor: AuditActor; skuId: string; supplierVendorId: string; amount: string; currency: string; sourceLinkId?: string; notes?: string }) {
+    async createPriceMaterial(input: { grants: PermissionGrants; actor: AuditActor; skuId: string; supplierVendorId: string; unitId: string; amount: string; currency: string; sourceLinkId?: string; notes?: string }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       const currency = requiredCurrency(input.currency);
@@ -66,9 +66,11 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         await assertVendorMaterialCapable(tx, input.supplierVendorId);
         await ensurePriceMaterialBrandSupplierLink(tx, ports, input.actor, input.skuId, input.supplierVendorId);
         if (input.sourceLinkId) { const link = await tx.brandLink.findUniqueOrThrow({ where: { id: input.sourceLinkId } }); if (!sku.brand_id) throw new AppError("VALIDATION", "LINK_BRAND_REQUIRED", "Source link requires a SKU Brand."); if (link.brand_id !== sku.brand_id) throw new AppError("VALIDATION", "LINK_BRAND_MISMATCH", "Source link must belong to the SKU's Brand."); }
-        const unitId = sku.purchase_unit_id ?? sku.base_unit_id;
+        if (!input.unitId) throw new AppError("VALIDATION", "PRICE_UNIT_REQUIRED", "Choose the supplier's purchase unit.");
+        const unit = await tx.unit.findUniqueOrThrow({ where: { id: input.unitId } });
+        if (unit.status !== "ACTIVE") throw new AppError("VALIDATION", "PRICE_UNIT_INACTIVE", "Unit must be active.");
         let price;
-        try { price = await tx.priceMaterial.create({ data: { id: randomUUID(), sku_id: input.skuId, supplier_vendor_id: input.supplierVendorId, amount, amount_label: amountLabel, currency, unit_id: unitId, source_link_id: input.sourceLinkId || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
+        try { price = await tx.priceMaterial.create({ data: { id: randomUUID(), sku_id: input.skuId, supplier_vendor_id: input.supplierVendorId, amount, amount_label: amountLabel, currency, unit_id: input.unitId, source_link_id: input.sourceLinkId || null, notes: input.notes?.trim() || null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } }); } catch (error) { mapWriteError(error); }
         await writeAudit(ports, tx, { action: "price-material.created", entityType: "price_material", entityId: price!.id, actor: input.actor, metadata: { sku_id: input.skuId, vendor_id: input.supplierVendorId } });
         await linkVendorCategories(tx, input.actor, input.supplierVendorId, (await tx.skuCategory.findMany({ where: { sku_id: input.skuId }, select: { category_id: true } })).map((row) => row.category_id));
         return { priceMaterialId: price!.id };
@@ -88,8 +90,6 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
         const unitId = input.unitId ?? existing.unit_id;
         const unit = await tx.unit.findUniqueOrThrow({ where: { id: unitId } });
         if (unit.status !== "ACTIVE") throw new AppError("VALIDATION", "PRICE_UNIT_INACTIVE", "Unit must be active.");
-        const allowedUnitId = existing.sku.purchase_unit_id ?? existing.sku.base_unit_id;
-        if (unitId !== allowedUnitId) throw new AppError("VALIDATION", "PRICE_UNIT_SKU_MISMATCH", "Unit must match the SKU's purchase unit or base unit.");
         const changes: Record<string, { from: unknown; to: unknown }> = {};
         if (existing.amount.toString() !== amount) changes.amount = { from: existing.amount.toString(), to: amount };
         if ((existing.amount_label ?? null) !== amountLabel) changes.amount_label = { from: existing.amount_label ?? null, to: amountLabel };
@@ -410,7 +410,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
      * Creates many material prices (existing SKUs), each row naming its own supplier, all or nothing. A SKU can be priced
      * by several suppliers and one supplier can price many SKUs in the same save. Row problems come back in `details.rows`.
      */
-    async createMaterialPriceRows(input: { grants: PermissionGrants; actor: AuditActor; currency: string; rows: Array<{ skuId: string; vendorId: string; amount: string; notes?: string | null }>; onInvalid?: OnInvalid; writeBatchAudit?: boolean }) {
+    async createMaterialPriceRows(input: { grants: PermissionGrants; actor: AuditActor; currency: string; rows: Array<{ skuId: string; vendorId: string; unitId: string; amount: string; notes?: string | null }>; onInvalid?: OnInvalid; writeBatchAudit?: boolean }) {
       requirePermission(input.grants, MASTERDATA_PERMISSIONS.priceMaterialManage);
       actorIsUsable(input.actor);
       if (input.rows.length === 0) throw new AppError("VALIDATION", "BULK_EMPTY", "Add at least one row.");
@@ -422,7 +422,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
           const pair = `${row.vendorId}|${row.skuId}`;
           if (seen.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "BULK_DUPLICATE_IN_BATCH", message: "Same SKU and supplier as another row in this batch." }); continue; }
           seen.set(pair, rowIndex); if (taken.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "PRICE_PAIR_CONFLICT", message: "This supplier already has a live price for this SKU. Edit that price instead." }); continue; }
-          try { const created = await runTransaction(async (rowTx: TxClient) => createPricingService(asPrismaClient(rowTx), { ...ports, runTransaction: async (work) => work(rowTx) }).createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: row.skuId, supplierVendorId: row.vendorId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined })); ids.push(created.priceMaterialId); taken.add(pair); }
+          try { const created = await runTransaction(async (rowTx: TxClient) => createPricingService(asPrismaClient(rowTx), { ...ports, runTransaction: async (work) => work(rowTx) }).createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: row.skuId, supplierVendorId: row.vendorId, unitId: row.unitId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined })); ids.push(created.priceMaterialId); taken.add(pair); }
           catch (error) { errors.push(error instanceof AppError ? { rowIndex, field: bulkErrorField(error.code), code: error.code, message: error.safeMessage } : { rowIndex, field: null, code: "PRICE_SAVE_FAILED", message: "This row could not be saved." }); }
         }
         if (ids.length === 0) throw new AppError("VALIDATION", "BULK_ROWS_INVALID", `${errors.length} row(s) need fixing. Nothing was saved.`, { details: { rows: errors } });
@@ -444,7 +444,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
           seen.set(pair, rowIndex);
           if (taken.has(pair)) { errors.push({ rowIndex, field: "skuId", code: "PRICE_PAIR_CONFLICT", message: "This supplier already has a live price for this SKU. Edit that price instead." }); continue; }
           try {
-            const created = await inner.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: row.skuId, supplierVendorId: row.vendorId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined });
+            const created = await inner.createPriceMaterial({ grants: input.grants, actor: input.actor, skuId: row.skuId, supplierVendorId: row.vendorId, unitId: row.unitId, amount: row.amount, currency: input.currency, notes: row.notes ?? undefined });
             ids.push(created.priceMaterialId);
           } catch (error) {
             if (!(error instanceof AppError)) throw error;
@@ -459,7 +459,7 @@ export function createPricingService(db: PrismaClient, ports: MasterDataServiceP
     },
 
     /** Creates many material prices (existing SKUs) for one supplier, all or nothing. See createMaterialPriceRows. */
-    async createMaterialPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; currency: string; rows: Array<{ skuId: string; amount: string; notes?: string | null }>; onInvalid?: OnInvalid }) {
+    async createMaterialPricesBulk(input: { grants: PermissionGrants; actor: AuditActor; vendorId: string; currency: string; rows: Array<{ skuId: string; unitId: string; amount: string; notes?: string | null }>; onInvalid?: OnInvalid }) {
       return createPricingService(db, ports).createMaterialPriceRows({ grants: input.grants, actor: input.actor, currency: input.currency, onInvalid: input.onInvalid, rows: input.rows.map((row) => ({ ...row, vendorId: input.vendorId })) });
     },
 

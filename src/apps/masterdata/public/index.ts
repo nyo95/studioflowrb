@@ -30,13 +30,10 @@ export type MaterialPriceOption = {
   currency: string;
   unit: { id: string; code: string; name: string };
   measurement: {
-    baseUnit: { id: string; code: string; name: string };
-    purchaseUnit: { id: string; code: string; name: string } | null;
     dimensionLength: string | null;
     dimensionWidth: string | null;
     dimensionThickness: string | null;
     dimensionUnit: { id: string; code: string; name: string } | null;
-    purchaseToBaseFactor: string | null;
   };
   sourceLink: { id: string; kind: string; url: string; label: string | null } | null;
 };
@@ -75,13 +72,10 @@ const MATERIAL_PRICE_OPTION_SELECT = {
     select: {
       name: true,
       code: true,
-      base_unit: { select: { id: true, code: true, name: true } },
-      purchase_unit: { select: { id: true, code: true, name: true } },
       dimension_length: true,
       dimension_width: true,
       dimension_thickness: true,
       dimension_unit: { select: { id: true, code: true, name: true } },
-      purchase_to_base_factor: true,
     },
   },
   source_link: { select: { id: true, kind: true, url: true, label: true } },
@@ -98,13 +92,10 @@ type MaterialPriceRow = {
   sku: {
     name: string | null;
     code: string | null;
-    base_unit: { id: string; code: string; name: string };
-    purchase_unit: { id: string; code: string; name: string } | null;
     dimension_length: { toString: () => string } | null;
     dimension_width: { toString: () => string } | null;
     dimension_thickness: { toString: () => string } | null;
     dimension_unit: { id: string; code: string; name: string } | null;
-    purchase_to_base_factor: { toString: () => string } | null;
   };
   source_link: { id: string; kind: string; url: string; label: string | null } | null;
 };
@@ -121,13 +112,10 @@ function toMaterialPriceOption(p: MaterialPriceRow): MaterialPriceOption {
     currency: p.currency,
     unit: p.unit,
     measurement: {
-      baseUnit: p.sku.base_unit,
-      purchaseUnit: p.sku.purchase_unit,
       dimensionLength: p.sku.dimension_length?.toString() ?? null,
       dimensionWidth: p.sku.dimension_width?.toString() ?? null,
       dimensionThickness: p.sku.dimension_thickness?.toString() ?? null,
       dimensionUnit: p.sku.dimension_unit,
-      purchaseToBaseFactor: p.sku.purchase_to_base_factor?.toString() ?? null,
     },
     sourceLink: p.source_link,
   };

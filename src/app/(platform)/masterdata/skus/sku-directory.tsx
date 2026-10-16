@@ -9,7 +9,7 @@ import { DirectoryShell,DraftDialog,EntityPrimaryCell,Pagination,RowActionMenu,T
 import { useState } from "react";
 import { useRowAction } from "@/platform/ui_engine";
 
-import { Badge,Button,Combobox,ConfirmDialog,DataTable,EmptyState,Field,FormActions,InlineError,Input,SearchField,SectionCard,Select,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
+import { Badge,Button,Combobox,ConfirmDialog,DataTable,EmptyState,Field,FormActions,InlineError,Input,SearchField,Select,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
 import { createMoney,formatMoney } from "@platform/utilities/money";
 import {
 archiveSkuAction,
@@ -26,13 +26,10 @@ type SkuRow = {
   notes: string | null;
   deleted_at: Date | null;
   brand: { id: string; name: string; slug: string } | null;
-  base_unit: { id: string; code: string; name: string };
-  purchase_unit: { id: string; code: string; name: string } | null;
   dimension_length: { toString(): string } | null;
   dimension_width: { toString(): string } | null;
   dimension_thickness: { toString(): string } | null;
   dimension_unit: { id: string; code: string; name: string } | null;
-  purchase_to_base_factor: { toString(): string } | null;
   categories: Array<{ category: { id: string; name: string; slug: string } }>;
   material_prices: Array<{
     id: string;
@@ -149,7 +146,7 @@ export function SkuDirectory({
             <TableRow>
               <TableHead sortable sortDirection={sortDirection} onSortChange={setSortDirection}>SKU &amp; Code</TableHead>
               <TableHead>Brand &amp; Categories</TableHead>
-              <TableHead>Units</TableHead>
+              <TableHead>Dimensions</TableHead>
               <TableHead>Prices</TableHead>
               <TableHead stickyEnd align="end">Actions</TableHead>
             </TableRow>
@@ -187,10 +184,7 @@ export function SkuDirectory({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <TableCellContent
-                      primary={<span>Base: <span className="font-ui-mono font-medium">{sku.base_unit.code}</span></span>}
-                      secondary={sku.purchase_unit ? <span>Buy: <span className="font-ui-mono">{sku.purchase_unit.code}</span></span> : undefined}
-                    />
+                    <span className="text-sm text-ink-secondary">{sku.dimension_length && sku.dimension_width && sku.dimension_unit ? `${sku.dimension_length.toString()} × ${sku.dimension_width.toString()}${sku.dimension_thickness ? ` × ${sku.dimension_thickness.toString()}` : ""} ${sku.dimension_unit.code}` : "—"}</span>
                   </TableCell>
                   <TableCell>
                     {lowestPrices.length ? (
@@ -245,7 +239,7 @@ export function SkuDirectory({
             <input type="hidden" name="brandId" value={editBrandId} />
             <input type="hidden" name="categoryId" value={editCategoryId} />
             {editError ? <InlineError>{editError}</InlineError> : null}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <Field label="SKU code / Article #">
                 <Input name="code" defaultValue={editTarget.code ?? ""} maxLength={32} />
               </Field>
@@ -256,38 +250,16 @@ export function SkuDirectory({
                 <Combobox label="SKU brand" options={[{ id: "", label: "No brand" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={editBrandId} onValueChange={setEditBrandId} placeholder="No brand" searchPlaceholder="Search brands…" />
               </Field>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Base measurement unit" required>
-                <Select name="baseUnitId" defaultValue={editTarget.base_unit.id} required>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.code} — {u.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Purchase unit">
-                <Select name="purchaseUnitId" defaultValue={editTarget.purchase_unit?.id ?? ""}>
-                  <option value="">Same as base unit</option>
-                  {units.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.code} — {u.name}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-
-            <SectionCard>
-              <div className="mb-3 grid gap-1"><Text weight="semibold">Dimensions and BQ conversion</Text><Text size="sm" tone="secondary">Optional rectangular dimensions. Conversion is recalculated on the server.</Text></div>
-              <div className="grid gap-3 sm:grid-cols-4">
+            <div className="grid gap-3 border-t border-line-subtle pt-4">
+              <div className="grid gap-1"><Text weight="semibold">Product dimensions</Text><Text size="sm" tone="secondary">Optional SKU details. Purchase units belong to supplier prices.</Text></div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Field label="Length">
                   <Input name="dimensionLength" defaultValue={editTarget.dimension_length?.toString() ?? ""} inputMode="decimal" />
                 </Field>
                 <Field label="Width">
                   <Input name="dimensionWidth" defaultValue={editTarget.dimension_width?.toString() ?? ""} inputMode="decimal" />
                 </Field>
-                <Field label="Thickness" description="Optional; excluded from area calculation.">
+                <Field label="Thickness" description="Optional product detail.">
                   <Input name="dimensionThickness" defaultValue={editTarget.dimension_thickness?.toString() ?? ""} inputMode="decimal" />
                 </Field>
                 <Field label="Dimension unit">
@@ -299,12 +271,7 @@ export function SkuDirectory({
                   </Select>
                 </Field>
               </div>
-              <Text tone="secondary">
-                {editTarget.purchase_to_base_factor
-                  ? `Current conversion: 1 ${editTarget.purchase_unit?.code ?? editTarget.base_unit.code} = ${editTarget.purchase_to_base_factor.toString()} ${editTarget.base_unit.code}`
-                  : "No dimensional conversion is stored."}
-              </Text>
-            </SectionCard>
+            </div>
 
             <Field label="Product category" required>
               <Combobox label="SKU product category" options={productCategories.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryId} onValueChange={setEditCategoryId} placeholder="Search product category" searchPlaceholder="Search product categories…" />
