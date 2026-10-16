@@ -1,5 +1,9 @@
 # Changelog
 
+## R9.127 | 2026-10-17 | fix(masterdata): use the full application canvas
+
+- Master Data now uses the same full-width application canvas as BQ. Directory workspaces can use the full available screen width while retaining their existing data, controls, and responsive behavior.
+
 ## R9.126 | 2026-10-17 | docs(ui-engine): queue directory workspace acceptance
 
 - Added the required browser acceptance walkthrough for the new shared directory workspace pattern.
