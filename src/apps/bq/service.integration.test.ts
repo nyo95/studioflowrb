@@ -563,6 +563,18 @@ describe("BQ R6.1 invariants", () => {
     assert.equal(stored.decision_reason, "Keep for the audit");
   });
 
+  it("publishes the latest project actor for Created and Updated directory metadata", async () => {
+    const project = await service.createProject({ grants: GRANTS, actor: ACTOR, title: "Directory metadata", clientName: "RAD" });
+    let summary = (await createBqPublicRead(testDb.prisma).listProjectSummaries()).find((row) => row.id === project.id)!;
+    assert.equal(summary.createdBy, ACTOR.userId);
+    assert.equal(summary.updatedBy, ACTOR.label);
+
+    await service.updateProject({ grants: GRANTS, actor: ACTOR_B, id: project.id, title: "Directory metadata updated" });
+    summary = (await createBqPublicRead(testDb.prisma).listProjectSummaries()).find((row) => row.id === project.id)!;
+    assert.equal(summary.updatedBy, ACTOR_B.label);
+    assert.equal(summary.title, "Directory metadata updated");
+  });
+
   it("never lets an edit commit into a project that a concurrent lock has locked", async () => {
     // BQ operations run in serializable transactions with retry (platform runtime), so an edit that read ACTIVE
     // while the lock committed must be aborted and retried into the locked rejection, never applied silently.

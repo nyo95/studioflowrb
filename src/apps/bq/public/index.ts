@@ -2,6 +2,7 @@ import { BQ_PERMISSIONS } from "../service";
 import { calculateItem, calculateProject, type ItemInput } from "../lib/calculation-engine";
 import { isMarkerPriceMode, type BqPriceMode } from "../lib/quotation";
 import { toDecimalString } from "@platform/utilities/decimal";
+import { latestAuditActorLabels } from "@platform/core/audit/persistence";
 import { readBqIssuerIdentity } from "./issuer-identity";
 
 export * from "./nav";
@@ -95,6 +96,8 @@ export type BqProjectSummary = {
   status: "ACTIVE" | "LOCKED" | "ARCHIVED";
   createdBy: string;
   createdAt: string;
+  /** Snapshot label from the latest project-level audit event. */
+  updatedBy: string | null;
   updatedAt: string;
   grandTotal: string | null;
 };
@@ -404,6 +407,12 @@ export function createBqPublicRead(db: PrismaClient) {
         },
       });
 
+      const updatedBy = await latestAuditActorLabels(db, {
+        appId: "bq",
+        entityType: "BqProject",
+        entityIds: projects.map((project) => project.id),
+      });
+
       return projects.map((p) => ({
         id: p.id,
         title: p.title,
@@ -411,6 +420,7 @@ export function createBqPublicRead(db: PrismaClient) {
         status: p.status,
         createdBy: p.created_by,
         createdAt: p.created_at.toISOString(),
+        updatedBy: updatedBy.get(p.id) ?? null,
         updatedAt: p.updated_at.toISOString(),
         grandTotal: applyCalculations(
           p.sections.map((s) => ({

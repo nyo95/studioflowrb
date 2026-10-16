@@ -73,6 +73,42 @@ export async function updateProjectAction(_prev: ActionResult<never> | null, for
   });
 }
 
+const ProjectRowActionSchema = z.object({
+  projectId: z.string().cuid(),
+  operation: z.enum(["lock", "unlock", "archive", "restore", "requestDeletion"]),
+  acknowledgeZeroPrices: z.boolean().optional(),
+});
+
+/** Administrative lifecycle actions live in the project directory, not inside the estimating workspace. */
+export async function runProjectRowAction(
+  projectId: string,
+  operation: "lock" | "unlock" | "archive" | "restore" | "requestDeletion",
+  acknowledgeZeroPrices = false,
+): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = ProjectRowActionSchema.safeParse({ projectId, operation, acknowledgeZeroPrices });
+    if (!parsed.success) throw validationError(parsed.error);
+    const value = parsed.data;
+    const actor = { kind: "USER" as const, userId: principal.userId, label: principal.displayName };
+
+    if (value.operation === "lock") {
+      await bqService.lockProject({ grants, actor, id: value.projectId, acknowledgeZeroPrices: value.acknowledgeZeroPrices });
+    } else if (value.operation === "unlock") {
+      await bqService.unlockProject({ grants, actor, id: value.projectId });
+    } else if (value.operation === "archive") {
+      await bqService.archiveProject({ grants, actor, id: value.projectId });
+    } else if (value.operation === "restore") {
+      await bqService.restoreProject({ grants, actor, id: value.projectId });
+    } else {
+      await bqService.requestProjectDeletion({ grants, actor, id: value.projectId });
+    }
+
+    revalidatePath("/bq");
+    revalidatePath(`/bq/${value.projectId}`);
+  });
+}
+
 const SectionSchema = z.object({
   projectId: z.string().cuid(),
   name: z.string().trim().min(1, "Section name is required").max(160),

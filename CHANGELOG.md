@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.104 | 2026-10-16 | fix(bq): Move project lifecycle actions to the directory (Lead)
+
+- **Outcome:** Lock/Unlock, Archive/Restore, and the protected deletion-request action now live in the three-dot menu on each BQ project row. The estimating workspace no longer carries project-administration controls and remains focused on BOQ content and quotation work. Permanent deletion is still available only after archive and still requires the existing approval flow.
+- **Directory metadata:** replaced the misleading `Estimator` column (which showed the creator) with explicit `Created` and `Updated` columns. Both show the date and person; `Updated` uses the latest project-level canonical audit actor and falls back to the creator for historical rows without an audit event. No schema or migration was needed.
+- **UI and safety:** reused the UI Engine row-action menu and confirmation dialog, kept risky actions separated and confirmed, retained the extra confirmation for intentional Rp0 locking, and kept the action column at the table edge. The detail-page lifecycle server actions were removed after their UI moved, leaving one active action boundary.
+- **Checks:** `npm test` **1216/1216**, typecheck, full lint, architecture boundaries, legacy-runtime, production build, focused BQ browser journey **1/1**, and direct browser inspection PASS. The full browser run finished **169/171**: all BQ and all 75 shared screen-size cases passed; the pre-existing Master Data mixed-price partial-save bug failed as already recorded in BACKLOG, while the unrelated R9.100 sample-decline timeout passed immediately in its isolated file (**3/3**). Neither failure touches BQ directory data, lifecycle actions, or layout.
+- **Scope:** no schema, migration, dependency, database data mutation outside the disposable test target, legacy access, or remote action. The restrained row-end action design follows the shared frontend hierarchy instead of adding a second action bar.
+
 ## R9.103 | 2026-10-16 | fix(ui-engine,settings): Use wide monitors for administration (Lead)
 
 - **Outcome:** Platform and StudioFlow administration settings now use a named 1920 px `expanded` page measure instead of stopping at 1440 px. On the owner's 2552 px-wide screen this reduces the unused space on each side from 524 px to 284 px while preserving a deliberate margin. Existing schedules, timelines, project pages and dense full-width work surfaces keep their prior measures.

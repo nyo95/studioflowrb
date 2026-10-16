@@ -675,18 +675,6 @@ export async function deleteLineItemAction(
 
 // ─── PROJECT ──────────────────────────────────────────────────
 
-export async function lockProjectAction(
-  _prev: ActionResult<BqProjectDetail> | null,
-  formData: FormData,
-): Promise<ActionResult<BqProjectDetail>> {
-  return runSafeAction(async () => {
-    const { grants, actor } = await authorize();
-    const { projectId } = parse(z.object({ projectId: Id }), formData);
-    await bqService.lockProject({ grants, actor, id: projectId, acknowledgeZeroPrices: formData.get("acknowledgeZeroPrices") === "true" });
-    return reload(projectId);
-  });
-}
-
 const QuotationSchema = z.object({
   projectId: Id,
   number: z.string().trim().max(80),
@@ -735,37 +723,6 @@ export async function updateQuotationAction(
     revalidatePath(`/bq/print/${value.projectId}/quotation`);
     return reload(value.projectId);
   });
-}
-
-async function projectLifecycleAction(
-  formData: FormData,
-  operation: "unlock" | "archive" | "restore" | "requestDeletion",
-): Promise<ActionResult<BqProjectDetail>> {
-  return runSafeAction(async () => {
-    const { grants, actor } = await authorize();
-    const { projectId } = parse(z.object({ projectId: Id }), formData);
-    if (operation === "unlock") await bqService.unlockProject({ grants, actor, id: projectId });
-    else if (operation === "archive") await bqService.archiveProject({ grants, actor, id: projectId });
-    else if (operation === "restore") await bqService.restoreProject({ grants, actor, id: projectId });
-    else await bqService.requestProjectDeletion({ grants, actor, id: projectId });
-    return reload(projectId);
-  });
-}
-
-export async function unlockProjectAction(_prev: ActionResult<BqProjectDetail> | null, formData: FormData) {
-  return projectLifecycleAction(formData, "unlock");
-}
-
-export async function archiveProjectAction(_prev: ActionResult<BqProjectDetail> | null, formData: FormData) {
-  return projectLifecycleAction(formData, "archive");
-}
-
-export async function restoreProjectAction(_prev: ActionResult<BqProjectDetail> | null, formData: FormData) {
-  return projectLifecycleAction(formData, "restore");
-}
-
-export async function requestProjectDeletionAction(_prev: ActionResult<BqProjectDetail> | null, formData: FormData) {
-  return projectLifecycleAction(formData, "requestDeletion");
 }
 
 // ─── SOURCE PICKER ────────────────────────────────────────────

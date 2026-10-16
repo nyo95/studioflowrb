@@ -19,9 +19,12 @@ import {
   SectionCard,
   TableBody,
   TableCell,
+  TableCellContent,
   TableHead,
   TableHeader,
   TableRow,
+  RowActionsCell,
+  RowActionsHead,
   PillTabs,
   FormattedInstant,
 } from "@/platform/ui_engine";
@@ -29,6 +32,7 @@ import { createMoney, formatMoney } from "@platform/utilities/money";
 import { getPaginationSlice } from "@platform/utilities/pagination";
 import { ProjectDeletionReview } from "./project-deletion-review";
 import { NewProjectButton } from "./new-project-dialog";
+import { ProjectRowActions } from "./project-row-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -83,9 +87,19 @@ export default async function BqProjectsPage({
   const directory = (rows: typeof projects, tab: View, empty: { title: string; description: string }) => {
     if (rows.length === 0) return <SectionCard><EmptyState icon={FileText} title={empty.title} description={empty.description} /></SectionCard>;
     const { pageCount, page, rows: pageRows } = getPaginationSlice(rows, tab === view ? requestedPage : 1, PAGE_SIZE);
-    return <DirectoryShell surface fill pagination={<Pagination page={page} pageCount={pageCount} total={rows.length} pageSize={PAGE_SIZE} getHref={(nextPage) => listHref(tab, nextPage)} label={tab === "archived" ? "Archived project pages" : "Project pages"} />}><DataTable framed={false} density="compact" stickyHeader fill minWidth={640}>
-      <TableHeader><TableRow><TableHead>Project</TableHead><TableHead>Client</TableHead><TableHead>Estimator</TableHead><TableHead align="end">Grand Total</TableHead><TableHead>Created</TableHead></TableRow></TableHeader>
-      <TableBody>{pageRows.map((project) => <TableRow key={project.id}><TableCell><EntityPrimaryCell tone={project.status === "ACTIVE" ? "success" : project.status === "ARCHIVED" ? "danger" : "warning"} statusLabel={project.status} name={<Link href={`/bq/${project.id}`} className="font-medium text-action hover:underline">{project.title}</Link>} secondary={<>{project.status === "LOCKED" ? "Locked · " : null}{pendingDeletion.has(project.id) ? "Deletion requested · " : null}Updated <FormattedInstant value={project.updatedAt} locale={settings.locale} timeZone={settings.timezone} /></>} /></TableCell><TableCell>{project.clientName}</TableCell><TableCell>{creatorNames.get(project.createdBy) ?? project.createdBy}</TableCell><TableCell align="end">{project.grandTotal === null ? "—" : formatMoney(createMoney(project.grandTotal, "IDR"), { locale: settings.locale })}</TableCell><TableCell><FormattedInstant value={project.createdAt} locale={settings.locale} timeZone={settings.timezone} /></TableCell></TableRow>)}</TableBody>
+    return <DirectoryShell surface fill pagination={<Pagination page={page} pageCount={pageCount} total={rows.length} pageSize={PAGE_SIZE} getHref={(nextPage) => listHref(tab, nextPage)} label={tab === "archived" ? "Archived project pages" : "Project pages"} />}><DataTable framed={false} density="compact" stickyHeader fill minWidth={920}>
+      <TableHeader><TableRow><TableHead>Project</TableHead><TableHead>Client</TableHead><TableHead align="end">Grand Total</TableHead><TableHead>Created</TableHead><TableHead>Updated</TableHead>{canManage ? <RowActionsHead /> : null}</TableRow></TableHeader>
+      <TableBody>{pageRows.map((project) => {
+        const createdBy = creatorNames.get(project.createdBy) ?? project.createdBy;
+        return <TableRow key={project.id}>
+          <TableCell><EntityPrimaryCell tone={project.status === "ACTIVE" ? "success" : project.status === "ARCHIVED" ? "danger" : "warning"} statusLabel={project.status} name={<Link href={`/bq/${project.id}`} className="font-medium text-action hover:underline">{project.title}</Link>} secondary={project.status === "LOCKED" ? "Locked" : pendingDeletion.has(project.id) ? "Deletion requested" : undefined} /></TableCell>
+          <TableCell>{project.clientName}</TableCell>
+          <TableCell align="end">{project.grandTotal === null ? "—" : formatMoney(createMoney(project.grandTotal, "IDR"), { locale: settings.locale })}</TableCell>
+          <TableCell><TableCellContent primary={<FormattedInstant value={project.createdAt} locale={settings.locale} timeZone={settings.timezone} style="date" />} secondary={`by ${createdBy}`} /></TableCell>
+          <TableCell><TableCellContent primary={<FormattedInstant value={project.updatedAt} locale={settings.locale} timeZone={settings.timezone} style="date" />} secondary={`by ${project.updatedBy ?? createdBy}`} /></TableCell>
+          {canManage ? <RowActionsCell><ProjectRowActions project={{ id: project.id, title: project.title, status: project.status }} deletionPending={pendingDeletion.has(project.id)} /></RowActionsCell> : null}
+        </TableRow>;
+      })}</TableBody>
     </DataTable></DirectoryShell>;
   };
 

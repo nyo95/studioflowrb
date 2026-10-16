@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, ArchiveRestore, ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Lock, LockOpen, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -56,14 +56,10 @@ import {
   addLineItemAction,
   addSubObjectAction,
   addSubsectionAction,
-  archiveProjectAction,
   applyAssemblyAction,
   deleteItemAction,
   deleteLineItemAction,
   deleteSubObjectAction,
-  lockProjectAction,
-  requestProjectDeletionAction,
-  restoreProjectAction,
   updateItemAction,
   updateLineItemAction,
   updateSubObjectAction,
@@ -76,7 +72,6 @@ import {
   groupLineItemsAction,
   revertLineItemPriceAction,
   saveItemAsAssemblyAction,
-  unlockProjectAction,
   updateQuotationAction,
 } from "./actions";
 import { AddSectionDialog } from "./add-section-dialog";
@@ -573,10 +568,6 @@ export function ProjectEditor({
   /** The Work Item whose Cost Components are being saved as an Assembly. */
   const [saveAssemblyItem, setSaveAssemblyItem] = useState<BqItemDetail | null>(null);
   const router = useRouter();
-  const [lockOpen, setLockOpen] = useState(false);
-  /** Set when the server refused to lock because rows still have a price of Rp0: the count to confirm. */
-  const [zeroPriceRows, setZeroPriceRows] = useState<number | null>(null);
-  const [lifecycleConfirm, setLifecycleConfirm] = useState<"archive" | "restore" | "delete" | null>(null);
   const [quotationOpen, setQuotationOpen] = useState(false);
   const [selection, setSelection] = useState<LineItemSelection>(null);
   const [inspected, setInspected] = useState<Inspected>(null);
@@ -893,17 +884,6 @@ export function ProjectEditor({
             <FileText aria-hidden="true" className="size-4" />
             Quotation
           </Link>
-          {canManage && project.status === "ACTIVE" ? <>
-            <Button variant="secondary" leadingIcon={<Lock aria-hidden="true" />} onClick={() => setLockOpen(true)} disabled={pending}>Kunci project</Button>
-            <Button variant="ghost" leadingIcon={<Archive aria-hidden="true" />} onClick={() => setLifecycleConfirm("archive")} disabled={pending}>Arsipkan</Button>
-          </> : null}
-          {canManage && project.status === "LOCKED" ? (
-            <Button variant="secondary" leadingIcon={<LockOpen aria-hidden="true" />} onClick={() => void run(unlockProjectAction, {}).catch(() => undefined)} disabled={pending}>Buka kunci</Button>
-          ) : null}
-          {canManage && project.status === "ARCHIVED" ? <>
-            <Button variant="secondary" leadingIcon={<ArchiveRestore aria-hidden="true" />} onClick={() => setLifecycleConfirm("restore")} disabled={pending}>Pulihkan</Button>
-            <Button variant="ghost" leadingIcon={<Trash2 aria-hidden="true" />} onClick={() => setLifecycleConfirm("delete")} disabled={pending}>Ajukan penghapusan</Button>
-          </> : null}
           {project.status !== "ACTIVE" ? <Badge tone={project.status === "ARCHIVED" ? "warning" : "neutral"}>{project.status === "ARCHIVED" ? "Diarsipkan — hanya baca" : "Terkunci — hanya baca"}</Badge> : null}
         </div>
       </div>
@@ -1058,54 +1038,6 @@ export function ProjectEditor({
           }}
         />
       ) : null}
-
-      <ConfirmDialog
-        open={lockOpen}
-        onOpenChange={setLockOpen}
-        title="Kunci project ini?"
-        description={`Project terkunci tidak bisa diubah (struktur maupun angkanya) sampai kuncinya dibuka kembali.${readiness.counts.empty > 0 ? ` Masih ada ${readiness.counts.empty} harga kosong; isi atau tandai TBC / By Owner dulu.` : ""}`}
-        confirmLabel="Kunci project"
-        tone="primary"
-        pending={pending}
-        onConfirm={() => {
-          void run(lockProjectAction, {})
-            .catch((caught: { code?: string; count?: number }) => {
-              // Rows priced Rp0 are not an error to hide: ask once more, then lock with the count recorded.
-              if (caught?.code === "bq.project.lock-zero-prices" && typeof caught.count === "number") {
-                setError(null);
-                setZeroPriceRows(caught.count);
-              }
-            })
-            .finally(() => setLockOpen(false));
-        }}
-      />
-
-      <ConfirmDialog
-        open={zeroPriceRows !== null}
-        onOpenChange={(open) => { if (!open) setZeroPriceRows(null); }}
-        title="Kunci dengan harga Rp0?"
-        description={`${zeroPriceRows ?? 0} baris berharga Rp0. Jika memang disengaja, kunci saja. Jika belum, batalkan dan isi harganya dulu.`}
-        confirmLabel="Tetap kunci"
-        tone="danger"
-        pending={pending}
-        onConfirm={() => {
-          void run(lockProjectAction, { acknowledgeZeroPrices: "true" }).catch(() => undefined).finally(() => setZeroPriceRows(null));
-        }}
-      />
-
-      <ConfirmDialog
-        open={lifecycleConfirm !== null}
-        onOpenChange={(open) => { if (!open) setLifecycleConfirm(null); }}
-        title={lifecycleConfirm === "archive" ? "Arsipkan project ini?" : lifecycleConfirm === "restore" ? "Pulihkan project ini?" : "Ajukan penghapusan permanen?"}
-        description={lifecycleConfirm === "archive" ? "Project tetap bisa dibaca tetapi tidak bisa diubah sampai dipulihkan." : lifecycleConfirm === "restore" ? "Project kembali aktif dan bisa diubah lagi." : "Permintaan harus ditinjau oleh approver sebelum project terarsip ini dihapus permanen."}
-        confirmLabel={lifecycleConfirm === "archive" ? "Arsipkan" : lifecycleConfirm === "restore" ? "Pulihkan" : "Kirim permintaan"}
-        tone={lifecycleConfirm === "restore" ? "primary" : "danger"}
-        pending={pending}
-        onConfirm={() => {
-          const action = lifecycleConfirm === "archive" ? archiveProjectAction : lifecycleConfirm === "restore" ? restoreProjectAction : requestProjectDeletionAction;
-          void run(action, {}).catch(() => undefined).finally(() => setLifecycleConfirm(null));
-        }}
-      />
 
       {assemblyItemId ? (
         <AssemblyPickerDialog
