@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.124 | 2026-10-17 | fix(bq): keep Work Item organization on canvas
+
+- Removed the duplicate checkbox and selection panel from Struktur.
+- Work Item organization now follows the canvas interaction model: right-click a Work Item to move it into an available Subsection, or return it to the direct Section list.
+
+### Verification
+
+- `npm run typecheck`: passed.
+
 ## R9.123 | 2026-10-17 | feat(bq): organize Work Items from Struktur
 
 - **Struktur:** Work Item kini dapat dipilih dalam satu Section, lalu dipindahkan ke daftar langsung atau Subsection yang tersedia. Pilihan otomatis tidak bercampur lintas Section.
