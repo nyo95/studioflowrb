@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.101 | 2026-10-16 | docs(agent): Record Claude-limit takeover handoff (Executor)
+
+- **Scope:** added a dated Lead handoff covering the R9.87 browser-acceptance continuation through R9.100, owner decisions, committed outcomes, and the SKU-size explanation. It distinguishes prior PASS evidence from partial and pending browser acceptance without claiming a new product verdict.
+- **Behavior:** documentation only; no app behavior, schema, migration, dependency, database operation, or remote action. The handoff preserves the office-only `test/` exclusion and records that R9.99/R9.100 remain local until separately authorized for push.
+- **Checks:** documentation content reconciled against the revision ledger, browser-acceptance backlog, active plan, and Git baseline. `npm test` 1212/1212, typecheck, boundaries, legacy-runtime, full lint, production build, and staged whitespace check PASS; no browser journey was rerun for this documentation-only revision.
+- **Limitation:** Claude/Lead still owns independent review of R9.99/R9.100 and the pending browser journeys; no new PASS or overall zero-bug claim.
+
 ## R9.100 | 2026-10-16 | fix(studioflow): Resolve declined samples in Product Schedule (Executor)
 
 - **Scope:** WO-SF-SAMPLE-DECLINE-01. A Master Data refusal now relays through the application coordinator to StudioFlow's app-owned sample-request command. StudioFlow keeps a distinct `DECLINED` state with staff reason, actor and time. Schedule shows “Sample declined” and the reason, removes it from waiting counts/filters, and permits a new request for that option. A request already received is never rewritten by a late refusal. Permission checks, app ownership and audit are preserved.
