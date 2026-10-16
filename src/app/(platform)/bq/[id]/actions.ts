@@ -143,6 +143,85 @@ export async function deleteSubsectionAction(
   });
 }
 
+const DeleteSectionSchema = z.object({
+  projectId: Id,
+  id: Id,
+  mode: z.enum(["MOVE", "DELETE"]),
+  targetSectionId: Id.optional(),
+}).superRefine((value, context) => {
+  if (value.mode === "MOVE" && !value.targetSectionId) {
+    context.addIssue({ code: "custom", path: ["targetSectionId"], message: "Pilih Section tujuan" });
+  }
+});
+
+export async function deleteSectionAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const { projectId, ...value } = parse(DeleteSectionSchema, formData);
+    await bqService.deleteSection({ grants, actor, ...value });
+    return reload(projectId);
+  });
+}
+
+const WorkItemIdsSchema = z.array(Id).min(1);
+function workItemMoveValues(formData: FormData) {
+  const entries = formData.getAll("itemIds");
+  let itemIds: unknown = entries;
+  if (entries.length === 1 && typeof entries[0] === "string" && entries[0].trim().startsWith("[")) {
+    try { itemIds = JSON.parse(entries[0]); }
+    catch { throw new AppError("VALIDATION", "bq.item.move-invalid", "Invalid Work Item list"); }
+  }
+  return { projectId: formData.get("projectId"), sectionId: formData.get("sectionId"), itemIds };
+}
+
+const MoveItemsWithinSectionSchema = z.object({
+  projectId: Id,
+  sectionId: Id,
+  itemIds: WorkItemIdsSchema,
+  targetSubsectionId: Id.optional(),
+});
+
+export async function moveItemsWithinSectionAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const parsed = MoveItemsWithinSectionSchema.safeParse({
+      ...workItemMoveValues(formData),
+      targetSubsectionId: formData.get("targetSubsectionId") || undefined,
+    });
+    if (!parsed.success) throw validationError(parsed.error);
+    const { projectId, ...value } = parsed.data;
+    await bqService.moveItemsWithinSection({ grants, actor, ...value });
+    return reload(projectId);
+  });
+}
+
+const GroupItemsIntoSubsectionSchema = z.object({
+  projectId: Id,
+  sectionId: Id,
+  itemIds: WorkItemIdsSchema,
+  name: z.string().trim().min(1).max(160),
+});
+
+export async function groupItemsIntoSubsectionAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const parsed = GroupItemsIntoSubsectionSchema.safeParse({ ...workItemMoveValues(formData), name: formData.get("name") });
+    if (!parsed.success) throw validationError(parsed.error);
+    const { projectId, ...value } = parsed.data;
+    await bqService.groupItemsIntoSubsection({ grants, actor, ...value });
+    return reload(projectId);
+  });
+}
+
 const LineItemMoveTargetSchema = z.union([
   z.strictObject({ direct: z.literal(true) }),
   z.strictObject({ subObjectId: Id }),

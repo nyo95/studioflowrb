@@ -1,5 +1,18 @@
 # Changelog
 
+## R9.122 | 2026-10-17 | feat(bq): Organize and remove project sections safely
+
+- **Safe Section removal:** Structure now exposes a hover-only Section delete action. Empty Sections use a simple confirmation; populated Sections show the exact direct Work Item, Subsection, and nested Work Item impact, then either move the complete structure to a peer Section or delete it permanently.
+- **Data safety:** BQ performs both Section outcomes atomically with an audit event. A move appends direct Work Items and Subsections in order and retains every nested Component Group and Cost Component; destructive deletion relies on the owned hierarchy cascade.
+- **Organization contract:** added guarded service and server-action paths for moving Work Items between a Section's direct list and its Subsections, and for grouping selected Work Items into a new named Subsection. These paths reject foreign and invalid destinations and do not alter calculation data.
+- **Tests:** added BQ integration coverage for whole-Section moves, destructive Section removal, grouping, same-Section moves, nested data retention, and invalid destination rejection.
+
+### Verification
+
+- `npm run typecheck`: passed.
+- `npm test -- --test-name-pattern "Section|Subsection" src/apps/bq/service.integration.test.ts`: passed (the repository test runner executes the full suite; zero exit status).
+- Browser acceptance is deferred to the BQ backlog for a reviewer walk.
+
 ## R9.121 | 2026-10-17 | plan(bq): Organize and remove project sections safely (Lead)
 
 - **Decision:** populated Section removal offers an audited, atomic choice to move its complete contents to another Section in the same project or permanently delete all contents after a count-aware dangerous confirmation. Empty Section removal stays simple.

@@ -364,6 +364,43 @@ describe("BQ R6.1 invariants", () => {
     assert.notEqual(await testDb.prisma.bqSubsection.findUnique({ where: { id: subsection.id } }), null);
   });
 
+  it("moves every Section child to another Section without changing its nested cost data", async () => {
+    const { project, section: source, item: direct } = await projectTree();
+    const target = await service.addSection({ grants: GRANTS, actor: ACTOR, projectId: project.id, name: "Target" });
+    const existing = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: target.id, name: "Existing", qty: "1", unit: "PCS" });
+    const subsection = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: source.id, name: "Floor" });
+    const nested = await service.addItem({ grants: GRANTS, actor: ACTOR, subsectionId: subsection.id, name: "Tile", qty: "1", unit: "M2" });
+    await service.addLineItem({ grants: GRANTS, actor: ACTOR, itemId: nested.id, sourceType: "CUSTOM", titleSnapshot: "Ceramic", purchaseUnitSnapshot: "M2", hargaSnapshot: "100", kategori: "MATERIAL", qty: "1" });
+
+    await service.deleteSection({ grants: GRANTS, actor: ACTOR, id: source.id, mode: "MOVE", targetSectionId: target.id });
+
+    assert.equal(await testDb.prisma.bqSection.findUnique({ where: { id: source.id } }), null);
+    assert.deepEqual((await testDb.prisma.bqItem.findMany({ where: { section_id: target.id }, orderBy: { sort_order: "asc" } })).map((row) => row.id), [existing.id, direct.id]);
+    assert.deepEqual(await testDb.prisma.bqSubsection.findMany({ where: { section_id: target.id }, select: { id: true } }), [{ id: subsection.id }]);
+    assert.equal((await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: nested.id } })).subsection_id, subsection.id);
+    assert.equal(await testDb.prisma.bqLineItem.count({ where: { item_id: nested.id } }), 1);
+    assert.deepEqual((await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "bq.section.deleted", entity_id: source.id } })).metadata,
+      { mode: "MOVE", directWorkItems: 1, subsections: 1, subsectionWorkItems: 1, targetSectionId: target.id });
+  });
+
+  it("deletes a populated Section only in destructive mode and groups or moves Work Items inside one Section", async () => {
+    const { project, section, item: first } = await projectTree();
+    const second = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Second", qty: "1", unit: "PCS" });
+    const subsection = await service.groupItemsIntoSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, itemIds: [first.id, second.id], name: "Floor" });
+    assert.deepEqual((await testDb.prisma.bqItem.findMany({ where: { subsection_id: subsection.id }, orderBy: { sort_order: "asc" } })).map((row) => row.id), [first.id, second.id]);
+    await service.moveItemsWithinSection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, itemIds: [second.id] });
+    assert.deepEqual((await testDb.prisma.bqItem.findMany({ where: { section_id: section.id }, orderBy: { sort_order: "asc" } })).map((row) => row.id), [second.id]);
+    await assert.rejects(
+      () => service.moveItemsWithinSection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, itemIds: [second.id], targetSubsectionId: "missing-subsection" }),
+      (error: unknown) => error instanceof AppError && error.code === "bq.item.move-target-invalid",
+    );
+    await service.deleteSection({ grants: GRANTS, actor: ACTOR, id: section.id, mode: "DELETE" });
+    assert.equal(await testDb.prisma.bqSection.findUnique({ where: { id: section.id } }), null);
+    assert.equal(await testDb.prisma.bqItem.count({ where: { id: { in: [first.id, second.id] } } }), 0);
+    assert.equal(await testDb.prisma.bqSubsection.count({ where: { id: subsection.id } }), 0);
+    assert.equal(await testDb.prisma.bqProject.count({ where: { id: project.id } }), 1);
+  });
+
   it("normalizes gaps in item positions and rolls back every reorder write if audit fails", async () => {
     const { section, item } = await projectTree();
     const last = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Last", qty: "1", unit: "PCS", sortOrder: 8 });

@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.122] BQ safe Section removal and optional Work Item organization
+- Surface: BQ Project → Struktur rail
+- Fixture: editable active BQ project with three Sections; source Section has direct Work Items, a populated Subsection with Cost Components, and an empty Subsection
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Hover/focus a Section and open its delete action; cancel an empty Section, then confirm its deletion. 2. For a populated Section choose a peer as destination, complete the move, reload, and inspect direct Work Item and Subsection order plus their Cost Components. 3. Repeat on a populated Section using permanent deletion and check the named impact before confirming. 4. Move a Work Item into and out of a Subsection; select several Work Items and group them into a new Subsection. 5. Compare all displayed totals before and after organization.
+- Acceptance: destructive choices are explicit; move retains all nested data and relative order; deletion removes only the selected Section's owned hierarchy; invalid cross-Section moves are unavailable; optional Subsection organization leaves every amount and total unchanged at both viewports.
+- Status: PENDING
+
 ### [R9.118] BQ treats Subsection as optional organization
 - Surface: BQ Project → Struktur rail
 - Fixture: editable active BQ project with a Section that has direct Work Items and another Section with Subsections

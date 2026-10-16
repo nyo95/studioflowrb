@@ -56,6 +56,7 @@ import {
   addLineItemAction,
   addSubsectionAction,
   applyAssemblyAction,
+  deleteSectionAction,
   deleteItemAction,
   deleteLineItemAction,
   deleteSubsectionAction,
@@ -395,6 +396,7 @@ function SectionOutline({
   onAddSubsection,
   onRenameSection,
   onRenameSubsection,
+  onDeleteSection,
   onDeleteSubsection,
   onDeleteWorkItem,
   onAddWorkItem,
@@ -408,6 +410,7 @@ function SectionOutline({
   onAddSubsection: (sectionId: string, name: string) => Promise<void>;
   onRenameSection: (id: string, name: string) => Promise<void>;
   onRenameSubsection: (id: string, name: string) => Promise<void>;
+  onDeleteSection: (section: BqSectionDetail) => void;
   onDeleteSubsection: (subsection: { id: string; name: string; itemCount: number; sectionName: string }) => void;
   onDeleteWorkItem: (item: BqItemDetail) => void;
   onAddWorkItem: (target: NewItemTarget) => void;
@@ -522,6 +525,18 @@ function SectionOutline({
                     disabled={pending}
                     onAdd={(name) => onAddSubsection(section.id, name)}
                   />
+                  <IconButton
+                    size="sm"
+                    variant="ghost"
+                    label={`Hapus Section ${section.name}`}
+                    icon={<Trash2 aria-hidden="true" />}
+                    disabled={pending}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onDeleteSection(section);
+                    }}
+                  />
                 </div>
               ) : null}
               {tail(count)}
@@ -593,6 +608,70 @@ function SectionOutline({
   );
 }
 
+function DeleteSectionDialog({
+  section,
+  sections,
+  pending,
+  error,
+  onClose,
+  onDelete,
+}: {
+  section: BqSectionDetail;
+  sections: readonly BqSectionDetail[];
+  pending: boolean;
+  error: string | null;
+  onClose: () => void;
+  onDelete: (mode: "MOVE" | "DELETE", targetSectionId?: string) => void;
+}) {
+  const directCount = section.items.length;
+  const subsectionCount = section.subsections.length;
+  const subsectionItemCount = section.subsections.reduce((count, subsection) => count + subsection.items.length, 0);
+  const contentCount = directCount + subsectionCount + subsectionItemCount;
+  const targets = sections.filter((candidate) => candidate.id !== section.id);
+  const [mode, setMode] = useState<"MOVE" | "DELETE">(contentCount > 0 ? "MOVE" : "DELETE");
+  const [targetSectionId, setTargetSectionId] = useState(targets[0]?.id ?? "");
+  const cannotMove = targets.length === 0;
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => { if (!open) onClose(); }}
+      title={`Hapus Section ${section.name}?`}
+      description={contentCount === 0 ? "Section kosong ini akan dihapus." : "Pilih apa yang dilakukan pada isi Section ini."}
+      size="sm"
+      dismissible={!pending}
+    >
+      <form className="grid gap-4" onSubmit={(event) => {
+        event.preventDefault();
+        if (!pending && (mode === "DELETE" || targetSectionId)) onDelete(mode, mode === "MOVE" ? targetSectionId : undefined);
+      }}>
+        {contentCount > 0 ? <Notice tone="warning">Terdampak: {directCount} Work Item langsung, {subsectionCount} Subsection, dan {subsectionItemCount} Work Item di dalam Subsection.</Notice> : null}
+        {contentCount > 0 ? <div className="grid gap-2">
+          <label className="flex cursor-pointer items-start gap-2 rounded-control border border-line p-3">
+            <input type="radio" name="section-delete-mode" checked={mode === "MOVE"} disabled={pending || cannotMove} onChange={() => setMode("MOVE")} />
+            <span><span className="block text-sm font-medium">Pindahkan isi ke Section lain</span><Text size="sm" tone="tertiary">Work Item dan Subsection tetap utuh.</Text></span>
+          </label>
+          {mode === "MOVE" ? <Field label="Section tujuan" required>
+            <Select value={targetSectionId} disabled={pending || cannotMove} onChange={(event) => setTargetSectionId(event.target.value)}>
+              {targets.map((target) => <option key={target.id} value={target.id}>{target.name}</option>)}
+            </Select>
+          </Field> : null}
+          <label className="flex cursor-pointer items-start gap-2 rounded-control border border-danger/40 p-3">
+            <input type="radio" name="section-delete-mode" checked={mode === "DELETE"} disabled={pending} onChange={() => setMode("DELETE")} />
+            <span><span className="block text-sm font-medium text-danger">Hapus semua isi</span><Text size="sm" tone="tertiary">Semua Work Item dan rincian biayanya akan dihapus permanen.</Text></span>
+          </label>
+        </div> : null}
+        {error ? <InlineError>{error}</InlineError> : null}
+        <FormActions>
+          <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>Batal</Button>
+          <Button type="submit" variant="danger" pending={pending} disabled={pending || (mode === "MOVE" && (!targetSectionId || cannotMove))}>
+            {mode === "MOVE" ? "Pindahkan lalu hapus" : "Hapus permanen"}
+          </Button>
+        </FormActions>
+      </form>
+    </Dialog>
+  );
+}
+
 export function ProjectEditor({
   project: initialProject,
   canManage,
@@ -626,6 +705,7 @@ export function ProjectEditor({
   const anchor = useRef<string | null>(null);
   const [dragging, setDragging] = useState<{ itemId: string; lineIds: readonly string[]; overId: string | null } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{ title: string; description?: string; run: () => Promise<void> } | null>(null);
+  const [sectionToDelete, setSectionToDelete] = useState<BqSectionDetail | null>(null);
   const [groupItemId, setGroupItemId] = useState<string | null>(null);
   const [moveConfirmation, setMoveConfirmation] = useState<MoveRequest | null>(null);
   const [moveNotice, setMoveNotice] = useState<{ message: string; tone: "neutral" | "success" } | null>(null);
@@ -945,6 +1025,7 @@ export function ProjectEditor({
           onAddSubsection={(sectionId, name) => run(addSubsectionAction, { sectionId, name })}
           onRenameSection={(id, name) => run(updateSectionAction, { id, name })}
           onRenameSubsection={(id, name) => run(updateSubsectionAction, { id, name })}
+          onDeleteSection={setSectionToDelete}
           onDeleteSubsection={(subsection) => setConfirmDelete({
             title: `Hapus Subsection ${subsection.name}?`,
             description: subsection.itemCount === 0
@@ -1152,6 +1233,22 @@ export function ProjectEditor({
               ? run(addItemAndApplyAssemblyAction, { ...where, assemblyId, name, qty, unit })
               : run(addItemAction, { ...where, name, qty, unit });
             void request.then(() => setNewItemTarget(null)).catch(() => undefined);
+          }}
+        />
+      ) : null}
+
+      {sectionToDelete ? (
+        <DeleteSectionDialog
+          key={sectionToDelete.id}
+          section={sectionToDelete}
+          sections={project.sections}
+          pending={pending}
+          error={error}
+          onClose={() => setSectionToDelete(null)}
+          onDelete={(mode, targetSectionId) => {
+            void run(deleteSectionAction, { id: sectionToDelete.id, mode, targetSectionId })
+              .then(() => setSectionToDelete(null))
+              .catch(() => undefined);
           }}
         />
       ) : null}

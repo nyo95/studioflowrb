@@ -219,6 +219,156 @@ async function deleteSubsection(input: {
   });
 }
 
+/** Removes a Section only after its contents were moved intact or intentionally destroyed. */
+async function deleteSection(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  id: string;
+  mode: "MOVE" | "DELETE";
+  targetSectionId?: string;
+}) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  const section = await db.bqSection.findUnique({
+    where: { id: input.id },
+    select: {
+      id: true,
+      project_id: true,
+      items: { select: { id: true }, orderBy: { sort_order: "asc" } },
+      subsections: {
+        select: { id: true, items: { select: { id: true } } },
+        orderBy: { sort_order: "asc" },
+      },
+    },
+  });
+  if (!section) throw new AppError("NOT_FOUND", "bq.section.not-found", "Section not found");
+  await requireEditableProject(section.project_id);
+
+  const subsectionWorkItems = section.subsections.reduce((count, subsection) => count + subsection.items.length, 0);
+  const changes = {
+    mode: input.mode,
+    directWorkItems: section.items.length,
+    subsections: section.subsections.length,
+    subsectionWorkItems,
+  };
+  if (input.mode === "MOVE") {
+    if (!input.targetSectionId || input.targetSectionId === section.id) {
+      throw new AppError("VALIDATION", "bq.section.move-target-invalid", "Choose another Section in this project");
+    }
+    const target = await db.bqSection.findUnique({
+      where: { id: input.targetSectionId },
+      select: { id: true, project_id: true },
+    });
+    if (!target || target.project_id !== section.project_id) {
+      throw new AppError("VALIDATION", "bq.section.move-target-invalid", "Choose another Section in this project");
+    }
+    const [lastDirect, lastSubsection] = await Promise.all([
+      db.bqItem.aggregate({ where: { section_id: target.id }, _max: { sort_order: true } }),
+      db.bqSubsection.aggregate({ where: { section_id: target.id }, _max: { sort_order: true } }),
+    ]);
+    for (const [index, item] of section.items.entries()) {
+      await db.bqItem.update({
+        where: { id: item.id },
+        data: { section_id: target.id, sort_order: (lastDirect._max.sort_order ?? -1) + 1 + index },
+      });
+    }
+    for (const [index, subsection] of section.subsections.entries()) {
+      await db.bqSubsection.update({
+        where: { id: subsection.id },
+        data: { section_id: target.id, sort_order: (lastSubsection._max.sort_order ?? -1) + 1 + index },
+      });
+    }
+    await db.bqSection.delete({ where: { id: section.id } });
+    await auditWriter({
+      appId: "bq", action: "bq.section.deleted", entityType: "BqSection", entityId: section.id, actor: input.actor,
+      changes: { ...changes, targetSectionId: target.id },
+    });
+    return;
+  }
+
+  await db.bqSection.delete({ where: { id: section.id } });
+  await auditWriter({
+    appId: "bq", action: "bq.section.deleted", entityType: "BqSection", entityId: section.id, actor: input.actor,
+    changes,
+  });
+}
+
+async function selectedWorkItemsInSection(sectionId: string, itemIds: readonly string[]) {
+  if (itemIds.length === 0 || new Set(itemIds).size !== itemIds.length) {
+    throw new AppError("VALIDATION", "bq.item.move-invalid", "Choose one or more unique Work Items");
+  }
+  await requireEditableProjectForSection(sectionId);
+  const items = await db.bqItem.findMany({
+    where: { id: { in: [...itemIds] } },
+    select: { id: true, sort_order: true, section_id: true, subsection_id: true, subsection: { select: { section_id: true } } },
+  });
+  if (items.length !== itemIds.length || items.some((item) => item.section_id !== sectionId && item.subsection?.section_id !== sectionId)) {
+    throw new AppError("VALIDATION", "bq.item.move-section-invalid", "Work Items must be in the same Section");
+  }
+  const byId = new Map(items.map((item) => [item.id, item]));
+  return itemIds.map((id) => byId.get(id)!);
+}
+
+async function moveItemsWithinSection(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  sectionId: string;
+  itemIds: string[];
+  targetSubsectionId?: string;
+}) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  const items = await selectedWorkItemsInSection(input.sectionId, input.itemIds);
+  if (input.targetSubsectionId) {
+    const target = await db.bqSubsection.findUnique({ where: { id: input.targetSubsectionId }, select: { section_id: true } });
+    if (!target || target.section_id !== input.sectionId) {
+      throw new AppError("VALIDATION", "bq.item.move-target-invalid", "Choose a Subsection in the same Section");
+    }
+  }
+  const last = await db.bqItem.aggregate({
+    where: input.targetSubsectionId ? { subsection_id: input.targetSubsectionId } : { section_id: input.sectionId },
+    _max: { sort_order: true },
+  });
+  for (const [index, item] of items.entries()) {
+    await db.bqItem.update({
+      where: { id: item.id },
+      data: {
+        section_id: input.targetSubsectionId ? null : input.sectionId,
+        subsection_id: input.targetSubsectionId ?? null,
+        sort_order: (last._max.sort_order ?? -1) + 1 + index,
+      },
+    });
+  }
+  await auditWriter({
+    appId: "bq", action: "bq.items.moved-within-section", entityType: "BqSection", entityId: input.sectionId, actor: input.actor,
+    changes: { itemIds: input.itemIds, targetSubsectionId: input.targetSubsectionId ?? null },
+  });
+}
+
+async function groupItemsIntoSubsection(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  sectionId: string;
+  itemIds: string[];
+  name: string;
+}) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  const items = await selectedWorkItemsInSection(input.sectionId, input.itemIds);
+  const last = await db.bqSubsection.aggregate({ where: { section_id: input.sectionId }, _max: { sort_order: true } });
+  const subsection = await db.bqSubsection.create({
+    data: { section_id: input.sectionId, name: input.name, sort_order: (last._max.sort_order ?? -1) + 1 },
+  });
+  for (const [index, item] of items.entries()) {
+    await db.bqItem.update({
+      where: { id: item.id },
+      data: { section_id: null, subsection_id: subsection.id, sort_order: index },
+    });
+  }
+  await auditWriter({
+    appId: "bq", action: "bq.subsection.grouped", entityType: "BqSubsection", entityId: subsection.id, actor: input.actor,
+    changes: { sectionId: input.sectionId, itemIds: input.itemIds },
+  });
+  return subsection;
+}
+
   async function addItem(input: {
   grants: PermissionGrants;
   actor: { kind: string; userId?: string; label: string };
@@ -775,7 +925,10 @@ async function deleteLineItem(input: {
     addSubsection,
     updateSection,
     updateSubsection,
+    deleteSection,
     deleteSubsection,
+    moveItemsWithinSection,
+    groupItemsIntoSubsection,
     addItem,
     reorderItems,
     reorderSections,
