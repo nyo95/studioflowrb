@@ -64,6 +64,14 @@ Section           (PRELIMINARIES, INTERIOR WORKS, FURNITURE WORKS...)
   Item langsung pada Section induknya; Work Item dan rincian biayanya tidak
   ikut terhapus. Item pindahan ditempatkan setelah Work Item langsung yang
   sudah ada, dengan urutan semula tetap terjaga.
+- Menghapus Section kosong cukup dengan konfirmasi. Bila Section berisi,
+  estimator memilih untuk memindahkan seluruh isinya ke Section lain pada
+  project yang sama—Work Item langsung dan Subsection beserta rinciannya tetap
+  terjaga—atau menghapus semuanya dengan konfirmasi berbahaya yang menyebut
+  jumlah data terdampak. Kedua pilihan atomik dan diaudit.
+- Work Item dapat dipindahkan antara daftar langsung dan Subsection hanya di
+  dalam Section yang sama. Beberapa Work Item dari Section yang sama dapat
+  dikelompokkan ke Subsection baru bernama; Subsection tidak boleh bersarang.
 - L1: selalu ada. Ini item BQ yang dikerjakan.
 - L2: **opsional**. Hanya muncul saat L1 perlu dipecah ke komponen (fixture kompleks). L1 sederhana langsung punya L3.
 - L3: **terminal**. Tidak ada level di bawah L3. Semua kalkulasi terjadi di sini.

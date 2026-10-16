@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.121 | 2026-10-17 | plan(bq): Organize and remove project sections safely (Lead)
+
+- **Decision:** populated Section removal offers an audited, atomic choice to move its complete contents to another Section in the same project or permanently delete all contents after a count-aware dangerous confirmation. Empty Section removal stays simple.
+- **Organization:** Subsection remains optional organization. Work Items can move direct ↔ Subsection only inside their Section and same-Section selections can form a named Subsection; neither nesting nor accidental cross-Section drag is allowed.
+- **Scope:** the READY plan preserves calculations, prices, permissions, project lifecycle and schema while extending BQ tree service/actions, audit, tests and editor wiring. The earlier BQ language plan remains queued in BACKLOG for its separate copy-only slice.
+
 ## R9.120 | 2026-10-17 | plan(bq): Align application language (Lead)
 
 - **Decision:** BQ will use Indonesian for interface prose while preserving its locked English domain nouns: Section, Subsection, Work Item, Component Group, Cost Component, Assembly, TBC, and By Owner. The application calls a quotation `Penawaran`; the contractual English printed document stays unchanged.

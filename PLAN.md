@@ -1,9 +1,9 @@
 # Active Plan
 
-Plan ID: WO-BQ-UI-LANGUAGE-ALIGNMENT-01
-Scope: Consistent BQ Indonesian UI copy
+Plan ID: WO-BQ-SECTION-AND-SUBSECTION-ORGANIZATION-01
+Scope: Safe Section removal and optional Subsection organization
 Module(s): bq
-Target revision: R9.121
+Target revision: R9.122
 Status: READY
 Priority: P2
 Owner: Product Owner
@@ -11,20 +11,19 @@ Last updated: 2026-10-17
 
 ## Outcome
 
-Every BQ application screen reads as one coherent Indonesian interface while
-retaining the BQ contract's English domain nouns.
+An estimator can safely remove a Section or move its complete contents to
+another Section, and can organize Work Items into optional Subsections without
+changing any cost calculation.
 
 ## Locked Decisions
 
-- Default UI prose, actions, statuses, empty states, validation, navigation,
-  dialogs and accessible labels are Indonesian.
-- Canonical domain nouns remain `Section`, `Subsection`, `Work Item`,
-  `Component Group`, `Cost Component`, `Assembly`, `TBC`, and `By Owner`.
-- `Quotation` is an English document heading/print format; interactive BQ UI
-  calls it `Penawaran`.
-- The future EN/ID switch is a separate per-person language preference. It
-  must not overload date/number locale or the first-use-guide language. This
-  BQ slice owns its copy catalogue only and does not add that platform setting.
+- Removing an empty Section uses ordinary confirmation.
+- Removing a populated Section offers: move its contents to another Section of
+  the same project, preserving direct Work Items and Subsections with nested
+  data; or permanently delete all contents after count-aware confirmation.
+- Work Item drag is direct ↔ Subsection only inside its current Section.
+- Multiple Work Items under one Section can form a new named Subsection; no
+  Subsection nesting and empty Subsections remain until intentionally removed.
 
 ## Boundaries and Non-goals
 
@@ -54,4 +53,4 @@ retaining the BQ contract's English domain nouns.
 
 You are the Backend Executor. Location: rumah. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this READY `PLAN.md`, then implement the entire
-READY outcome, run required checks, update the changelog, and create R9.121.
+READY outcome, run required checks, update the changelog, and create R9.122.
