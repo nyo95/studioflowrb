@@ -47,7 +47,7 @@ export function GeneralSettingsForm({
     <form action={action}>
       <div className="grid gap-5">
         <SectionCard title="General" description="Shared display defaults for every application.">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <Field id="settings-organization" label="Organization name">
               <Input id="settings-organization" name="organizationName" defaultValue={settings.organizationName} required maxLength={120} disabled={disabled} />
             </Field>
@@ -99,7 +99,7 @@ export function GeneralSettingsForm({
         </SectionCard>
 
         <SectionCard title="Appearance" description="Global visual identity applied across every application.">
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <Field id="settings-app-title" label="Application title">
               <Input id="settings-app-title" name="appTitle" defaultValue={settings.appTitle} required maxLength={120} disabled={disabled} />
             </Field>

@@ -340,6 +340,10 @@ describe("UI Engine foundation", () => {
     assert.match(css, /--ui-dialog-sm:\s*420px/);
     assert.match(css, /--ui-dialog-full:\s*1180px/);
     assert.match(css, /--ui-dialog-max-height:\s*90dvh/);
+    assert.match(css, /--ui-page-wide-max:\s*1920px/);
+    const expandedPage = renderToStaticMarkup(createElement(ui.PageShell, { measure: "expanded" }, "Settings"));
+    assert.match(expandedPage, /max-w-\(--ui-page-wide-max\)/);
+    assert.match(expandedPage, /data-measure="expanded"/);
     const table = renderToStaticMarkup(createElement(ui.DataTable, { minWidth: "900px" }));
     assert.match(table, /data-table-overflow="horizontal"/);
     assert.match(table, /min-width:900px/);

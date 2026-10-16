@@ -40,7 +40,7 @@ export default async function UsersPage() {
   }
 
   return (
-    <PageShell fill>
+    <PageShell measure="expanded" fill>
       <PageHeader
         context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "Platform settings", href: "/settings" }, { label: "Users" }]} />}
         title="Users"

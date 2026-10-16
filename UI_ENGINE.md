@@ -406,6 +406,12 @@ Apps do not wire either of these.
 ### PageShell
 Owns canvas, max width, page padding, responsive container behavior.
 
+Its named measures keep page width a shared decision: `narrow` (720px) for a focused form,
+`default` (1100px) for ordinary content, `wide` (1440px) for schedules and timelines,
+`expanded` (1920px) for settings and administration that should use an ultrawide monitor
+without becoming edge-to-edge, and `full` for dense work surfaces that need the whole window.
+Do not change a shared measure to repair one screen; choose the measure matching the page family.
+
 ### PageHeader
 
 ```tsx

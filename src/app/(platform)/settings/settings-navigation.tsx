@@ -73,5 +73,5 @@ export function SettingsFrame({
       )}
     </>
   );
-  return withPageShell ? <PageShell measure="wide" fill={fill}>{body}</PageShell> : body;
+  return withPageShell ? <PageShell measure="expanded" fill={fill}>{body}</PageShell> : body;
 }

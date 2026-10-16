@@ -110,7 +110,7 @@
   --ui-page-narrow:  720px;   /* forms, settings              */
   --ui-page-content: 1100px;  /* general content               */
   --ui-page-max:     1440px;  /* schedule, timeline (wide)    */
-  --ui-page-wide-max:1920px;  /* full-bleed (dense workspaces, print) */
+  --ui-page-wide-max:1920px;  /* expanded settings and administration */
 
   /* ── Shell layout ────────────────────────────────────────────────────────  */
   /* --ui-rail-width is the live column width: 64px at rest, overridden to

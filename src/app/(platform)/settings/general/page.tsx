@@ -40,7 +40,7 @@ export default async function GeneralSettingsPage() {
   }
 
   return (
-    <PageShell measure="wide">
+    <PageShell measure="expanded">
       <PageHeader
         context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "Platform settings", href: "/settings" }, { label: "General" }]} />}
         title="General Settings"

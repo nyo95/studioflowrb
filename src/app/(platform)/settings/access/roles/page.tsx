@@ -47,7 +47,7 @@ export default async function RolesPage() {
   }
 
   return (
-    <PageShell fill>
+    <PageShell measure="expanded" fill>
       <PageHeader
         context={<Breadcrumb variant="capsule" entries={[{ label: "Home", href: "/" }, { label: "Platform settings", href: "/settings" }, { label: "Roles & Access" }]} />}
         title="Roles & Access"

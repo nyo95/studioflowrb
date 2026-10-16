@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.103 | 2026-10-16 | fix(ui-engine,settings): Use wide monitors for administration (Lead)
+
+- **Outcome:** Platform and StudioFlow administration settings now use a named 1920 px `expanded` page measure instead of stopping at 1440 px. On the owner's 2552 px-wide screen this reduces the unused space on each side from 524 px to 284 px while preserving a deliberate margin. Existing schedules, timelines, project pages and dense full-width work surfaces keep their prior measures.
+- **Responsive behavior:** General Settings keeps two field columns only when the content area is roomy; at 840 px the fields stack before they become cramped. Browser checks at 2552, 1440, 840, 839 and 375 px found no horizontal overflow. UI Engine documentation and focused regressions cover the new measure and the form breakpoint.
+- **Checks:** `npm test` 1213/1213, typecheck, full lint, boundaries, legacy-runtime, production build, focused Settings browser suite 16/16, and the changed Settings case in the full browser run PASS. The full browser run finished 168/170: the R9.100 Sample decline timeout passed immediately when rerun alone; a pre-existing Master Data mixed-price partial-save scenario failed again in its complete 13-case file and is recorded in BACKLOG as an out-of-scope `[BUG]`. Its unchanged dialog cannot hide a Settings-width regression because it exercises separate Master Data price action/result code, while every Settings assertion and all shared viewport checks passed.
+- **Scope:** no schema, migration, dependency, database behavior, product workflow, remote action, or push. The change reuses the existing shared 1920 px token; it does not widen Master Data's special settings pages that deliberately live inside the Master Data shell.
+
 ## R9.102 | 2026-10-16 | review(masterdata,studioflow): Accept takeover workflows in browser (Lead)
 
 - **Verdict:** PASS for WO-MD-SKU-INFORMATION-01/R9.99 and WO-SF-SAMPLE-DECLINE-01/R9.100 within their locked scope. The owner directed Codex to act as Lead temporarily while Claude is limited. Actual code paths, tests, ownership boundaries and failure handling were inspected; no in-scope defect was found. This does not claim the entire app has zero bugs.

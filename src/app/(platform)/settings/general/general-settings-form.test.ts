@@ -9,4 +9,11 @@ describe("General Settings form", () => {
     assert.match(source, /<form action=\{action\}>/);
     assert.doesNotMatch(source, /encType=/);
   });
+
+  it("keeps the two-column form for roomy settings content", () => {
+    const source = readFileSync(new URL("./general-settings-form.tsx", import.meta.url), "utf8");
+
+    assert.equal(source.match(/lg:grid-cols-2/g)?.length, 2);
+    assert.doesNotMatch(source, /md:grid-cols-2/);
+  });
 });

@@ -66,6 +66,37 @@ test("My preferences is personal: no settings sidebar, display preferences prese
   await page.screenshot({ path: `${SHOTS}/_account.png`, fullPage: true });
 });
 
+test("Settings uses the expanded desktop measure and stacks the General form before it becomes cramped", async ({ page }) => {
+  await page.setViewportSize({ width: 2552, height: 1274 });
+  await open(page, "/settings/general");
+
+  const desktop = await page.locator('main').evaluate((main) => {
+    const shell = main.querySelector<HTMLElement>('[data-measure="expanded"]');
+    if (!shell) return null;
+    const mainRect = main.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    return {
+      width: Math.round(shellRect.width),
+      leftGap: Math.round(shellRect.left - mainRect.left),
+      rightGap: Math.round(mainRect.right - shellRect.right),
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    };
+  });
+  expect(desktop).toEqual({ width: 1920, leftGap: 284, rightGap: 284, scrollWidth: 2552, clientWidth: 2552 });
+  await page.screenshot({ path: `${SHOTS}/_general-expanded.png`, fullPage: true });
+
+  await page.setViewportSize({ width: 840, height: 900 });
+  const organization = await page.getByLabel("Organization name").boundingBox();
+  const locale = await page.getByLabel("Locale").boundingBox();
+  expect(organization).not.toBeNull();
+  expect(locale).not.toBeNull();
+  expect(Math.round(locale!.x)).toBe(Math.round(organization!.x));
+  expect(locale!.y).toBeGreaterThan(organization!.y + organization!.height);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(840);
+  await page.screenshot({ path: `${SHOTS}/_general-840.png`, fullPage: true });
+});
+
 test("app rails link to their own settings", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await open(page, "/studioflow");

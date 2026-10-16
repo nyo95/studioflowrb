@@ -135,6 +135,8 @@ Order matters; each item is its own Work Order.
 
 ## Master Data
 
+- [ ] [BUG] Saving a mixed Material-price batch no longer gives the promised partial-save result. In the seeded browser journey, two complete new rows plus one duplicate and one incomplete row leave the New price dialog unchanged: no `2 saved. 2 rows need fixing and are still here.` alert appears. Reproduced in the full 170-case browser run and again in the isolated 13-case Master Data file on 2026-10-16 while reviewing the unrelated Settings width change. Diagnose the price action/result handling as its own Master Data slice; do not fold it into UI Engine layout work.
+
 
 - [ ] [UNVERIFIED] Sample shelf R8.386-R8.390, still open after the 2026-10-08 walk (passed on an isolated server: add a sample with a typed new rack, lend it to a person and a StudioFlow project, return it, the history of both steps, "Remove" disabled with "return it first" while it is out; StudioFlow request, Put on shelf from Sample requests, the designer's Schedule card reading "Sample received" and the requester's notification "Your sample is on the shelf: R3 / B9"): send to a client, mark lost, discard, the right-click menu, the list view and the filters, and the "Sample received" shelf note inside the option dialog.
 
