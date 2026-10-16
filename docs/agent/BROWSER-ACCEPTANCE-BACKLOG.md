@@ -36,15 +36,15 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default) and 375 px
 - Steps: 1. Take the request in Master Data and decline with a reason. 2. Open or refresh the project's Product Schedule. 3. Check the Sample waiting filter and Home sample count. 4. Request another sample from the same option. 5. For an older Master Data-declined/StudioFlow-requested mismatch, use Update product schedule in the queue.
 - Acceptance: notification and Schedule agree on declined; reason is readable, not counted as waiting, and a new request is allowed. Retry fixes the old mismatch without a second decline notification; the screens remain usable on a phone.
-- Status: PENDING
+- Status: PASS 2026-10-16 (Codex acting as Lead, R9.102) — isolated Chromium journey takes and declines the request, checks requester notification and reason, removes it from the Schedule filter and Home waiting counts, recreates an older intake/Schedule mismatch only in the guarded disposable test database, repairs it through “Update product schedule” without another decline notification, and submits a new request. Reason and controls remain visible at 375 px.
 
 ### [R9.99] SKU dimensions and supplier price units are independent
 - Surface: Master Data → Pricing → Material, then SKUs
-- Fixture: disposable HPL SKU with dimensions 1220 × 2440 × 12 mm; two material suppliers and active sheet/box units
+- Fixture: disposable HPL SKU with dimensions 1220 × 2440 × 0.7 mm; two material suppliers and active sheet/box units
 - Viewport: desktop (default) and 375 px
 - Steps: 1. Add the SKU with its first price per sheet. 2. Add another supplier price per box. 3. Open the SKU editor and change its dimensions. 4. Reload Pricing and SKUs.
 - Acceptance: each supplier price keeps its own purchase unit; the SKU shows dimensions as information only; no BQ/base unit or conversion is asked for or shown; forms remain usable at 375 px.
-- Status: PENDING
+- Status: PASS 2026-10-16 (Codex acting as Lead, R9.102) — isolated Chromium journey creates a dimensioned HPL SKU from Pricing with a per-sheet price, adds another supplier price per box, reads the size and both units in SKUs, edits the dimensions, and confirms persistence without altering either price unit. SKU edit and Pricing controls remain reachable at 375 px. No BQ/base-unit conversion field appeared in this flow.
 
 ### [R9.99] A price-less sample-shelf SKU needs no purchase unit
 - Surface: Master Data → Samples → shelf SKU creation, then SKUs
@@ -52,7 +52,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Viewport: desktop (default)
 - Steps: 1. Create a new SKU while shelving the sample without recording a price. 2. Open the new SKU in the catalogue.
 - Acceptance: the SKU exists without a price or purchase unit; any optional dimensions remain informational.
-- Status: PENDING
+- Status: PASS 2026-10-16 (Codex acting as Lead, R9.102) — isolated Chromium journey creates a new SKU through Add sample without a price or purchase unit, shelves it, then finds the SKU with “No price” in the catalogue.
 
 ### [R9.91] Deliverable version numbers stay attached to uploads
 - Surface: StudioFlow project → Phases → a phase's deliverables
