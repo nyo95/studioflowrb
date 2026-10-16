@@ -92,6 +92,49 @@ describe("Presentation extracted module", () => {
     assert.ok((await testDb.prisma.auditEvent.findMany({ where: { app_id: "presentation" } })).every((event) => event.action.startsWith("presentation.")));
   });
 
+  it("reconciles every keyset page, clears only missing Schedule links, and is idempotent", async () => {
+    const board = await testDb.prisma.sfPresentationBoard.create({ data: { project_id: projectId, title: "Maintenance", sort_order: 0, created_by_id: userId } });
+    const slide = await testDb.prisma.sfPresentationSlide.create({ data: { board_id: board.id, sort_order: 0 } });
+    const image = await testDb.prisma.sfPresentationSlideImage.create({ data: { slide_id: slide.id, slot: 0, image_key: `presentation/${randomUUID()}.png` } });
+    const entryIds = [
+      "00000000-0000-4000-8000-000000000001",
+      "00000000-0000-4000-8000-000000000002",
+      "00000000-0000-4000-8000-000000000003",
+    ];
+    for (const [index, id] of entryIds.entries()) {
+      await testDb.prisma.sfScheduleEntry.create({ data: { id, project_id: projectId, section: "MATERIAL", category: "Stone", category_key: "stone", prefix: "ST", increment: index + 1, sort_order: index } });
+      await testDb.prisma.sfPresentationAnnotation.create({ data: { image_id: image.id, schedule_entry_id: id, pin_x: 10 + index, pin_y: 20, sort_order: index } });
+    }
+    await testDb.prisma.sfScheduleEntry.deleteMany({ where: { id: { in: entryIds.slice(1) } } });
+
+    assert.deepEqual(await presentation.reconcileScheduleLinks(1), { checked: 3, cleared: 2 }, "a live first page cannot starve later dangling IDs");
+    assert.deepEqual((await testDb.prisma.sfPresentationAnnotation.findMany({ orderBy: { sort_order: "asc" }, select: { schedule_entry_id: true } })).map((row) => row.schedule_entry_id), [entryIds[0], null, null]);
+    assert.deepEqual(await presentation.reconcileScheduleLinks(1), { checked: 1, cleared: 0 });
+  });
+
+  it("leaves links unchanged when StudioFlow lookup fails, then clears them on retry", async () => {
+    const board = await testDb.prisma.sfPresentationBoard.create({ data: { project_id: projectId, title: "Retry", sort_order: 0, created_by_id: userId } });
+    const slide = await testDb.prisma.sfPresentationSlide.create({ data: { board_id: board.id, sort_order: 0 } });
+    const image = await testDb.prisma.sfPresentationSlideImage.create({ data: { slide_id: slide.id, slot: 0, image_key: `presentation/${randomUUID()}.png` } });
+    const missingId = randomUUID();
+    const annotation = await testDb.prisma.sfPresentationAnnotation.create({ data: { image_id: image.id, schedule_entry_id: missingId, pin_x: 10, pin_y: 20, sort_order: 0 } });
+    const failing = createPresentationService(testDb.prisma, {
+      ...ports,
+      studioFlow: { ...ports.studioFlow, async listExistingPresentationScheduleEntryIds() { throw new Error("StudioFlow unavailable"); } },
+    });
+
+    await assert.rejects(() => failing.reconcileScheduleLinks(1), /StudioFlow unavailable/);
+    assert.equal((await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: annotation.id } })).schedule_entry_id, missingId);
+    const invalid = createPresentationService(testDb.prisma, {
+      ...ports,
+      studioFlow: { ...ports.studioFlow, async listExistingPresentationScheduleEntryIds() { return [randomUUID()]; } },
+    });
+    await assert.rejects(() => invalid.reconcileScheduleLinks(1), /invalid Presentation Schedule-link maintenance result/);
+    assert.equal((await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: annotation.id } })).schedule_entry_id, missingId);
+    assert.deepEqual(await presentation.reconcileScheduleLinks(1), { checked: 1, cleared: 1 });
+    assert.equal((await testDb.prisma.sfPresentationAnnotation.findUniqueOrThrow({ where: { id: annotation.id } })).schedule_entry_id, null);
+  });
+
   it("moves a pin without changing its linked item, note, label side or order, and retains write gates", async () => {
     const { boardId } = await presentation.createBoard({ ...command(), title: "Pin movement" });
     await presentation.addSlides({ ...command(), boardId, files: [png()] });

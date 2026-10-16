@@ -25,6 +25,7 @@ const IMAGE_BYTES = 3 * 1024 * 1024;
 /** The board an image is put on by "Add to moodboard"; found by this title (any letter case), created when missing. */
 const MOODBOARD_TITLE = "Moodboard";
 const SIGNED_URL_SECONDS = 15 * 60;
+const SCHEDULE_LINK_BATCH_SIZE = 100;
 const IMAGE_TYPES: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp" };
 
 export type PresentationImageUpload = { body: Uint8Array; contentType: string; imageRatio?: number | null };
@@ -423,6 +424,38 @@ export function createPresentationService(db: PresentationDb, ports: Presentatio
 
     async clearScheduleEntryLink(entryId: string) {
       return db.sfPresentationAnnotation.updateMany({ where: { schedule_entry_id: entryId }, data: { schedule_entry_id: null } });
+    },
+
+    async reconcileScheduleLinks(limit = SCHEDULE_LINK_BATCH_SIZE) {
+      const pageSize = Number.isInteger(limit) && limit > 0 ? Math.min(limit, SCHEDULE_LINK_BATCH_SIZE) : SCHEDULE_LINK_BATCH_SIZE;
+      let after: string | undefined;
+      let checked = 0;
+      let cleared = 0;
+      for (;;) {
+        const rows = await db.sfPresentationAnnotation.findMany({
+          where: { schedule_entry_id: { not: null, ...(after ? { gt: after } : {}) } },
+          distinct: ["schedule_entry_id"],
+          orderBy: { schedule_entry_id: "asc" },
+          take: pageSize,
+          select: { schedule_entry_id: true },
+        });
+        const entryIds = rows.flatMap((row) => row.schedule_entry_id ? [row.schedule_entry_id] : []);
+        if (entryIds.length === 0) break;
+        const existingIds = await ports.studioFlow.listExistingPresentationScheduleEntryIds(entryIds);
+        if (!Array.isArray(existingIds) || existingIds.some((id) => typeof id !== "string" || !entryIds.includes(id)) || new Set(existingIds).size !== existingIds.length) {
+          throw new Error("StudioFlow returned an invalid Presentation Schedule-link maintenance result.");
+        }
+        const existing = new Set(existingIds);
+        const missing = entryIds.filter((id) => !existing.has(id));
+        if (missing.length > 0) {
+          const result = await db.sfPresentationAnnotation.updateMany({ where: { schedule_entry_id: { in: missing } }, data: { schedule_entry_id: null } });
+          cleared += result.count;
+        }
+        checked += entryIds.length;
+        if (entryIds.length < pageSize) break;
+        after = entryIds[entryIds.length - 1];
+      }
+      return { checked, cleared };
     },
 
     async purgeArchivedProjectAssets(projectId: string) {

@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.109 | 2026-10-16 | fix(presentation): Reconcile deleted Schedule links (Executor + Lead PASS)
+
+- **Outcome:** Presentation maintenance now reads bounded, ordered pages of its linked Product Schedule IDs through a narrow StudioFlow existence projection and clears only IDs that no longer exist. Keyset paging drains the current set in one pass, so live links in an early page cannot starve later stale links. Normal board reads remain write-free and still hide a missing link before maintenance runs.
+- **Failure recovery:** the immediate post-delete clear remains unchanged for the normal fast path. If StudioFlow lookup fails or returns an invalid result, the current page is not changed and the established boot/daily maintenance retries later. A reconciliation failure is reported but does not prevent the unrelated archive-retention sweep; lifecycle maintenance bypasses the optional module gate so disabled Presentation data is not abandoned.
+- **Evidence:** focused Presentation and maintenance tests **9/9** prove live-link preservation, stale-link cleanup across one-item pages, idempotence, failed/invalid lookup safety, successful retry, read-only board projection, and maintenance composition. Full `npm test` **1223/1223**, typecheck, full lint, architecture boundaries, legacy-runtime, production build, and staged/unstaged whitespace checks PASS. Verbose successful output is retained in ignored local `.r9.109-*.log` files.
+- **Scope:** no UI behavior, permission, audit vocabulary, schema, migration, dependency, generic queue, cross-app foreign key, legacy access, remote action, or push. Browser review is not applicable because rendered and interactive behavior did not change. WO-PRESENTATION-SCHEDULE-LINK-RECONCILE-01 is complete with Lead verdict PASS.
+
 ## R9.108 | 2026-10-16 | plan(presentation): Prevent reconciliation batch starvation (Lead)
 
 - **Correction:** review found that restarting every daily reconciliation at the same first bounded batch could let a stable set of live links permanently hide later dangling IDs. The READY plan now requires keyset pagination through all current linked entry IDs in bounded cross-module chunks during one maintenance pass.

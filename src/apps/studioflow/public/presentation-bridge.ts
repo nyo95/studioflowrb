@@ -89,5 +89,14 @@ export function createStudioFlowPresentationBridge(db: PrismaClient) {
         return { entryId: entry.id, code: scheduleCode(entry.prefix, entry.increment), productName: option?.product_name ?? null };
       });
     },
+
+    /** Trusted lifecycle fact for Presentation maintenance; no user or project data crosses the boundary. */
+    async listExistingPresentationScheduleEntryIds(entryIds: string[]) {
+      const ids = [...new Set(entryIds)];
+      if (ids.length > 100) throw new Error("Presentation Schedule-link maintenance batch exceeds 100 entries.");
+      if (ids.length === 0) return [];
+      const entries = await db.sfScheduleEntry.findMany({ where: { id: { in: ids } }, select: { id: true } });
+      return entries.map((entry) => entry.id);
+    },
   };
 }
