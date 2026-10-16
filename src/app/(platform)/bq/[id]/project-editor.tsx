@@ -1284,7 +1284,7 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
             <TableRow className="hover:!bg-transparent">
               <TableCell />
               <TableCell colSpan={span - 1} className="!pt-4">
-                <span className="text-sm font-semibold uppercase tracking-[0.04em] text-ink">{subsection.name}</span>
+                <span className="text-sm font-semibold text-ink">{subsection.name}</span>
                 <span className="ml-2 text-xs text-ink-tertiary">{subsection.items.length} Work Item</span>
               </TableCell>
             </TableRow>
@@ -1334,17 +1334,6 @@ function ItemRows({ item, number, ctx, columns }: { item: BqItemDetail; number: 
           <TableCell className="tabular-nums text-ink-tertiary">{number}</TableCell>
           <TableCell wrap className="font-medium">
             <InlineEdit label="Nama Work Item" value={item.name} disabled={!ctx.editable} onCommit={ctx.commit(updateItemAction, item.id, "name")} />
-            {/* An L1 with children takes its cost from them (its own coefficient is dormant); a childless L1 has no
-                markup (zeroMarkupIfChildless). So only the one that applies is shown, and only when it is not neutral. */}
-            {(() => {
-              // The TBC / By Owner badge already says the row is not counted.
-              const note = isMarkerPriceMode(item.priceMode)
-                ? null
-                : hasChildren
-                  ? `Dari Cost Component (${lineItemIds(item).length} baris)${isZeroPrice(item.markupL1Pct) ? "" : ` · markup ${item.markupL1Pct}%`}`
-                  : isOne(item.koefisien) ? null : `koef ${item.koefisien}`;
-              return note ? <Text tone="tertiary" size="sm" className="mt-0.5 block px-1.5 font-normal">{note}</Text> : null;
-            })()}
           </TableCell>
           <TableCell wrap>
             {item.specification ? <Text tone="secondary" size="sm" className="line-clamp-3 whitespace-pre-line">{item.specification}</Text> : null}
@@ -1487,9 +1476,6 @@ function LineItemRow({ item, line, depth, ctx, selected }: {
             <InlineEdit label="Nama Cost Component" value={line.titleSnapshot} disabled={!ctx.editable} onCommit={ctx.commit(updateLineItemAction, line.id, "titleSnapshot")} />
             <div className="mt-0.5 flex flex-wrap items-center gap-1.5 px-1.5">
               <Badge tone="neutral">{KATEGORI_LABEL[line.kategori] ?? line.kategori}</Badge>
-              {line.sourceType !== "CUSTOM" ? (
-                <Text tone="tertiary" size="sm">{line.sourceType === "MASTERDATA" ? "Master Data" : "BQ Library"}</Text>
-              ) : null}
               {isOne(line.koefisien) ? null : <Text tone="tertiary" size="sm">koef {line.koefisien}</Text>}
               {line.sourcePriceSnapshot !== null && line.hargaSnapshot !== line.sourcePriceSnapshot ? (
                 <>

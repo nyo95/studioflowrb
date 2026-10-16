@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.116 | 2026-10-16 | fix(bq): Keep canvas copy focused (Lead)
+
+- **Canvas copy:** Subsection headings preserve their entered title case. Removed repeated Work Item calculation summaries and Cost Component source labels from the table; category, names and prices remain. Calculation and source detail stays in the selected-row panel.
+- **Verification:** typecheck, lint, and whitespace checks passed. No behavior, schema, dependency, permission, remote action, or push.
+
 ## R9.115 | 2026-10-16 | fix(bq): Hide Subsection deletion until layer interaction (Lead)
 
 - **Structure layer:** aligned the Subsection delete control with Work Item deletion. It is now hidden by default and appears only when its Struktur layer row is hovered or keyboard-focused, preserving its accessible label and existing confirmation.
