@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.105 | 2026-10-16 | plan(studioflow): Lock deliverable safety and concurrency (Lead)
+
+- **Decision:** confirmed the audit's deliverable findings against the accepted file contract and current runtime. The backend slice must prune by stable version number, serialize Final replacement per slot, add a database-level one-Final invariant, and prove timestamp disagreement plus concurrent Final requests. Existing permissions, expiry, audit, storage cleanup and stable numbering remain unchanged.
+- **UI contract:** deleting either a Final or working file requires the shared danger confirmation; delete, Final/Clear final and Extend must display their returned safe failure and remain retryable. The restrained design reuses the existing confirmation, command and inline-error patterns without redesigning the panel.
+- **Sequencing:** `PLAN.md` is READY for the R9.106 backend/migration/test revision. The acting Lead will then add the owned UI behavior and browser acceptance in a separate revision. Presentation dangling-link retry is explicitly a later module outcome, not an implicit cross-module write inside this file lifecycle.
+- **Checks:** plan reconciled against the current contract, service, schema, transaction runner, action boundary, UI Engine patterns, Next.js 16.3.2 mutation/error guidance, and existing regression tests. Documentation whitespace check PASS. No database command, dependency, legacy access, application behavior, remote action, or push.
+
 ## R9.104 | 2026-10-16 | fix(bq): Move project lifecycle actions to the directory (Lead)
 
 - **Outcome:** Lock/Unlock, Archive/Restore, and the protected deletion-request action now live in the three-dot menu on each BQ project row. The estimating workspace no longer carries project-administration controls and remains focused on BOQ content and quotation work. Permanent deletion is still available only after archive and still requires the existing approval flow.
