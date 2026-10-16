@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.115 | 2026-10-16 | fix(bq): Hide Subsection deletion until layer interaction (Lead)
+
+- **Structure layer:** aligned the Subsection delete control with Work Item deletion. It is now hidden by default and appears only when its Struktur layer row is hovered or keyboard-focused, preserving its accessible label and existing confirmation.
+- **Verification:** typecheck, focused lint, and whitespace checks passed. No behavior, schema, dependency, permission, remote action, or push.
+
 ## R9.114 | 2026-10-16 | fix(bq): Keep deletion controls in the Structure layer (Lead)
 
 - **Canvas hierarchy:** removed the persistent Work Item delete column from the estimating table. The table is now dedicated to workbook reading and cost editing.

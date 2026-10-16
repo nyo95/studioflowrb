@@ -521,6 +521,7 @@ function SectionOutline({
                   </a>
                   {tail(subsection.items.length)}
                   {editable ? (
+                    <span className="opacity-0 transition-opacity group-hover/outline:opacity-100 group-focus-within/outline:opacity-100">
                     <IconButton
                       size="sm"
                       variant="ghost"
@@ -533,6 +534,7 @@ function SectionOutline({
                         onDeleteSubsection({ id: subsection.id, name: subsection.name, itemCount: subsection.items.length, sectionName: section.name });
                       }}
                     />
+                    </span>
                   ) : null}
                 </div>
                 )}
