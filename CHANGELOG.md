@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.108 | 2026-10-16 | plan(presentation): Prevent reconciliation batch starvation (Lead)
+
+- **Correction:** review found that restarting every daily reconciliation at the same first bounded batch could let a stable set of live links permanently hide later dangling IDs. The READY plan now requires keyset pagination through all current linked entry IDs in bounded cross-module chunks during one maintenance pass.
+- **Scope:** this remains a read-only StudioFlow existence projection plus Presentation-owned cleanup. It adds no queue framework, maintenance cursor table, schema migration, dependency, UI behavior, write-on-read repair, cross-app foreign key, remote action, or push.
+- **Verification:** corrected the plan against the existing annotation index, StudioFlow public bridge, Presentation lifecycle surface, and application maintenance scheduler; documentation whitespace check PASS. Target implementation moves to R9.109.
+
 ## R9.107 | 2026-10-16 | fix(studioflow): Confirm deliverable deletion and show failures (Lead)
 
 - **Verdict:** PASS for WO-SF-DELIVERABLE-SAFETY-01/R9.106. The Deliverables panel now asks before deleting either a working or Final file, names the extra consequence for a Final, makes no server call after Cancel, and routes Delete, Mark/Clear Final, and Extend through the shared visible-error command so a refused request remains retryable.

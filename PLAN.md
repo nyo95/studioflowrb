@@ -3,7 +3,7 @@
 Plan ID: WO-PRESENTATION-SCHEDULE-LINK-RECONCILE-01
 Scope: Retry-safe cleanup of Presentation links to deleted Product Schedule entries
 Module(s): presentation, studioflow
-Target revision: R9.108
+Target revision: R9.109
 Status: READY
 Priority: P3
 Owner: Product Owner; Codex temporarily acts as Lead for this plan, then as Backend Executor
@@ -32,8 +32,10 @@ read-only.
 
 - Presentation owns its annotation rows and is the only module that may clear
   their stored links. StudioFlow exposes only a narrow read-only existence fact.
-- Reconciliation is bounded and idempotent: clear only IDs that are absent from
-  StudioFlow; never alter a link that still resolves.
+- Reconciliation is idempotent: clear only IDs that are absent from StudioFlow;
+  never alter a link that still resolves. Each cross-module read is bounded, and
+  one maintenance pass advances by keyset through all IDs present at its start so
+  stable live links cannot starve later dangling IDs.
 - A failed StudioFlow existence read performs no Presentation write and remains
   eligible for the next scheduled attempt.
 - Keep the immediate post-delete best-effort cleanup for fast normal behavior,
@@ -55,8 +57,11 @@ read-only.
 
 ## Backend Contract
 
-- Presentation selects a bounded batch of distinct non-null Schedule entry IDs
-  from its annotations and asks StudioFlow which still exist.
+- Presentation selects distinct non-null Schedule entry IDs in bounded,
+  lexicographically ordered keyset pages and asks StudioFlow which still exist.
+- One reconciliation call drains those pages to the end of the current result
+  set. It must not restart at the first page between chunks or use offset paging
+  that can skip rows after stale links are cleared.
 - It clears only links whose IDs are absent from that result and returns explicit
   counts sufficient for maintenance tests and observability.
 - If existence resolution throws or returns an invalid response, fail the batch
@@ -116,8 +121,9 @@ and failure/retry evidence.
 - A resolver that falsely reports a live ID absent would clear a useful link, so
   the public projection and failure validation need exact tests. Recovery is to
   relink the pin manually; never guess from deleted Schedule content.
-- A bounded batch may leave later stale IDs for a following daily run. This is
-  acceptable hygiene latency, not a reason to add an unbounded scan or queue.
+- Each bridge call and database page stays bounded, while one maintenance pass
+  examines the finite current set. Do not add a durable cursor or queue unless
+  measured scale later proves this indexed keyset scan insufficient.
 - Normal rollback is the local commit revert; no data rollback or remote action
   is authorized.
 
@@ -128,7 +134,7 @@ You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
 backend outcome and nothing beyond it. Inspect only the named Presentation/
 StudioFlow bridge, lifecycle, maintenance composition, and relevant tests;
 preserve unrelated owner work. Run the required checks with concise logged
-output, update `CHANGELOG.md`, and create R9.108 as one local commit. Stop only
+output, update `CHANGELOG.md`, and create R9.109 as one local commit. Stop only
 for a material locked-decision conflict or unsafe boundary, using the BLOCKED /
 CONFLICT report; otherwise finish the coherent outcome and report the commit,
 checks, limitations, and remaining unrelated dirty files.
