@@ -1,5 +1,9 @@
 # Changelog
 
+## R9.126 | 2026-10-17 | docs(ui-engine): queue directory workspace acceptance
+
+- Added the required browser acceptance walkthrough for the new shared directory workspace pattern.
+
 ## R9.125 | 2026-10-17 | feat(ui-engine): introduce professional directory workspace
 
 - Added the opt-in `workspace` DirectoryShell variant: a bounded, lightly framed operational surface with a deliberately quiet toolbar and pagination band.

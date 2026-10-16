@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.125] Professional directory workspace
+- Surface: BQ → Projects; Master Data → Brands
+- Fixture: editable account; a BQ project and at least one Brand
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Open each directory with few rows. 2. Use search, filter, sort, a row action, and pagination when available. 3. Resize to 375 px and inspect the horizontal-table behavior.
+- Acceptance: each directory reads as one bounded operational workspace with a quiet toolbar and pagination band; table controls, row actions, keyboard focus, and responsive overflow retain their prior behavior.
+- Status: PENDING
+
 ### [R9.122] BQ safe Section removal and optional Work Item organization
 - Surface: BQ Project → Struktur rail
 - Fixture: editable active BQ project with three Sections; source Section has direct Work Items, a populated Subsection with Cost Components, and an empty Subsection
