@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.107 | 2026-10-16 | fix(studioflow): Confirm deliverable deletion and show failures (Lead)
+
+- **Verdict:** PASS for WO-SF-DELIVERABLE-SAFETY-01/R9.106. The Deliverables panel now asks before deleting either a working or Final file, names the extra consequence for a Final, makes no server call after Cancel, and routes Delete, Mark/Clear Final, and Extend through the shared visible-error command so a refused request remains retryable.
+- **Browser evidence:** the disposable office fixture cancelled both working and Final deletion without losing either row, then confirmed each deletion; deliberately refused Final, delete, and Extend requests displayed the safe failure, kept the row usable, and succeeded on retry. The completed workflow had no page-level horizontal overflow at 375 px.
+- **Checks:** focused panel tests **2/2**, focused browser journey **1/1**, `npm test` **1220/1220**, typecheck, full lint, architecture boundaries, legacy-runtime, production build, and staged/unstaged whitespace checks PASS. The browser server logged the expected aborted-request errors from deliberate network refusal; assertions and process exit passed.
+- **Scope:** no schema, migration, dependency, permission, retention rule, remote action, or push in this Lead revision. The next READY plan handles Presentation's hidden dangling Schedule-link cleanup as a separate cross-module maintenance outcome; normal Presentation reads remain read-only.
+
 ## R9.106 | 2026-10-16 | fix(studioflow): Harden deliverable retention and Final concurrency (Executor)
 
 - **Scope:** WO-SF-DELIVERABLE-SAFETY-01 backend slice. Working-file pruning now keeps the two greatest stable version numbers instead of inferring upload order from transaction timestamps. Final replacement locks the existing durable phase/name slot before reading, clearing and setting Final, so it remains correct with a read-committed injected transaction runner as well as the production serializable runner.

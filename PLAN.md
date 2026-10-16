@@ -1,142 +1,134 @@
 # Active Plan
 
-Plan ID: WO-SF-DELIVERABLE-SAFETY-01
-Scope: Safe deliverable deletion, deterministic working-version retention, and one-Final concurrency
-Module(s): studioflow
-Target revision: R9.106
+Plan ID: WO-PRESENTATION-SCHEDULE-LINK-RECONCILE-01
+Scope: Retry-safe cleanup of Presentation links to deleted Product Schedule entries
+Module(s): presentation, studioflow
+Target revision: R9.108
 Status: READY
-Priority: P1
+Priority: P3
 Owner: Product Owner; Codex temporarily acts as Lead for this plan, then as Backend Executor
 Last updated: 2026-10-16
 
 ## Outcome
 
-Project staff cannot accidentally delete a deliverable without a clear warning,
-failed file commands are visible and retryable, the two newest working versions
-are selected by the canonical stored version number, and concurrent Final choices
-cannot leave two Final files in one phase/name slot.
+If immediate cleanup fails after a Product Schedule entry is deleted,
+Presentation eventually removes the stored link from its pins without relying on
+a user opening the board. Live links remain untouched and normal reads remain
+read-only.
 
 ## Context and Evidence
 
-- The accepted file contract keeps one Final plus the two newest working files in
-  each normalized phase/name slot; the stable increasing version number is the
-  canonical upload order.
-- Upload pruning currently orders working files by creation timestamp and id.
-- Final changes clear the prior Final and set the requested row inside one
-  transaction. Production uses serializable retries, but the database has no
-  direct one-Final invariant and no concurrent-final regression.
-- The Deliverables panel deletes immediately and ignores the safe failure result
-  returned by delete, Final, and expiry-extension actions.
+- Schedule deletion currently attempts to clear Presentation links after the
+  StudioFlow delete commits, but `Promise.allSettled` discards a cleanup failure.
+- Presentation board reads resolve links through StudioFlow and already project a
+  missing entry as no linked item, so users do not see an old code, name, or image.
+- The stored `schedule_entry_id` can nevertheless remain indefinitely. The
+  accepted R9.68 read contract intentionally performs no repair write during
+  `getBoard`, so opening a board cannot be the retry mechanism.
+- The existing production maintenance sweep already runs application-composed,
+  bounded cleanup for StudioFlow and optional Presentation data.
 
 ## Locked Decisions
 
-- Managers may intentionally delete a Final file; this plan adds explicit
-  confirmation rather than forbidding the workflow.
-- A slot keeps the Final independently from exactly the two highest surviving
-  non-Final version numbers. Timestamp and id never decide retention.
-- Exactly one Final is allowed for a phase/name slot at database level. Normal
-  service finalisation serializes per slot so competing requests finish safely;
-  the later completed request may replace the earlier Final.
-- Existing permission, expiry, audit, private-storage, cleanup-ledger, normalized
-  slot-name, and stable-version meanings remain unchanged.
-- No new dependency or cross-module relation is permitted.
+- Presentation owns its annotation rows and is the only module that may clear
+  their stored links. StudioFlow exposes only a narrow read-only existence fact.
+- Reconciliation is bounded and idempotent: clear only IDs that are absent from
+  StudioFlow; never alter a link that still resolves.
+- A failed StudioFlow existence read performs no Presentation write and remains
+  eligible for the next scheduled attempt.
+- Keep the immediate post-delete best-effort cleanup for fast normal behavior,
+  but correctness must no longer depend on that one attempt.
+- Maintenance must still run when the optional Presentation module is disabled;
+  disabling a module does not abandon its retained data.
+- No cross-app foreign key, cross-app database write, new dependency, or write on
+  a user-facing read path is permitted.
 
 ## Business Rules and Architecture Constraints
 
-- REUSE the existing durable deliverable-slot row as the per-slot coordination
-  point and the existing UI Engine confirmation/error patterns.
-- Keep all persistence and policy inside StudioFlow. The database migration must
-  reject any future attempt to persist two Final rows for the same slot.
-- Do not infer order from transaction timestamps; concurrent uploads may wait on
-  the slot allocator after their transaction clock was established.
+- EXTEND the existing StudioFlow-to-Presentation public bridge with one trusted,
+  read-only existence projection for a bounded set of Schedule entry IDs.
+- EXTEND Presentation's lifecycle surface with app-owned reconciliation and
+  compose it into the existing maintenance runner. Do not create a generic
+  outbox, queue framework, or second scheduler for this hygiene task.
+- Do not expose deleted entry details, user grants, or Presentation internals
+  through the existence projection.
 
 ## Backend Contract
 
-- Upload pruning keeps the two greatest `version_number` values among non-Final
-  rows after the new upload.
-- Finalisation obtains a per-slot database lock before reading/clearing the
-  existing Final and setting the requested row. This must remain correct even
-  when the injected transaction runner uses ordinary read-committed transactions.
-- A forward-only migration adds the one-Final-per-slot database invariant without
-  rewriting legitimate deliverables. If pre-existing duplicate Finals exist, the
-  migration fails visibly rather than choosing a winner silently.
-- Add deterministic regressions for timestamp/version disagreement and concurrent
-  finalisation. Keep the existing concurrent upload and lifecycle coverage.
+- Presentation selects a bounded batch of distinct non-null Schedule entry IDs
+  from its annotations and asks StudioFlow which still exist.
+- It clears only links whose IDs are absent from that result and returns explicit
+  counts sufficient for maintenance tests and observability.
+- If existence resolution throws or returns an invalid response, fail the batch
+  closed before changing any annotation.
+- Application maintenance invokes this reconciliation on the established
+  boot/daily schedule alongside existing Presentation asset retry and StudioFlow
+  archive retention. Repeated runs converge without duplicate effects.
 
 ## UI Contract
 
-Visual thesis: a calm operational file list where destructive intent and failure
-state are unmistakable without adding permanent visual clutter.
-
-Content plan: preserve the existing list; use one shared danger confirmation for
-deletion and one nearby inline error for failed delete, Final, or Extend commands.
-
-Interaction thesis: deletion performs no server call before confirmation; the
-target row alone shows pending state; a safe server refusal remains visible and
-the operator can retry without reloading.
-
-The Lead owns this UI follow-through after the Executor backend commit. Reuse
-`useConfirm`, `useCommand`, and `InlineError`; do not create a second dialog,
-notification system, or new layout.
+None. Missing Schedule entries continue to render as unlinked pins exactly as
+they do today. No new button, message, loading state, or user workflow.
 
 ## Boundaries and Non-goals
 
-- No change to who can upload, finalise, extend, download, or delete.
-- No file restore/undo, bulk actions, renaming, retention-duration change, or
-  broad Deliverables redesign.
-- Presentation dangling-link reconciliation is a separate module outcome and is
-  not mixed into this deliverable transaction.
+- No change to Schedule deletion, Presentation pin editing, permissions, module
+  switches, board rendering, or audit vocabulary.
+- No Ideas usage cleanup redesign; option-usage cleanup is separately owned and
+  is not evidence for this exact entry-link outcome.
+- No durable generic integration queue, manual repair UI, or schema migration
+  unless repository evidence proves the bounded reconciliation cannot work.
 - No legacy access, remote action, release, or push.
 
 ## Acceptance Criteria
 
-- A Final and a working file both require the destructive confirmation before
-  deletion; cancel leaves the row and object untouched.
-- Safe failures from delete, Final/Clear final, and Extend are shown in the panel;
-  success refreshes the list and clears the prior error.
-- Deliberately inverted timestamps cannot cause a higher working version to be
-  pruned while a lower one survives.
-- Two simultaneous Final requests finish with exactly one Final, and the database
-  itself refuses a manually attempted duplicate.
-- Existing one-Final-plus-two-working behavior, permissions, expiry, version
-  continuity, audit, and storage cleanup tests remain green.
+- A missing Schedule entry's stored ID is cleared by maintenance without a board
+  read and remains cleared on repeated runs.
+- A live Schedule entry link survives reconciliation unchanged.
+- A simulated StudioFlow read failure leaves every Presentation link unchanged;
+  a later successful run clears the stale link.
+- Immediate post-delete cleanup still clears normally, while an injected failure
+  is repaired by maintenance.
+- Reconciliation runs through the existing production maintenance composition
+  even when Presentation is disabled.
+- Existing board reads remain write-free and continue projecting a missing link
+  as `null` before reconciliation has run.
 
 ## Verification
 
-- Focused StudioFlow service integration tests for pruning, concurrent Final, and
-  direct database invariant.
-- Focused component/action tests for confirmation, cancel, pending state, safe
-  errors, retry, and success.
-- Mandatory Executor gates: `npm test`, typecheck, lint, boundary check,
-  legacy-runtime check, production build, and staged/unstaged whitespace checks.
-- Apply the migration to both verified office rebuild databases and regenerate
-  the Prisma client before final verification.
+- Focused Presentation integration tests for live, dangling, failure, retry, and
+  idempotent batches; focused maintenance-composition test.
+- Level 3 gates: relevant integration tests, typecheck, lint, architecture
+  boundaries, legacy-runtime, full test suite, production build, and staged/
+  unstaged whitespace checks.
+- Capture verbose successful output in local ignored logs and report concise
+  summaries; expose the relevant excerpt and log path only on failure.
 
 ## Reviewer Acceptance
 
-- In the disposable browser fixture, cancel deletion of a working and Final file,
-  then confirm deletion and observe the correct row disappear.
-- Force one safe refusal for delete, Final, and Extend; each message is visible,
-  the row remains usable, and retry succeeds.
-- Confirm the list remains usable at 375 px and has no sideways overflow.
+Browser review is not applicable: the stored dangling ID is already hidden from
+the UI and this plan deliberately changes no rendered or interactive behavior.
+Reviewer verifies the service diff, ownership boundary, scheduled composition,
+and failure/retry evidence.
 
 ## Regression Risks and Recovery
 
-- The partial unique index is intentionally stricter than service code; migration
-  failure reveals pre-existing invalid data and must block rather than repair it.
-- The slot lock must cover the read/clear/set sequence without changing the
-  version allocator. Rollback is the normal local commit revert plus the
-  forward-only migration policy; no destructive database rollback is authorized.
+- A resolver that falsely reports a live ID absent would clear a useful link, so
+  the public projection and failure validation need exact tests. Recovery is to
+  relink the pin manually; never guess from deleted Schedule content.
+- A bounded batch may leave later stale IDs for a following daily run. This is
+  acceptable hygiene latency, not a reason to add an unbounded scan or queue.
+- Normal rollback is the local commit revert; no data rollback or remote action
+  is authorized.
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY
-backend outcome and nothing beyond it. Inspect current repository evidence,
-preserve unrelated owner work, make sound in-scope implementation decisions,
-run the required checks, update `CHANGELOG.md`, and create R9.106 as one local
-commit. Leave the Lead-owned confirmation/error presentation and browser
-acceptance for the following Lead revision. Stop only for a material
-locked-decision conflict or unsafe boundary, using the BLOCKED / CONFLICT report;
-otherwise finish the coherent outcome and report the commit, checks, limitations,
-and remaining unrelated dirty files.
+backend outcome and nothing beyond it. Inspect only the named Presentation/
+StudioFlow bridge, lifecycle, maintenance composition, and relevant tests;
+preserve unrelated owner work. Run the required checks with concise logged
+output, update `CHANGELOG.md`, and create R9.108 as one local commit. Stop only
+for a material locked-decision conflict or unsafe boundary, using the BLOCKED /
+CONFLICT report; otherwise finish the coherent outcome and report the commit,
+checks, limitations, and remaining unrelated dirty files.

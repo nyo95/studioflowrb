@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState } from "react";
 import { FileDown, Trash2, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 
-import { Badge, Button, SectionCard, Text } from "@/platform/ui_engine";
+import { Badge, Button, InlineError, SectionCard, Text, useConfirm } from "@/platform/ui_engine";
+import { useCommand } from "../../../../_components/use-command";
 import { deleteDeliverableAction, extendDeliverableExpiryAction, setDeliverableFinalAction } from "../../../../actions";
 
 type Deliverable = {
@@ -55,8 +56,8 @@ export function DeliverablesPanel({
   canWork: boolean;
   canManage: boolean;
 }) {
-  const [isPending, startTransition] = useTransition();
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const command = useCommand();
+  const confirm = useConfirm();
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -64,12 +65,17 @@ export function DeliverablesPanel({
   const statusConfig = STATUS_CONFIG[status];
   const StatusIcon = statusConfig.icon;
 
-  function remove(d: Deliverable) {
-    setPendingId(d.id);
-    startTransition(async () => {
-      await deleteDeliverableAction({ projectId, deliverableId: d.id });
-      setPendingId(null);
+  async function remove(d: Deliverable) {
+    const accepted = await confirm.confirm({
+      title: d.isFinal ? `Delete final file ${d.name}?` : `Delete ${d.name}?`,
+      description: d.isFinal
+        ? `Version ${d.versionNumber} is the Final file. Deleting it is permanent and leaves this file slot without a Final.`
+        : `Version ${d.versionNumber} will be permanently deleted. This cannot be undone.`,
+      confirmLabel: "Delete file",
+      tone: "danger",
     });
+    if (!accepted) return;
+    await command.run(`deliverable:${d.id}`, () => deleteDeliverableAction({ projectId, deliverableId: d.id }));
   }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -111,13 +117,11 @@ export function DeliverablesPanel({
   }
 
   function setFinal(d: Deliverable, isFinal: boolean) {
-    setPendingId(d.id);
-    startTransition(async () => { await setDeliverableFinalAction({ projectId, deliverableId: d.id, isFinal }); setPendingId(null); });
+    void command.run(`deliverable:${d.id}`, () => setDeliverableFinalAction({ projectId, deliverableId: d.id, isFinal }));
   }
 
   function extend(d: Deliverable) {
-    setPendingId(d.id);
-    startTransition(async () => { await extendDeliverableExpiryAction({ projectId, deliverableId: d.id }); setPendingId(null); });
+    void command.run(`deliverable:${d.id}`, () => extendDeliverableExpiryAction({ projectId, deliverableId: d.id }));
   }
 
   return (
@@ -165,8 +169,8 @@ export function DeliverablesPanel({
               {canManage ? (
                 <button
                   type="button"
-                  disabled={pendingId === d.id && isPending}
-                  onClick={() => remove(d)}
+                  disabled={command.isPending(`deliverable:${d.id}`)}
+                  onClick={() => void remove(d)}
                   className="shrink-0 text-ink-tertiary opacity-0 transition-opacity hover:text-danger group-hover:opacity-100 focus:opacity-100"
                   aria-label={`Delete ${d.name}`}
                 >
@@ -175,16 +179,18 @@ export function DeliverablesPanel({
               ) : null}
               {canWork || canManage ? (
                 <div className="flex gap-1">
-                  <Button type="button" size="sm" variant="ghost" disabled={pendingId === d.id && isPending} onClick={() => setFinal(d, !d.isFinal)}>
+                  <Button type="button" size="sm" variant="ghost" disabled={command.isPending(`deliverable:${d.id}`)} onClick={() => setFinal(d, !d.isFinal)}>
                     {d.isFinal ? "Clear final" : "Mark final"}
                   </Button>
-                  {!d.isFinal ? <Button type="button" size="sm" variant="ghost" disabled={pendingId === d.id && isPending} onClick={() => extend(d)}>Extend</Button> : null}
+                  {!d.isFinal ? <Button type="button" size="sm" variant="ghost" disabled={command.isPending(`deliverable:${d.id}`)} onClick={() => extend(d)}>Extend</Button> : null}
                 </div>
               ) : null}
             </li>
           ))}
         </ul>
       )}
+
+      {command.error ? <div className="mt-3"><InlineError>{command.error}</InlineError></div> : null}
 
       {canWork ? (
         <div className={`mt-3 ${status === "MISSING" ? "rounded-control bg-surface-muted p-3" : ""}`}>
@@ -198,7 +204,7 @@ export function DeliverablesPanel({
           />
           <label
             htmlFor={`deliverable-upload-${phaseId}`}
-            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:border-line-emphasis hover:text-ink ${isPending || progress !== null ? "pointer-events-none opacity-60" : ""}`}
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:border-line-emphasis hover:text-ink ${command.pending || progress !== null ? "pointer-events-none opacity-60" : ""}`}
           >
             <Upload className="size-3.5" />
             {progress !== null ? `Uploading… ${progress}%` : "Upload file"}
@@ -208,6 +214,7 @@ export function DeliverablesPanel({
           <p className="mt-1 text-xs text-ink-tertiary" title="Files that are not marked final delete themselves after 30 days; only the 2 newest versions of a file are kept.">PDF, PNG, JPEG, WebP or ZIP · up to 500 MB. Temporary files expire.</p>
         </div>
       ) : null}
+      {confirm.dialog}
     </SectionCard>
   );
 }
