@@ -25,7 +25,7 @@ const PRESENTATION: Readonly<Record<string, PermissionPresentation>> = {
 
   "bq.project.read": { resourceLabel: "Projects", actionLabel: "View BQ projects" },
   "bq.project.manage": { resourceLabel: "Projects", actionLabel: "Create and edit BQ projects" },
-  "bq.project-deletion.approve": { resourceLabel: "Projects", actionLabel: "Approve permanent deletion", description: "Can permanently delete archived BQ projects.", caution: true },
+  "bq.project-deletion.approve": { resourceLabel: "Projects", actionLabel: "Delete permanently", description: "Can permanently delete archived BQ projects.", caution: true },
   "bq.library.read": { resourceLabel: "Library", actionLabel: "View BQ Library" },
   "bq.library.manage": { resourceLabel: "Library", actionLabel: "Manage BQ Library and templates" },
   "bq.library.promote": { resourceLabel: "Library", actionLabel: "Submit items to Master Data" },

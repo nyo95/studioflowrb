@@ -977,9 +977,10 @@ describe("Master Data service", () => {
       grants: GRANTS,
       actor: ACTOR,
       name: "Granite Tile 60x60",
+      notes: "Polished finish",
       brandId: brand.brandId,
       categoryId: prodCat.categoryId,
-      priceMaterials: [{ unitId: defaultUnitId, supplierVendorId: vendor.vendorId, amount: "185000", currency: "IDR" }],
+      priceMaterials: [{ unitId: defaultUnitId, supplierVendorId: vendor.vendorId, amount: "185000", currency: "IDR", notes: "Include delivery" }],
     });
 
     // 2. Material + Labor price
@@ -1015,6 +1016,8 @@ describe("Master Data service", () => {
     const byId = await publicRead.getMaterialPriceOption(matOptions[0].id);
     assert.equal(byId?.id, matOptions[0].id);
     assert.equal(byId?.amount, "185000");
+    assert.equal(byId?.skuNotes, "Polished finish");
+    assert.equal(byId?.notes, "Include delivery");
     assert.equal(await publicRead.getMaterialPriceOption("00000000-0000-0000-0000-000000000000"), null);
 
     const workPrices = await publicRead.listWorkPricesRead({ categoryId: workCat.categoryId });

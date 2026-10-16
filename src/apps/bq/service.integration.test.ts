@@ -834,7 +834,7 @@ describe("BQ R6.1 invariants", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: assembly.id } }), assemblyAuditCount);
   });
 
-  it("permanently deletes only an archived project through an approved request", async () => {
+  it("allows a deletion-right holder to approve their own archived-project request", async () => {
     const { project } = await projectTree();
     await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });
     const request = await service.requestProjectDeletion({
@@ -858,12 +858,7 @@ describe("BQ R6.1 invariants", () => {
       "PENDING",
     );
     await service.archiveProject({ grants: GRANTS, actor: ACTOR, id: project.id });
-    await assert.rejects(
-      () => service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.id }),
-      (error: unknown) => error instanceof AppError && error.code === "bq.project.deletion-self-approval",
-    );
-    assert.ok(await testDb.prisma.bqProject.findUnique({ where: { id: project.id } }));
-    await service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR_B, requestId: request.id });
+    await service.approveProjectDeletion({ grants: GRANTS, actor: ACTOR, requestId: request.id });
     assert.equal(await testDb.prisma.bqProject.findUnique({ where: { id: project.id } }), null);
     assert.equal(
       (await testDb.prisma.bqProjectDeletionRequest.findUniqueOrThrow({ where: { id: request.id } })).status,

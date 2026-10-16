@@ -80,7 +80,7 @@ import { NewWorkItemDialog } from "./new-work-item-dialog";
 import { SaveAsAssemblyDialog } from "./save-as-assembly-dialog";
 import { ImportDialog } from "./source-picker-dialog";
 import { QuotationDialog } from "./quotation-dialog";
-import { QuickEntryRow, type QuickEntryFields } from "./quick-entry-row";
+import { QuickEntryRow } from "./quick-entry-row";
 import {
   buildLineItemMoveFields,
   lineItemIds,
@@ -815,13 +815,6 @@ export function ProjectEditor({
       if (!current || current.itemId !== item.id) return;
       runMoveTransition(() => requestLineItemMove(item, label, target, undefined, current.lineIds));
     },
-    quickAdd: (target, fields) => {
-      const price = fields.hargaSnapshot ? (resolveCalcExpression(fields.hargaSnapshot) ?? fields.hargaSnapshot) : "";
-      return run(addItemAction, {
-        ...target, name: fields.name, qty: fields.qty, unit: fields.unit, specification: fields.specification || undefined,
-        ...(price ? { hargaSnapshot: price } : { priceMode: "TBC" }),
-      });
-    },
   };
 
   /** Work Items in screen order, for ↑ ↓ in the side panel. */
@@ -1172,7 +1165,6 @@ type TableCtx = {
   dragOver: (item: BqItemDetail, overId: string) => boolean;
   dragEnd: () => void;
   drop: (item: BqItemDetail, target: ExistingLineItemTarget, label: string) => void;
-  quickAdd: (target: { sectionId?: string; subsectionId?: string }, fields: QuickEntryFields) => Promise<void>;
 };
 
 /** A click that lands on a control inside a row (expand, delete, a name being edited) is that control's. */
@@ -1214,11 +1206,9 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
   const [folded, setFolded] = useState(false);
   const entry = (target: { sectionId?: string; subsectionId?: string }, where: string) => (
     <QuickEntryRow
-      units={ctx.units.map((unit) => unit.code)}
       disabled={ctx.pending}
-      editableColumn={ctx.editable}
-      onAdd={(fields) => ctx.quickAdd(target, fields)}
-      onMore={onMore ? () => onMore({ ...target, where }) : undefined}
+      columns={span}
+      onAdd={() => onMore?.({ ...target, where })}
     />
   );
   return (

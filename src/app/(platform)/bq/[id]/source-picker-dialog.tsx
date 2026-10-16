@@ -6,14 +6,9 @@ import { Button, Dialog, EmptyState, InlineError, SearchField } from "@/platform
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import { listLineItemSourcesAction, type LineItemSourceOption } from "./source-actions";
 
-const KATEGORI_LABEL: Record<string, string> = {
-  MATERIAL: "Material",
-  UPAH: "Labor",
-  MATERIAL_UPAH: "Material + Labor",
-  BIAYA_UMUM: "Biaya Umum",
-  TRANSPORTASI_AKOMODASI: "Transportasi",
-  ALAT: "Alat",
-};
+function sourceDescription(option: LineItemSourceOption) {
+  return [option.specification, option.notes].filter((value): value is string => Boolean(value?.trim())).join(" · ");
+}
 
 export type SourcePickOption =
   | LineItemSourceOption
@@ -194,9 +189,7 @@ export function ImportDialog({
                     >
                       <span className="grid min-w-0 gap-0.5">
                         <span className="truncate font-medium text-ink">{option.title}</span>
-                        <span className="truncate text-xs text-ink-tertiary">
-                          {option.detail} · {KATEGORI_LABEL[option.kategori] ?? option.kategori}
-                        </span>
+                        {sourceDescription(option) ? <span className="truncate text-xs text-ink-tertiary">{sourceDescription(option)}</span> : null}
                       </span>
                       <span className="shrink-0 text-right tabular-nums text-ink">
                         {formatMoney(createMoney(option.amount, option.currency))}

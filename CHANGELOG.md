@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.112 | 2026-10-16 | fix(bq): Simplify deletion, Work Item entry, and cost-source detail (Executor)
+
+- **Penghapusan BQ:** pemegang izin penghapusan dapat langsung menjalankan penghapusan project yang sudah diarsipkan, termasuk bila ia sendiri yang mengajukannya. Tidak ada lagi isian `DELETE` atau kebutuhan orang kedua; akses izin dan jejak pengajuan tetap berlaku.
+- **Pembuatan Work Item:** menghapus baris ketik cepat yang menumpuk dengan ikon form. Setiap bagian sekarang memiliki satu tombol Tambah Work Item yang membuka form lengkap dan tetap mendukung Assembly.
+- **Pemilih Cost Component:** ringkasan setiap pilihan kini menampilkan spesifikasi dan catatan sumber yang tersedia, bukan nama vendor maupun label teknis asal data. Kontrak baca Master Data sekarang juga menyediakan catatan SKU dan harga material untuk kebutuhan ini.
+- **Evidence:** `npm test` 1227/1227, typecheck, lint, architecture boundaries, legacy-runtime, production build, pemeriksaan browser BQ, dan whitespace check PASS. Tidak ada migrasi, dependency, atau aksi remote.
+
 ## R9.111 | 2026-10-16 | fix(studioflow): Keep Home limited to signed-in projects (Lead)
 
 - **Home:** removed the Mine / Everyone's switch. Project cards and running-project figures always use the signed-in person's PIC assignments, including for managers; an old `scope=all` URL has no effect. Running / Completed remains available, and the empty-state copy no longer suggests switching to all projects.

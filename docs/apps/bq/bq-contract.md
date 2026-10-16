@@ -419,17 +419,17 @@ Project hanya boleh dikunci bila memiliki sedikitnya satu Work Item. Baris denga
 
 **Service-layer enforcement:** setiap mutation terhadap content BQ wajib melewati guard `requireEditableProject` yang reject bila status `LOCKED` atau `ARCHIVED`. Tidak cukup hanya disable tombol di UI.
 
-Permanent deletion is a separate, BQ-owned approval workflow:
+Permanent deletion stays BQ-owned and permission-gated:
 
 - only an ARCHIVED project may receive a deletion request;
 - at most one request may be PENDING for a project;
-- approval requires `bq.project-deletion.approve` (never a Role-name bypass);
-- approval hard-deletes the project and closes the request in one transaction;
+- permanent deletion requires `bq.project-deletion.approve` (never a Role-name bypass);
+- execution hard-deletes the project and closes the request in one transaction;
 - request, rejection, and successful deletion produce BQ audit events;
-- restoring the project before approval causes approval to fail while the
+- restoring the project before execution causes deletion to fail while the
   request remains reviewable.
 
-Orang yang mengajukan permintaan penghapusan tidak boleh menyetujui permintaan yang sama. Menolak permintaan sendiri tetap boleh sebagai pembatalan; tidak ada pengecualian untuk studio dengan satu approver, sehingga diperlukan approver kedua.
+Pemegang `bq.project-deletion.approve` dapat langsung mengeksekusi penghapusan, termasuk untuk permintaannya sendiri. Tidak ada ketik ulang `DELETE` atau approver kedua; izin tersebut adalah pengaman yang menentukan siapa yang boleh melakukannya.
 
 BQ Project berdiri sendiri dulu — integrasi formal ke StudioFlow via `external_ref` menyusul.
 
@@ -548,19 +548,18 @@ ke baris Work Item-nya sendiri (keluar dari grup), hanya di dalam Work Item yang
 sama; pemindahan memakai pratinjau dan aturan Slice 3 yang sama. Urutan Work Item
 tetap diatur di panel Struktur.
 
-**Baris isi (owner 2026-10-14).** Baris terakhir setiap Subsection (dan Section
-tanpa Subsection) adalah baris kosong di kolom yang sama: nama, spesifikasi, vol,
-sat, harga; Tab pindah kolom, Enter menyimpan dan baris siap untuk pekerjaan
-berikutnya (satuan diingat), Esc mengosongkan. Harga kosong = TBC. Satuan kantor
-seperti "titik" atau "m'" dibaca sebagai kode studio (point, m). Ikon di ujung
-baris membuka form lengkap (bisa memakai Assembly). Tidak ada tempel dari Excel:
-pekerjaan dari workbook dikonversi manual (owner 2026-10-14).
+**Tambah Work Item (owner 2026-10-16).** Setiap Subsection (dan Section tanpa
+Subsection) memiliki satu tombol tambah yang membuka form lengkap, termasuk opsi
+memakai Assembly. Baris isi cepat di tabel tidak digunakan agar tidak ada dua cara
+yang melakukan hal yang sama. Tidak ada tempel dari Excel: pekerjaan dari workbook
+dikonversi manual.
 
 *Penyisipan* Cost Component tetap punya afordansnya sendiri, karena memilih sumber bukan
 mengubah nilai: "Baris custom" langsung membuat baris kosong yang siap diketik,
 sedangkan "Impor" membuka picker pencarian Master Data dan BQ Library. Picker itu
 tidak melanggar aturan inline — ia memilih dari mana sebuah baris berasal, bukan
-mengedit isinya. Setelah tersisip, Cost Component impor sama bisa di-edit inline seperti
+mengedit isinya. Setiap hasil menampilkan spesifikasi dan catatan yang tersedia,
+bukan label teknis asal data. Setelah tersisip, Cost Component impor sama bisa di-edit inline seperti
 yang lain (K-05).
 
 Impor harga material memerlukan `MASTERDATA_PERMISSIONS.priceMaterialRead`; impor labor dan material-labor memerlukan `MASTERDATA_PERMISSIONS.priceWorkRead`. Pemeriksaan ini dilakukan di server sebelum pembacaan harga.

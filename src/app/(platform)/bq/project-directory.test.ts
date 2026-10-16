@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 const page = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
 const rowActions = readFileSync(new URL("./project-row-actions.tsx", import.meta.url), "utf8");
+const deletionReview = readFileSync(new URL("./project-deletion-review.tsx", import.meta.url), "utf8");
 const editor = readFileSync(new URL("./[id]/project-editor.tsx", import.meta.url), "utf8");
 
 describe("BQ project directory", () => {
@@ -20,5 +21,10 @@ describe("BQ project directory", () => {
       assert.match(rowActions, new RegExp(label));
     }
     assert.doesNotMatch(editor, /Kunci project ini\?|Arsipkan project ini\?|Ajukan penghapusan permanen\?/);
+  });
+
+  it("lets a deletion-right holder execute the pending deletion without a typed confirmation", () => {
+    assert.match(deletionReview, /label: "Delete permanently"/);
+    assert.doesNotMatch(deletionReview, /requireTypedConfirmation|ConfirmDialog|Approve permanent deletion/);
   });
 });

@@ -23,7 +23,8 @@ export type LineItemSourceOption = {
   sourceType: "MASTERDATA" | "BQ_LIBRARY";
   sourceKind: "material" | "material-labor" | "labor" | "library";
   title: string;
-  detail: string;
+  specification: string | null;
+  notes: string | null;
   unit: string;
   amount: string;
   currency: string;
@@ -55,7 +56,8 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
         sourceType: "BQ_LIBRARY",
         sourceKind: "library",
         title: item.name,
-        detail: "BQ Library",
+        specification: null,
+        notes: item.notes,
         unit: item.purchaseUnit,
         amount: item.harga,
         currency: item.currency,
@@ -76,7 +78,8 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
           sourceType: "MASTERDATA",
           sourceKind: "material",
           title: option.skuName ?? option.skuCode ?? "Material",
-          detail: `${option.supplierVendor.name} · Master Data`,
+          specification: formatMaterialSpecification(option.measurement),
+          notes: [option.skuNotes, option.notes].filter((value): value is string => Boolean(value?.trim())).join(" · ") || null,
           unit: option.unit.code,
           amount: option.amount,
           currency: option.currency,
@@ -94,7 +97,8 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
           sourceType: "MASTERDATA",
           sourceKind: option.kind,
           title: option.name,
-          detail: `${option.vendor.name} · Master Data`,
+          specification: option.dimDisplay ?? option.scopeNote,
+          notes: option.notes,
           unit: option.unit.code,
           amount: option.amount,
           currency: option.currency,
@@ -105,6 +109,11 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
 
     return options;
   });
+}
+
+function formatMaterialSpecification(measurement: { dimensionLength: string | null; dimensionWidth: string | null; dimensionThickness: string | null; dimensionUnit: { code: string } | null }) {
+  const dimensions = [measurement.dimensionLength, measurement.dimensionWidth, measurement.dimensionThickness].filter((value): value is string => value !== null);
+  return dimensions.length > 0 ? `${dimensions.join(" × ")} ${measurement.dimensionUnit?.code ?? ""}`.trim() : null;
 }
 
 /**

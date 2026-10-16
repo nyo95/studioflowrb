@@ -35,6 +35,8 @@ export type MaterialPriceOption = {
     dimensionThickness: string | null;
     dimensionUnit: { id: string; code: string; name: string } | null;
   };
+  skuNotes: string | null;
+  notes: string | null;
   sourceLink: { id: string; kind: string; url: string; label: string | null } | null;
 };
 
@@ -66,6 +68,7 @@ const MATERIAL_PRICE_OPTION_SELECT = {
   amount: true,
   amount_label: true,
   currency: true,
+  notes: true,
   supplier_vendor: { select: { id: true, name: true, slug: true } },
   unit: { select: { id: true, code: true, name: true } },
   sku: {
@@ -76,6 +79,7 @@ const MATERIAL_PRICE_OPTION_SELECT = {
       dimension_width: true,
       dimension_thickness: true,
       dimension_unit: { select: { id: true, code: true, name: true } },
+      notes: true,
     },
   },
   source_link: { select: { id: true, kind: true, url: true, label: true } },
@@ -96,7 +100,9 @@ type MaterialPriceRow = {
     dimension_width: { toString: () => string } | null;
     dimension_thickness: { toString: () => string } | null;
     dimension_unit: { id: string; code: string; name: string } | null;
+    notes: string | null;
   };
+  notes: string | null;
   source_link: { id: string; kind: string; url: string; label: string | null } | null;
 };
 
@@ -117,6 +123,8 @@ function toMaterialPriceOption(p: MaterialPriceRow): MaterialPriceOption {
       dimensionThickness: p.sku.dimension_thickness?.toString() ?? null,
       dimensionUnit: p.sku.dimension_unit,
     },
+    skuNotes: p.sku.notes,
+    notes: p.notes,
     sourceLink: p.source_link,
   };
 }

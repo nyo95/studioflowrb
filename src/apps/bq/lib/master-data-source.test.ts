@@ -25,6 +25,8 @@ const material = {
     dimensionUnit: null,
     purchaseToBaseFactor: "2.88",
   },
+  skuNotes: null,
+  notes: null,
   sourceLink: null,
 };
 

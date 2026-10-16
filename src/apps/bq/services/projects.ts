@@ -470,9 +470,6 @@ async function approveProjectDeletion(input: {
   if (!request || request.status !== "PENDING") {
     throw new AppError("CONFLICT", "bq.project.deletion-not-pending", "Deletion request is no longer pending");
   }
-  if (request.requester_user_id === input.actor.userId) {
-    throw new AppError("CONFLICT", "bq.project.deletion-self-approval", "The person who asked for the deletion cannot approve it.");
-  }
   const project = await db.bqProject.findUnique({ where: { id: request.project_id } });
   if (!project) throw new AppError("NOT_FOUND", "bq.project.not-found", "Project not found");
   if (project.status !== "ARCHIVED") {
