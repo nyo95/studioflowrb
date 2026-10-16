@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.117] BQ Work Item creation lives in Struktur
+- Surface: BQ Project → Struktur rail and Section canvas
+- Fixture: editable active BQ project with one Section without Subsections and one Section with at least one Subsection
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Hover and keyboard-focus a valid Section row, then open Add Work Item. 2. Repeat for a Subsection. 3. Confirm each new Work Item appears under the chosen parent after save. 4. Verify the desktop canvas has no Work Item add row. 5. At 375 px, open each valid compact fallback and confirm it opens the same form.
+- Acceptance: Desktop creation is available only from Struktur, opens the existing complete Work Item form, and places the result at its selected parent. Cost Component insertion remains in the expanded Work Item/Component Group context. The responsive fallback remains reachable without recreating the desktop table-entry UI.
+- Status: PENDING
+
 ### [R9.113] BQ Subsection removal preserves Work Items and contextualises actions
 - Surface: BQ Project → Struktur rail and expanded Work Item footer
 - Fixture: editable active BQ project with one Section containing direct Work Items, a populated Subsection, an empty Subsection, direct Cost Components, and an Assembly

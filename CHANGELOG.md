@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.117 | 2026-10-17 | fix(bq): Create Work Items from Struktur (Lead)
+
+- **Structure entry:** on desktop, a Section or Subsection reveals an accessible Add Work Item action on hover or keyboard focus. It reuses the complete existing Work Item form, including Assembly selection, and preserves the parent rules: a Section with only Subsections does not also accept direct Work Items.
+- **Canvas focus:** removed the duplicate Work Item-entry rows from the estimating table. Cost Component insertion stays within the expanded Work Item or Component Group, where its source picker belongs. At narrow widths where Struktur is hidden, compact actions provide the same Work Item form.
+- **Terminology:** the hierarchy is recorded consistently as Section → Subsection → Work Item → Component Group → Cost Component; “Item” by itself is not used as a structural level.
+- **Verification:** typecheck, full-repository lint, production build, and whitespace checks passed. Browser acceptance is queued in `BROWSER-ACCEPTANCE-BACKLOG.md` because the local in-app browser denied this session inspection authority. No schema, migration, dependency, permission, remote action, or push.
+
 ## R9.116 | 2026-10-16 | fix(bq): Keep canvas copy focused (Lead)
 
 - **Canvas copy:** Subsection headings preserve their entered title case. Removed repeated Work Item calculation summaries and Cost Component source labels from the table; category, names and prices remain. Calculation and source detail stays in the selected-row panel.

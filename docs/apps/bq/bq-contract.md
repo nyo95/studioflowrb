@@ -554,10 +554,13 @@ ke baris Work Item-nya sendiri (keluar dari grup), hanya di dalam Work Item yang
 sama; pemindahan memakai pratinjau dan aturan Slice 3 yang sama. Urutan Work Item
 tetap diatur di panel Struktur.
 
-**Tambah Work Item (owner 2026-10-16).** Setiap Subsection (dan Section tanpa
-Subsection) memiliki satu tombol tambah yang membuka form lengkap, termasuk opsi
-memakai Assembly. Baris isi cepat di tabel tidak digunakan agar tidak ada dua cara
-yang melakukan hal yang sama. Tidak ada tempel dari Excel: pekerjaan dari workbook
+**Tambah Work Item (owner 2026-10-17).** Pada desktop, tombol tambah Work Item
+berada di **Struktur**, pada Section tanpa Subsection (atau yang sudah memiliki
+Work Item langsung) dan pada setiap Subsection. Tombol membuka form lengkap,
+termasuk opsi memakai Assembly. Di layar sempit ketika Struktur disembunyikan,
+aksi yang sama tersedia sebagai fallback ringkas di area Section. Canvas desktop
+tidak menyediakan tombol atau baris tambah Work Item, supaya tetap menjadi tempat
+membaca dan mengedit biaya. Tidak ada tempel dari Excel: pekerjaan dari workbook
 dikonversi manual.
 
 *Penyisipan* Cost Component tetap punya afordansnya sendiri, karena memilih sumber bukan

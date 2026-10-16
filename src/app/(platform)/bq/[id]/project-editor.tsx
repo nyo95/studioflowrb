@@ -80,7 +80,6 @@ import { NewWorkItemDialog } from "./new-work-item-dialog";
 import { SaveAsAssemblyDialog } from "./save-as-assembly-dialog";
 import { ImportDialog } from "./source-picker-dialog";
 import { QuotationDialog } from "./quotation-dialog";
-import { QuickEntryRow } from "./quick-entry-row";
 import {
   buildLineItemMoveFields,
   lineItemIds,
@@ -398,6 +397,7 @@ function SectionOutline({
   onRenameSubsection,
   onDeleteSubsection,
   onDeleteWorkItem,
+  onAddWorkItem,
   onReorder,
   onReorderSections,
 }: {
@@ -410,6 +410,7 @@ function SectionOutline({
   onRenameSubsection: (id: string, name: string) => Promise<void>;
   onDeleteSubsection: (subsection: { id: string; name: string; itemCount: number; sectionName: string }) => void;
   onDeleteWorkItem: (item: BqItemDetail) => void;
+  onAddWorkItem: (target: NewItemTarget) => void;
   onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
   onReorderSections: (sectionId: string | null, orderedIds: string[]) => Promise<void>;
 }) {
@@ -497,6 +498,22 @@ function SectionOutline({
               >
                 {section.name}
               </a>
+              {editable && (section.items.length > 0 || section.subsections.length === 0) ? (
+                <span className="opacity-0 transition-opacity group-hover/outline:opacity-100 group-focus-within/outline:opacity-100">
+                  <IconButton
+                    size="sm"
+                    variant="ghost"
+                    label={`Tambah Work Item di ${section.name}`}
+                    icon={<Plus aria-hidden="true" />}
+                    disabled={pending}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      onAddWorkItem({ sectionId: section.id, where: section.name });
+                    }}
+                  />
+                </span>
+              ) : null}
               {tail(count)}
             </div>
             )}
@@ -522,6 +539,18 @@ function SectionOutline({
                   {tail(subsection.items.length)}
                   {editable ? (
                     <span className="opacity-0 transition-opacity group-hover/outline:opacity-100 group-focus-within/outline:opacity-100">
+                    <IconButton
+                      size="sm"
+                      variant="ghost"
+                      label={`Tambah Work Item di ${subsection.name}`}
+                      icon={<Plus aria-hidden="true" />}
+                      disabled={pending}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onAddWorkItem({ subsectionId: subsection.id, where: `${section.name} › ${subsection.name}` });
+                      }}
+                    />
                     <IconButton
                       size="sm"
                       variant="ghost"
@@ -925,6 +954,7 @@ export function ProjectEditor({
             run: () => run(deleteSubsectionAction, { id: subsection.id }),
           })}
           onDeleteWorkItem={(item) => setConfirmDelete({ title: `Hapus ${item.name}?`, run: () => run(deleteItemAction, { id: item.id }) })}
+          onAddWorkItem={(target) => { setError(null); setNewItemTarget(target); }}
           onReorder={(parent, orderedIds) => run(reorderItemsAction, { ...parent, orderedIds: JSON.stringify(orderedIds) })}
           onReorderSections={(sectionId, orderedIds) => run(reorderSectionsAction, { sectionId: sectionId ?? undefined, orderedIds: JSON.stringify(orderedIds) })}
         />
@@ -954,11 +984,20 @@ export function ProjectEditor({
                 letter={SECTION_LETTERS[sectionIndex] ?? String(sectionIndex + 1)}
                 ctx={tableCtx}
                 columns={totalColumns}
-                onMore={editable ? (target) => { setError(null); setNewItemTarget(target); } : undefined}
               />
               {editable ? (
-                // Only where the Struktur panel is hidden (< 1024 px); from there on "+ Subsection" lives in the panel.
+                // Struktur is hidden below 1024 px, so its creation actions remain reachable here.
                 <div className="flex flex-wrap gap-1.5 lg:hidden">
+                  {(section.items.length > 0 || section.subsections.length === 0) ? (
+                    <Button size="sm" variant="ghost" leadingIcon={<Plus aria-hidden="true" />} disabled={pending} onClick={() => { setError(null); setNewItemTarget({ sectionId: section.id, where: section.name }); }}>
+                      Tambah Work Item
+                    </Button>
+                  ) : null}
+                  {section.subsections.map((subsection) => (
+                    <Button key={subsection.id} size="sm" variant="ghost" leadingIcon={<Plus aria-hidden="true" />} disabled={pending} onClick={() => { setError(null); setNewItemTarget({ subsectionId: subsection.id, where: `${section.name} › ${subsection.name}` }); }}>
+                      Tambah Work Item di {subsection.name}
+                    </Button>
+                  ))}
                   <AddRow
                     label="Subsection"
                     placeholder="Nama Subsection"
@@ -1219,33 +1258,23 @@ function sectionSubtotal(section: BqSectionDetail): string | null {
 
 /**
  * One Section as one sheet (owner 2026-10-14, "sesuai struktur Excel"): the workbook's columns (No, Uraian,
- * Spesifikasi, Vol, Sat, Harga satuan, Total), Subsections as group heading rows inside the same table, an empty
- * last row to type the next Work Item into, and the Section subtotal at the bottom. Names of Sections and
+ * Spesifikasi, Vol, Sat, Harga satuan, Total), Subsections as group heading rows inside the same table, and the
+ * Section subtotal at the bottom. Names of Sections and
  * Subsections change in Struktur only.
  */
-function SectionTable({ section, letter, ctx, columns, onMore }: {
+function SectionTable({ section, letter, ctx, columns }: {
   section: BqSectionDetail;
   letter: string;
   ctx: TableCtx;
   columns: number;
-  onMore?: (target: NewItemTarget) => void;
 }) {
   const span = columns;
   let counter = 0;
   const direct = section.items.map(() => `${letter}.${++counter}`);
   const grouped = section.subsections.map((subsection) => subsection.items.map(() => `${letter}.${++counter}`));
-  // A Section split into Subsections takes new Work Items in a Subsection, unless it already holds its own.
-  const directEntry = ctx.editable && (section.items.length > 0 || section.subsections.length === 0);
   const subtotal = sectionSubtotal(section);
   // Folding a Section keeps its heading and subtotal on screen (owner 2026-10-14).
   const [folded, setFolded] = useState(false);
-  const entry = (target: { sectionId?: string; subsectionId?: string }, where: string) => (
-    <QuickEntryRow
-      disabled={ctx.pending}
-      columns={span}
-      onAdd={() => onMore?.({ ...target, where })}
-    />
-  );
   return (
     <div className="grid gap-2">
       <div className="flex items-center gap-2">
@@ -1274,7 +1303,6 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
         </TableHeader>
         <TableBody>
           {section.items.map((item, index) => <ItemRows key={item.id} item={item} number={direct[index]!} ctx={ctx} columns={span} />)}
-          {directEntry ? entry({ sectionId: section.id }, section.name) : null}
           {!ctx.editable && section.items.length === 0 && section.subsections.length === 0 ? (
             <TableRow><TableCell colSpan={span}><Text tone="tertiary" size="sm">Belum ada Work Item.</Text></TableCell></TableRow>
           ) : null}
@@ -1289,7 +1317,6 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
               </TableCell>
             </TableRow>
             {subsection.items.map((item, index) => <ItemRows key={item.id} item={item} number={grouped[subsectionIndex]![index]!} ctx={ctx} columns={span} />)}
-            {ctx.editable ? entry({ subsectionId: subsection.id }, `${section.name} › ${subsection.name}`) : null}
           </TableBody>
         ))}
         {counter > 0 ? (
