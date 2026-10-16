@@ -55,6 +55,17 @@ function deliverableMaxBytes(value = process.env.STUDIOFLOW_DELIVERABLE_MAX_BYTE
 function slotKey(name: string): string { return name.trim().toLowerCase(); }
 function expiryFrom(date: Date): Date { return new Date(date.getTime() + DELIVERABLE_RETENTION_DAYS * 86_400_000); }
 
+/** Serializes Final replacement even when a caller injects a read-committed transaction runner. */
+async function lockDeliverableSlot(tx: TxClient, phaseId: string, normalizedSlot: string): Promise<void> {
+  const rows = await tx.$queryRaw<Array<{ phase_id: string }>>`
+    SELECT "phase_id"
+    FROM "studioflow"."sf_deliverable_slot"
+    WHERE "phase_id" = ${phaseId} AND "slot_key" = ${normalizedSlot}
+    FOR UPDATE
+  `;
+  if (rows.length !== 1) throw new Error("Deliverable slot lock is missing.");
+}
+
 async function saveDeliverable(
   input: CommandContext & { projectId: string; phaseId: string },
   name: string,
@@ -90,7 +101,7 @@ async function saveDeliverable(
       `;
       if (!allocated) throw new Error("Deliverable version allocation failed.");
       const created = await tx.sfDeliverable.create({ data: { project_id: input.projectId, phase_id: input.phaseId, revision_id: revision.id, name, slot_key: normalizedSlot, version_number: allocated.last_version, storage_key: key, file_size_bytes: stored.bytes, content_type: contentType, created_by_id: input.actor.userId, expires_at: expiryFrom(nowOf(ports)) } });
-      const older = await tx.sfDeliverable.findMany({ where: { phase_id: input.phaseId, slot_key: created.slot_key, is_final: false }, orderBy: [{ created_at: "desc" }, { id: "desc" }], skip: 2, select: { id: true, storage_key: true } });
+      const older = await tx.sfDeliverable.findMany({ where: { phase_id: input.phaseId, slot_key: created.slot_key, is_final: false }, orderBy: { version_number: "desc" }, skip: 2, select: { id: true, storage_key: true } });
       if (older.length) await tx.sfDeliverable.deleteMany({ where: { id: { in: older.map((row) => row.id) } } });
       await writeAudit(ports, tx, { action: "studioflow.deliverable.uploaded", entityType: "deliverable", entityId: created.id, actor: input.actor, metadata: { projectId: input.projectId, phaseId: input.phaseId, name, bytes: stored.bytes, declaredBytes, pruned: older.length } });
       return enqueueUnreferencedCleanup(tx, older.map((row) => row.storage_key));
@@ -184,6 +195,7 @@ const deliverables = {
         requirePermission(input.grants, P.phaseWork);
         await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: d.phase_id, kind: "content" });
       }
+      await lockDeliverableSlot(tx, d.phase_id, d.slot_key);
       const at = nowOf(ports);
       if (input.isFinal) {
         const previousFinals = await tx.sfDeliverable.findMany({ where: { phase_id: d.phase_id, slot_key: d.slot_key, is_final: true, id: { not: d.id } }, select: { id: true, name: true } });

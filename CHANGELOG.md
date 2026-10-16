@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.106 | 2026-10-16 | fix(studioflow): Harden deliverable retention and Final concurrency (Executor)
+
+- **Scope:** WO-SF-DELIVERABLE-SAFETY-01 backend slice. Working-file pruning now keeps the two greatest stable version numbers instead of inferring upload order from transaction timestamps. Final replacement locks the existing durable phase/name slot before reading, clearing and setting Final, so it remains correct with a read-committed injected transaction runner as well as the production serializable runner.
+- **Database safety:** added a forward-only partial unique index that permits at most one Final deliverable per phase/name slot. The migration applied successfully to the verified office `studioflow_rebuild` development database and disposable `studioflow_rebuild_test` database; Prisma was regenerated. No legitimate row or file was rewritten.
+- **Regression evidence:** a deliberately inverted timestamp fixture now proves Version 2 and 3 survive over Version 1; concurrent Final requests finish with exactly one Final; and a direct duplicate-Final database write is rejected. Existing normalized-slot, Final-plus-two-working, version continuity, concurrent upload, expiry, audit and cleanup behavior remains covered.
+- **Checks:** focused deliverable integration tests **5/5 PASS**; `npm test` **1218/1218**, typecheck, full lint, architecture boundaries, legacy-runtime, production build, and staged/unstaged whitespace checks PASS. The Lead-owned confirmation, safe-error display and browser acceptance remain for the next revision; no dependency, legacy access, remote action, or push.
+
 ## R9.105 | 2026-10-16 | plan(studioflow): Lock deliverable safety and concurrency (Lead)
 
 - **Decision:** confirmed the audit's deliverable findings against the accepted file contract and current runtime. The backend slice must prune by stable version number, serialize Final replacement per slot, add a database-level one-Final invariant, and prove timestamp disagreement plus concurrent Final requests. Existing permissions, expiry, audit, storage cleanup and stable numbering remain unchanged.

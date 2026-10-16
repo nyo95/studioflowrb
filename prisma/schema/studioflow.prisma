@@ -610,6 +610,7 @@ model SfPhaseEvent {
 
 /// Phase deliverable uploaded file; status computed from revision (V2-D8).
 /// status: MISSING (no row), CURRENT (revision_id = active revision), OUTDATED (revision closed).
+/// A partial unique index in the migration chain permits only one Final per phase/name slot.
 model SfDeliverable {
   id              String   @id @default(uuid())
   project_id      String

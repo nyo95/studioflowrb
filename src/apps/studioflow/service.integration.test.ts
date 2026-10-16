@@ -2374,6 +2374,39 @@ describe("Deliverable reference revision", () => {
     assert.deepEqual(listed.items.filter((item) => item.isNewest).map((item) => item.versionNumber), [2]);
   });
 
+  it("prunes working files by stable version number when timestamps disagree", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "moodboard");
+    const input = { ...as(designer), projectId, phaseId: phase.id, name: "ordered.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } };
+    await sf.phases.uploadDeliverable(input);
+    await sf.phases.uploadDeliverable(input);
+    const firstTwo = await testDb.prisma.sfDeliverable.findMany({ where: { phase_id: phase.id, slot_key: "ordered.pdf" }, orderBy: { version_number: "asc" } });
+    await testDb.prisma.sfDeliverable.update({ where: { id: firstTwo[0]!.id }, data: { created_at: new Date("2099-01-01T00:00:00Z") } });
+    await testDb.prisma.sfDeliverable.update({ where: { id: firstTwo[1]!.id }, data: { created_at: new Date("2000-01-01T00:00:00Z") } });
+
+    await sf.phases.uploadDeliverable(input);
+
+    const versions = await testDb.prisma.sfDeliverable.findMany({ where: { phase_id: phase.id, slot_key: "ordered.pdf" }, orderBy: { version_number: "asc" }, select: { version_number: true } });
+    assert.deepEqual(versions.map((row) => row.version_number), [2, 3]);
+  });
+
+  it("serializes concurrent Final choices and the database rejects a duplicate Final", async () => {
+    const { projectId } = await newProject();
+    const phase = await phaseOf(projectId, "moodboard");
+    const input = { ...as(designer), projectId, phaseId: phase.id, name: "final.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } };
+    await sf.phases.uploadDeliverable(input);
+    await sf.phases.uploadDeliverable(input);
+    const files = await testDb.prisma.sfDeliverable.findMany({ where: { phase_id: phase.id, slot_key: "final.pdf" }, orderBy: { version_number: "asc" } });
+
+    await Promise.all(files.map((file) => sf.phases.setDeliverableFinal({ ...as(designer), projectId, deliverableId: file.id, isFinal: true })));
+
+    const after = await testDb.prisma.sfDeliverable.findMany({ where: { phase_id: phase.id, slot_key: "final.pdf" }, orderBy: { version_number: "asc" } });
+    assert.equal(after.filter((file) => file.is_final).length, 1);
+    const other = after.find((file) => !file.is_final)!;
+    await assert.rejects(testDb.prisma.sfDeliverable.update({ where: { id: other.id }, data: { is_final: true } }));
+    assert.equal(await testDb.prisma.sfDeliverable.count({ where: { phase_id: phase.id, slot_key: "final.pdf", is_final: true } }), 1);
+  });
+
   it("streams a deliverable, and refuses a stream that is short of, or over, its declared size", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
