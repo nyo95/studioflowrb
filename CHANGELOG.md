@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.113 | 2026-10-16 | feat(bq): Preserve Work Items when removing a Subsection (Lead + Executor)
+
+- **Subsection removal:** an estimator can remove a Subsection from Struktur after a clear confirmation. Its Work Items and every nested Component Group/Cost Component are retained as direct Work Items of the same Section, appended after its existing direct Work Items in their original order. The move, removal and audit are atomic; the existing project-manage permission and locked/archived safeguards still apply.
+- **Work Item actions:** the expanded Work Item now leads with Tambah Cost Component. Applying an Assembly is the related `Tambahkan… → Dari Assembly` choice. Grouping stays in the established selection panel/context menu, while saving an Assembly is available only when every eligible direct Cost Component is selected; unrelated actions no longer compete in one row.
+- **Contract and evidence:** the BQ contract records the retained-item rule and selection-context Assembly rule. Integration coverage proves transfer order, nested data retention, authorization/lifecycle refusal, and audit rollback.
+- **Verification:** `npm test`, typecheck, lint, architecture boundaries, legacy-runtime, and production build passed; staged/unstaged whitespace check passed. Browser acceptance is queued in `BROWSER-ACCEPTANCE-BACKLOG.md` because this session's in-app browser denied authority to inspect the local page after the server restart. No schema, migration, dependency, legacy access, remote action, or push.
+
 ## R9.112 | 2026-10-16 | fix(bq): Simplify deletion, Work Item entry, and cost-source detail (Executor)
 
 - **Penghapusan BQ:** pemegang izin penghapusan dapat langsung menjalankan penghapusan project yang sudah diarsipkan, termasuk bila ia sendiri yang mengajukannya. Tidak ada lagi isian `DELETE` atau kebutuhan orang kedua; akses izin dan jejak pengajuan tetap berlaku.

@@ -172,6 +172,53 @@ async function updateSubsection(input: {
   return updated;
 }
 
+/**
+ * A Subsection is optional organisation inside a Section. Removing it keeps
+ * its Work Items by making them direct children of that same Section instead
+ * of relying on the database cascade that would destroy them.
+ */
+async function deleteSubsection(input: {
+  grants: PermissionGrants;
+  actor: { kind: string; userId?: string; label: string };
+  id: string;
+}) {
+  requirePermission(input.grants, BQ_PERMISSIONS.projectManage);
+  const subsection = await db.bqSubsection.findUnique({
+    where: { id: input.id },
+    select: {
+      id: true,
+      section_id: true,
+      section: { select: { project_id: true } },
+      items: { select: { id: true }, orderBy: { sort_order: "asc" } },
+    },
+  });
+  if (!subsection) throw new AppError("NOT_FOUND", "bq.subsection.not-found", "Subsection not found");
+  await requireEditableProject(subsection.section.project_id);
+
+  // Direct Work Items have their own sibling-order namespace. Appending the
+  // moved rows avoids its unique index and preserves their relative order.
+  const lastDirect = await db.bqItem.aggregate({
+    where: { section_id: subsection.section_id },
+    _max: { sort_order: true },
+  });
+  const firstMovedOrder = (lastDirect._max.sort_order ?? -1) + 1;
+  for (const [index, item] of subsection.items.entries()) {
+    await db.bqItem.update({
+      where: { id: item.id },
+      data: { section_id: subsection.section_id, subsection_id: null, sort_order: firstMovedOrder + index },
+    });
+  }
+  await db.bqSubsection.delete({ where: { id: subsection.id } });
+  await auditWriter({
+    appId: "bq",
+    action: "bq.subsection.deleted",
+    entityType: "BqSubsection",
+    entityId: subsection.id,
+    actor: input.actor,
+    changes: { sectionId: subsection.section_id, movedWorkItems: subsection.items.length },
+  });
+}
+
   async function addItem(input: {
   grants: PermissionGrants;
   actor: { kind: string; userId?: string; label: string };
@@ -728,6 +775,7 @@ async function deleteLineItem(input: {
     addSubsection,
     updateSection,
     updateSubsection,
+    deleteSubsection,
     addItem,
     reorderItems,
     reorderSections,

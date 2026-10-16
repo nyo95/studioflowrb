@@ -54,11 +54,11 @@ import {
   addItemAction,
   addItemAndApplyAssemblyAction,
   addLineItemAction,
-  addSubObjectAction,
   addSubsectionAction,
   applyAssemblyAction,
   deleteItemAction,
   deleteLineItemAction,
+  deleteSubsectionAction,
   deleteSubObjectAction,
   updateItemAction,
   updateLineItemAction,
@@ -393,6 +393,7 @@ function SectionOutline({
   onAddSubsection,
   onRenameSection,
   onRenameSubsection,
+  onDeleteSubsection,
   onReorder,
   onReorderSections,
 }: {
@@ -403,6 +404,7 @@ function SectionOutline({
   onAddSubsection: (sectionId: string, name: string) => Promise<void>;
   onRenameSection: (id: string, name: string) => Promise<void>;
   onRenameSubsection: (id: string, name: string) => Promise<void>;
+  onDeleteSubsection: (subsection: { id: string; name: string; itemCount: number; sectionName: string }) => void;
   onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
   onReorderSections: (sectionId: string | null, orderedIds: string[]) => Promise<void>;
 }) {
@@ -513,6 +515,20 @@ function SectionOutline({
                     {subsection.name}
                   </a>
                   {tail(subsection.items.length)}
+                  {editable ? (
+                    <IconButton
+                      size="sm"
+                      variant="ghost"
+                      label={`Hapus ${subsection.name}`}
+                      icon={<Trash2 aria-hidden="true" />}
+                      disabled={pending}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        onDeleteSubsection({ id: subsection.id, name: subsection.name, itemCount: subsection.items.length, sectionName: section.name });
+                      }}
+                    />
+                  ) : null}
                 </div>
                 )}
                 {itemsOpen.has(subsection.id) ? <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-11" editable={editable} pending={pending} onReorder={onReorder} /> : null}
@@ -574,7 +590,7 @@ export function ProjectEditor({
   /** The last Cost Component clicked without Shift: where a Shift-click range starts. */
   const anchor = useRef<string | null>(null);
   const [dragging, setDragging] = useState<{ itemId: string; lineIds: readonly string[]; overId: string | null } | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<{ title: string; run: () => Promise<void> } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ title: string; description?: string; run: () => Promise<void> } | null>(null);
   const [groupItemId, setGroupItemId] = useState<string | null>(null);
   const [moveConfirmation, setMoveConfirmation] = useState<MoveRequest | null>(null);
   const [moveNotice, setMoveNotice] = useState<{ message: string; tone: "neutral" | "success" } | null>(null);
@@ -758,7 +774,6 @@ export function ProjectEditor({
     units, editable, pending, expanded, toggle, run, commit,
     onImport: setImportTarget,
     onApplyAssembly: setAssemblyItemId,
-    onSaveAssembly: setSaveAssemblyItem,
     inspected, selection, highlighted: highlightedLineIds,
     pressItem: (item) => { anchor.current = null; setSelection(null); setInspected({ kind: "item", id: item.id }); },
     pressGroup: (group) => { anchor.current = null; setSelection(null); setInspected({ kind: "group", id: group.id }); },
@@ -792,6 +807,9 @@ export function ProjectEditor({
         ...(many ? [] : [{ label: "Buka di panel", onSelect: () => { setSelection({ itemId: item.id, lineItemIds: [line.id] }); setInspected({ kind: "line" as const, id: line.id }); } }]),
         ...(editable ? [
           { label: many ? `Kelompokkan ${ids.length} Cost Component…` : "Kelompokkan…", disabled: pending, onSelect: () => { setSelection({ itemId: item.id, lineItemIds: ids }); setError(null); setGroupItemId(item.id); } },
+          ...(item.subObjects.length === 0 && ids.length === item.lineItems.length
+            ? [{ label: "Simpan sebagai Assembly", disabled: pending, onSelect: () => setSaveAssemblyItem(item) }]
+            : []),
           ...moveTargets(item).map((option, index) => ({ label: `Pindahkan ke: ${option.label}`, separatorBefore: index === 0, disabled: pending, onSelect: () => moveTo(item, ids, option) })),
           { label: many ? `Hapus ${ids.length} Cost Component` : "Hapus", danger: true, separatorBefore: true, disabled: pending, onSelect: () => askDeleteLines(ids) },
         ] : []),
@@ -892,6 +910,13 @@ export function ProjectEditor({
           onAddSubsection={(sectionId, name) => run(addSubsectionAction, { sectionId, name })}
           onRenameSection={(id, name) => run(updateSectionAction, { id, name })}
           onRenameSubsection={(id, name) => run(updateSubsectionAction, { id, name })}
+          onDeleteSubsection={(subsection) => setConfirmDelete({
+            title: `Hapus Subsection ${subsection.name}?`,
+            description: subsection.itemCount === 0
+              ? "Subsection kosong ini akan dihapus."
+              : `${subsection.itemCount} Work Item akan tetap ada dan pindah ke Section ${subsection.sectionName}.`,
+            run: () => run(deleteSubsectionAction, { id: subsection.id }),
+          })}
           onReorder={(parent, orderedIds) => run(reorderItemsAction, { ...parent, orderedIds: JSON.stringify(orderedIds) })}
           onReorderSections={(sectionId, orderedIds) => run(reorderSectionsAction, { sectionId: sectionId ?? undefined, orderedIds: JSON.stringify(orderedIds) })}
         />
@@ -959,6 +984,9 @@ export function ProjectEditor({
                 {editable ? (
                   <div className="grid gap-2">
                     <Button variant="secondary" disabled={pending} onClick={() => { setError(null); setGroupItemId(multiItem.id); }}>Kelompokkan…</Button>
+                    {multiItem.subObjects.length === 0 && ids.length === multiItem.lineItems.length ? (
+                      <Button variant="secondary" disabled={pending} onClick={() => setSaveAssemblyItem(multiItem)}>Simpan sebagai Assembly</Button>
+                    ) : null}
                     <ButtonMenu label={pending ? "Memproses…" : "Pindahkan ke"} variant="secondary" align="start" items={moveTargets(multiItem).map((option) => ({ label: option.label, description: option.description, disabled: pending, onSelect: () => moveTo(multiItem, ids, option) }))} />
                     <Button variant="ghost" disabled={pending} onClick={() => askDeleteLines(ids)}>Hapus {ids.length} Cost Component</Button>
                   </div>
@@ -1105,7 +1133,7 @@ export function ProjectEditor({
         open={confirmDelete !== null}
         onOpenChange={(open) => { if (!open) setConfirmDelete(null); }}
         title={confirmDelete?.title ?? ""}
-        description="Tidak bisa dibatalkan."
+        description={confirmDelete?.description ?? "Tidak bisa dibatalkan."}
         confirmLabel="Hapus"
         tone="danger"
         pending={pending}
@@ -1149,7 +1177,6 @@ type TableCtx = {
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
   onImport: (target: { itemId?: string; subObjectId?: string }) => void;
   onApplyAssembly?: (itemId: string) => void;
-  onSaveAssembly?: (item: BqItemDetail) => void;
   inspected: Inspected;
   selection: LineItemSelection;
   highlighted: ReadonlySet<string>;
@@ -1349,12 +1376,10 @@ function ItemRows({ item, number, ctx, columns }: { item: BqItemDetail; number: 
                     </Text>
                   ) : null}
                   {ctx.editable ? <>
-                    <Button size="sm" variant="ghost" leadingIcon={<Plus aria-hidden="true" />} disabled={ctx.pending} onClick={() => ctx.onImport({ itemId: item.id })}>Cost Component</Button>
-                    <AddRow label="Component Group" placeholder="Nama Component Group" disabled={ctx.pending} onAdd={(name) => ctx.run(addSubObjectAction, { itemId: item.id, name })} />
-                    {ctx.onApplyAssembly ? <Button size="sm" variant="ghost" disabled={ctx.pending} onClick={() => ctx.onApplyAssembly?.(item.id)}>Terapkan Assembly</Button> : null}
-                    {ctx.onSaveAssembly && item.lineItems.length > 0 && item.subObjects.length === 0 ? (
-                      <Button size="sm" variant="ghost" disabled={ctx.pending} onClick={() => ctx.onSaveAssembly?.(item)}>Simpan sebagai Assembly</Button>
-                    ) : null}
+                    <Button size="sm" variant="secondary" leadingIcon={<Plus aria-hidden="true" />} disabled={ctx.pending} onClick={() => ctx.onImport({ itemId: item.id })}>Tambah Cost Component</Button>
+                    {ctx.onApplyAssembly ? <ButtonMenu label="Tambahkan…" variant="ghost" align="start" items={[
+                      { label: "Dari Assembly", description: "Tambahkan kumpulan Cost Component siap pakai.", disabled: ctx.pending, onSelect: () => ctx.onApplyAssembly?.(item.id) },
+                    ]} /> : null}
                     {lineItemIds(item).length > 1 ? <Text tone="tertiary" size="sm" className="ml-auto">Ctrl/Shift + klik untuk memilih beberapa · seret ke grup · klik kanan untuk menu</Text> : null}
                   </> : null}
                 </div>

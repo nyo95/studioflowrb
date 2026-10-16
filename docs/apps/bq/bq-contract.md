@@ -60,6 +60,10 @@ Section           (PRELIMINARIES, INTERIOR WORKS, FURNITURE WORKS...)
 **Aturan hierarki:**
 - Section: wajib ada, sumber dari Template atau dibuat manual.
 - Subsection: opsional di Section manapun.
+- Menghapus Subsection memindahkan semua Work Item di dalamnya menjadi Work
+  Item langsung pada Section induknya; Work Item dan rincian biayanya tidak
+  ikut terhapus. Item pindahan ditempatkan setelah Work Item langsung yang
+  sudah ada, dengan urutan semula tetap terjaga.
 - L1: selalu ada. Ini item BQ yang dikerjakan.
 - L2: **opsional**. Hanya muncul saat L1 perlu dipecah ke komponen (fixture kompleks). L1 sederhana langsung punya L3.
 - L3: **terminal**. Tidak ada level di bawah L3. Semua kalkulasi terjadi di sini.
@@ -543,7 +547,9 @@ menjadi panel pilihan (Kelompokkan…, Pindahkan ke, Hapus). Klik kanan sebuah
 baris membuka menu tindakannya (Work Item: buka, tandai Berharga/TBC/By Owner,
 tambah Cost Component, hapus; Component Group: buka, tambah, hapus; Cost
 Component: buka, Kelompokkan…, Pindahkan ke …, hapus — atas pilihan bila baris
-itu termasuk pilihan). Cost Component bisa diseret ke Component Group lain atau
+itu termasuk pilihan). Simpan sebagai Assembly tersedia pada konteks pilihan
+ketika seluruh Cost Component langsung sebuah Work Item dipilih dan Work Item
+itu tidak memakai Component Group. Cost Component bisa diseret ke Component Group lain atau
 ke baris Work Item-nya sendiri (keluar dari grup), hanya di dalam Work Item yang
 sama; pemindahan memakai pratinjau dan aturan Slice 3 yang sama. Urutan Work Item
 tetap diatur di panel Struktur.

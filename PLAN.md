@@ -1,63 +1,128 @@
 # Active Plan
 
-Plan ID: WO-SF-OWNER-CORRECTIONS-01
-Scope: Owner-reported Notes identity, limited project viewing, file safety, and SKU Brand correction
-Module(s): studioflow, presentation, masterdata
-Target revision: R9.110
-Status: COMPLETE — Lead PASS
+Plan ID: WO-BQ-SUBSECTION-DELETE-AND-WORK-ITEM-ACTIONS-01
+Scope: Safe Subsection removal and contextual Work Item actions
+Module(s): bq
+Target revision: R9.113
+Status: READY
 Priority: P1
 Owner: Product Owner
 Last updated: 2026-10-16
 
 ## Outcome
 
-People can identify who sent every Notes message; their own messages appear on the left and other people's on the right. A project viewer who is neither a PIC nor a manager sees only Schedule, Presentation (when enabled), Timeline, and History, all read-only. Archived-file cleanup cannot be triggered before its authorization check. Manual file deletion is audited. Final, expiry extension, and deletion are rejected for a locked phase. Staff can correct a mistaken SKU Brand as an ordinary edit, even when prices already have source links.
+An estimator can remove a Subsection without losing its Work Items: they become
+direct children of the same Section. The Work Item action row gives one clear
+primary way to add content and shows grouping or Assembly actions only when
+they are relevant.
+
+## Context and Evidence
+
+- The owner explicitly directed that deleting a Subsection keeps its Work
+  Items, without a Subsection, under the parent Section.
+- BQ already permits a Work Item to belong to exactly one Section or
+  Subsection. Direct Section items are therefore the established destination;
+  no schema change is needed.
+- The current Work Item footer puts Cost Component, Component Group, apply
+  Assembly, and save Assembly side by side even though grouping requires a
+  selection and saving requires direct Cost Components.
+- BQ contract §13.2 already makes multi-selection the canonical place for
+  grouping and describes Assembly as content insertion, not an editing field.
 
 ## Locked Decisions
 
-- A manager for this workflow holds `studioflow.project.manage`. The `studioflow.project.override` grant alone no longer gives a non-PIC write access; effective assignment override requires both grants. PIC write access continues to follow the established phase and document rules. Reads still require `studioflow.project.read`.
-- A non-PIC without manager rights sees the four named project sections only. Direct links to hidden Phases and MOM views do not reveal their content. The restriction applies regardless of `project.override`.
-- Notes alignment is relative to the signed-in viewer's immutable author ID, never a display name. Own message left, others right; show sender name on each message, including image/file messages and board threads. Historic notes without a resolvable author show a neutral fallback.
-- An archived-file cleanup attempt checks StudioFlow authority before any Presentation cleanup. A rejected request performs no cleanup work.
-- Manual deliverable deletion records the actor and deleted file identity in the audit trail in the same database transaction.
-- A locked phase rejects Final, expiry extension, and manual deletion, as it already rejects upload. Existing project completion/archive gates remain.
-- When staff changes a SKU's Brand, detach live material-price source links that point to the old Brand, preserving price values and an audit record of the detached references. Do not rewrite historical BQ snapshots. Use the existing automatic Brand-Supplier association behavior where needed so supplier links do not make correction impractical. Preserve identity uniqueness and archived-Brand checks. The owner accepted the consequences of prior staff errors in existing BQ snapshots.
+- Deleting a Subsection transfers every contained Work Item to its own parent
+  Section, preserving every Work Item and all of its nested data. It never
+  deletes or flattens Work Items.
+- Transferred Work Items are appended after existing direct Work Items in the
+  parent Section, preserving their order within the removed Subsection.
+- The transfer, Subsection deletion, and one audit event are one BQ
+  transaction. It requires the existing `bq.project.manage` grant and rejects
+  locked or archived projects.
+- The Structure rail offers a clearly labelled destructive control only for an
+  editable Subsection, protected by a confirmation that names the number of
+  Work Items being moved.
+- `Tambah Cost Component` remains the primary footer action. `Terapkan
+  Assembly` is available from its adjacent add menu as `Dari Assembly`.
+- `Component Group` is not a permanent footer action: it remains available
+  through the established multi-selection panel/context menu. `Simpan sebagai
+  Assembly` is available only through that contextual selection flow when its
+  existing eligibility rules hold.
 
-## Architecture and Backend Contract
+## Business Rules and Architecture Constraints
 
-- EXTEND StudioFlow's canonical project access gate and read projection. Do not create a new role enum or duplicate project policy in app routes. Update the durable StudioFlow contract to reflect the changed override meaning.
-- REUSE the existing author ID/name in StudioFlow Notes. No schema change is needed.
-- REUSE the existing phase writable guard and audit writer for deliverables; no new audit mechanism.
-- Use existing module boundaries. StudioFlow calls Presentation only through its public door.
-- EXTEND Master Data's existing SKU edit service inside its transaction, with explicit audit of SKU Brand and affected price source links. Do not add a one-off migration or cross-app write.
+- EXTEND the BQ project-tree service, existing BQ action boundary, Structure
+  rail, selection panel, and Assembly flows. Do not add a role, permission,
+  schema migration, dependency, cross-app access, or client-side calculation.
+- Preserve BQ's Section/Subsection XOR parent invariant for every Work Item.
+- Reuse the existing audit writer and safe action result boundary; the client
+  sends only a Subsection ID and the service re-reads its owning Section.
 
 ## UI Contract
 
-The Lead completes Notes bubble alignment, sender labels, the restricted navigation/direct-route behavior, and clear SKU correction feedback after backend integration. The Executor may add minimal wiring needed to exercise the updated access facts. Presentation remains hidden when its module is disabled.
+- The Structure rail has a compact delete affordance for a Subsection. The
+  confirmation says its Work Items move to the named parent Section; an empty
+  Subsection needs no move-count sentence.
+- The open Work Item footer groups add choices rather than presenting unrelated
+  commands as equal links. The entry affordance remains keyboard accessible,
+  clearly labelled, and usable at narrow widths.
+- Selection actions stay in the existing side panel and right-click menu, so
+  they appear only after selection and retain their existing guidance.
+
+## Boundaries and Non-goals
+
+- Do not support deletion of a Section, cross-Section Work Item moves,
+  Component Group/Cost Component reordering, or saving grouped Work Items as
+  Assemblies.
+- Do not change calculation, price, quotation, template, or permission policy.
 
 ## Acceptance Criteria
 
-- Two users with the same display name still get different left/right alignment from their IDs; the name is visible on every note.
-- A non-PIC with `project.override` but without `project.manage` cannot mutate phase, documents, Schedule, or Presentation and only sees/opens the four read-only sections. A manager or PIC keeps authorized paths.
-- A user without cleanup authority cannot trigger Presentation retry or StudioFlow purge.
-- Successful manual file deletion leaves actor/file audit evidence; failed audit leaves the file intact.
-- Final, expiry extension, and deletion on locked phases fail without file/audit change; unlocked cases still work.
-- Editing a SKU to a different active Brand succeeds with existing live prices, detaches old-Brand source links, keeps amounts, records what was detached, and establishes any needed supplier associations. A new BQ snapshot uses corrected Master Data; an existing BQ snapshot remains as originally captured.
+- Removing a populated editable Subsection retains every Work Item and nested
+  Component Group/Cost Component; the items appear directly under the parent
+  Section, after its existing direct Work Items, in their original order.
+- The deletion is atomic: a failed audit or mutation leaves the Subsection and
+  its items unchanged. Missing IDs, missing management permission, locked and
+  archived projects are refused.
+- The Structure rail confirmation makes the transfer consequence explicit and
+  Cancel makes no server call.
+- A Work Item footer shows the primary add action with a `Dari Assembly` path,
+  not four equal actions. Grouping and saving an Assembly remain accessible in
+  their selection context only.
+- Existing right-click, selection, direct Assembly apply, lock/read-only, and
+  browser layout behavior remains intact.
 
 ## Verification
 
-Focused tests for permission combinations, Notes identity/layout logic, cleanup side-effect ordering, deliverable lock and audit behavior, and SKU correction with sourced prices. Run the Executor's full required gate: test, typecheck, lint, boundary, legacy-runtime, production build, and staged/unstaged whitespace check.
+- Focused BQ service/action/UI tests for move-on-delete, sort order, audit
+  rollback, authorization/lifecycle rejection, footer hierarchy and selection
+  affordances.
+- Full Executor gate: `npm test`, typecheck, lint, boundary check,
+  legacy-runtime check, production build, staged and unstaged whitespace
+  checks.
 
 ## Reviewer Acceptance
 
-Browser check with two user identities and a viewer holding override but no manager permission: Notes placement/name, project tabs/direct routes, and read-only controls. Exercise SKU Brand correction and file actions on locked/unlocked phases in the browser where practical.
+- In the browser, delete a populated and an empty Subsection; cancel once,
+  confirm once, and verify placement/order after reload.
+- Inspect the Work Item footer at desktop and 375 px, add a Cost Component and
+  apply an Assembly through the add menu, then select Cost Components to find
+  grouping and saving only in the selection context.
 
-Result: PASS. The Notes, restricted-viewer, and SKU browser journeys passed 3/3; the combined responsive browser suite passed 83/83. Backend tests passed 1226/1226, including file lock/audit and hidden-image bridge checks. Typecheck, lint, boundary, legacy-runtime, production build, and whitespace checks passed. File lock and audit behavior was verified by integration tests; no separate browser file-action case was added.
+## Regression Risks and Recovery
 
-## Boundaries
-
-No legacy, remote, push, publication, or unrelated refactor.
+- The Section-level partial unique item sort index can reject a naive parent
+  transfer; assign fresh direct-Section positions inside the same transaction.
+- A database cascade would destroy children if deletion preceded transfer; move
+  first, then delete, with the audit write before commit.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this READY `PLAN.md`; implement the backend outcome with the smallest correct change. Preserve unrelated work, run required checks, update `CHANGELOG.md`, and commit R9.110 locally. The Lead completes UI and browser review in the same owner-requested run.
+You are the Backend Executor. Location: rumah. Read `AGENTS.md`,
+`docs/agent/EXECUTOR.md`, and this READY `PLAN.md`, then implement the entire
+READY backend outcome and nothing beyond it. Inspect current repository
+evidence, preserve unrelated owner work, run the required checks, update the
+changelog, and create target local revision R9.113. Stop only for a material
+locked-decision conflict or unsafe boundary; otherwise finish the coherent
+outcome and report the commit, checks, limitations, and remaining unrelated
+dirty files.

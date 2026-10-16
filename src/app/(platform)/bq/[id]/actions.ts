@@ -129,6 +129,20 @@ export async function updateSubsectionAction(
   });
 }
 
+const DeleteSubsectionSchema = z.object({ projectId: Id, id: Id });
+
+export async function deleteSubsectionAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const { projectId, id } = parse(DeleteSubsectionSchema, formData);
+    await bqService.deleteSubsection({ grants, actor, id });
+    return reload(projectId);
+  });
+}
+
 const LineItemMoveTargetSchema = z.union([
   z.strictObject({ direct: z.literal(true) }),
   z.strictObject({ subObjectId: Id }),

@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.113] BQ Subsection removal preserves Work Items and contextualises actions
+- Surface: BQ Project → Struktur rail and expanded Work Item footer
+- Fixture: editable active BQ project with one Section containing direct Work Items, a populated Subsection, an empty Subsection, direct Cost Components, and an Assembly
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Start deleting the populated Subsection and cancel. 2. Confirm its deletion, reload, and inspect the parent Section order. 3. Delete an empty Subsection. 4. Open a Work Item and use Tambahkan… → Dari Assembly. 5. Select all direct Cost Components and inspect the selection panel; repeat with only part of the selection.
+- Acceptance: Cancel sends no deletion. Confirm keeps every moved Work Item and its nested data directly under the parent Section after pre-existing direct items; an empty Subsection also deletes safely. The Work Item footer has one primary Cost Component action plus the Assembly add menu; grouping and save-as-Assembly appear only in their eligible selection context, including at 375 px.
+- Status: PENDING
+
 ### [R9.100] Declined sample request leaves Product Schedule waiting state
 - Surface: Master Data → Sample requests; StudioFlow project → Product Schedule
 - Fixture: disposable project option with a requested sample and a Master Data staff account

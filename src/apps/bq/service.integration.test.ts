@@ -320,6 +320,50 @@ describe("BQ R6.1 invariants", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "bq.items.reordered" } }), 0);
   });
 
+  it("removes a Subsection by appending its Work Items to the parent Section", async () => {
+    const { project, section, item: firstDirect } = await projectTree();
+    const secondDirect = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Second direct", qty: "1", unit: "PCS" });
+    const subsection = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Floor" });
+    const firstMoved = await service.addItem({ grants: GRANTS, actor: ACTOR, subsectionId: subsection.id, name: "Tile", qty: "2", unit: "M2" });
+    const lastMoved = await service.addItem({ grants: GRANTS, actor: ACTOR, subsectionId: subsection.id, name: "Grout", qty: "1", unit: "KG" });
+    await service.addLineItem({ grants: GRANTS, actor: ACTOR, itemId: firstMoved.id, sourceType: "CUSTOM", titleSnapshot: "Ceramic", purchaseUnitSnapshot: "M2", hargaSnapshot: "100", kategori: "MATERIAL", qty: "1" });
+
+    await service.deleteSubsection({ grants: GRANTS, actor: ACTOR, id: subsection.id });
+
+    assert.equal(await testDb.prisma.bqSubsection.findUnique({ where: { id: subsection.id } }), null);
+    const direct = await testDb.prisma.bqItem.findMany({ where: { section_id: section.id }, orderBy: { sort_order: "asc" } });
+    assert.deepEqual(direct.map((row) => row.id), [firstDirect.id, secondDirect.id, firstMoved.id, lastMoved.id]);
+    assert.deepEqual(direct.map((row) => row.subsection_id), [null, null, null, null]);
+    assert.deepEqual(direct.map((row) => row.sort_order), [0, 1, 2, 3]);
+    assert.equal(await testDb.prisma.bqLineItem.count({ where: { item_id: firstMoved.id } }), 1);
+    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "bq.subsection.deleted" } });
+    assert.equal(audit.entity_id, subsection.id);
+    assert.deepEqual(audit.metadata, { sectionId: section.id, movedWorkItems: 2 });
+    const detail = await createBqPublicRead(testDb.prisma).getProjectDetail(project.id);
+    assert.deepEqual(detail!.sections[0]!.items.map((row) => row.id), [firstDirect.id, secondDirect.id, firstMoved.id, lastMoved.id]);
+  });
+
+  it("rejects unsafe Subsection deletion and rolls it back when audit fails", async () => {
+    const { project, section } = await projectTree();
+    const subsection = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Floor" });
+    const item = await service.addItem({ grants: GRANTS, actor: ACTOR, subsectionId: subsection.id, name: "Tile", qty: "1", unit: "M2" });
+    const original = await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: item.id } });
+    for (const operation of [
+      () => service.deleteSubsection({ grants: GRANTS.filter((grant) => grant !== BQ_PERMISSIONS.projectManage), actor: ACTOR, id: subsection.id }),
+      () => service.deleteSubsection({ grants: GRANTS, actor: ACTOR, id: "missing-subsection" }),
+    ]) await assert.rejects(operation);
+    await service.lockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+    await assert.rejects(() => service.deleteSubsection({ grants: GRANTS, actor: ACTOR, id: subsection.id }), (error: unknown) => error instanceof AppError && error.code === "bq.project.locked");
+    await service.unlockProject({ grants: GRANTS, actor: ACTOR, id: project.id });
+    const failing = createBqService(testDb.prisma, {
+      runTransaction: <T>(work: (tx: PrismaClient) => Promise<T>) => testDb.prisma.$transaction((tx) => work(tx as unknown as PrismaClient)),
+      auditWriter: { async write() { throw new Error("Audit unavailable"); } },
+    });
+    await assert.rejects(() => failing.deleteSubsection({ grants: GRANTS, actor: ACTOR, id: subsection.id }));
+    assert.deepEqual(await testDb.prisma.bqItem.findUnique({ where: { id: item.id } }), original);
+    assert.notEqual(await testDb.prisma.bqSubsection.findUnique({ where: { id: subsection.id } }), null);
+  });
+
   it("normalizes gaps in item positions and rolls back every reorder write if audit fails", async () => {
     const { section, item } = await projectTree();
     const last = await service.addItem({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Last", qty: "1", unit: "PCS", sortOrder: 8 });
