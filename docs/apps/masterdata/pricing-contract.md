@@ -89,6 +89,12 @@ Supplier must be a live Vendor with `can_supply_material = true` on at least one
 - `unit_id` must reference an active Unit; it may differ between suppliers
 - `source_link_id` when set must reference a live BrandLink belonging to the SKU's own Brand
 - `source_link_id` cannot be set when the SKU has no Brand
+- Correcting a SKU's Brand through ordinary Edit clears active prices' source
+  links to the previous Brand in the same transaction. It keeps the price amounts
+  and units, records the detached links and actor in the audit, and associates
+  live priced suppliers with the destination Brand through the existing
+  non-authorized supplier link rule. Existing BQ snapshots are historical and
+  do not change when Master Data is corrected (owner, 2026-10-16).
 - SKU dimensions may be corrected while prices exist; each price's selected unit changes only through an audited price update
 - SKU must not be archived
 - exact live SKU × Vendor match opens/targets the existing row for update; creating

@@ -8,7 +8,7 @@ import { STUDIOFLOW_IMAGE_TYPES } from "../domain/images";
 import { scheduleCode } from "../domain/schedule";
 import { createScheduleService } from "../schedule/service";
 import type { SnapshotInput } from "../schedule/sync";
-import { hasPermission, invalid, P, projectAccessFromFacts, requireCommand, requirePermission, type CommandContext, type StudioFlowPorts } from "../shared";
+import { hasPermission, hasProjectAssignmentOverride, invalid, P, projectAccessFromFacts, requireCommand, requirePermission, requireWorkSectionAccess, type CommandContext, type StudioFlowPorts } from "../shared";
 
 export type ExternalScheduleTarget =
   | { kind: "new-item"; section: string; category: string; qty?: string | null; unit?: string | null; location?: string | null }
@@ -34,7 +34,7 @@ export function createStudioFlowIdeasBridge(db: PrismaClient, ports: StudioFlowP
     async listWritableScheduleTargets(input: CommandContext) {
       const userId = requireCommand(input, P.ideasManage);
       if (!hasPermission(input.grants, P.scheduleManage)) return [];
-      const override = hasPermission(input.grants, P.projectOverride);
+      const override = hasProjectAssignmentOverride(input.grants);
       const projects = await db.sfProject.findMany({
         where: { archived_at: null, status: { not: "COMPLETED" }, ...(override ? {} : { OR: [{ pic_designer_id: userId }, { pic_drafter_id: userId }] }) },
         orderBy: { name: "asc" },
@@ -87,8 +87,9 @@ export function createStudioFlowIdeasBridge(db: PrismaClient, ports: StudioFlowP
 
     /** An image element on the project's Workspace (the phase, when given, must be its phase label). Ids of former card images are kept. */
     async readWorkspaceImageSource(input: CommandContext & { projectId: string; phaseId?: string | null; imageId: string }) {
-      requireCommand(input, P.ideasManage);
+      const actorId = requireCommand(input, P.ideasManage);
       requirePermission(input.grants, P.projectRead);
+      await requireWorkSectionAccess(db, { ...input, actorId });
       const image = await db.sfWorkspaceCard.findFirst({
         where: { id: input.imageId, kind: "IMAGE", project_id: input.projectId, ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
         select: { id: true, storage_key: true, content_type: true, bytes: true, project: { select: { name: true } } },

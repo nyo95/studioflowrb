@@ -1,144 +1,63 @@
 # Active Plan
 
-Plan ID: WO-PRESENTATION-SCHEDULE-LINK-RECONCILE-01
-Scope: Retry-safe cleanup of Presentation links to deleted Product Schedule entries
-Module(s): presentation, studioflow
-Target revision: R9.109
-Status: COMPLETE — R9.109 built and Lead review PASS
-Priority: P3
-Owner: Product Owner; Codex temporarily acts as Lead for this plan, then as Backend Executor
+Plan ID: WO-SF-OWNER-CORRECTIONS-01
+Scope: Owner-reported Notes identity, limited project viewing, file safety, and SKU Brand correction
+Module(s): studioflow, presentation, masterdata
+Target revision: R9.110
+Status: COMPLETE — Lead PASS
+Priority: P1
+Owner: Product Owner
 Last updated: 2026-10-16
-
-Reviewer outcome: PASS. R9.109 satisfies the locked ownership, read-only board,
-bounded bridge, failure/retry, disabled-module maintenance, and keyset-drain
-criteria. No next Work Order is selected by this completed plan.
 
 ## Outcome
 
-If immediate cleanup fails after a Product Schedule entry is deleted,
-Presentation eventually removes the stored link from its pins without relying on
-a user opening the board. Live links remain untouched and normal reads remain
-read-only.
-
-## Context and Evidence
-
-- Schedule deletion currently attempts to clear Presentation links after the
-  StudioFlow delete commits, but `Promise.allSettled` discards a cleanup failure.
-- Presentation board reads resolve links through StudioFlow and already project a
-  missing entry as no linked item, so users do not see an old code, name, or image.
-- The stored `schedule_entry_id` can nevertheless remain indefinitely. The
-  accepted R9.68 read contract intentionally performs no repair write during
-  `getBoard`, so opening a board cannot be the retry mechanism.
-- The existing production maintenance sweep already runs application-composed,
-  bounded cleanup for StudioFlow and optional Presentation data.
+People can identify who sent every Notes message; their own messages appear on the left and other people's on the right. A project viewer who is neither a PIC nor a manager sees only Schedule, Presentation (when enabled), Timeline, and History, all read-only. Archived-file cleanup cannot be triggered before its authorization check. Manual file deletion is audited. Final, expiry extension, and deletion are rejected for a locked phase. Staff can correct a mistaken SKU Brand as an ordinary edit, even when prices already have source links.
 
 ## Locked Decisions
 
-- Presentation owns its annotation rows and is the only module that may clear
-  their stored links. StudioFlow exposes only a narrow read-only existence fact.
-- Reconciliation is idempotent: clear only IDs that are absent from StudioFlow;
-  never alter a link that still resolves. Each cross-module read is bounded, and
-  one maintenance pass advances by keyset through all IDs present at its start so
-  stable live links cannot starve later dangling IDs.
-- A failed StudioFlow existence read performs no Presentation write and remains
-  eligible for the next scheduled attempt.
-- Keep the immediate post-delete best-effort cleanup for fast normal behavior,
-  but correctness must no longer depend on that one attempt.
-- Maintenance must still run when the optional Presentation module is disabled;
-  disabling a module does not abandon its retained data.
-- No cross-app foreign key, cross-app database write, new dependency, or write on
-  a user-facing read path is permitted.
+- A manager for this workflow holds `studioflow.project.manage`. The `studioflow.project.override` grant alone no longer gives a non-PIC write access; effective assignment override requires both grants. PIC write access continues to follow the established phase and document rules. Reads still require `studioflow.project.read`.
+- A non-PIC without manager rights sees the four named project sections only. Direct links to hidden Phases and MOM views do not reveal their content. The restriction applies regardless of `project.override`.
+- Notes alignment is relative to the signed-in viewer's immutable author ID, never a display name. Own message left, others right; show sender name on each message, including image/file messages and board threads. Historic notes without a resolvable author show a neutral fallback.
+- An archived-file cleanup attempt checks StudioFlow authority before any Presentation cleanup. A rejected request performs no cleanup work.
+- Manual deliverable deletion records the actor and deleted file identity in the audit trail in the same database transaction.
+- A locked phase rejects Final, expiry extension, and manual deletion, as it already rejects upload. Existing project completion/archive gates remain.
+- When staff changes a SKU's Brand, detach live material-price source links that point to the old Brand, preserving price values and an audit record of the detached references. Do not rewrite historical BQ snapshots. Use the existing automatic Brand-Supplier association behavior where needed so supplier links do not make correction impractical. Preserve identity uniqueness and archived-Brand checks. The owner accepted the consequences of prior staff errors in existing BQ snapshots.
 
-## Business Rules and Architecture Constraints
+## Architecture and Backend Contract
 
-- EXTEND the existing StudioFlow-to-Presentation public bridge with one trusted,
-  read-only existence projection for a bounded set of Schedule entry IDs.
-- EXTEND Presentation's lifecycle surface with app-owned reconciliation and
-  compose it into the existing maintenance runner. Do not create a generic
-  outbox, queue framework, or second scheduler for this hygiene task.
-- Do not expose deleted entry details, user grants, or Presentation internals
-  through the existence projection.
-
-## Backend Contract
-
-- Presentation selects distinct non-null Schedule entry IDs in bounded,
-  lexicographically ordered keyset pages and asks StudioFlow which still exist.
-- One reconciliation call drains those pages to the end of the current result
-  set. It must not restart at the first page between chunks or use offset paging
-  that can skip rows after stale links are cleared.
-- It clears only links whose IDs are absent from that result and returns explicit
-  counts sufficient for maintenance tests and observability.
-- If existence resolution throws or returns an invalid response, fail the batch
-  closed before changing any annotation.
-- Application maintenance invokes this reconciliation on the established
-  boot/daily schedule alongside existing Presentation asset retry and StudioFlow
-  archive retention. Repeated runs converge without duplicate effects.
+- EXTEND StudioFlow's canonical project access gate and read projection. Do not create a new role enum or duplicate project policy in app routes. Update the durable StudioFlow contract to reflect the changed override meaning.
+- REUSE the existing author ID/name in StudioFlow Notes. No schema change is needed.
+- REUSE the existing phase writable guard and audit writer for deliverables; no new audit mechanism.
+- Use existing module boundaries. StudioFlow calls Presentation only through its public door.
+- EXTEND Master Data's existing SKU edit service inside its transaction, with explicit audit of SKU Brand and affected price source links. Do not add a one-off migration or cross-app write.
 
 ## UI Contract
 
-None. Missing Schedule entries continue to render as unlinked pins exactly as
-they do today. No new button, message, loading state, or user workflow.
-
-## Boundaries and Non-goals
-
-- No change to Schedule deletion, Presentation pin editing, permissions, module
-  switches, board rendering, or audit vocabulary.
-- No Ideas usage cleanup redesign; option-usage cleanup is separately owned and
-  is not evidence for this exact entry-link outcome.
-- No durable generic integration queue, manual repair UI, or schema migration
-  unless repository evidence proves the bounded reconciliation cannot work.
-- No legacy access, remote action, release, or push.
+The Lead completes Notes bubble alignment, sender labels, the restricted navigation/direct-route behavior, and clear SKU correction feedback after backend integration. The Executor may add minimal wiring needed to exercise the updated access facts. Presentation remains hidden when its module is disabled.
 
 ## Acceptance Criteria
 
-- A missing Schedule entry's stored ID is cleared by maintenance without a board
-  read and remains cleared on repeated runs.
-- A live Schedule entry link survives reconciliation unchanged.
-- A simulated StudioFlow read failure leaves every Presentation link unchanged;
-  a later successful run clears the stale link.
-- Immediate post-delete cleanup still clears normally, while an injected failure
-  is repaired by maintenance.
-- Reconciliation runs through the existing production maintenance composition
-  even when Presentation is disabled.
-- Existing board reads remain write-free and continue projecting a missing link
-  as `null` before reconciliation has run.
+- Two users with the same display name still get different left/right alignment from their IDs; the name is visible on every note.
+- A non-PIC with `project.override` but without `project.manage` cannot mutate phase, documents, Schedule, or Presentation and only sees/opens the four read-only sections. A manager or PIC keeps authorized paths.
+- A user without cleanup authority cannot trigger Presentation retry or StudioFlow purge.
+- Successful manual file deletion leaves actor/file audit evidence; failed audit leaves the file intact.
+- Final, expiry extension, and deletion on locked phases fail without file/audit change; unlocked cases still work.
+- Editing a SKU to a different active Brand succeeds with existing live prices, detaches old-Brand source links, keeps amounts, records what was detached, and establishes any needed supplier associations. A new BQ snapshot uses corrected Master Data; an existing BQ snapshot remains as originally captured.
 
 ## Verification
 
-- Focused Presentation integration tests for live, dangling, failure, retry, and
-  idempotent batches; focused maintenance-composition test.
-- Level 3 gates: relevant integration tests, typecheck, lint, architecture
-  boundaries, legacy-runtime, full test suite, production build, and staged/
-  unstaged whitespace checks.
-- Capture verbose successful output in local ignored logs and report concise
-  summaries; expose the relevant excerpt and log path only on failure.
+Focused tests for permission combinations, Notes identity/layout logic, cleanup side-effect ordering, deliverable lock and audit behavior, and SKU correction with sourced prices. Run the Executor's full required gate: test, typecheck, lint, boundary, legacy-runtime, production build, and staged/unstaged whitespace check.
 
 ## Reviewer Acceptance
 
-Browser review is not applicable: the stored dangling ID is already hidden from
-the UI and this plan deliberately changes no rendered or interactive behavior.
-Reviewer verifies the service diff, ownership boundary, scheduled composition,
-and failure/retry evidence.
+Browser check with two user identities and a viewer holding override but no manager permission: Notes placement/name, project tabs/direct routes, and read-only controls. Exercise SKU Brand correction and file actions on locked/unlocked phases in the browser where practical.
 
-## Regression Risks and Recovery
+Result: PASS. The Notes, restricted-viewer, and SKU browser journeys passed 3/3; the combined responsive browser suite passed 83/83. Backend tests passed 1226/1226, including file lock/audit and hidden-image bridge checks. Typecheck, lint, boundary, legacy-runtime, production build, and whitespace checks passed. File lock and audit behavior was verified by integration tests; no separate browser file-action case was added.
 
-- A resolver that falsely reports a live ID absent would clear a useful link, so
-  the public projection and failure validation need exact tests. Recovery is to
-  relink the pin manually; never guess from deleted Schedule content.
-- Each bridge call and database page stays bounded, while one maintenance pass
-  examines the finite current set. Do not add a durable cursor or queue unless
-  measured scale later proves this indexed keyset scan insufficient.
-- Normal rollback is the local commit revert; no data rollback or remote action
-  is authorized.
+## Boundaries
+
+No legacy, remote, push, publication, or unrelated refactor.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY
-backend outcome and nothing beyond it. Inspect only the named Presentation/
-StudioFlow bridge, lifecycle, maintenance composition, and relevant tests;
-preserve unrelated owner work. Run the required checks with concise logged
-output, update `CHANGELOG.md`, and create R9.109 as one local commit. Stop only
-for a material locked-decision conflict or unsafe boundary, using the BLOCKED /
-CONFLICT report; otherwise finish the coherent outcome and report the commit,
-checks, limitations, and remaining unrelated dirty files.
+You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this READY `PLAN.md`; implement the backend outcome with the smallest correct change. Preserve unrelated work, run required checks, update `CHANGELOG.md`, and commit R9.110 locally. The Lead completes UI and browser review in the same owner-requested run.

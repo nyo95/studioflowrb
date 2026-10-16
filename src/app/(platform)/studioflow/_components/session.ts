@@ -22,3 +22,8 @@ export async function pageProjectAccess(projectId: string) {
   const session = await pageSession();
   return studioFlow.projects.getAccess({ grants: session.grants, actor: session.actor, projectId });
 }
+
+/** Work sections are for a project PIC or someone with manager authority. */
+export function canSeeProjectWorkSections(access: Awaited<ReturnType<typeof pageProjectAccess>>) {
+  return access.canSeeWorkSections;
+}

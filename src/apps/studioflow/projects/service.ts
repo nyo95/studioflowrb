@@ -20,6 +20,7 @@ import {
   conflict,
   getProjectAccess,
   hasPermission,
+  hasProjectAssignmentOverride,
   invalid,
   loadWritableProject,
   mapWriteError,
@@ -775,7 +776,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           pic_ids: { designer: project.pic_designer_id, drafter: project.pic_drafter_id },
           all_phases_done: allPhasesDone,
           dependents_review_suggested: earliestActive !== undefined && project.phases.some((phase) => phase.order_index > earliestActive && phase.status === "DONE" && !phase.allow_parallel),
-          can_mark_completed: project.status !== "COMPLETED" && Boolean(input.actorId && (project.pic_designer_id === input.actorId || project.pic_drafter_id === input.actorId || hasPermission(input.grants, P.projectOverride))),
+          can_mark_completed: project.status !== "COMPLETED" && Boolean(input.actorId && (project.pic_designer_id === input.actorId || project.pic_drafter_id === input.actorId || hasProjectAssignmentOverride(input.grants))),
           note_phases: project.phases.filter((phase) => phase._count.workspace_cards > 0).map((phase) => phase.id),
           last_update_at: [project.updated_at, ...project.phases.map((phase) => phase.updated_at)].reduce((latest, value) => latest > value ? latest : value),
           phases,
@@ -786,7 +787,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     /** Small, read-only Home projection shared by the page and the app rail. */
     async getHomeStats(input: ReadContext & { filter: "all" | "mine"; actorId: string }) {
       requireRead(input.grants);
-      const canOverride = hasPermission(input.grants, P.projectOverride);
+      const canOverride = hasProjectAssignmentOverride(input.grants);
       const canWork = hasPermission(input.grants, P.phaseWork);
       const projects = await db.sfProject.findMany({
         where: {
@@ -822,7 +823,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     async countWaitingOnYou(input: ReadContext & { actorId: string }): Promise<number> {
       requireRead(input.grants);
       if (!hasPermission(input.grants, P.phaseWork)) return 0;
-      const canOverride = hasPermission(input.grants, P.projectOverride);
+      const canOverride = hasProjectAssignmentOverride(input.grants);
       return db.sfRevision.count({ where: {
         status: "ANSWERED",
         phase: { project: {

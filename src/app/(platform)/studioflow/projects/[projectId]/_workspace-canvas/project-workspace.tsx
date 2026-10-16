@@ -23,7 +23,7 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
   archived: boolean;
   status: string;
 }) {
-  const { grants } = await pageSession();
+  const { grants, userId } = await pageSession();
   const [elements, phases, access, phaseList, threads] = await Promise.all([
     studioFlow.workspace.readWorkspace({ grants, projectId }),
     studioFlow.workspace.listWorkspacePhaseLabels({ grants, projectId }),
@@ -53,6 +53,7 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
     <WorkspaceCanvas
       projectId={projectId}
       projectName={projectName}
+      currentUserId={userId}
       phases={phases}
       selectedPhase={selected ? { id: selected.id, name: selected.label } : null}
       readOnlyReason={writable ? null : archived ? "archived" : status !== "ACTIVE" ? "inactive" : "permission"}

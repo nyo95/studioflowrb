@@ -9,6 +9,7 @@ import { AppError } from "@platform/core/errors";
 import { requireModuleEnabled } from "@platform/core/modules";
 import { validationError } from "@platform/core/validation";
 import { studioFlow } from "@/apps/studioflow/runtime";
+import { P, requireCommand } from "@/apps/studioflow/shared";
 import { clearScheduleEntryLink, purgeArchivedProjectAssets, retryPresentationAssetCleanup } from "@/apps/presentation/public/lifecycle";
 import { removeScheduleOptionUsage } from "@/apps/ideas/public/lifecycle";
 
@@ -292,6 +293,7 @@ export async function runAssetCleanupAction(limit?: number) {
   return runSafeAction(async () => {
     const ctx = await context();
     const parsedLimit = parse(z.number().int().min(1).max(100).default(25), limit);
+    requireCommand(ctx, P.projectManage);
     await retryPresentationAssetCleanup(parsedLimit);
     const result = await studioFlow.projects.runAssetCleanup({ ...ctx, limit: parsedLimit }, purgeArchivedProjectAssets);
     refresh();

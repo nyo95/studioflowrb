@@ -23,6 +23,7 @@ export type ChatNote = {
   pinned: boolean;
   origin: "NOTE" | "CLIENT_ANSWER" | "SITE_VISIT";
   workflowRecord: boolean;
+  authorId: string | null;
   authorName: string | null;
   createdAt: Date;
   editedAt: Date | null;
@@ -83,7 +84,7 @@ function groupAlbums(notes: readonly ChatNote[]): Entry[] {
     const head = last?.notes[0];
     const tail = last?.notes.at(-1);
     const joins = head && tail && note.kind === "IMAGE" && head.kind === "IMAGE" && !note.replyTo && !note.body
-      && note.authorName === head.authorName && note.phaseId === head.phaseId && note.origin === head.origin
+      && note.authorId !== null && note.authorId === head.authorId && note.phaseId === head.phaseId && note.origin === head.origin
       && note.tags.join() === head.tags.join()
       && new Date(note.createdAt).getTime() - new Date(tail.createdAt).getTime() <= ALBUM_WINDOW_MS;
     if (joins) last!.notes.push(note);
@@ -105,9 +106,10 @@ const TOKEN_TRIGGERS = ["@", "#"];
  * topic (the phase tag comes from the composer), `@HT1` links a Product Schedule item. Writing follows each phase's
  * rule, so the composer offers only the phases this person may write.
  */
-export function NotesChat({ projectId, projectName, phases, writablePhaseIds, canEditGeneral, defaultPhaseId, initial, canUseIdeas, canUsePresentation, scopeOf, poster, header, composer = true, emptyText, onLocate }: {
+export function NotesChat({ projectId, projectName, currentUserId, phases, writablePhaseIds, canEditGeneral, defaultPhaseId, initial, canUseIdeas, canUsePresentation, scopeOf, poster, header, composer = true, emptyText, onLocate }: {
   projectId: string;
   projectName: string;
+  currentUserId: string;
   phases: readonly ChatPhase[];
   writablePhaseIds: readonly string[];
   canEditGeneral: boolean;
@@ -343,6 +345,7 @@ export function NotesChat({ projectId, projectName, phases, writablePhaseIds, ca
                 group={entry.notes}
                 projectId={projectId}
                 projectName={projectName}
+                currentUserId={currentUserId}
                 canEdit={canEdit}
                 canUseIdeas={canUseIdeas}
                 canUsePresentation={canUsePresentation}
@@ -400,10 +403,11 @@ function tagsOf(text: string) {
   return [...new Set([...plain(text).matchAll(TAG)].map((match) => match[1]!).filter((name) => name.toLowerCase() !== "feedback"))].slice(0, 5);
 }
 
-function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onReload, onLocate, onMarkup, onDelete }: {
+function Bubble({ group, projectId, projectName, currentUserId, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onReload, onLocate, onMarkup, onDelete }: {
   group: readonly ChatNote[];
   projectId: string;
   projectName: string;
+  currentUserId: string;
   canEdit: boolean;
   canUseIdeas: boolean;
   canUsePresentation: boolean;
@@ -422,6 +426,7 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
   onDelete: (group: readonly ChatNote[]) => void;
 }) {
   const note = group[0]!;
+  const ownMessage = note.authorId !== null && note.authorId === currentUserId;
   const album = group.length > 1;
   const feedback = note.origin === "CLIENT_ANSWER";
   const [editing, setEditing] = useState(false);
@@ -442,9 +447,10 @@ function Bubble({ group, projectId, projectName, canEdit, canUseIdeas, canUsePre
   return (
     <article
       id={`note-${note.id}`}
-      className={`group flex w-fit max-w-[min(36rem,92%)] flex-col gap-1.5 self-end rounded-[14px] rounded-br-[4px] border px-3 py-2 ${feedback ? "border-warning/40 bg-warning/5" : "border-line-subtle bg-surface"} ${images.length && !note.body ? "!px-1 !pt-1" : ""}`}
-      aria-label={`${album ? `${group.length} images` : note.kind === "IMAGE" ? "Image" : note.kind === "FILE" ? "File" : "Note"} from ${formatInstant(new Date(note.createdAt), { locale, timeZone: timezone, style: "datetime" })}`}
+      className={`group flex w-fit max-w-[min(36rem,92%)] flex-col gap-1.5 rounded-[14px] border px-3 py-2 ${ownMessage ? "self-start rounded-bl-[4px]" : "self-end rounded-br-[4px]"} ${feedback ? "border-warning/40 bg-warning/5" : "border-line-subtle bg-surface"} ${images.length && !note.body ? "!px-1 !pt-1" : ""}`}
+      aria-label={`${album ? `${group.length} images` : note.kind === "IMAGE" ? "Image" : note.kind === "FILE" ? "File" : "Note"} from ${note.authorName ?? "Unknown sender"} at ${formatInstant(new Date(note.createdAt), { locale, timeZone: timezone, style: "datetime" })}`}
     >
+      <span className="text-xs font-semibold text-ink-secondary">{note.authorName ?? "Unknown sender"}</span>
       {note.replyTo ? (
         <a href={`#note-${note.replyTo.id}`} className={`block rounded-action border-l-[3px] bg-surface-raised px-2 py-1 text-xs text-ink-secondary no-underline ${note.replyTo.clientFeedback ? "border-warning" : "border-line-strong"}`}>
           <span className="font-semibold text-ink">{note.replyTo.authorName ?? "Note"}</span>

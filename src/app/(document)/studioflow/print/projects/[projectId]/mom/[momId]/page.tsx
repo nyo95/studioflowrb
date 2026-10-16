@@ -17,7 +17,9 @@ const LABEL = "text-[9px] font-semibold uppercase tracking-[0.18em] text-neutral
 
 export default async function MomPrintPage({ params }: { params: Promise<{ projectId: string; momId: string }> }) {
   const { projectId, momId } = await params;
-  const { grants } = await requirePrincipalGrants();
+  const { principal, grants } = await requirePrincipalGrants();
+  const access = await studioFlow.projects.getAccess({ grants, actor: { kind: "USER", userId: principal.userId, label: principal.displayName }, projectId });
+  if (!access.canSeeWorkSections) notFound();
   const load = async () => {
     try {
       return await Promise.all([

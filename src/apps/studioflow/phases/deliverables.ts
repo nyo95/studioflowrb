@@ -6,7 +6,6 @@ import {
   hasPermission,
   invalid,
   loadWritablePhase,
-  loadWritableProject,
   notFound,
   nowOf,
   requireCommand,
@@ -188,7 +187,7 @@ const deliverables = {
     return runTransaction(async (tx) => {
       const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId } });
       if (!d || d.project_id !== input.projectId) throw notFound("deliverable");
-      await loadWritableProject(tx, input.projectId);
+      await loadWritablePhase(tx, input.projectId, d.phase_id);
       if (hasPermission(input.grants, P.projectManage)) {
         // Project managers may finalise any phase in the project.
       } else {
@@ -216,7 +215,7 @@ const deliverables = {
       const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId } });
       if (!d || d.project_id !== input.projectId) throw notFound("deliverable");
       if (d.is_final) throw conflict("DELIVERABLE_FINAL", "A final file does not expire.");
-      await loadWritableProject(tx, input.projectId);
+      await loadWritablePhase(tx, input.projectId, d.phase_id);
       await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: d.phase_id, kind: "content" });
       const expiresAt = expiryFrom(nowOf(ports));
       await tx.sfDeliverable.update({ where: { id: d.id }, data: { expires_at: expiresAt, expiry_warned_at: null } });
@@ -252,11 +251,12 @@ const deliverables = {
 
     requireCommand(input, P.projectManage);
     const keys = await runTransaction(async (tx) => {
-      const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId }, select: { id: true, project_id: true, phase_id: true, storage_key: true } });
+      const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId }, select: { id: true, project_id: true, phase_id: true, storage_key: true, name: true, version_number: true, is_final: true } });
       if (!d || d.project_id !== input.projectId) throw notFound("deliverable");
-      await loadWritableProject(tx, input.projectId);
+      await loadWritablePhase(tx, input.projectId, d.phase_id);
       await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: d.phase_id, kind: "content" });
       await tx.sfDeliverable.delete({ where: { id: d.id } });
+      await writeAudit(ports, tx, { action: "studioflow.deliverable.deleted", entityType: "deliverable", entityId: d.id, actor: input.actor, metadata: { projectId: d.project_id, phaseId: d.phase_id, name: d.name, versionNumber: d.version_number, wasFinal: d.is_final } });
       return enqueueUnreferencedCleanup(tx, [d.storage_key]);
     });
     await discardObjects(db, ports.storage, keys);

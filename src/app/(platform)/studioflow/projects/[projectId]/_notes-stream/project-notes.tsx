@@ -21,7 +21,7 @@ export async function ProjectNotes({ projectId, projectName, selectedPhaseId, pe
   archived: boolean;
   status: string;
 }) {
-  const { grants } = await pageSession();
+  const { grants, userId } = await pageSession();
   const [access, phaseList, initial] = await Promise.all([
     pageProjectAccess(projectId),
     studioFlow.phases.listProjectPhases({ grants, projectId }),
@@ -50,6 +50,7 @@ export async function ProjectNotes({ projectId, projectName, selectedPhaseId, pe
           key={projectId}
           projectId={projectId}
           projectName={projectName}
+          currentUserId={userId}
           phases={phaseList.map((phase) => ({ id: phase.id, label: phase.label, iteration: phase.iterationShortName ?? null }))}
           writablePhaseIds={writablePhaseIds}
           canEditGeneral={open && access.canEditDocuments}

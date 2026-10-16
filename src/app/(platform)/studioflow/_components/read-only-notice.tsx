@@ -5,8 +5,8 @@ export function ReadOnlyNotice({ scope, className }: { scope: "project" | "phase
   return (
     <Notice className={className} tone="neutral" title="View only">
       {scope === "phase"
-        ? "This phase belongs to the project's other assigned person, so you can read it but not change it."
-        : "Only this project's assigned designer or drafter can change it. You can still read everything."}
+        ? "This phase is assigned to someone else. You can read it, but an assigned PIC or manager must make changes."
+        : "You can view this section. Only an assigned PIC or manager can make changes."}
     </Notice>
   );
 }

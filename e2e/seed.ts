@@ -104,6 +104,12 @@ async function main() {
     const sku1 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 1", brandId: brand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: matA.vendorId, amount: "10000", currency: "IDR" }] });
     const sku2 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 2", brandId: brand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
     const sku3 = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test SKU 3", brandId: brand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: matA.vendorId, amount: "11000", currency: "IDR" }] });
+    const wrongBrand = await masterData.createBrand({ grants: masterDataGrants, actor, name: "ZZ-Test Wrong Brand", suppliers: [{ vendorId: matA.vendorId }], links: [{ kind: "CATALOG", url: "https://example.test/old-brand" }] });
+    const rightBrand = await masterData.createBrand({ grants: masterDataGrants, actor, name: "ZZ-Test Correct Brand" });
+    const correctionSku = await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test Brand Correction SKU", brandId: wrongBrand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: matA.vendorId, amount: "26000", currency: "IDR" }] });
+    const correctionLink = await db.brandLink.findFirstOrThrow({ where: { brand_id: wrongBrand.brandId } });
+    const correctionPrice = await db.priceMaterial.findFirstOrThrow({ where: { sku_id: correctionSku.skuId } });
+    await masterData.updatePriceMaterial({ grants: masterDataGrants, actor, priceMaterialId: correctionPrice.id, amount: "26000", currency: "IDR", sourceLinkId: correctionLink.id });
     const guardBrand = await masterData.createBrand({ grants: masterDataGrants, actor, name: "ZZ-Test Guard Brand", ownerVendorId: matA.vendorId, suppliers: [{ vendorId: matA.vendorId }, { vendorId: matB.vendorId }] });
     await masterData.createSku({ grants: masterDataGrants, actor, name: "ZZ-Test Guard SKU", brandId: guardBrand.brandId, categoryId: productCategory.categoryId, priceMaterials: [{ unitId: pcs.id, supplierVendorId: matB.vendorId, amount: "15000", currency: "IDR" }] });
     await masterData.createPriceMaterialLabor({ grants: masterDataGrants, actor, name: "ZZ-Test Existing Matrix", categoryId: workCategory.categoryId, vendorId: labor.vendorId, unitId: pcs.id, amount: "9000", currency: "IDR" });
@@ -183,12 +189,21 @@ async function main() {
     await db.rolePermission.createMany({ data: registry.permissions.filter((permission) => !permission.startsWith("platform.integration.")).map((permission_id) => ({ role_id: limitedRole.id, permission_id })) });
     const limitedUser = await db.user.create({ data: { email: limitedEmail, display_name: "Lia Limited", password_hash: await hashPassword(limitedPassword) } });
     await db.userRole.create({ data: { user_id: limitedUser.id, role_id: limitedRole.id } });
+    await sf.workspace.createWorkspaceCard({ grants: registry.permissions, actor: { kind: "USER", userId: limitedUser.id, label: "Lia Limited" }, projectId: sfFixtures.notesChat, body: "ZZ-Test note from Lia", x: 50, y: 380, w: 280 });
+
+    const viewerEmail = "e2e-override-viewer@example.test";
+    const viewerPassword = `E2e-${randomBytes(12).toString("hex")}!`;
+    const viewerRole = await db.role.create({ data: { code: "e2e-override-viewer", name: "E2E override viewer" } });
+    const viewerPermissions = ["studioflow.access", "studioflow.project.read", "studioflow.project.override", "studioflow.phase.work", "studioflow.mom.manage", "studioflow.schedule.manage", "studioflow.presentation.manage"];
+    await db.rolePermission.createMany({ data: viewerPermissions.map((permission_id) => ({ role_id: viewerRole.id, permission_id })) });
+    const viewerUser = await db.user.create({ data: { email: viewerEmail, display_name: "Rani Viewer", password_hash: await hashPassword(viewerPassword) } });
+    await db.userRole.create({ data: { user_id: viewerUser.id, role_id: viewerRole.id } });
 
     const bq = createBqService(db, { auditWriter: createAuditEventWriter(), runTransaction: (work) => db.$transaction((tx) => work(tx as unknown as PrismaClient)) });
     const bqProject = await bq.createProject({ grants: registry.permissions, actor, title: "E2E Long BQ Project Title For Phone Width Checks At The Breeze BSD Phase 2", clientName: "E2E Client" });
 
     mkdirSync("e2e/.tmp", { recursive: true });
-    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, limited: { email: limitedEmail, password: limitedPassword }, projectId: project.projectId, sf: sfFixtures, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, sku3: sku3.skuId, workCategory: workCategory.categoryId, priceLess62: priceLess62.skuId, priceLess63: priceLess63.skuId, priceLess63Brand: priceLess63Brand.brandId, requestSku: requestSku.skuId } }));
+    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, limited: { email: limitedEmail, password: limitedPassword }, viewer: { email: viewerEmail, password: viewerPassword }, projectId: project.projectId, sf: sfFixtures, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, sku3: sku3.skuId, correctionSku: correctionSku.skuId, rightBrand: rightBrand.brandId, workCategory: workCategory.categoryId, priceLess62: priceLess62.skuId, priceLess63: priceLess63.skuId, priceLess63Brand: priceLess63Brand.brandId, requestSku: requestSku.skuId } }));
   } finally {
     await closeTestDb(testDb);
   }

@@ -14,13 +14,14 @@ type Actions = {
 };
 
 /** Executes the real StudioFlow action module with only its framework and runtime edges replaced. */
-function loadActions() {
+function loadActions(grants = ["studioflow.access", "studioflow.project.manage"]) {
   const source = readFileSync("src/app/(platform)/studioflow/actions.ts", "utf8");
   const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const cleanupCalls: Array<{ limit: number; userId: string }> = [];
   const previewCalls: string[] = [];
+  const retryCalls: number[] = [];
   const revalidated: Array<[string, string | undefined]> = [];
-  const ctx = { principal: { userId: "user-1", displayName: "Owner" }, grants: ["studioflow.project.manage"] };
+  const ctx = { principal: { userId: "user-1", displayName: "Owner" }, grants };
   const dependencies: Record<string, unknown> = {
     "next/cache": { revalidatePath: (path: string, type?: string) => revalidated.push([path, type]) },
     "zod": { z },
@@ -29,7 +30,13 @@ function loadActions() {
     "@platform/core/errors": { AppError },
     "@platform/core/modules": { requireModuleEnabled: async () => undefined },
     "@platform/core/validation": { validationError },
-    "@/apps/presentation/public/lifecycle": { purgeArchivedProjectAssets: async () => ({ presentationSlides: 0 }), clearScheduleEntryLink: async () => ({ count: 0 }), retryPresentationAssetCleanup: async () => ({ attempted: 0, resolved: 0, failed: 0 }) },
+    "@/apps/studioflow/shared": {
+      P: { projectManage: "studioflow.project.manage" },
+      requireCommand: (input: { grants: string[] }, permission: string) => {
+        if (!input.grants.includes("studioflow.access") || !input.grants.includes(permission)) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Permission denied.");
+      },
+    },
+    "@/apps/presentation/public/lifecycle": { purgeArchivedProjectAssets: async () => ({ presentationSlides: 0 }), clearScheduleEntryLink: async () => ({ count: 0 }), retryPresentationAssetCleanup: async (limit: number) => { retryCalls.push(limit); return { attempted: 0, resolved: 0, failed: 0 }; } },
     "@/apps/ideas/public/lifecycle": { removeScheduleOptionUsage: async () => ({ count: 0 }) },
     "@/apps/studioflow/runtime": {
       studioFlow: {
@@ -45,7 +52,7 @@ function loadActions() {
     assert.ok(id in dependencies, `unexpected dependency: ${id}`);
     return dependencies[id];
   }, exports);
-  return { exports, cleanupCalls, previewCalls, revalidated };
+  return { exports, cleanupCalls, previewCalls, retryCalls, revalidated };
 }
 
 it("runAssetCleanupAction rejects a limit outside 1 to 100 before touching the service, and defaults to 25", async () => {
@@ -71,4 +78,19 @@ it("getAssetCleanupPreviewAction returns the preview for the signed-in user and 
   assert.deepEqual(await exports.getAssetCleanupPreviewAction!(), { ok: true, data: { eligibleProjects: 3, retentionDays: 90 } });
   assert.deepEqual(previewCalls, ["user-1"]);
   assert.equal(revalidated.length, 0);
+});
+
+it("runAssetCleanupAction checks StudioFlow authority before Presentation cleanup", async () => {
+  for (const grants of [[], ["studioflow.access"], ["studioflow.project.manage"]]) {
+    const { exports, cleanupCalls, retryCalls, revalidated } = loadActions(grants);
+    const result = await exports.runAssetCleanupAction!();
+    assert.equal(result.ok, false);
+    if (!result.ok) assert.equal(result.error.code, "PERMISSION_DENIED");
+    assert.deepEqual(retryCalls, []);
+    assert.deepEqual(cleanupCalls, []);
+    assert.deepEqual(revalidated, []);
+  }
+  const authorized = loadActions();
+  assert.equal((await authorized.exports.runAssetCleanupAction!()).ok, true);
+  assert.deepEqual(authorized.retryCalls, [25]);
 });

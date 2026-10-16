@@ -9,7 +9,7 @@ import { DirectoryShell,DraftDialog,EntityPrimaryCell,Pagination,RowActionMenu,T
 import { useState } from "react";
 import { useRowAction } from "@/platform/ui_engine";
 
-import { Badge,Button,Combobox,ConfirmDialog,DataTable,EmptyState,Field,FormActions,InlineError,Input,SearchField,Select,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
+import { Badge,Button,Combobox,ConfirmDialog,DataTable,EmptyState,Field,FormActions,InlineError,Input,Notice,SearchField,Select,TableBody,TableCell,TableCellContent,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
 import { createMoney,formatMoney } from "@platform/utilities/money";
 import {
 archiveSkuAction,
@@ -33,6 +33,7 @@ type SkuRow = {
   categories: Array<{ category: { id: string; name: string; slug: string } }>;
   material_prices: Array<{
     id: string;
+    source_link_id: string | null;
     amount: unknown;
     amount_label?: string | null;
     currency: string;
@@ -79,6 +80,7 @@ export function SkuDirectory({
 
   const [editError, setEditError] = useState<string | null>(null);
   const [editPending, setEditPending] = useState(false);
+  const linkedSourceCount = editTarget?.material_prices.filter((price) => price.source_link_id).length ?? 0;
 
   const filtered = skus.filter((sku) => {
     if (!matchesDirectoryStatus(sku.deleted_at, statusFilter)) return false;
@@ -250,6 +252,13 @@ export function SkuDirectory({
                 <Combobox label="SKU brand" options={[{ id: "", label: "No brand" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={editBrandId} onValueChange={setEditBrandId} placeholder="No brand" searchPlaceholder="Search brands…" />
               </Field>
             </div>
+            {editBrandId !== (editTarget.brand?.id ?? "") ? (
+              <Notice tone="warning" title="Correcting this SKU's Brand">
+                {linkedSourceCount > 0
+                  ? `${linkedSourceCount} price source link${linkedSourceCount === 1 ? "" : "s"} from the old Brand will be removed. Price amounts stay the same. Existing BQ snapshots stay as they were.`
+                  : "Existing prices stay the same. Existing BQ snapshots stay as they were."}
+              </Notice>
+            ) : null}
             <div className="grid gap-3 border-t border-line-subtle pt-4">
               <div className="grid gap-1"><Text weight="semibold">Product dimensions</Text><Text size="sm" tone="secondary">Optional SKU details. Purchase units belong to supplier prices.</Text></div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

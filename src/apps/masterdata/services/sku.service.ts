@@ -59,7 +59,7 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
           brand: { select: { id: true, name: true, slug: true } },
           dimension_length: true, dimension_width: true, dimension_thickness: true, dimension_unit: { select: { id: true, code: true, name: true } },
           categories: { select: { category: { select: { id: true, name: true, slug: true } } } },
-          material_prices: { where: { deleted_at: null }, select: { id: true, amount: true, amount_label: true, currency: true, supplier_vendor: { select: { id: true, name: true } }, unit: { select: { id: true, code: true, name: true } } } },
+          material_prices: { where: { deleted_at: null }, select: { id: true, amount: true, amount_label: true, currency: true, source_link_id: true, supplier_vendor: { select: { id: true, name: true } }, unit: { select: { id: true, code: true, name: true } } } },
           _count: { select: { material_prices: true } },
         },
       });
@@ -106,17 +106,8 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         const measurement = await resolveSkuMeasurement(tx, measurementInput);
         const brand = input.brandId ? await tx.brand.findUniqueOrThrow({ where: { id: input.brandId } }) : null;
         if (brand?.deleted_at) throw new AppError("VALIDATION", "SKU_BRAND_ARCHIVED", "Brand is archived.");
-        if ((input.brandId || null) !== (existing.brand_id || null)) {
-          const linkedPriceCount = await tx.priceMaterial.count({ where: { sku_id: input.skuId, deleted_at: null, source_link_id: { not: null } } });
-          if (linkedPriceCount > 0) throw new AppError("CONFLICT", "SKU_BRAND_CHANGE_BLOCKED", "Brand cannot be changed while live material prices have source links. Clear source links first.");
-          if (input.brandId) {
-            const prices = await tx.priceMaterial.findMany({ where: { sku_id: input.skuId, deleted_at: null }, select: { supplier_vendor_id: true } });
-            for (const price of prices) {
-              const relation = await tx.brandSupplier.findFirst({ where: { brand_id: input.brandId, vendor_id: price.supplier_vendor_id } });
-              if (brand?.owner_vendor_id !== price.supplier_vendor_id && !relation) throw new AppError("CONFLICT", "SKU_BRAND_CHANGE_BLOCKED", `Brand change would invalidate ${prices.length} live material price(s).`);
-            }
-          }
-        }
+        const brandChanged = (input.brandId || null) !== (existing.brand_id || null);
+        const livePrices = brandChanged ? await tx.priceMaterial.findMany({ where: { sku_id: input.skuId, deleted_at: null }, select: { id: true, supplier_vendor_id: true, source_link: { select: { id: true, brand_id: true, url: true, kind: true, label: true } } } }) : [];
         const categories = await tx.category.findMany({ where: { id: { in: categoryIds } }, select: { id: true, kind: true, status: true } });
         if (categories.length !== categoryIds.length) throw new AppError("VALIDATION", "SKU_CATEGORY_NOT_FOUND", "One or more categories not found.");
         for (const cat of categories) { if (cat.status !== "ACTIVE") throw new AppError("VALIDATION", "SKU_CATEGORY_INACTIVE", `Category ${cat.id} is not active.`); if (cat.kind !== "PRODUCT") throw new AppError("VALIDATION", "SKU_CATEGORY_KIND_INVALID", "SKU categories must be PRODUCT categories."); }
@@ -131,6 +122,15 @@ export function createSkuService(db: PrismaClient, ports: MasterDataServicePorts
         for (const [field, next] of Object.entries(measurement)) { const previousValue = existing[field as keyof typeof existing]; const previous = previousValue && typeof previousValue === "object" && "toString" in previousValue ? previousValue.toString() : previousValue ?? null; if (previous !== next) changes[field] = { from: previous, to: next }; }
         if (changes.name !== undefined || changes.brand_id !== undefined || Object.keys(changes).some((k) => k === "slug")) { const skuIdentityConflict = await tx.sku.findFirst({ where: { id: { not: input.skuId }, brand_id: input.brandId || null, slug: identity.slug, deleted_at: null }, select: { id: true } }); if (skuIdentityConflict) throw new AppError("CONFLICT", "SKU_IDENTITY_CONFLICT", "A live SKU already uses this identity."); }
         if (Object.keys(changes).length > 0) { try { await tx.sku.update({ where: { id: input.skuId }, data: { name: identity.name, slug: identity.slug, code: identity.code, notes: input.notes?.trim() || null, brand_id: input.brandId || null, ...measurement } }); } catch (error) { mapWriteError(error); } }
+        if (brandChanged) {
+          for (const price of livePrices) {
+            if (price.source_link && price.source_link.brand_id !== (input.brandId || null)) {
+              await tx.priceMaterial.update({ where: { id: price.id }, data: { source_link_id: null, updated_by_user_id: input.actor.userId ?? null, updated_by_label: input.actor.label } });
+              await writeAudit(ports, tx, { action: "price-material.updated", entityType: "price_material", entityId: price.id, actor: input.actor, changes: { source_link_id: { from: price.source_link.id, to: null } }, metadata: { reason: "sku-brand-correction", sku_id: input.skuId, previous_brand_id: existing.brand_id, new_brand_id: input.brandId || null, detached_source_link: { id: price.source_link.id, url: price.source_link.url, kind: price.source_link.kind, label: price.source_link.label } } });
+            }
+            if (input.brandId) await ensurePriceMaterialBrandSupplierLink(tx, ports, input.actor, input.skuId, price.supplier_vendor_id);
+          }
+        }
         if (changes.categories) { await tx.skuCategory.deleteMany({ where: { sku_id: input.skuId } }); await tx.skuCategory.createMany({ data: categoryIds.map((categoryId) => ({ id: randomUUID(), sku_id: input.skuId, category_id: categoryId })) }); }
         const touchedBrandCategoryIds = await tx.brandCategoryOrigin.findMany({ where: { source_sku_id: input.skuId }, select: { brand_category_id: true } }).then((rows) => rows.map((row) => row.brand_category_id));
         await tx.brandCategoryOrigin.deleteMany({ where: { source_sku_id: input.skuId } });

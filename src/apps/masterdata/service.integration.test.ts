@@ -699,7 +699,7 @@ describe("Master Data service", () => {
     );
   });
 
-  it("blocks SKU brand change when live material prices have source links", async () => {
+  it("corrects a SKU Brand while preserving prices and auditing detached source links", async () => {
     const context = await createMaterialContext();
     const brand2 = await service.createBrand({ grants: GRANTS, actor: ACTOR, name: "Brand Two" });
     const { skuId } = await service.createSku({
@@ -712,16 +712,18 @@ describe("Master Data service", () => {
 
     await service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id, amount: "1000", currency: "IDR", sourceLinkId: link.id });
 
-    await assert.rejects(
-      () => service.updateSku({ grants: GRANTS, actor: ACTOR, skuId, name: "Brand-Linked SKU", brandId: brand2.brandId, categoryId: context.categoryId }),
-      (error: unknown) => error instanceof AppError && error.code === "SKU_BRAND_CHANGE_BLOCKED",
-    );
-
-    // Clearing the source link allows the brand change once the supplier also carries the new brand
-    await linkBrand(brand2.brandId, context.vendorId);
-    await service.updatePriceMaterial({ grants: GRANTS, actor: ACTOR, priceMaterialId: price.id, amount: "1000", currency: "IDR", sourceLinkId: null });
     await service.updateSku({ grants: GRANTS, actor: ACTOR, skuId, name: "Brand-Linked SKU", brandId: brand2.brandId, categoryId: context.categoryId });
     assert.equal((await testDb.prisma.sku.findUniqueOrThrow({ where: { id: skuId } })).brand_id, brand2.brandId);
+    const correctedPrice = await testDb.prisma.priceMaterial.findUniqueOrThrow({ where: { id: price.id } });
+    assert.equal(correctedPrice.amount.toString(), "1000");
+    assert.equal(correctedPrice.source_link_id, null);
+    assert.equal(correctedPrice.updated_by_label, ACTOR.label);
+    assert.equal(await testDb.prisma.brandSupplier.count({ where: { brand_id: brand2.brandId, vendor_id: context.vendorId, is_authorized: false } }), 1);
+    const priceAudit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "price-material.updated", entity_id: price.id, metadata: { path: ["reason"], equals: "sku-brand-correction" } } });
+    assert.deepEqual(priceAudit.changes, { source_link_id: { from: link.id, to: null } });
+    assert.deepEqual(priceAudit.metadata, { reason: "sku-brand-correction", sku_id: skuId, previous_brand_id: context.brandId, new_brand_id: brand2.brandId, detached_source_link: { id: link.id, url: link.url, kind: link.kind, label: link.label } });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "sku.updated", entity_id: skuId } }), 1);
+    assert.equal((await service.listSkus({ grants: GRANTS })).find((sku) => sku.id === skuId)?.material_prices[0].source_link_id, null);
   });
 
   it("blocks SKU restore when all its prices still have other archive causes", async () => {

@@ -94,7 +94,7 @@ owns grant mechanics.
 | `studioflow.access` | Open the app |
 | `studioflow.project.read` | Read projects, clients, phases, rounds, requirements, files, MOM, schedule, presentation, library, timeline |
 | `studioflow.project.manage` | Create/edit clients and projects, PICs, priority, status, archive/restore, mark completed; see every running project on Home; edit planned phase dates |
-| `studioflow.project.override` | Pass every assignment gate (replaces legacy "admin always allowed") |
+| `studioflow.project.override` | Together with `studioflow.project.manage`, pass assignment gates (replaces legacy "admin always allowed"); alone it gives no write bypass |
 | `studioflow.project.pic-designer` / `.pic-drafter` | Positions: who may be picked for each PIC seat |
 | `studioflow.phase.work` | Round commands (add, send, client answered, outcome, visits, rename, delete unsent), phase notes (post, edit, star, mark client feedback, delete, images), dismiss requirement, undo of the round commands, CD list, files |
 | `studioflow.phase.review` | Skip a phase that is pending or active (bypass, reason required) and undo that skip |
@@ -114,8 +114,13 @@ Rules:
   data = PIC designer; phase transitions = PIC designer on every phase, PIC
   drafter only on a drafter-seat phase; phase content = drafter-seat phase:
   drafter or designer, other phases: designer; project documents (MOM,
-  Schedule, Presentation) = designer or drafter. `studioflow.project.override`
-  passes every gate. Reading needs only `studioflow.project.read`.
+  Schedule, Presentation) = designer or drafter. Both `studioflow.project.manage`
+  and `studioflow.project.override` are required to pass assignment gates.
+  Reading needs only `studioflow.project.read`. A non-PIC without manager rights
+  sees Schedule, Presentation (when enabled), Timeline, and History as read-only
+  project sections; Phases and MOM are unavailable even by direct link.
+  Workspace images also cannot be copied into Ideas or Presentation through
+  their public bridges by a viewer who cannot see those work sections.
 - Suggested role configuration (owner configures in Platform Access):
   Designer = access, read, pic-designer, phase.work, phase.review, task.manage,
   mom.manage, schedule.manage, presentation.manage; Drafter = access, read,

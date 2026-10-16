@@ -29,6 +29,7 @@ export type OpenThread = { key: string; spec: ThreadSpec; title: string; world: 
 export type ThreadChatProps = {
   projectId: string;
   projectName: string;
+  currentUserId: string;
   phases: readonly ChatPhase[];
   writablePhaseIds: readonly string[];
   canEditGeneral: boolean;

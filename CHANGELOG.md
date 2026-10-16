@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.110 | 2026-10-16 | fix(studioflow,masterdata): Identify notes and correct access, files, and SKU Brand (Executor + Lead PASS)
+
+- **Notes and access:** Notes now show each sender and place the signed-in person's messages on the left, others on the right, in both the project stream and board threads. Image albums group by author ID. A non-PIC without project-manager authority sees only Schedule, enabled Presentation, Timeline, and History; hidden Phases/MOM pages and MOM print refuse direct access. Ideas and Presentation image-source bridges also deny copying hidden Workspace images. Assignment override now requires both project-manage and project-override grants, while PIC rights remain intact.
+- **Master Data:** ordinary SKU Edit can correct a mistaken Brand even with priced suppliers and source links. The correction preserves price values, detaches incompatible old-Brand source links with audit evidence, and associates priced suppliers with the destination Brand. Existing BQ snapshots are unchanged; the editor explains the effect before saving.
+- **File safety:** archived-file cleanup checks StudioFlow authority before Presentation retry; manual file deletion audits the actor and file in the delete transaction; Final, expiry extension, and deletion refuse locked phases.
+- **Evidence:** full `npm test` **1226/1226**, typecheck, lint, architecture boundaries, legacy-runtime, production build, and whitespace checks PASS. Focused browser acceptance and screen-size suite **83/83** PASS, including two senders, restricted viewer, SKU correction, and 375–841 px layouts. Reviewer verdict PASS. No migration, dependency, legacy access, remote action, or push.
+
 ## R9.109 | 2026-10-16 | fix(presentation): Reconcile deleted Schedule links (Executor + Lead PASS)
 
 - **Outcome:** Presentation maintenance now reads bounded, ordered pages of its linked Product Schedule IDs through a narrow StudioFlow existence projection and clears only IDs that no longer exist. Keyset paging drains the current set in one pass, so live links in an early page cannot starve later stale links. Normal board reads remain write-free and still hide a missing link before maintenance runs.

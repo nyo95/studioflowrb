@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
 import { isModuleEnabled } from "@platform/core/modules";
@@ -11,7 +11,8 @@ import { SectionCard, Text } from "@/platform/ui_engine";
 
 import { PhaseAside } from "../../_components/phase-aside";
 import { PhaseCanvas } from "../../_components/phase-canvas";
-import { pageSession } from "../../_components/session";
+import { canSeeProjectWorkSections, pageProjectAccess, pageSession } from "../../_components/session";
+import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { ProjectNotes } from "./_notes-stream/project-notes";
 import { ProjectWorkspace } from "./_workspace-canvas/project-workspace";
 import { PhaseTabs } from "./phase-tabs";
@@ -30,6 +31,8 @@ export default async function ProjectOverviewPage({
 }) {
   const [{ projectId }, sp] = await Promise.all([params, searchParams]);
   const { grants } = await pageSession();
+  const access = await pageProjectAccess(projectId);
+  if (!canSeeProjectWorkSections(access)) redirect(STUDIOFLOW_ROUTES.projectSchedule(projectId));
 
   const [project, phases, people, boardEnabled] = await Promise.all([
     studioFlow.projects.getProject({ grants, projectId }).catch((error) => {

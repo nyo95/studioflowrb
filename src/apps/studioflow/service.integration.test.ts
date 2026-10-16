@@ -984,6 +984,23 @@ describe("SF-R1 bootstrap and naming", () => {
     await rejectsWith(sf.schedule.createEntry({ ...as(outsider, unassignedGrants), projectId, section: "MATERIAL", category: "Panel" }), "PERMISSION_DENIED");
     await rejectsWith(presentation.createBoard({ ...as(outsider, unassignedGrants), projectId, title: "Denied" }), "PERMISSION_DENIED");
 
+    const overrideWithoutManage = ALL.filter((grant) => grant !== P.projectManage);
+    const limitedViewer = await seedUser("Override without manager rights", overrideWithoutManage);
+    const limitedAccess = await sf.projects.getAccess({ grants: overrideWithoutManage, actor: limitedViewer.actor, projectId });
+    assert.equal(limitedAccess.override, false);
+    assert.equal(limitedAccess.canSeeWorkSections, false);
+    assert.equal(limitedAccess.canEditProject, false);
+    assert.equal(limitedAccess.canEditDocuments, false);
+    assert.ok(limitedAccess.phases.every((phase) => !phase.canTransition && !phase.canEditContent));
+    await rejectsWith(sf.phases.postPhaseNote({ ...as(limitedViewer, overrideWithoutManage), projectId, phaseId: moodboard.id, body: "Denied" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.mom.createDocument({ ...as(limitedViewer, overrideWithoutManage), projectId, topic: "Denied" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.schedule.createEntry({ ...as(limitedViewer, overrideWithoutManage), projectId, section: "MATERIAL", category: "Panel" }), "PERMISSION_DENIED");
+    await rejectsWith(presentation.createBoard({ ...as(limitedViewer, overrideWithoutManage), projectId, title: "Denied" }), "PERMISSION_DENIED");
+    await assert.doesNotReject(() => sf.schedule.listSchedule({ grants: overrideWithoutManage, projectId }));
+    const picAccess = await sf.projects.getAccess({ grants: overrideWithoutManage, actor: designer.actor, projectId });
+    assert.equal(picAccess.canSeeWorkSections, true);
+    assert.equal(picAccess.canEditDocuments, true, "missing manager rights do not remove assigned PIC rights");
+
     await sf.projects.setProjectPriority({ ...as(designer), projectId, priority: "URGENT" });
     await sf.mom.createDocument({ ...as(drafter, [...DRAFTER_GRANTS, P.momManage]), projectId, topic: "Drafter can edit documents" });
     await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
@@ -2438,6 +2455,43 @@ describe("Deliverable reference revision", () => {
     assert.equal(storage.objects.has(row.storage_key), false);
   });
 
+  it("rejects Final, expiry extension, and manual deletion while the phase is locked", async () => {
+    const { projectId } = await newProject("Locked deliverables");
+    const phase = await phaseOf(projectId, "moodboard");
+    await sf.phases.uploadDeliverable({ ...as(designer), projectId, phaseId: phase.id, name: "locked.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
+    const row = await testDb.prisma.sfDeliverable.findFirstOrThrow({ where: { phase_id: phase.id } });
+    const beforeAudit = await testDb.prisma.auditEvent.count({ where: { entity_id: row.id } });
+    await testDb.prisma.sfPhase.update({ where: { id: phase.id }, data: { is_locked: true } });
+    await rejectsWith(sf.phases.setDeliverableFinal({ ...as(designer), projectId, deliverableId: row.id, isFinal: true }), "PHASE_LOCKED");
+    await rejectsWith(sf.phases.extendDeliverableExpiry({ ...as(designer), projectId, deliverableId: row.id }), "PHASE_LOCKED");
+    await rejectsWith(sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id }), "PHASE_LOCKED");
+    assert.deepEqual(await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { id: row.id } }), row);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: row.id } }), beforeAudit);
+    assert.equal(storage.objects.has(row.storage_key), true);
+  });
+
+  it("records manual deletion with the actor and file identity, and rolls back if audit fails", async () => {
+    const { projectId } = await newProject("Audited deletion");
+    const phase = await phaseOf(projectId, "moodboard");
+    await sf.phases.uploadDeliverable({ ...as(designer), projectId, phaseId: phase.id, name: "delete.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
+    const row = await testDb.prisma.sfDeliverable.findFirstOrThrow({ where: { phase_id: phase.id } });
+    const failing = createStudioFlowService(testDb.prisma, {
+      runTransaction: (work) => testDb.prisma.$transaction((tx) => work(tx)),
+      auditWriter: { write: async () => { throw new Error("audit down"); } },
+      people: createPeopleDirectory(testDb.prisma), storage, masterData: createMasterDataPublicRead(testDb.prisma), now: () => clock,
+    });
+    await assert.rejects(failing.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id }), /audit down/);
+    assert.ok(await testDb.prisma.sfDeliverable.findUnique({ where: { id: row.id } }));
+    assert.equal(storage.objects.has(row.storage_key), true);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: row.id, action: "studioflow.deliverable.deleted" } }), 0);
+    await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id });
+    const event = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { entity_id: row.id, action: "studioflow.deliverable.deleted" } });
+    assert.equal(event.actor_kind, "USER");
+    assert.equal(event.actor_user_id, designer.id);
+    assert.deepEqual(event.metadata, { projectId, phaseId: phase.id, name: row.name, versionNumber: row.version_number, wasFinal: row.is_final });
+    assert.equal(await testDb.prisma.sfDeliverable.count({ where: { id: row.id } }), 0);
+  });
+
   describe("every deliverable/MOM blob delete is tracked until it really happens (WO-SF-SAFE-03)", () => {
     const ledger = (key: string) => testDb.prisma.sfAssetCleanupFailure.findUnique({ where: { storage_key: key } });
     async function uploaded(name: string) {
@@ -3770,6 +3824,11 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     const { imageId: noteId } = await sf.phases.postPhaseImage({ ...base, file: png() });
     const image = (await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { id: noteId, kind: "IMAGE" }, select: { id: true, storage_key: true } })) as { id: string; storage_key: string };
     const bridge = createStudioFlowPresentationBridge(testDb.prisma);
+    const restrictedGrants = ALL.filter((grant) => grant !== P.projectManage);
+    const restrictedViewer = await seedUser("Workspace image restricted viewer", restrictedGrants);
+    const restrictedInput = { ...as(restrictedViewer, restrictedGrants), projectId, phaseId: phase.id, imageId: image.id };
+    await rejectsWith(bridge.readWorkspaceImageSource(restrictedInput), "PERMISSION_DENIED");
+    await rejectsWith(ideas.saveNoteImageToIdeas(restrictedInput), "PERMISSION_DENIED");
     const first = await presentation.addStoredImageToMoodboard({ ...as(designer), projectId, source: await bridge.readWorkspaceImageSource({ ...base, imageId: image.id }) });
     assert.equal(first.created, true);
 

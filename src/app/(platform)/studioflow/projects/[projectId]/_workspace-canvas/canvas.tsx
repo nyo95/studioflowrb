@@ -39,13 +39,14 @@ const isEditable = (target: EventTarget | null) => target instanceof HTMLElement
  * (or middle-click, or Space + drag) to move around; zoom only enlarges, and the overview map jumps anywhere.
  * Layout is last-write-wins and never makes someone's text edit stale. Below 768 px the elements read top to bottom.
  */
-export function WorkspaceCanvas({ projectId, projectName, elements: board, threads: serverThreads, chatPhases, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, canUsePresentation, drawingList }: {
+export function WorkspaceCanvas({ projectId, projectName, currentUserId, elements: board, threads: serverThreads, chatPhases, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, canUsePresentation, drawingList }: {
   projectId: string;
   /** Note threads on the board (WO-SF-BOARD-THREADS-01); their messages are project notes, never board elements. */
   threads: readonly BoardThread[];
   /** The phases as the Notes chat names them, for the thread windows. */
   chatPhases: readonly ChatPhase[];
   projectName: string;
+  currentUserId: string;
   elements: WorkspaceCardView[];
   phases: readonly PhaseOption[];
   selectedPhase: { id: string; name: string } | null;
@@ -112,7 +113,7 @@ export function WorkspaceCanvas({ projectId, projectName, elements: board, threa
   // A board note is a Notes message: it needs a phase this person may write (G3); moving a free marker is project-level.
   const canThread = labelChoices.phases.length > 0;
   const canMoveThreads = canEditGeneral;
-  const chat: ThreadChatProps = { projectId, projectName, phases: chatPhases, writablePhaseIds, canEditGeneral, defaultPhaseId: selectedPhase?.id ?? null, canUseIdeas, canUsePresentation };
+  const chat: ThreadChatProps = { projectId, projectName, currentUserId, phases: chatPhases, writablePhaseIds, canEditGeneral, defaultPhaseId: selectedPhase?.id ?? null, canUseIdeas, canUsePresentation };
 
   // ── View (pan and zoom are personal: this browser only) ─────────────
   const viewKey = `studioflow.workspace.view.${projectId}`;

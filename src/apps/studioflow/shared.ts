@@ -64,6 +64,7 @@ export function requireCommand(ctx: CommandContext, permission: string): string 
 
 export type ProjectAccess = {
   override: boolean;
+  canSeeWorkSections: boolean;
   /** A completed project is read-only for everyone until it is reopened (owner, 2026-10-04). */
   completed: boolean;
   isDesigner: boolean;
@@ -72,6 +73,11 @@ export type ProjectAccess = {
   canEditDocuments: boolean;
   phases: Array<{ phaseId: string; canTransition: boolean; canEditContent: boolean }>;
 };
+
+/** Assignment bypass belongs to managers explicitly granted project recovery authority. */
+export function hasProjectAssignmentOverride(grants: PermissionGrants): boolean {
+  return hasPermission(grants, P.projectManage) && hasPermission(grants, P.projectOverride);
+}
 
 type ProjectAccessFacts = {
   status: string;
@@ -82,13 +88,14 @@ type ProjectAccessFacts = {
 
 /** The single StudioFlow PIC-assignment policy, evaluated from already-read project facts. */
 export function projectAccessFromFacts(project: ProjectAccessFacts, input: { grants: PermissionGrants; actorId: string }): ProjectAccess {
-  const override = hasPermission(input.grants, P.projectOverride);
+  const override = hasProjectAssignmentOverride(input.grants);
   const isDesigner = project.pic_designer_id === input.actorId;
   const isDrafter = project.pic_drafter_id === input.actorId;
   const completed = project.status === "COMPLETED";
   const open = !completed;
   return {
     override,
+    canSeeWorkSections: isDesigner || isDrafter || hasPermission(input.grants, P.projectManage),
     completed,
     isDesigner,
     isDrafter,
@@ -107,6 +114,12 @@ export async function getProjectAccess(tx: Db | TxClient, input: { grants: Permi
   const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } } } });
   if (!project) throw notFound("project");
   return projectAccessFromFacts(project, input);
+}
+
+/** Hidden work sections must also stay private through cross-module image sources. */
+export async function requireWorkSectionAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<void> {
+  const access = await getProjectAccess(tx, input);
+  if (!access.canSeeWorkSections) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "This project's work sections are restricted to its assigned team and managers.");
 }
 
 /** Who may mark a project completed or reopen it: either PIC, or an override holder. */

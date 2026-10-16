@@ -44,7 +44,7 @@ export type ProjectCardData = {
   phases: ProjectCardPhase[];
 };
 
-export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: ProjectCardData; viewer: { userId: string; canOverride: boolean; canWork: boolean; canReview: boolean }; defaultExpanded?: boolean }) {
+export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: ProjectCardData; viewer: { userId: string; canManageProjects: boolean; canOverride: boolean; canWork: boolean; canReview: boolean }; defaultExpanded?: boolean }) {
   const router = useRouter();
   const commands = usePhaseCommands(card.id);
   const completion = useCommand();
@@ -58,11 +58,12 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
 
   const completed = card.status === "COMPLETED";
   const isPic = viewer.userId === card.pic_ids.designer || viewer.userId === card.pic_ids.drafter;
+  const projectHref = isPic || viewer.canManageProjects ? `/studioflow/projects/${card.id}` : `/studioflow/projects/${card.id}/schedule`;
   const projectActive = card.status === "ACTIVE";
   const seatOwner = (phase: ProjectCardPhase) => viewer.canOverride || viewer.userId === (phase.seat === "drafter" ? card.pic_ids.drafter : card.pic_ids.designer);
   const canManage = isPic || viewer.canOverride;
   const menu: RowActionItem[] = [
-    { label: "Open project", onSelect: () => router.push(`/studioflow/projects/${card.id}`) },
+    { label: "Open project", onSelect: () => router.push(projectHref) },
     ...(canManage && !completed ? [{ label: "Mark as completed…", separatorBefore: true, onSelect: () => setConfirmComplete(true) }] : []),
     ...(canManage && completed ? [{ label: "Reopen project", separatorBefore: true, onSelect: () => void completion.run("reopen", () => projectCompletionAction(card.id, "reopen")) }] : []),
   ];
@@ -108,7 +109,7 @@ export function ProjectCard({ card, viewer, defaultExpanded = true }: { card: Pr
               {expanded ? <ChevronDown size={16} aria-hidden="true" /> : <ChevronRight size={16} aria-hidden="true" />}
             </button>
             <div className="min-w-0">
-              <Link href={`/studioflow/projects/${card.id}`} className="text-base font-semibold text-ink hover:underline">{card.name}</Link>
+              <Link href={projectHref} className="text-base font-semibold text-ink hover:underline">{card.name}</Link>
               <p className="m-0 text-sm text-ink-secondary">{card.client?.name ?? "No client"}</p>
             </div>
           </div>

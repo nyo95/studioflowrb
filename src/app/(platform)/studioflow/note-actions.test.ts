@@ -44,6 +44,7 @@ function loadActions(failure?: AppError) {
     "@platform/core/errors": { AppError },
     "@platform/core/modules": { requireModuleEnabled: async () => { moduleChecks++; if (!boardEnabled) throw new AppError("CONFLICT", "MODULE_DISABLED", "Board is disabled."); } },
     "@platform/core/validation": { validationError },
+    "@/apps/studioflow/shared": { P: { projectManage: "studioflow.project.manage" }, requireCommand: () => undefined },
     "@/apps/presentation/public/lifecycle": {},
     "@/apps/ideas/public/lifecycle": {},
     "@/apps/studioflow/runtime": { studioFlow: { workspace } },
