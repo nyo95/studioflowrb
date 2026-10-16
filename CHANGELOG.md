@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.119 | 2026-10-17 | fix(bq): Differentiate Structure creation actions (Lead)
+
+- **Structure actions:** Add Work Item now uses a list-with-plus icon and Add Subsection uses a folder-with-plus icon. The two hover actions remain in the same compact place but no longer look like two identical `+` buttons; their accessible labels and outcomes are unchanged.
+- **Verification:** typecheck, focused lint, and whitespace checks passed. No schema, migration, dependency, permission, remote action, or push.
+
 ## R9.118 | 2026-10-17 | fix(bq): Make Subsection optional in Struktur (Lead)
 
 - **Structure hierarchy:** removed the permanently visible Add Subsection row. A Section now reveals its accessible `+` action only on hover or keyboard focus, retaining the existing inline naming flow. The narrow-screen fallback remains because Struktur is hidden there.

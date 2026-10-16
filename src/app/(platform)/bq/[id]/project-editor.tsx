@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, ChevronUp, FileText, GripVertical, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, FileText, FolderPlus, GripVertical, ListPlus, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -505,7 +505,7 @@ function SectionOutline({
                     size="sm"
                     variant="ghost"
                     label={`Tambah Work Item di ${section.name}`}
-                    icon={<Plus aria-hidden="true" />}
+                    icon={<ListPlus aria-hidden="true" />}
                     disabled={pending}
                     onClick={(event) => {
                       event.preventDefault();
@@ -1865,7 +1865,7 @@ function AddRow({
 
   if (!open) {
     if (iconOnly) {
-      return <IconButton size="sm" variant="ghost" label={`Tambah ${label}`} icon={<Plus aria-hidden="true" />} disabled={disabled} onClick={() => setOpen(true)} />;
+      return <IconButton size="sm" variant="ghost" label={`Tambah ${label}`} icon={<FolderPlus aria-hidden="true" />} disabled={disabled} onClick={() => setOpen(true)} />;
     }
     return (
       <Button size="sm" variant="ghost" leadingIcon={<Plus aria-hidden="true" />} disabled={disabled} onClick={() => setOpen(true)}>
