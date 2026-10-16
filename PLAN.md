@@ -1,9 +1,9 @@
 # Active Plan
 
-Plan ID: WO-BQ-STRUCTURE-ENTRY-ICONS-01
-Scope: Distinct Structure entry icons
+Plan ID: WO-BQ-UI-LANGUAGE-ALIGNMENT-01
+Scope: Consistent BQ Indonesian UI copy
 Module(s): bq
-Target revision: R9.119
+Target revision: R9.121
 Status: READY
 Priority: P2
 Owner: Product Owner
@@ -11,38 +11,47 @@ Last updated: 2026-10-17
 
 ## Outcome
 
-An estimator can distinguish the two creation actions in a hovered Section
-without having to open each tooltip.
+Every BQ application screen reads as one coherent Indonesian interface while
+retaining the BQ contract's English domain nouns.
 
 ## Locked Decisions
 
-- Add Work Item uses the standard list-with-plus icon.
-- Add Subsection uses the standard folder-with-plus icon.
-- Accessible labels, hover/focus behavior, and existing entry flows remain
-  unchanged.
+- Default UI prose, actions, statuses, empty states, validation, navigation,
+  dialogs and accessible labels are Indonesian.
+- Canonical domain nouns remain `Section`, `Subsection`, `Work Item`,
+  `Component Group`, `Cost Component`, `Assembly`, `TBC`, and `By Owner`.
+- `Quotation` is an English document heading/print format; interactive BQ UI
+  calls it `Penawaran`.
+- The future EN/ID switch is a separate per-person language preference. It
+  must not overload date/number locale or the first-use-guide language. This
+  BQ slice owns its copy catalogue only and does not add that platform setting.
 
 ## Boundaries and Non-goals
 
-- EXTEND BQ editor composition only. No schema, service, calculation,
-  permission, hierarchy, entry flow, or deletion behavior changes.
+- EXTEND BQ presentation copy only. No schema, service behavior, calculation,
+  permission, hierarchy, entry flow, deletion behavior, platform setting, or
+  print-document wording changes.
 
 ## Acceptance Criteria
 
-- Hovering or keyboard-focusing a Section shows visually distinct icons for
-  Add Work Item and Add Subsection when both are available.
-- Each retains its accessible name and existing result.
+- Directory, project, library, template, assembly, source-picker, settings and
+  deletion-review screens no longer mix sentence-level Indonesian and English.
+- Canonical domain nouns and print quotation language remain intentional.
+- Copy is prepared in a BQ-owned catalogue so the future setting can add EN
+  selection without a second string hunt.
 
 ## Verification
 
-- Typecheck, lint, production build, and staged/unstaged whitespace checks.
+- Focused BQ copy tests, typecheck, lint, production build, and whitespace
+  checks.
 
 ## Reviewer Acceptance
 
-- At desktop, confirm the two actions are recognizable at a glance and their
-  tooltips/keyboard labels identify the same action.
+- Walk every BQ screen and its common dialogs in Indonesian; verify contract
+  nouns remain exact and quotation print stays unchanged.
 
 ## Executor Prompt
 
 You are the Backend Executor. Location: rumah. Read `AGENTS.md`,
 `docs/agent/EXECUTOR.md`, and this READY `PLAN.md`, then implement the entire
-READY outcome, run required checks, update the changelog, and create R9.119.
+READY outcome, run required checks, update the changelog, and create R9.121.

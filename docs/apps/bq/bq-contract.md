@@ -591,6 +591,21 @@ Impor harga material memerlukan `MASTERDATA_PERMISSIONS.priceMaterialRead`; impo
 5. **Promotion status** — estimator melihat status request pada BQ Library
 6. **Master Data promotion queue** — admin/staff Master Data review, approve/reject, dan menghubungkan canonical price yang sudah ada
 
+### 13.4 Bahasa antarmuka BQ (owner 2026-10-17)
+
+Bahasa layar BQ saat ini adalah Bahasa Indonesia. Kalimat, tombol, status,
+pesan kosong, dialog, validasi, navigasi, dan label aksesibilitas memakai Bahasa
+Indonesia. Istilah domain yang sudah dikunci tetap ditulis konsisten sebagai
+**Section**, **Subsection**, **Work Item**, **Component Group**, **Cost
+Component**, **Assembly**, **TBC**, dan **By Owner**. Di layar aplikasi,
+quotation disebut **Penawaran**; judul dan isi dokumen quotation cetak mengikuti
+format surat yang sudah dikunci di §10.
+
+Sakelar EN/ID di masa depan adalah preferensi bahasa per orang yang berdiri
+sendiri. Ia tidak memakai `locale` (angka/tanggal) ataupun bahasa first-use
+guide. BQ menyiapkan katalog copy miliknya sekarang; kemampuan memilih bahasa
+di Settings menjadi pekerjaan Platform terpisah.
+
 ---
 
 ## 14. Build order

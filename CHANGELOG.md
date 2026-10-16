@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.120 | 2026-10-17 | plan(bq): Align application language (Lead)
+
+- **Decision:** BQ will use Indonesian for interface prose while preserving its locked English domain nouns: Section, Subsection, Work Item, Component Group, Cost Component, Assembly, TBC, and By Owner. The application calls a quotation `Penawaran`; the contractual English printed document stays unchanged.
+- **Foundation boundary:** a future EN/ID switch is a separate person-level language preference. It must not reuse locale (dates/numbers) or first-use-guide language. This READY BQ work prepares an app-owned copy catalogue without adding the future Platform setting.
+- **Scope:** recorded the language contract and a bounded implementation plan for all BQ screens and dialogs. No runtime behavior, schema, dependency, database, remote action, or push.
+
 ## R9.119 | 2026-10-17 | fix(bq): Differentiate Structure creation actions (Lead)
 
 - **Structure actions:** Add Work Item now uses a list-with-plus icon and Add Subsection uses a folder-with-plus icon. The two hover actions remain in the same compact place but no longer look like two identical `+` buttons; their accessible labels and outcomes are unchanged.
