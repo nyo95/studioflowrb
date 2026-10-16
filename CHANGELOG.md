@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.114 | 2026-10-16 | fix(bq): Keep deletion controls in the Structure layer (Lead)
+
+- **Canvas hierarchy:** removed the persistent Work Item delete column from the estimating table. The table is now dedicated to workbook reading and cost editing.
+- **Structure layer:** Work Item and Subsection deletion controls live in Struktur like layer actions, appearing only when their row is hovered or keyboard-focused. Existing confirmations and deletion behavior are unchanged; Component Group and Cost Component controls remain in their existing contextual interactions.
+- **Verification:** typecheck, lint, and whitespace checks passed. Full test/build/browser acceptance remains to be batched with the active BQ browser backlog; no schema, migration, dependency, permission, or remote action.
+
 ## R9.113 | 2026-10-16 | feat(bq): Preserve Work Items when removing a Subsection (Lead + Executor)
 
 - **Subsection removal:** an estimator can remove a Subsection from Struktur after a clear confirmation. Its Work Items and every nested Component Group/Cost Component are retained as direct Work Items of the same Section, appended after its existing direct Work Items in their original order. The move, removal and audit are atomic; the existing project-manage permission and locked/archived safeguards still apply.

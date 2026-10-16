@@ -291,6 +291,7 @@ function OutlineItems({
   editable,
   pending,
   onReorder,
+  onDelete,
 }: {
   items: readonly BqItemDetail[];
   parent: ReorderParent;
@@ -298,6 +299,7 @@ function OutlineItems({
   editable: boolean;
   pending: boolean;
   onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
+  onDelete: (item: BqItemDetail) => void;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -344,6 +346,7 @@ function OutlineItems({
         >
           {editable ? <GripVertical aria-hidden="true" className="size-3.5 shrink-0 cursor-grab text-ink-tertiary opacity-0 group-hover/outline:opacity-100" /> : null}
           <a href={`#bq-row-${item.id}`} className="min-w-0 flex-1 truncate py-1" draggable={false}>{item.name}</a>
+          {editable ? <span className="opacity-0 transition-opacity group-hover/outline:opacity-100 group-focus-within/outline:opacity-100"><IconButton size="sm" variant="ghost" label={`Hapus ${item.name}`} icon={<Trash2 aria-hidden="true" />} disabled={pending} onClick={() => onDelete(item)} /></span> : null}
         </li>
       ))}
     </ul>
@@ -394,6 +397,7 @@ function SectionOutline({
   onRenameSection,
   onRenameSubsection,
   onDeleteSubsection,
+  onDeleteWorkItem,
   onReorder,
   onReorderSections,
 }: {
@@ -405,6 +409,7 @@ function SectionOutline({
   onRenameSection: (id: string, name: string) => Promise<void>;
   onRenameSubsection: (id: string, name: string) => Promise<void>;
   onDeleteSubsection: (subsection: { id: string; name: string; itemCount: number; sectionName: string }) => void;
+  onDeleteWorkItem: (item: BqItemDetail) => void;
   onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
   onReorderSections: (sectionId: string | null, orderedIds: string[]) => Promise<void>;
 }) {
@@ -496,7 +501,7 @@ function SectionOutline({
             </div>
             )}
             {closed.has(section.id) ? null : <>
-            <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-7" editable={editable} pending={pending} onReorder={onReorder} />
+            <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-7" editable={editable} pending={pending} onReorder={onReorder} onDelete={onDeleteWorkItem} />
             {section.subsections.map((subsection) => (
               <div key={subsection.id} className="grid min-w-0 grid-cols-1 gap-0.5">
                 {renaming === subsection.id ? nameField(subsection.id, subsection.name, onRenameSubsection, "py-1 pl-5 pr-1.5") : (
@@ -531,7 +536,7 @@ function SectionOutline({
                   ) : null}
                 </div>
                 )}
-                {itemsOpen.has(subsection.id) ? <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-11" editable={editable} pending={pending} onReorder={onReorder} /> : null}
+                {itemsOpen.has(subsection.id) ? <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-11" editable={editable} pending={pending} onReorder={onReorder} onDelete={onDeleteWorkItem} /> : null}
               </div>
             ))}
             {editable ? (
@@ -917,6 +922,7 @@ export function ProjectEditor({
               : `${subsection.itemCount} Work Item akan tetap ada dan pindah ke Section ${subsection.sectionName}.`,
             run: () => run(deleteSubsectionAction, { id: subsection.id }),
           })}
+          onDeleteWorkItem={(item) => setConfirmDelete({ title: `Hapus ${item.name}?`, run: () => run(deleteItemAction, { id: item.id }) })}
           onReorder={(parent, orderedIds) => run(reorderItemsAction, { ...parent, orderedIds: JSON.stringify(orderedIds) })}
           onReorderSections={(sectionId, orderedIds) => run(reorderSectionsAction, { sectionId: sectionId ?? undefined, orderedIds: JSON.stringify(orderedIds) })}
         />
@@ -1222,7 +1228,7 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
   columns: number;
   onMore?: (target: NewItemTarget) => void;
 }) {
-  const span = columns + (ctx.editable ? 1 : 0);
+  const span = columns;
   let counter = 0;
   const direct = section.items.map(() => `${letter}.${++counter}`);
   const grouped = section.subsections.map((subsection) => subsection.items.map(() => `${letter}.${++counter}`));
@@ -1262,7 +1268,6 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
             <TableHead className="w-[72px]">Sat</TableHead>
             <TableHead align="end" className="w-[130px]">Harga satuan</TableHead>
             <TableHead align="end" className="w-[140px]">Total</TableHead>
-            {ctx.editable ? <TableHead align="end" className="w-[48px]" aria-label="Aksi" /> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -1290,7 +1295,6 @@ function SectionTable({ section, letter, ctx, columns, onMore }: {
             <TableRow className="hover:!bg-transparent">
               <TableCell colSpan={7} align="end" className="border-t border-line font-semibold">Subtotal {letter}</TableCell>
               <TableCell align="end" className="border-t border-line font-semibold tabular-nums">{subtotal === null ? "—" : money(subtotal)}</TableCell>
-              {ctx.editable ? <TableCell className="border-t border-line" /> : null}
             </TableRow>
           </TableBody>
         ) : null}
@@ -1353,11 +1357,6 @@ function ItemRows({ item, number, ctx, columns }: { item: BqItemDetail; number: 
           <TableCell align="end" className="font-semibold">
             {isMarkerPriceMode(item.priceMode) ? <Text tone="tertiary" size="sm">{PRICE_STATUS_LABEL[item.priceMode]}</Text> : money(item.total)}
           </TableCell>
-          {ctx.editable ? (
-            <TableCell align="end">
-              <RemoveButton label={`Hapus ${item.name}`} onRemove={() => ctx.run(deleteItemAction, { id: item.id })} disabled={ctx.pending} />
-            </TableCell>
-          ) : null}
         </TableRow>
       </ContextActionMenu>
 
