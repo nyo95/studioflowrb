@@ -9,6 +9,22 @@ import { nowOf, writeAudit } from "../shared";
  */
 export function createStudioFlowSampleRequestCommand(db: PrismaClient, ports: StudioFlowPorts) {
   return {
+    async markSampleDeclinedFromMasterData(input: { actor: AuditActor; requestId: string; reason: string }): Promise<{ updated: boolean; reason?: "ALREADY_DECLINED" | "ALREADY_RECEIVED" | "REQUEST_MISSING" | "PROJECT_ARCHIVED" }> {
+      return ports.runTransaction(async (tx) => {
+        const request = await tx.sfScheduleSampleRequest.findUnique({ where: { id: input.requestId }, include: { option: { include: { entry: { include: { project: true } } } } } });
+        if (!request) return { updated: false, reason: "REQUEST_MISSING" };
+        if (request.option.entry.project.archived_at) return { updated: false, reason: "PROJECT_ARCHIVED" };
+        if (request.status === "DECLINED") return { updated: false, reason: "ALREADY_DECLINED" };
+        if (request.status === "RECEIVED") return { updated: false, reason: "ALREADY_RECEIVED" };
+        const updated = await tx.sfScheduleSampleRequest.updateMany({ where: { id: request.id, status: "REQUESTED" }, data: { status: "DECLINED", declined_by_id: input.actor.userId, declined_by_name: input.actor.label, declined_at: nowOf(ports), decline_reason: input.reason } });
+        if (updated.count === 0) {
+          const latest = await tx.sfScheduleSampleRequest.findUnique({ where: { id: request.id }, select: { status: true } });
+          return { updated: false, reason: latest?.status === "DECLINED" ? "ALREADY_DECLINED" : "ALREADY_RECEIVED" };
+        }
+        await writeAudit(ports, tx, { action: "studioflow.schedule.sample-declined", entityType: "schedule_option", entityId: request.option_id, actor: input.actor, metadata: { via: "masterdata", projectId: request.option.entry.project_id, entryId: request.option.entry_id, label: request.option.label, requestId: request.id } });
+        return { updated: true };
+      });
+    },
     async markSampleReceivedFromShelf(input: { actor: AuditActor; requestId: string; rack: string; box: string }): Promise<{ updated: boolean; reason?: "ALREADY_RECEIVED" | "REQUEST_MISSING" | "PROJECT_ARCHIVED" }> {
       return ports.runTransaction(async (tx) => {
         const request = await tx.sfScheduleSampleRequest.findUnique({ where: { id: input.requestId }, include: { option: { include: { entry: { include: { project: true } } } } } });

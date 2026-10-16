@@ -886,6 +886,7 @@ model SfScheduleOption {
 enum SfSampleRequestStatus {
   REQUESTED
   RECEIVED
+  DECLINED
 
   @@map("sf_sample_request_status")
   @@schema("studioflow")
@@ -908,6 +909,10 @@ model SfScheduleSampleRequest {
   received_by_name  String?
   received_at       DateTime?
   received_note     String?
+  declined_by_id    String?
+  declined_by_name  String?
+  declined_at       DateTime?
+  decline_reason    String?
   created_at        DateTime              @default(now())
   updated_at        DateTime              @updatedAt
 

@@ -17,6 +17,7 @@ type SampleRequestCoordinatorDependencies = {
   studioFlow: {
     listPendingSampleRequests(input?: { limit?: number }): Promise<SampleRequestRead[]>;
     getSampleRequests(ids: readonly string[]): Promise<SampleRequestRead[]>;
+    markSampleDeclinedFromMasterData(input: { actor: Actor; requestId: string; reason: string }): Promise<{ updated: boolean; reason?: string }>;
     markSampleReceivedFromShelf(input: { actor: Actor; requestId: string; rack: string; box: string }): Promise<{ updated: boolean; reason?: string }>;
     listProjectChoices(): Promise<Array<{ id: string; name: string }>>;
   };
@@ -39,7 +40,7 @@ export type SampleQueueRow = {
   /** "NEW" means StudioFlow asked and nobody in Master Data has taken it yet. */
   state: "NEW" | SampleRequestIntakeStatus;
   /** StudioFlow's own view: the physical sample may already be in the designer's hands. Null if it can no longer be read. */
-  sourceStatus: "REQUESTED" | "RECEIVED" | null;
+  sourceStatus: "REQUESTED" | "RECEIVED" | "DECLINED" | null;
   product: { name: string; brandName: string | null; color: string | null; pattern: string | null; finishing: string | null; dimension: string | null };
   project: { id: string; name: string };
   requestedFrom: string;
@@ -87,8 +88,8 @@ const STATE_ORDER: Record<SampleQueueRow["state"], number> = { NEW: 0, IN_PROGRE
 
 /**
  * Cross-app use case: StudioFlow asks for a physical sample, Master Data staff work it. Neither app imports
- * the other; the shell hands each one's public contract to this coordinator. Master Data's actions never
- * change StudioFlow's request, so "priced" and "sample received" stay two separate facts.
+ * the other; the shell hands each one's public contract to this coordinator. Pricing remains a
+ * Master Data fact, physical receipt a StudioFlow fact, while a refusal resolves both views.
  */
 export function createSampleRequestCoordinator(deps: SampleRequestCoordinatorDependencies) {
   const authorize = (grants: PermissionGrants) => requirePermission(grants, MASTERDATA_PERMISSIONS.sampleRequestManage);
@@ -101,7 +102,7 @@ export function createSampleRequestCoordinator(deps: SampleRequestCoordinatorDep
       const pending = await deps.studioFlow.listPendingSampleRequests({ limit: PENDING_LIMIT });
       const [open, forPending, priced, declined] = await Promise.all([
         deps.masterData.listSampleRequestIntakes({ grants: input.grants, status: "IN_PROGRESS", limit: OPEN_LIMIT }),
-        pending.length > 0 ? deps.masterData.listSampleRequestIntakes({ grants: input.grants, sourceRequestIds: pending.map((request) => request.id) }) : Promise.resolve([]),
+        pending.length > 0 ? deps.masterData.listSampleRequestIntakes({ grants: input.grants, sourceRequestIds: pending.map((request) => request.id), limit: PENDING_LIMIT }) : Promise.resolve([]),
         input.includeFinished ? deps.masterData.listSampleRequestIntakes({ grants: input.grants, status: "PRICED", limit: FINISHED_LIMIT }) : Promise.resolve([]),
         input.includeFinished ? deps.masterData.listSampleRequestIntakes({ grants: input.grants, status: "DECLINED", limit: FINISHED_LIMIT }) : Promise.resolve([]),
       ]);
@@ -127,7 +128,7 @@ export function createSampleRequestCoordinator(deps: SampleRequestCoordinatorDep
       const [request] = await deps.studioFlow.getSampleRequests([input.sourceRequestId]);
       if (!request) throw new AppError("NOT_FOUND", "SAMPLE_REQUEST_NOT_FOUND", "This sample request no longer exists.");
       if (request.project.archived) throw new AppError("CONFLICT", "SAMPLE_PROJECT_ARCHIVED", "This request belongs to an archived project.");
-      if (request.status !== "REQUESTED") throw new AppError("CONFLICT", "SAMPLE_REQUEST_NOT_PENDING", "The designer already marked this sample as received.");
+      if (request.status !== "REQUESTED") throw new AppError("CONFLICT", "SAMPLE_REQUEST_NOT_PENDING", "This sample request is no longer pending.");
       return deps.masterData.startSampleRequestIntake({
         grants: input.grants,
         actor: input.actor,
@@ -157,8 +158,22 @@ export function createSampleRequestCoordinator(deps: SampleRequestCoordinatorDep
     markPriced(input: { grants: PermissionGrants; actor: Actor; intakeId: string } & SampleQuoteInput) {
       return deps.masterData.markSampleRequestPriced(input);
     },
-    decline(input: { grants: PermissionGrants; actor: Actor; intakeId: string; reason: string }) {
-      return deps.masterData.declineSampleRequest(input);
+    async decline(input: { grants: PermissionGrants; actor: Actor; intakeId: string; reason: string }) {
+      authorize(input.grants);
+      const intake = await deps.masterData.declineSampleRequest(input);
+      try {
+        const result = await deps.studioFlow.markSampleDeclinedFromMasterData({ actor: input.actor, requestId: intake.sourceRequestId, reason: intake.staffNote ?? input.reason });
+        return { intake, studioFlowUpdated: result.updated || result.reason === "ALREADY_DECLINED", reason: result.reason };
+      } catch {
+        return { intake, studioFlowUpdated: false, reason: "SYNC_FAILED" as const };
+      }
+    },
+    async retryStudioFlowDeclined(input: { grants: PermissionGrants; actor: Actor; sourceRequestId: string }) {
+      authorize(input.grants);
+      const intake = (await deps.masterData.listSampleRequestIntakes({ grants: input.grants, sourceRequestIds: [input.sourceRequestId] }))[0];
+      if (intake?.status !== "DECLINED" || !intake.staffNote) throw new AppError("CONFLICT", "SAMPLE_NOT_DECLINED", "This sample request was not declined in Master Data.");
+      const result = await deps.studioFlow.markSampleDeclinedFromMasterData({ actor: input.actor, requestId: intake.sourceRequestId, reason: intake.staffNote });
+      return { ...result, sourceProjectId: intake.sourceProjectId };
     },
     syncPrice(input: { grants: PermissionGrants; actor: Actor; intakeId: string; unitId?: string }) {
       return deps.masterData.syncSampleQuoteToPrice(input);

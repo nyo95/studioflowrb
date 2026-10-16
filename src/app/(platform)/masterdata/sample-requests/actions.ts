@@ -9,6 +9,7 @@ import { validationError } from "@platform/core/validation";
 
 import { sampleRequestCoordinator } from "@/app/sample-request-runtime";
 import { MASTERDATA_ROUTES } from "@/apps/masterdata/public";
+import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
 
 function revalidateSampleRequests(): void {
   revalidatePath(MASTERDATA_ROUTES.sampleRequests);
@@ -81,13 +82,26 @@ export async function markSampleRequestPricedAction(intakeId: string, input: unk
   });
 }
 
-export async function declineSampleRequestAction(intakeId: string, reason: string): Promise<ActionResult<unknown>> {
+export async function declineSampleRequestAction(intakeId: string, reason: string): Promise<ActionResult<{ studioFlowUpdated: boolean; reason?: string }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const parsed = z.string().trim().min(1, "A reason is required").max(1000).safeParse(reason);
     if (!parsed.success) throw validationError(parsed.error);
     const result = await sampleRequestCoordinator.decline({ grants, actor: actorOf(principal), intakeId, reason: parsed.data });
     revalidateSampleRequests();
+    revalidatePath(STUDIOFLOW_ROUTES.projectSchedule(result.intake.sourceProjectId));
+    return result;
+  });
+}
+
+export async function retrySampleDeclinedAction(sourceRequestId: string): Promise<ActionResult<{ updated: boolean; reason?: string }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.string().uuid().safeParse(sourceRequestId);
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await sampleRequestCoordinator.retryStudioFlowDeclined({ grants, actor: actorOf(principal), sourceRequestId: parsed.data });
+    revalidateSampleRequests();
+    revalidatePath(STUDIOFLOW_ROUTES.projectSchedule(result.sourceProjectId));
     return result;
   });
 }

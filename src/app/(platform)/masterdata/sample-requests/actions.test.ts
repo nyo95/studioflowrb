@@ -12,6 +12,7 @@ type Actions = {
   recordSampleQuoteAction?: (intakeId: string, input: unknown) => Promise<Result>;
   markSampleRequestPricedAction?: (intakeId: string, input: unknown) => Promise<Result>;
   declineSampleRequestAction?: (intakeId: string, reason: unknown) => Promise<Result>;
+  retrySampleDeclinedAction?: (sourceRequestId: string) => Promise<Result>;
 };
 
 /** Runs the real action module with only its runtime edges replaced. */
@@ -32,12 +33,14 @@ function load(signedIn = true) {
       },
     },
     "@/apps/masterdata/public": { MASTERDATA_ROUTES: { sampleRequests: "/masterdata/sample-requests" } },
+    "@/apps/studioflow/public/nav": { STUDIOFLOW_ROUTES: { projectSchedule: (projectId: string) => `/studioflow/projects/${projectId}/schedule` } },
     "@/app/sample-request-runtime": {
       sampleRequestCoordinator: {
         take: async (input: unknown) => { calls.push(["take", input]); return { id: "intake-1" }; },
         recordQuote: async (input: unknown) => { calls.push(["recordQuote", input]); return { id: "intake-1" }; },
         markPriced: async (input: unknown) => { calls.push(["markPriced", input]); return { id: "intake-1" }; },
-        decline: async (input: unknown) => { calls.push(["decline", input]); return { id: "intake-1" }; },
+        decline: async (input: unknown) => { calls.push(["decline", input]); return { intake: { id: "intake-1", sourceProjectId: "project-1" }, studioFlowUpdated: true }; },
+        retryStudioFlowDeclined: async (input: unknown) => { calls.push(["retryDeclined", input]); return { updated: true, sourceProjectId: "project-1" }; },
       },
     },
   };
@@ -77,8 +80,17 @@ it("requires a non-blank reason to decline, and forwards it trimmed", async () =
   const blank = await exports.declineSampleRequestAction!("intake-1", "   ");
   assert.equal(blank.ok, false);
   await exports.markSampleRequestPricedAction!("intake-1", {});
-  await exports.declineSampleRequestAction!("intake-1", "  no stock  ");
+  assert.equal((await exports.declineSampleRequestAction!("intake-1", "  no stock  ")).ok, true);
   assert.deepEqual(calls[1], ["decline", { grants: ["masterdata.sample-request.manage"], actor, intakeId: "intake-1", reason: "no stock" }]);
+});
+
+it("authorizes and validates a decline repair before touching StudioFlow", async () => {
+  const { exports, calls, grants } = load();
+  const requestId = "d6c241dc-b6aa-4d31-ab7f-d8db45b98fc6";
+  assert.equal((await exports.retrySampleDeclinedAction!("not-an-id")).ok, false);
+  assert.equal(calls.length, 0);
+  assert.equal((await exports.retrySampleDeclinedAction!(requestId)).ok, true);
+  assert.deepEqual(calls, [["retryDeclined", { grants, actor, sourceRequestId: requestId }]]);
 });
 
 it("turns a signed-out caller into a safe failure and never reaches the coordinator", async () => {
@@ -88,6 +100,7 @@ it("turns a signed-out caller into a safe failure and never reaches the coordina
     exports.recordSampleQuoteAction!("intake-1", {}),
     exports.markSampleRequestPricedAction!("intake-1", {}),
     exports.declineSampleRequestAction!("intake-1", "reason"),
+    exports.retrySampleDeclinedAction!("d6c241dc-b6aa-4d31-ab7f-d8db45b98fc6"),
   ]) {
     const result = await attempt;
     assert.equal(result.ok, false);

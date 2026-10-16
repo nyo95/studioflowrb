@@ -2749,7 +2749,7 @@ describe("Sample-request read contract (StudioFlow public)", () => {
     const rows = await read.listPendingSampleRequests();
     assert.deepEqual(rows.map((row) => row.id), [older.requestId, newer.requestId]);
     const [first] = rows;
-    assert.deepEqual(Object.keys(first).sort(), ["id", "note", "option", "project", "receivedAt", "requestedAt", "requestedBy", "requestedFrom", "status"]);
+    assert.deepEqual(Object.keys(first).sort(), ["declineReason", "declinedAt", "id", "note", "option", "project", "receivedAt", "requestedAt", "requestedBy", "requestedFrom", "status"]);
     assert.deepEqual(Object.keys(first.option).sort(), ["brandName", "color", "dimension", "finishing", "id", "pattern", "productName"]);
     assert.equal(first.project.name.includes("Older"), true);
     assert.equal(first.project.archived, false);
@@ -2852,6 +2852,43 @@ describe("Sample receipt from the Master Data shelf (StudioFlow public command)"
     const row = await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: requestId } });
     assert.deepEqual([row.status, row.received_note, row.received_at], ["REQUESTED", null, null]);
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.schedule.sample-received", metadata: { path: ["via"], equals: "masterdata" } } }), 0);
+  });
+
+  it("records a Master Data decline in Schedule, removes waiting counts, and permits another request", async () => {
+    const staff = await seedUser("Sari Decline", []);
+    const { projectId, requestId, optionId, entryId } = await pendingRequest("Decline A");
+    const read = createStudioFlowSampleRequestRead(testDb.prisma);
+    assert.equal(await read.countPendingSampleRequests(), 1);
+    clock = new Date("2026-09-20T08:30:00Z");
+    assert.deepEqual(await commandWith().markSampleDeclinedFromMasterData({ actor: staff.actor, requestId, reason: "Supplier is out of stock" }), { updated: true });
+    const row = await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: requestId } });
+    assert.deepEqual([row.status, row.declined_by_id, row.declined_by_name, row.declined_at?.toISOString(), row.decline_reason], ["DECLINED", staff.id, "Sari Decline", "2026-09-20T08:30:00.000Z", "Supplier is out of stock"]);
+    assert.equal(await read.countPendingSampleRequests(), 0);
+    assert.equal((await read.listPendingSampleRequests()).length, 0);
+    assert.equal((await sf.projects.getHomeStats({ grants: ALL, filter: "mine", actorId: designer.id })).samplesWaiting, 0);
+    assert.deepEqual([(await read.getSampleRequests([requestId]))[0]?.status, (await read.getSampleRequests([requestId]))[0]?.declineReason], ["DECLINED", "Supplier is out of stock"]);
+    const option = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((entry) => entry.id === entryId)!.options[0];
+    assert.deepEqual([option.sampleRequest?.status, option.sampleRequest?.declineReason], ["DECLINED", "Supplier is out of stock"]);
+    const events = await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.schedule.sample-declined", entity_id: optionId } });
+    assert.equal(events.length, 1);
+    assert.equal(events[0].actor_user_id, staff.id);
+    const again = await sf.schedule.requestSample({ ...as(designer), projectId, optionId, requestedFrom: "Another supplier" });
+    assert.notEqual(again.requestId, requestId);
+    assert.equal(await read.countPendingSampleRequests(), 1);
+  });
+
+  it("makes decline retries idempotent and never rewrites a received request", async () => {
+    const staff = await seedUser("Sari Decline", []);
+    const first = await pendingRequest("Decline B");
+    const command = commandWith();
+    await command.markSampleDeclinedFromMasterData({ actor: staff.actor, requestId: first.requestId, reason: "Unavailable" });
+    assert.deepEqual(await command.markSampleDeclinedFromMasterData({ actor: staff.actor, requestId: first.requestId, reason: "Changed reason" }), { updated: false, reason: "ALREADY_DECLINED" });
+    assert.equal((await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: first.requestId } })).decline_reason, "Unavailable");
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.schedule.sample-declined", entity_id: first.optionId } }), 1);
+    const received = await pendingRequest("Decline C");
+    await sf.schedule.receiveSample({ ...as(designer), projectId: received.projectId, requestId: received.requestId });
+    assert.deepEqual(await command.markSampleDeclinedFromMasterData({ actor: staff.actor, requestId: received.requestId, reason: "Too late" }), { updated: false, reason: "ALREADY_RECEIVED" });
+    assert.equal((await testDb.prisma.sfScheduleSampleRequest.findUniqueOrThrow({ where: { id: received.requestId } })).status, "RECEIVED");
   });
 
   it("lists live projects by name for the holder picker, and leaves archived ones out", async () => {

@@ -1,43 +1,30 @@
 # Active Plan
 
-Plan ID: WO-MD-SKU-INFORMATION-01
-Scope: SKU dimensions as information and independently quoted material-price units
-Module(s): masterdata; BQ read-only consumption of its public price contract
-Target revision: R9.99
+Plan ID: WO-SF-SAMPLE-DECLINE-01
+Scope: Master Data sample-request refusal reaches Product Schedule
+Module(s): masterdata; studioflow through their existing application coordinator and public app contracts
+Target revision: R9.100
 Status: READY
 Priority: P1
 Owner: Product Owner; Codex implements the explicitly approved workflow
-Last updated: 2026-10-15
+Last updated: 2026-10-16
 
 ## Outcome
 
-A SKU describes the product, optionally including rectangular dimensions. Each supplier's material price states its own required purchase unit. Creating an HPL SKU with 1220 × 2440 × 12 mm and prices per sheet and per box is valid. The dimensions never automatically produce m², a BQ base unit, or a price conversion. A sample-shelf SKU can exist without any price or purchase unit.
+When Master Data declines a physical sample request, the requester is notified and Product Schedule shows “Sample declined” with the staff reason. The request ceases to count as waiting, and the designer may request a new sample for the same option. A request already declined in Master Data but still `REQUESTED` in StudioFlow is visibly repairable without re-declining or duplicating the notification.
 
 ## Locked Decisions
 
-- SKU owns identity, brand, category and optional dimensions; it owns no new base/BQ or purchase unit. Length and width require a dimension unit; thickness is optional. These fields describe size only.
-- `PriceMaterial.unit_id` is the unit of that supplier's quote. It is required, active, independently selected per supplier, and may be changed with the audited price. No alignment to another supplier or to the SKU.
-- SKU creation from Pricing still requires its first price. The sample-shelf exception remains price-less and requires no unit.
-- BQ imports the quoted price and its actual unit as a historical snapshot; its own quantity/coefficient controls calculation. It neither calculates nor displays a dimensions-to-m² conversion.
-- Preserve historical SKU unit/factor values and existing BQ snapshots without rewriting them. Legacy columns may remain nullable/inert for compatibility; new writes do not populate or consume them.
-- Keep the existing pure rectangle-area utility disconnected from runtime business flows, documented as available only if a future owner decision needs it. Do not add a new futureproof framework or module.
+- `DECLINED` is a distinct StudioFlow sample-request state; keep the staff reason, actor and time as historical facts on that request, not in `received_note`.
+- Master Data owns its intake/refusal and notification; StudioFlow owns its schedule request. The application coordinator connects them through app-owned commands. No cross-app foreign key, implicit cross-app schema write or new permission.
+- The existing physical sample `RECEIVED` fact is not rewritten by a late decline. A new request is permitted after a `DECLINED` one, following the existing re-request rule after `RECEIVED`.
+- A normal refusal updates StudioFlow promptly. If the second app write cannot complete, preserve Master Data's committed refusal and expose an idempotent retry for staff, including pre-existing mismatches.
+- Pending counts and “Sample waiting” filters remain defined only by `REQUESTED`.
 
-## Backend Contract
+## Implementation and Verification
 
-Update schema constraints and service/action/workbook contracts so all new material-price entry paths require a unit at the price row, and SKU dimensions validate only positive structured values. Import/export must represent price unit per row and preserve correct supplier-specific units. Existing rows remain readable. Maintain permissions, audits, archive rules and module boundaries.
-
-## UI Contract
-
-Pricing offers a unit selector per material price row, including new SKU rows and edit. SKU and shelf dialogs cease asking for SKU base/purchase units. Size remains optional, informational. Remove conversion language/hints from Pricing, SKU and BQ user flows. Keep existing UI Engine components.
-
-## Verification
-
-Focused service and workbook regressions: dimensioned SKU without conversion; sample SKU without unit; two supplier units for one SKU; price-unit update; BQ snapshot; import/export. Then full tests, typecheck, boundaries, legacy-runtime, lint and build. Browser acceptance for Pricing → Add SKU and sample shelf after commit; if unavailable, mark unverified explicitly. Verify rebuild-only office database target before any migration/test database command.
-
-## Boundaries and Non-goals
-
-No legacy DB, no root `test/`, no remote push, no new automated BQ conversion, no historical data purge, no unrelated UI redesign. Do not compare price amounts with unlike units as if directly comparable.
+Add StudioFlow-owned migration, read projection and narrow idempotent decline command; connect it in the coordinator and action, add a retry affordance to Master Data's queue, and display the declined state and reason in Schedule. Update the relevant contract, regression/integration tests, browser-acceptance ledger and changelog. Run the Executor commit gates. Do not touch the root `test/` directory, legacy database or remote GitHub.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the READY outcome and nothing beyond it. Preserve unrelated owner work, run the required checks, update `CHANGELOG.md`, and create the target local revision commit. Stop for a material locked-decision conflict or unsafe boundary; otherwise report commit, checks, limitations, and remaining unrelated dirty files.
+You are the Backend Executor at the kantor checkout. Implement this READY work order as R9.100 using app-owned contracts and the smallest correct UI wiring. Preserve historical data and unrelated changes, run required checks, update CHANGELOG, and create one local commit. Report results and any remaining browser acceptance; do not push.

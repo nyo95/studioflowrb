@@ -2,16 +2,19 @@ import type { PrismaClient } from "@/generated/prisma/client";
 
 /**
  * What other apps may know about a physical-sample request. Facts only: no storage keys, no images,
- * no schedule internals. Master Data reads this to build its own working queue; it never writes back.
+ * no schedule internals. Master Data reads this to build its own working queue;
+ * refusal is relayed separately through StudioFlow's narrow command.
  */
 export type SampleRequestRead = {
   id: string;
-  status: "REQUESTED" | "RECEIVED";
+  status: "REQUESTED" | "RECEIVED" | "DECLINED";
   requestedAt: Date;
   requestedBy: { id: string; name: string };
   requestedFrom: string;
   note: string | null;
   receivedAt: Date | null;
+  declinedAt: Date | null;
+  declineReason: string | null;
   project: { id: string; name: string; archived: boolean };
   option: {
     id: string;
@@ -37,6 +40,8 @@ const SELECT = {
   requested_from: true,
   note: true,
   received_at: true,
+  declined_at: true,
+  decline_reason: true,
   option: {
     select: {
       id: true,
@@ -74,6 +79,8 @@ function toRead(row: Row): SampleRequestRead {
     requestedFrom: row.requested_from,
     note: row.note,
     receivedAt: row.received_at,
+    declinedAt: row.declined_at,
+    declineReason: row.decline_reason,
     project: { id: option.entry.project.id, name: option.entry.project.name, archived: option.entry.project.archived_at !== null },
     option: {
       id: option.id,

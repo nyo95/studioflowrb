@@ -43,6 +43,7 @@ import {
   declineSampleRequestAction,
   markSampleRequestPricedAction,
   recordSampleQuoteAction,
+  retrySampleDeclinedAction,
   retrySampleReceivedAction,
   shelveSampleRequestAction,
   syncSampleQuoteToPriceAction,
@@ -74,6 +75,7 @@ function statusBadge(row: SampleQueueRow) {
       <span className="text-xs text-ink-tertiary">On the shelf: {shelved.rack} / {shelved.box}{row.sourceStatus === "REQUESTED" ? " · StudioFlow not told yet" : ""}</span>
     </div>
   ) : base;
+  if (row.state === "DECLINED" && row.sourceStatus === "REQUESTED") return <div className="grid gap-1">{primary}<StatusBadge tone="warning">Schedule still waiting</StatusBadge></div>;
   if (!alreadyReceived(row)) return primary;
   return (
     <div className="flex flex-wrap items-center gap-1">
@@ -84,7 +86,14 @@ function statusBadge(row: SampleQueueRow) {
   );
 }
 
-type ActionResultLike = { ok: boolean; error?: { safeMessage?: string } };
+function declineSyncNotice(reason?: string): string {
+  if (reason === "ALREADY_RECEIVED") return "Request declined in Master Data, but Product Schedule already records the sample as received. Its received status was kept.";
+  if (reason === "PROJECT_ARCHIVED") return "Request declined in Master Data. The archived project's schedule was not changed.";
+  if (reason === "REQUEST_MISSING") return "Request declined in Master Data. The original schedule request no longer exists.";
+  return "Request declined, but product schedule was not updated. If it still says Sample waiting, use “Update product schedule” on this request.";
+}
+
+type ActionResultLike = { ok: boolean; data?: unknown; error?: { safeMessage?: string } };
 
 type SkuChoice = { id: string; name: string | null; code: string | null; brandName: string | null };
 
@@ -126,7 +135,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, units, canPrice, c
   const [, startTransition] = useTransition();
   const { locale, timezone } = useDisplaySettings();
 
-  const visibleByStatus = rows.filter((row) => showFinished || row.state === "NEW" || row.state === "IN_PROGRESS");
+  const visibleByStatus = rows.filter((row) => showFinished || row.state === "NEW" || row.state === "IN_PROGRESS" || (row.state === "DECLINED" && row.sourceStatus === "REQUESTED"));
   const filtered = visibleByStatus.filter((row) => {
     const haystack = `${row.product.name} ${row.project.name} ${row.requestedBy.name} ${row.requestedFrom}`.toLowerCase();
     return haystack.includes(query.toLowerCase());
@@ -161,7 +170,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, units, canPrice, c
     setQuickOpen(false);
   }
 
-  function run(id: string, command: () => Promise<ActionResultLike>, onSuccess?: () => void) {
+  function run(id: string, command: () => Promise<ActionResultLike>, onSuccess?: (result: ActionResultLike) => void) {
     if (pendingId) return;
     setPendingId(id);
     setRowError(null);
@@ -172,7 +181,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, units, canPrice, c
           setRowError(result.error?.safeMessage ?? "The action could not be completed.");
           return;
         }
-        onSuccess?.();
+        onSuccess?.(result);
       } catch {
         setRowError("The action could not be completed. Please try again.");
       } finally {
@@ -223,6 +232,8 @@ export function SampleRequestDirectory({ rows, vendors, skus, units, canPrice, c
               const busy = pendingId === row.sourceRequestId;
               const stateItems = row.state === "NEW"
                 ? [{ label: "Take", onSelect: () => run(row.sourceRequestId, () => takeSampleRequestAction(row.sourceRequestId)), disabled: busy, danger: false, separatorBefore: false }]
+                : row.state === "DECLINED" && row.sourceStatus === "REQUESTED"
+                  ? [{ label: "Update product schedule", onSelect: () => run(row.sourceRequestId, () => retrySampleDeclinedAction(row.sourceRequestId), (result) => { const data = result.data as { updated: boolean; reason?: string }; setNotice(data.updated || data.reason === "ALREADY_DECLINED" ? "Product schedule now shows the sample as declined." : "Product schedule could not be updated. Check the request and try again."); }), disabled: busy, danger: false, separatorBefore: false }]
                 : row.state === "PRICED" && canPrice && readyForPriceList(row) && !row.intake?.priceMaterialId
                   ? [{ label: "Add to price list", onSelect: () => { setSyncUnitId(""); setSyncTarget(row); }, disabled: busy, danger: false, separatorBefore: false }]
                 : row.state === "IN_PROGRESS"
@@ -441,7 +452,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, units, canPrice, c
         <DraftDialog open onOpenChange={(open) => !open && setDeclineTarget(null)} title="Decline this sample request" description={declineTarget.product.name}>
           <div className="grid gap-4">
             {rowError ? <InlineError>{rowError}</InlineError> : null}
-            <Field label="Reason" required><Textarea value={declineReason} onChange={(event) => setDeclineReason(event.target.value)} placeholder="Why this request cannot be priced" /></Field>
+            <Field label="Reason" description="The requester will see this reason in Product Schedule." required><Textarea value={declineReason} onChange={(event) => setDeclineReason(event.target.value)} placeholder="Why this sample cannot be provided" maxLength={1000} /></Field>
             <FormActions>
               <Button data-dialog-cancel variant="ghost" onClick={() => setDeclineTarget(null)}>Cancel</Button>
               <Button
@@ -450,7 +461,7 @@ export function SampleRequestDirectory({ rows, vendors, skus, units, canPrice, c
                 onClick={() => {
                   const target = declineTarget;
                   const reason = declineReason;
-                  run(target.sourceRequestId, () => declineSampleRequestAction(target.intake!.id, reason), () => { setDeclineTarget(null); setDeclineReason(""); });
+                  run(target.sourceRequestId, () => declineSampleRequestAction(target.intake!.id, reason), (result) => { const data = result.data as { studioFlowUpdated: boolean; reason?: string }; setDeclineTarget(null); setDeclineReason(""); if (!data.studioFlowUpdated) setNotice(declineSyncNotice(data.reason)); });
                 }}
               >
                 Decline request

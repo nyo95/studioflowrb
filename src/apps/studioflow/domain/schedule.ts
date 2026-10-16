@@ -90,7 +90,7 @@ export function normalizeExtraFields(input: unknown): ScheduleExtraField[] {
 
 export type ScheduleSampleRequestView = {
   id: string;
-  status: "REQUESTED" | "RECEIVED";
+  status: "REQUESTED" | "RECEIVED" | "DECLINED";
   requestedFrom: string;
   note: string | null;
   requestedByName: string;
@@ -98,6 +98,9 @@ export type ScheduleSampleRequestView = {
   receivedByName: string | null;
   receivedAt: Date | null;
   receivedNote: string | null;
+  declinedByName: string | null;
+  declinedAt: Date | null;
+  declineReason: string | null;
 };
 
 export type ScheduleOptionView = {

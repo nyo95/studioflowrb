@@ -260,6 +260,7 @@ function entryBadges(entry: ScheduleEntryView): Array<{ label: string; tone: "su
   else if (entry.options.length === 1) badges.push({ label: "Not final", tone: "neutral" });
   if (shown?.sampleRequest?.status === "REQUESTED") badges.push({ label: "Sample waiting", tone: "warning" });
   else if (shown?.sampleRequest?.status === "RECEIVED") badges.push({ label: "Sample received", tone: "success" });
+  else if (shown?.sampleRequest?.status === "DECLINED") badges.push({ label: "Sample declined", tone: "warning" });
   return badges.slice(0, 2);
 }
 
@@ -1223,7 +1224,7 @@ function EntryPanelContent({
     <div className="flex flex-wrap items-center gap-2 rounded-control bg-surface-muted px-3 py-2">
       <Text size="sm" tone="secondary" className="mr-auto">
         {`Option ${selected.label}`}
-        {selected.sampleRequest?.status === "REQUESTED" ? ` · sample asked${selected.sampleRequest.requestedFrom ? ` from ${selected.sampleRequest.requestedFrom}` : ", supplier to be found"}` : selected.sampleRequest?.status === "RECEIVED" ? " · sample received" : ""}
+        {selected.sampleRequest?.status === "REQUESTED" ? ` · sample asked${selected.sampleRequest.requestedFrom ? ` from ${selected.sampleRequest.requestedFrom}` : ", supplier to be found"}` : selected.sampleRequest?.status === "RECEIVED" ? " · sample received" : selected.sampleRequest?.status === "DECLINED" ? " · sample declined" : ""}
       </Text>
       {selected.isFinal ? (
         <Badge tone="success"><Crown aria-hidden="true" className="h-3 w-3" />Final</Badge>
@@ -1266,6 +1267,7 @@ function EntryPanelContent({
         {reuse ? <InlineReuse projectId={projectId} entry={entry} command={command} onClose={() => setReuse(false)} /> : null}
         {selectedId !== "new" ? optionActions : null}
         {selectedId !== "new" && selected?.sampleRequest?.status === "RECEIVED" && selected.sampleRequest.receivedNote ? <Text size="sm" tone="secondary">{selected.sampleRequest.receivedNote}</Text> : null}
+        {selectedId !== "new" && selected?.sampleRequest?.status === "DECLINED" ? <Text size="sm" tone="secondary">Sample declined{selected.sampleRequest.declineReason ? `: ${selected.sampleRequest.declineReason}` : "."}</Text> : null}
         {sampleFor ? <InlineSampleRequest projectId={projectId} option={sampleFor} command={command} onClose={() => setSampleFor(null)} /> : null}
         {entry.options.length === 0 && selectedId !== "new" ? <Text size="sm" tone="tertiary">No product yet. Fill in the Type and fields below and Save, or copy one from a past project.</Text> : null}
       </div>

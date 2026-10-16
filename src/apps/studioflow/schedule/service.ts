@@ -396,6 +396,9 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
             receivedByName: option.sample_requests[0].received_by_name,
             receivedAt: option.sample_requests[0].received_at,
             receivedNote: option.sample_requests[0].received_note,
+            declinedByName: option.sample_requests[0].declined_by_name,
+            declinedAt: option.sample_requests[0].declined_at,
+            declineReason: option.sample_requests[0].decline_reason,
           } : null,
         })),
       }));

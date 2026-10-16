@@ -14,7 +14,7 @@ const ACTOR = { kind: "USER" as const, userId: "staff-1", label: "Sari Staff" };
 function request(id: string, over: Partial<SampleRequestRead> = {}): SampleRequestRead {
   return {
     id, status: "REQUESTED", requestedAt: new Date("2026-09-10T03:00:00Z"), requestedBy: { id: "designer-1", name: "Dina" },
-    requestedFrom: "Toko Kayu", note: "swatch", receivedAt: null, project: { id: "p1", name: "2026-506 Test", archived: false },
+    requestedFrom: "Toko Kayu", note: "swatch", receivedAt: null, declinedAt: null, declineReason: null, project: { id: "p1", name: "2026-506 Test", archived: false },
     option: { id: `option-${id}`, productName: `Product ${id}`, brandName: "Brand", color: "Oak", pattern: null, finishing: null, dimension: null }, ...over,
   };
 }
@@ -29,7 +29,7 @@ function intake(sourceRequestId: string, status: SampleRequestIntakeStatus, over
   };
 }
 
-function setup(state: { pending?: SampleRequestRead[]; sources?: SampleRequestRead[]; intakes?: SampleRequestIntakeRead[]; projects?: Array<{ id: string; name: string }>; receipt?: () => Promise<{ updated: boolean; reason?: string }> }) {
+function setup(state: { pending?: SampleRequestRead[]; sources?: SampleRequestRead[]; intakes?: SampleRequestIntakeRead[]; projects?: Array<{ id: string; name: string }>; receipt?: () => Promise<{ updated: boolean; reason?: string }>; decline?: () => Promise<{ updated: boolean; reason?: string }> }) {
   const calls: string[] = [];
   const started: SampleRequestSnapshot[] = [];
   const statusCalls: Array<Record<string, unknown>> = [];
@@ -37,6 +37,7 @@ function setup(state: { pending?: SampleRequestRead[]; sources?: SampleRequestRe
     studioFlow: {
       async listPendingSampleRequests() { calls.push("sf.pending"); return state.pending ?? []; },
       async getSampleRequests(ids) { calls.push(`sf.get:${ids.join(",")}`); return (state.sources ?? state.pending ?? []).filter((row) => ids.includes(row.id)); },
+      async markSampleDeclinedFromMasterData({ requestId, reason }) { calls.push(`sf.declined:${requestId}:${reason}`); return state.decline ? state.decline() : { updated: true }; },
       async markSampleReceivedFromShelf({ requestId, rack, box }) { calls.push(`sf.received:${requestId}:${rack}/${box}`); return state.receipt ? state.receipt() : { updated: true }; },
       async listProjectChoices() { calls.push("sf.projects"); return state.projects ?? []; },
     },
@@ -45,7 +46,7 @@ function setup(state: { pending?: SampleRequestRead[]; sources?: SampleRequestRe
       async recordSampleQuote({ intakeId }) { calls.push(`md.quote:${intakeId}`); return intake("x", "IN_PROGRESS"); },
       async markSampleRequestPriced({ intakeId }) { calls.push(`md.priced:${intakeId}`); return intake("x", "PRICED"); },
       async syncSampleQuoteToPrice({ intakeId }) { calls.push(`md.sync:${intakeId}`); return intake("x", "PRICED"); },
-      async declineSampleRequest({ intakeId }) { calls.push(`md.decline:${intakeId}`); return intake("x", "DECLINED"); },
+      async declineSampleRequest({ intakeId, reason }) { calls.push(`md.decline:${intakeId}`); return intake("x", "DECLINED", { staffNote: reason }); },
       async shelveSampleFromIntake({ intakeId, rack, box }) { calls.push(`md.shelve:${intakeId}`); return { id: "sample-1", rack: rack.toUpperCase(), box: box.toUpperCase() }; },
       async setSampleStatus(input) { calls.push("md.status"); statusCalls.push(input); return {}; },
       async listSampleRequestIntakes({ status, sourceRequestIds }) {
@@ -120,12 +121,32 @@ describe("sample request coordinator", () => {
     assert.deepEqual(started, []);
   });
 
-  it("passes quote, priced and decline straight to Master Data", async () => {
+  it("keeps quote/priced in Master Data and relays a decline to StudioFlow after its intake commits", async () => {
     const { coordinator, calls } = setup({});
     await coordinator.recordQuote({ grants: STAFF_GRANTS, actor: ACTOR, intakeId: "i1", quotedAmount: "10", quotedCurrency: "IDR" });
     await coordinator.markPriced({ grants: STAFF_GRANTS, actor: ACTOR, intakeId: "i2", quotedAmount: "10", quotedCurrency: "IDR" });
     await coordinator.decline({ grants: STAFF_GRANTS, actor: ACTOR, intakeId: "i3", reason: "No" });
-    assert.deepEqual(calls, ["md.quote:i1", "md.priced:i2", "md.decline:i3"]);
+    assert.deepEqual(calls, ["md.quote:i1", "md.priced:i2", "md.decline:i3", "sf.declined:x:No"]);
+  });
+
+  it("keeps a committed decline visible when StudioFlow fails, then retries without another decline", async () => {
+    const failed = setup({ decline: async () => { throw new Error("temporary StudioFlow outage"); } });
+    const result = await failed.coordinator.decline({ grants: STAFF_GRANTS, actor: ACTOR, intakeId: "intake-a", reason: "Supplier cannot send it" });
+    assert.equal(result.studioFlowUpdated, false);
+    assert.equal(result.reason, "SYNC_FAILED");
+    assert.deepEqual(failed.calls, ["md.decline:intake-a", "sf.declined:x:Supplier cannot send it"]);
+
+    const retry = setup({ intakes: [intake("a", "DECLINED", { staffNote: "Supplier cannot send it" })] });
+    assert.deepEqual(await retry.coordinator.retryStudioFlowDeclined({ grants: STAFF_GRANTS, actor: ACTOR, sourceRequestId: "a" }), { updated: true, sourceProjectId: "p1" });
+    assert.deepEqual(retry.calls, ["md.list:ids", "sf.declined:a:Supplier cannot send it"]);
+  });
+
+  it("will not relay a decline without permission or a saved declined intake", async () => {
+    const { coordinator, calls } = setup({ intakes: [intake("a", "IN_PROGRESS")] });
+    await denied(coordinator.decline({ grants: [], actor: ACTOR, intakeId: "intake-a", reason: "No" }));
+    await denied(coordinator.retryStudioFlowDeclined({ grants: [], actor: ACTOR, sourceRequestId: "a" }));
+    await code(coordinator.retryStudioFlowDeclined({ grants: STAFF_GRANTS, actor: ACTOR, sourceRequestId: "a" }), "SAMPLE_NOT_DECLINED");
+    assert.ok(!calls.some((call) => call.startsWith("sf.declined")));
   });
 
   describe("putting a request on the shelf", () => {

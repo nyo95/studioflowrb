@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.100] Declined sample request leaves Product Schedule waiting state
+- Surface: Master Data → Sample requests; StudioFlow project → Product Schedule
+- Fixture: disposable project option with a requested sample and a Master Data staff account
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Take the request in Master Data and decline with a reason. 2. Open or refresh the project's Product Schedule. 3. Check the Sample waiting filter and Home sample count. 4. Request another sample from the same option. 5. For an older Master Data-declined/StudioFlow-requested mismatch, use Update product schedule in the queue.
+- Acceptance: notification and Schedule agree on declined; reason is readable, not counted as waiting, and a new request is allowed. Retry fixes the old mismatch without a second decline notification; the screens remain usable on a phone.
+- Status: PENDING
+
 ### [R9.99] SKU dimensions and supplier price units are independent
 - Surface: Master Data → Pricing → Material, then SKUs
 - Fixture: disposable HPL SKU with dimensions 1220 × 2440 × 12 mm; two material suppliers and active sheet/box units

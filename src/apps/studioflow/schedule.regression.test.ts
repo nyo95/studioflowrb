@@ -64,6 +64,11 @@ describe("WO-SF-SCHED-RELAYOUT-01 board structure", () => {
     assert.match(scheduleBoard, /function entryBadges/);
     assert.ok((scheduleBoard.match(/entryBadges\(entry\)/g) ?? []).length >= 2);
   });
+  it("shows a declined sample and its reason without counting it as waiting", () => {
+    assert.match(scheduleBoard, /status === "DECLINED"\) badges\.push\(\{ label: "Sample declined"/);
+    assert.match(scheduleBoard, /selected\.sampleRequest\.declineReason/);
+    assert.match(scheduleBoard, /sampleRequest\?\.status === "REQUESTED"/);
+  });
   it("keeps drag reorder bounded to All", () => {
     assert.match(scheduleBoard, /const reorderEnabled = canEdit && filter === "all"/);
   });

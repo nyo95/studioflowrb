@@ -940,22 +940,29 @@ declined to add for this.
 
 A schedule option can carry a physical sample request: `requestedFrom` (vendor/supplier, free
 text — no live reference into Master Data, same reasoning as `brand_name`
-in §11.10) and an optional note. Status is `REQUESTED` → `RECEIVED`; an
+in §11.10) and an optional note. Status is `REQUESTED` → `RECEIVED` or
+`REQUESTED` → `DECLINED` when Master Data staff refuse it. A decline keeps
+the staff reason, actor and time on the StudioFlow request, removes it from
+waiting counts, and offers the designer a new request for the same option. An
 option can have only one open (`REQUESTED`) request at a time, but a new one
-may be started once the previous is `RECEIVED` (`SfScheduleSampleRequest`,
+may be started once the previous is `RECEIVED` or `DECLINED` (`SfScheduleSampleRequest`,
 `option_id` FK, cascades with the option). Receiving a sample **never writes
 to Master Data** — Master Data's public contract is read-only by design
 (masterdata `pricing-contract.md` §12), so adding the resulting SKU/price is
 a separate, manual step a Master Data user does themselves; StudioFlow only
 records that a sample arrived (`receivedNote`, `receivedByName`). The
-designer sees a `Badge` on the option card ("Sample requested" / "Sample
-received") plus a "Requested from …" line. Master Data reads open requests
+designer sees a `Badge` on the option card ("Sample waiting" / "Sample
+received" / "Sample declined") plus the decline reason when applicable. Master Data reads open requests
 through StudioFlow's public read (`public/sample-request-read.ts`) into its
 Sample requests queue, and the staff who work that queue get a platform
 notification when a request arrives (`sample-request-notifier.ts`; the
 requester is never notified of their own request). Actions: `Request sample` /
 `Mark sample received` in the option's row-action menu
 (`requestScheduleSampleAction`/`receiveScheduleSampleAction`).
+The application coordinator asks StudioFlow through its narrow command after
+Master Data commits a refusal. If that second write fails, staff can retry it
+from the Master Data queue, including for requests declined before R9.100;
+retry does not send another refusal notification.
 
 ### 11.13 Ideas board (WO-SF-IDEAS-01, owner 2026-10-08)
 

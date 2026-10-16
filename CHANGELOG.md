@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.100 | 2026-10-16 | fix(studioflow): Resolve declined samples in Product Schedule (Executor)
+
+- **Scope:** WO-SF-SAMPLE-DECLINE-01. A Master Data refusal now relays through the application coordinator to StudioFlow's app-owned sample-request command. StudioFlow keeps a distinct `DECLINED` state with staff reason, actor and time. Schedule shows “Sample declined” and the reason, removes it from waiting counts/filters, and permits a new request for that option. A request already received is never rewritten by a late refusal. Permission checks, app ownership and audit are preserved.
+- **Existing mismatches and failure recovery:** if Master Data commits a refusal but StudioFlow cannot update, the queue keeps that mismatch visible with an idempotent “Update product schedule” action. It also repairs pre-existing declined/intake versus requested/schedule rows without another refusal or notification. No cross-app database relation or cross-app migration write was introduced.
+- **Migration:** added the StudioFlow-owned enum value and decline fields; applied to the verified office rebuild development and disposable test databases, then regenerated Prisma. No dependency or historical-data rewrite; root `test/` untouched and no remote action.
+- **Checks:** focused coordinator, Schedule and action tests PASS; `npm test` 1212/1212 PASS after correcting one action-test mock that initially lacked the new Schedule route; typecheck, boundary and legacy-runtime checks PASS; full lint PASS; production build PASS; whitespace check PASS. Browser acceptance for refusal, reason, count and retry is queued for the Reviewer and not claimed as PASS.
+
 ## R9.99 | 2026-10-16 | fix(masterdata): Keep SKU dimensions informational and price units per supplier (Executor)
 
 - **Scope:** WO-MD-SKU-INFORMATION-01. New SKUs carry optional dimensions but no base/BQ or purchase unit; every material price has its own required supplier purchase unit. Pricing, SKU, shelf, sample-quote sync, workbook import/export and BQ public reads now follow that separation. A priced HPL SKU can therefore have one supplier per sheet and another per box without an m² conversion. Existing SKU base/purchase/factor values and existing BQ snapshots remain stored but inert; the pure rectangle-area utility remains available only if a future owner decision calls for it. Removed the superseded unit-conversion helper plan from BACKLOG.
