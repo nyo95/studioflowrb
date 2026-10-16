@@ -11,12 +11,15 @@ export function DirectoryShell({
   pagination,
   surface = false,
   fill = false,
+  variant = "standard",
   children,
   className,
   ...props
 }: HTMLAttributes<HTMLDivElement> & {
   header?: ReactNode;
   surface?: boolean;
+  /** A bounded operational directory surface with quiet chrome around its data. */
+  variant?: "standard" | "workspace";
   /** When true the shell grows to fill its flex parent (flex:1 min-h-0) and the
    *  inner content area also fills, enabling viewport-tall tables without magic heights. */
   fill?: boolean;
@@ -24,12 +27,12 @@ export function DirectoryShell({
   pagination?: ReactNode;
 }) {
   return (
-    <div className={cx(fill ? "flex min-h-0 flex-1 flex-col gap-4" : "grid gap-4", className)} {...props}>
+    <div className={cx(fill ? "flex min-h-0 flex-1 flex-col gap-4" : "grid gap-4", className)} data-directory-variant={variant} {...props}>
       {header}
-      {surface ? <div className={cx("min-w-0 overflow-hidden rounded-card bg-surface shadow-plane", fill && "flex flex-col flex-1 min-h-0")} data-directory-surface>
-        {toolbar ? <div className="border-b border-line">{toolbar}</div> : null}
+      {surface ? <div className={cx("min-w-0 overflow-hidden rounded-card bg-surface shadow-plane", variant === "workspace" && "border border-line", fill && "flex flex-col flex-1 min-h-0")} data-directory-surface>
+        {toolbar ? <div className={cx("border-b border-line", variant === "workspace" && "bg-surface-muted/35")}>{toolbar}</div> : null}
         <div className={cx("min-w-0", fill && "flex min-h-0 flex-1 flex-col")}>{children}</div>
-        {pagination ? <div className="border-t border-line px-4 py-3">{pagination}</div> : null}
+        {pagination ? <div className={cx("border-t border-line px-4 py-3", variant === "workspace" && "bg-surface-muted/20")}>{pagination}</div> : null}
       </div> : <>{toolbar}<div className={cx("min-w-0", fill && "flex min-h-0 flex-1 flex-col")}>{children}</div>{pagination}</>}
     </div>
   );

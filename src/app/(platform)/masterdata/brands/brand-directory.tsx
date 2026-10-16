@@ -290,7 +290,7 @@ export function BrandDirectory({
   };
 
   return (
-    <DirectoryShell fill header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
+    <DirectoryShell fill variant="workspace" header={rowError ? <InlineError>{rowError}</InlineError> : undefined} surface pagination={pageFooter} toolbar={<TableToolbar framed={false} actions={canManage ? (
           <Button
             type="button"
             variant="primary"

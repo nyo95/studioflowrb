@@ -87,7 +87,7 @@ export default async function BqProjectsPage({
   const directory = (rows: typeof projects, tab: View, empty: { title: string; description: string }) => {
     if (rows.length === 0) return <SectionCard><EmptyState icon={FileText} title={empty.title} description={empty.description} /></SectionCard>;
     const { pageCount, page, rows: pageRows } = getPaginationSlice(rows, tab === view ? requestedPage : 1, PAGE_SIZE);
-    return <DirectoryShell surface fill pagination={<Pagination page={page} pageCount={pageCount} total={rows.length} pageSize={PAGE_SIZE} getHref={(nextPage) => listHref(tab, nextPage)} label={tab === "archived" ? "Archived project pages" : "Project pages"} />}><DataTable framed={false} density="compact" stickyHeader fill minWidth={920}>
+    return <DirectoryShell surface fill variant="workspace" pagination={<Pagination page={page} pageCount={pageCount} total={rows.length} pageSize={PAGE_SIZE} getHref={(nextPage) => listHref(tab, nextPage)} label={tab === "archived" ? "Archived project pages" : "Project pages"} />}><DataTable framed={false} density="compact" stickyHeader fill minWidth={920}>
       <TableHeader><TableRow><TableHead>Project</TableHead><TableHead>Client</TableHead><TableHead align="end">Grand Total</TableHead><TableHead>Created</TableHead><TableHead>Updated</TableHead>{canManage ? <RowActionsHead /> : null}</TableRow></TableHeader>
       <TableBody>{pageRows.map((project) => {
         const createdBy = creatorNames.get(project.createdBy) ?? project.createdBy;

@@ -50,7 +50,9 @@ export default async function BrandsPage() {
   return (
     <>
       <PageHeader
+        eyebrow="Master Data"
         title="Brands Catalog"
+        description="Kelola brand, supplier, kategori, dan referensi katalog."
         divider
       />
       <BrandDirectory

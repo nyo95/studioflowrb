@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.125 | 2026-10-17 | feat(ui-engine): introduce professional directory workspace
+
+- Added the opt-in `workspace` DirectoryShell variant: a bounded, lightly framed operational surface with a deliberately quiet toolbar and pagination band.
+- Applied the shared pattern to BQ Projects and Master Data Brands, preserving table behavior, filters, permissions, and row actions.
+- Added Master Data context to Brands so its page hierarchy matches BQ directories without moving its existing primary action.
+
 ## R9.124 | 2026-10-17 | fix(bq): keep Work Item organization on canvas
 
 - Removed the duplicate checkbox and selection panel from Struktur.
