@@ -3,7 +3,7 @@
 Plan ID: WO-BQ-SECTION-AND-SUBSECTION-ORGANIZATION-01
 Scope: Safe Section removal and optional Subsection organization
 Module(s): bq
-Target revision: R9.122
+Target revision: R9.123
 Status: READY
 Priority: P2
 Owner: Product Owner
@@ -21,7 +21,7 @@ changing any cost calculation.
 - Removing a populated Section offers: move its contents to another Section of
   the same project, preserving direct Work Items and Subsections with nested
   data; or permanently delete all contents after count-aware confirmation.
-- Work Item drag is direct ↔ Subsection only inside its current Section.
+- Work Item selection is direct ↔ Subsection only inside its current Section.
 - Multiple Work Items under one Section can form a new named Subsection; no
   Subsection nesting and empty Subsections remain until intentionally removed.
 

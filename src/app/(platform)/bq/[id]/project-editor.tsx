@@ -61,6 +61,8 @@ import {
   deleteLineItemAction,
   deleteSubsectionAction,
   deleteSubObjectAction,
+  groupItemsIntoSubsectionAction,
+  moveItemsWithinSectionAction,
   updateItemAction,
   updateLineItemAction,
   updateSubObjectAction,
@@ -292,6 +294,8 @@ function OutlineItems({
   pending,
   onReorder,
   onDelete,
+  selectedIds,
+  onToggleSelected,
 }: {
   items: readonly BqItemDetail[];
   parent: ReorderParent;
@@ -300,6 +304,8 @@ function OutlineItems({
   pending: boolean;
   onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
   onDelete: (item: BqItemDetail) => void;
+  selectedIds: ReadonlySet<string>;
+  onToggleSelected: (item: BqItemDetail) => void;
 }) {
   const [dragId, setDragId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -345,6 +351,7 @@ function OutlineItems({
           ].join(" ")}
         >
           {editable ? <GripVertical aria-hidden="true" className="size-3.5 shrink-0 cursor-grab text-ink-tertiary opacity-0 group-hover/outline:opacity-100" /> : null}
+          {editable ? <input aria-label={`Pilih ${item.name}`} type="checkbox" checked={selectedIds.has(item.id)} onChange={() => onToggleSelected(item)} className="size-3.5 accent-[var(--ui-ink)]" /> : null}
           <a href={`#bq-row-${item.id}`} className="min-w-0 flex-1 truncate py-1" draggable={false}>{item.name}</a>
           {editable ? <span className="opacity-0 transition-opacity group-hover/outline:opacity-100 group-focus-within/outline:opacity-100"><IconButton size="sm" variant="ghost" label={`Hapus ${item.name}`} icon={<Trash2 aria-hidden="true" />} disabled={pending} onClick={() => onDelete(item)} /></span> : null}
         </li>
@@ -402,6 +409,8 @@ function SectionOutline({
   onAddWorkItem,
   onReorder,
   onReorderSections,
+  onMoveItems,
+  onGroupItems,
 }: {
   projectId: string;
   sections: readonly BqSectionDetail[];
@@ -416,6 +425,8 @@ function SectionOutline({
   onAddWorkItem: (target: NewItemTarget) => void;
   onReorder: (parent: ReorderParent, orderedIds: string[]) => Promise<void>;
   onReorderSections: (sectionId: string | null, orderedIds: string[]) => Promise<void>;
+  onMoveItems: (sectionId: string, itemIds: string[], targetSubsectionId?: string) => Promise<void>;
+  onGroupItems: (sectionId: string, itemIds: string[], name: string) => Promise<void>;
 }) {
   // Double-click a Section or Subsection name to rename it here (owner 2026-10-14); a single click still jumps to it.
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -447,6 +458,7 @@ function SectionOutline({
   // Items (to re-order them) only when opened.
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const [itemsOpen, setItemsOpen] = useState<ReadonlySet<string>>(new Set());
+  const [selected, setSelected] = useState<{ sectionId: string; ids: ReadonlySet<string> } | null>(null);
   const flip = (set: ReadonlySet<string>, id: string) => { const next = new Set(set); if (!next.delete(id)) next.add(id); return next; };
   if (sections.length === 0 && !editable) return null;
   const chevron = (open: boolean, name: string, onToggle: () => void, hidden = false) => (
@@ -484,6 +496,13 @@ function SectionOutline({
       <Text tone="tertiary" size="sm" meta className="px-2.5 pb-1">Struktur</Text>
       {sections.map((section) => {
         const count = workItemCount(section);
+        const selectedIds = selected?.sectionId === section.id ? selected.ids : new Set<string>();
+        const toggleSelected = (item: BqItemDetail) => setSelected((current) => {
+          const ids = current?.sectionId === section.id ? new Set(current.ids) : new Set<string>();
+          if (ids.has(item.id)) ids.delete(item.id); else ids.add(item.id);
+          return ids.size === 0 ? null : { sectionId: section.id, ids };
+        });
+        const selectedArray = [...selectedIds];
         return (
           <div key={section.id} className="grid min-w-0 grid-cols-1 gap-0.5">
             {renaming === section.id ? nameField(section.id, section.name, onRenameSection, "px-1.5 py-1") : (
@@ -543,7 +562,7 @@ function SectionOutline({
             </div>
             )}
             {closed.has(section.id) ? null : <>
-            <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-7" editable={editable} pending={pending} onReorder={onReorder} onDelete={onDeleteWorkItem} />
+            <OutlineItems items={section.items} parent={{ sectionId: section.id }} indent="pl-7" editable={editable} pending={pending} onReorder={onReorder} onDelete={onDeleteWorkItem} selectedIds={selectedIds} onToggleSelected={toggleSelected} />
             {section.subsections.map((subsection) => (
               <div key={subsection.id} className="grid min-w-0 grid-cols-1 gap-0.5">
                 {renaming === subsection.id ? nameField(subsection.id, subsection.name, onRenameSubsection, "py-1 pl-5 pr-1.5") : (
@@ -592,9 +611,19 @@ function SectionOutline({
                   ) : null}
                 </div>
                 )}
-                {itemsOpen.has(subsection.id) ? <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-11" editable={editable} pending={pending} onReorder={onReorder} onDelete={onDeleteWorkItem} /> : null}
+                {itemsOpen.has(subsection.id) ? <OutlineItems items={subsection.items} parent={{ subsectionId: subsection.id }} indent="pl-11" editable={editable} pending={pending} onReorder={onReorder} onDelete={onDeleteWorkItem} selectedIds={selectedIds} onToggleSelected={toggleSelected} /> : null}
               </div>
             ))}
+            {editable && selectedArray.length > 0 ? <div className="ml-7 mt-1 grid gap-1 rounded-control border border-line bg-surface p-2">
+              <Text size="sm" tone="secondary">{selectedArray.length} Work Item dipilih</Text>
+              <div className="flex flex-wrap gap-1">
+                <ButtonMenu label="Pindahkan ke" size="sm" variant="secondary" disabled={pending} items={[
+                  { label: "Langsung di Section", disabled: pending, onSelect: () => void onMoveItems(section.id, selectedArray).then(() => setSelected(null)) },
+                  ...section.subsections.map((subsection) => ({ label: subsection.name, disabled: pending, onSelect: () => void onMoveItems(section.id, selectedArray, subsection.id).then(() => setSelected(null)) })),
+                ]} />
+                <AddRow label="Kelompokkan" placeholder="Nama Subsection" disabled={pending} onAdd={(name) => onGroupItems(section.id, selectedArray, name).then(() => setSelected(null))} />
+              </div>
+            </div> : null}
             </>}
           </div>
         );
@@ -1037,6 +1066,8 @@ export function ProjectEditor({
           onAddWorkItem={(target) => { setError(null); setNewItemTarget(target); }}
           onReorder={(parent, orderedIds) => run(reorderItemsAction, { ...parent, orderedIds: JSON.stringify(orderedIds) })}
           onReorderSections={(sectionId, orderedIds) => run(reorderSectionsAction, { sectionId: sectionId ?? undefined, orderedIds: JSON.stringify(orderedIds) })}
+          onMoveItems={(sectionId, itemIds, targetSubsectionId) => run(moveItemsWithinSectionAction, { sectionId, itemIds: JSON.stringify(itemIds), targetSubsectionId })}
+          onGroupItems={(sectionId, itemIds, name) => run(groupItemsIntoSubsectionAction, { sectionId, itemIds: JSON.stringify(itemIds), name })}
         />
         <div className="grid min-w-0 flex-1 gap-4">
           {/* Below 1024 px the Struktur panel is hidden, so its "+ Section" is offered here. */}

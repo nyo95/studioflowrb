@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.123 | 2026-10-17 | feat(bq): organize Work Items from Struktur
+
+- **Struktur:** Work Item kini dapat dipilih dalam satu Section, lalu dipindahkan ke daftar langsung atau Subsection yang tersedia. Pilihan otomatis tidak bercampur lintas Section.
+- **Grouping:** pilihan Work Item dapat diberi nama menjadi Subsection baru langsung dari Struktur; Subsection tetap organisasi opsional dan tidak mengubah harga atau total.
+
+### Verification
+
+- `npm run typecheck`: passed.
+
 ## R9.122 | 2026-10-17 | feat(bq): Organize and remove project sections safely
 
 - **Safe Section removal:** Structure now exposes a hover-only Section delete action. Empty Sections use a simple confirmation; populated Sections show the exact direct Work Item, Subsection, and nested Work Item impact, then either move the complete structure to a peer Section or delete it permanently.
