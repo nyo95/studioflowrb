@@ -434,14 +434,13 @@ menu). Deleting a template detaches generated rows.
 
 `/studioflow` is Home: one card per project.
 
-Home also shows the current-scope running-project figures: work waiting for the
+Home shows the signed-in person's running-project figures: work waiting for the
 viewer, rounds with the client, phases done, and requested physical samples.
 The waiting count includes only an active phase whose answered round that viewer
 may act on; the same read supplies the Home rail badge.
 
-- **Mine** = running projects where I am PIC designer or drafter.
-  **Everyone's** is available to holders of `studioflow.project.manage`.
-  A Running / Completed switch sits beside it.
+- Home lists projects where the signed-in person is PIC designer or drafter,
+  including for managers. A Running / Completed switch filters that list.
 - A card shows the project name and client, badges (On hold, Completed, Check
   later phases), the starred-notes marker, the actions menu (Open, Mark as
   completed…, Reopen), and the phase strip (`PipelineStrip variant="track"`)

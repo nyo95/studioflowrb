@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.111 | 2026-10-16 | fix(studioflow): Keep Home limited to signed-in projects (Lead)
+
+- **Home:** removed the Mine / Everyone's switch. Project cards and running-project figures always use the signed-in person's PIC assignments, including for managers; an old `scope=all` URL has no effect. Running / Completed remains available, and the empty-state copy no longer suggests switching to all projects.
+- **Contract:** updated the StudioFlow Home contract and removed the obsolete Everyone's browser-check item from the outstanding real-data walk. No schema, dependency, permission grant, or backend service change.
+- **Evidence:** typecheck, focused lint, and whitespace checks PASS. Browser inspection on the office app showed the switch absent with `?scope=all`, the four assigned running projects still listed, and Completed navigating to its own empty state. No remote action or push.
+
 ## R9.110 | 2026-10-16 | fix(studioflow,masterdata): Identify notes and correct access, files, and SKU Brand (Executor + Lead PASS)
 
 - **Notes and access:** Notes now show each sender and place the signed-in person's messages on the left, others on the right, in both the project stream and board threads. Image albums group by author ID. A non-PIC without project-manager authority sees only Schedule, enabled Presentation, Timeline, and History; hidden Phases/MOM pages and MOM print refuse direct access. Ideas and Presentation image-source bridges also deny copying hidden Workspace images. Assignment override now requires both project-manage and project-override grants, while PIC rights remain intact.
