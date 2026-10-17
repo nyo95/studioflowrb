@@ -1,7 +1,8 @@
 # Active Plan Template
 
 Copy this structure into root `PLAN.md`; keep one active plan. Delete optional
-sections that do not help the Executor.
+sections that do not help the Executor. Module(s), risk/rationale, acceptance
+criteria and verification gate are required for every READY order.
 
 ```markdown
 # Active Plan
@@ -10,6 +11,7 @@ Plan ID: <stable identifier — the Work Order ID>
 Scope: <bounded product/technical area>
 Module(s): <module ids this plan changes; a new capability names its new module>
 Target revision: R<N>.<NN>
+Risk: low | medium | high - <rationale and escalation triggers>
 Status: DRAFT | READY | BLOCKED
 Priority: P0 | P1 | P2 | P3 | PARKED
 Owner: <owner or decision authority>
@@ -50,7 +52,10 @@ and UX are the Lead's and are not specified for the Executor.>
 
 ## Verification
 
-<Focused checks plus full checks proportionate to risk.>
+<Mandatory: VERIFICATION.md tier; exact runner command/test files and affected
+consumer coverage; build/e2e conditions; per-command timeout (default 15 min).
+State required external DB/fixture prerequisites without secrets. No omitted
+mandatory check counts as passing. High risk/integration/release uses full gate.>
 
 ## Reviewer Acceptance
 

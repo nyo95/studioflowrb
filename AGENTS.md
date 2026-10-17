@@ -150,7 +150,7 @@ reproducible verified defect, and `[CLEANUP]` is dead code or doc drift, not a
 behavioral defect. `CHANGELOG.md` is the revision ledger. Do not churn every
 ledger at every handoff. Detailed rules are in `docs/agent/README.md`.
 
-Before editing, record HEAD, branch, remote/published baseline, existing revision entries, and the complete dirty-file list. Determine the next unused revision from `CHANGELOG.md`; never infer it from memory. Preserve unrelated owner changes, stage only owned files, inspect staged diff and whitespace, and make exactly one local revision commit for each cohesive completed change set. Run proportionate checks; a skipped, unavailable, or cancelled mandatory check is not a pass and must be reported. Do not call work complete without the required changelog, validation, and local commit.
+Before editing, record HEAD, branch, remote/published baseline, existing revision entries, and the complete dirty-file list. Determine the next unused revision from `CHANGELOG.md`; never infer it from memory. Preserve unrelated owner changes, stage only owned files, inspect staged diff and whitespace, and make exactly one local revision commit for each cohesive completed change set. Use the risk tiers and evidence rules in `docs/agent/VERIFICATION.md`; a skipped, unavailable, or cancelled mandatory check is not a pass and must be reported. Do not call work complete without the required changelog, validation, and local commit.
 
 The exact revision format and required ledger fields are mandatory in `docs/agent/README.md#revision-and-commit-protocol` for every role that edits, approves, or reviews a change.
 

@@ -87,8 +87,8 @@ docs/apps/<ext>/CONTRACT.md                          # wire contract + decisions
 
 ## Definition of done for an extension Work Order
 
-`npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm test` all
-pass; wire contract documented; every route has an auth-failure, scope-failure,
+The gate in VERIFICATION.md passes (high when crossing a shared/security
+boundary); wire contract documented; every route has an auth-failure, scope-failure,
 validation-failure, idempotent-replay, and happy-path test; CHANGELOG entry;
 one local commit. Then the Lead reviews and finishes the UI.
 

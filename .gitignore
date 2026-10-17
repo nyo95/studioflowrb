@@ -8,6 +8,7 @@ e2e/.tmp/
 .env.*
 !.env.example
 coverage/
+.verification/
 dist/
 .DS_Store
 *.log

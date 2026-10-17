@@ -36,7 +36,12 @@ the next Executor must deliver.
 `PLAN.md` is the canonical Work Order; use `PLAN-TEMPLATE.md`. For backend-bearing
 work state the business rules, architecture constraints, backend contract, UI
 contract, non-goals, regression risks, and tests required, plus the **target
-revision**. Name the shared capability being REUSED, EXTENDED, or ADDED and keep
+revision**. Every READY order must name affected modules (or harness-only/no app
+module), low/medium/high risk with rationale and escalation triggers, observable
+acceptance criteria, and the explicit verification gate from VERIFICATION.md.
+Specify exact affected tests/consumer coverage, conditional build/e2e/browser
+checks, per-command timeout and a safe checkpoint if the outcome is interrupted.
+These fields are mandatory even when optional template sections are removed. Name the shared capability being REUSED, EXTENDED, or ADDED and keep
 app policy app-owned.
 
 The UI contract says what the backend must expose and which minimal wiring the

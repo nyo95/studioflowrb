@@ -1,0 +1,151 @@
+import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { createWriteStream } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { resolve, join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { config as loadEnv } from 'dotenv';
+
+const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
+const git = (...args) => {
+  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(`git ${args[0]} failed`);
+  return result.stdout.trim();
+};
+
+export function parseOptions(args) {
+  const options = { tests: [], timeout: 15 * 60_000 };
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === '--tier') options.tier = args[++i];
+    else if (arg === '--tests') {
+      const start = options.tests.length;
+      while (args[i + 1] && !args[i + 1].startsWith('--')) options.tests.push(args[++i]);
+      if (options.tests.length === start) throw new Error('--tests requires exact test files');
+    } else if (arg === '--build') options.build = true;
+    else if (arg === '--e2e') options.e2e = true;
+    else if (arg === '--fingerprint') options.fingerprint = true;
+    else if (arg === '--timeout-minutes') options.timeout = Number(args[++i]) * 60_000;
+    else throw new Error(`Unknown option: ${arg}`);
+  }
+  if (!Number.isFinite(options.timeout) || options.timeout <= 0 || options.timeout > 2_147_483_647) throw new Error('Invalid timeout');
+  if (!options.fingerprint && !['low', 'medium', 'high'].includes(options.tier)) throw new Error('--tier low|medium|high required');
+  if (options.tier === 'medium' && options.tests.length === 0) throw new Error('Medium gate requires exact affected test files');
+  if (options.tier === 'high' && options.tests.length) throw new Error('High gate always runs the full suite; omit --tests');
+  return options;
+}
+
+export function gateCommands(options) {
+  const node = (name, args) => ({ name, executable: process.execPath, args });
+  // Resolve the installed CLIs, avoiding shell quoting and platform-specific npm shims.
+  const commands = [
+    node('boundaries', ['scripts/check-boundaries.mjs']),
+    node('legacy-runtime', ['scripts/check-legacy-runtime.mjs']),
+    { name: 'whitespace', executable: 'git', args: ['diff', '--check'] },
+    { name: 'staged-whitespace', executable: 'git', args: ['diff', '--cached', '--check'] },
+  ];
+  if (options.tier !== 'low') commands.push(
+    node('typecheck', ['node_modules/typescript/bin/tsc', '--noEmit']),
+    node('lint', ['node_modules/eslint/bin/eslint.js', '.']),
+  );
+  if (options.tier === 'high' || options.tests.length) commands.push(node('tests', ['scripts/run-tests.mjs', ...options.tests]));
+  if (options.tier === 'high' || options.build) commands.push(
+    node('generate', ['node_modules/prisma/build/index.js', 'generate']),
+    node('build', ['node_modules/next/dist/bin/next', 'build']),
+  );
+  if (options.e2e) commands.push(node('e2e', ['node_modules/@playwright/test/cli.js', 'test']));
+  return commands;
+}
+
+export async function fingerprint() {
+  const files = git('ls-files', '-c', '-o', '--exclude-standard', '-z').split('\0').filter(Boolean).sort();
+  const content = createHash('sha256');
+  for (const file of new Set(files)) {
+    content.update(file).update('\0');
+    try { content.update(await readFile(join(root, file))); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; content.update('<deleted>'); }
+    content.update('\0');
+  }
+  const environment = createHash('sha256');
+  for (const file of ['.env', '.env.local', `.env.${process.env.STUDIOFLOW_LOCATION}`, '.env.test', '.env.test.local', 'package-lock.json', 'node_modules/.package-lock.json']) {
+    environment.update(file).update('\0');
+    try { environment.update(await readFile(join(root, file))); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; environment.update('<absent>'); }
+  }
+  // Include inherited overrides, hashing only; never expose their values.
+  for (const key of Object.keys(process.env).sort()) {
+    if (/DATABASE|DIRECT_URL|SHADOW|SESSION_SECRET|PLAYWRIGHT|STUDIOFLOW|NODE_OPTIONS|NEXT_DIST_DIR/.test(key)) environment.update(key).update('\0').update(process.env[key]);
+  }
+  return { baseHead: git('rev-parse', 'HEAD'), content: content.digest('hex'), environment: environment.digest('hex'), node: process.version, platform: process.platform, location: process.env.STUDIOFLOW_LOCATION };
+}
+
+export async function runCommand(command, logPath, timeout, cwd = root) {
+  const start = Date.now();
+  const stream = createWriteStream(logPath);
+  let tail = '';
+  let timedOut = false;
+  let spawnError;
+  // Streaming to disk avoids storing complete output in the agent or a memory buffer.
+  const child = spawn(command.executable, command.args, { cwd, env: process.env, windowsHide: true, detached: process.platform !== 'win32', stdio: ['ignore', 'pipe', 'pipe'] });
+  const capture = (data) => {
+    stream.write(data);
+    tail = (tail + data.toString()).slice(-32_768);
+  };
+  child.stdout.on('data', capture);
+  child.stderr.on('data', capture);
+  child.on('error', (error) => { spawnError = error.code; capture(Buffer.from(`Spawn failed: ${error.code}\n`)); });
+  const timer = setTimeout(() => {
+    timedOut = true;
+    if (child.pid) {
+      if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true });
+      else { try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); } }
+    }
+  }, timeout);
+  const exitCode = await new Promise((resolveExit) => child.on('close', resolveExit));
+  clearTimeout(timer);
+  await new Promise((done) => stream.end(done));
+  const counts = {};
+  for (const key of ['tests', 'pass', 'fail', 'cancelled', 'skipped', 'todo']) {
+    const match = tail.match(new RegExp(`^# ${key} (\\d+)\\s*$`, 'm'));
+    if (match) counts[key] = Number(match[1]);
+  }
+  if (command.name === 'e2e') {
+    for (const [label, key] of [['passed', 'pass'], ['failed', 'fail'], ['skipped', 'skipped'], ['timed out', 'cancelled'], ['interrupted', 'cancelled'], ['flaky', 'flaky']]) {
+      const match = tail.match(new RegExp(`(\\d+) ${label}\\b`));
+      if (match) counts[key] = (counts[key] ?? 0) + Number(match[1]);
+    }
+    counts.tests = Object.values(counts).reduce((sum, value) => sum + value, 0);
+  }
+  const missingTestEvidence = ['tests', 'e2e'].includes(command.name) && (!counts.tests || counts.fail > 0 || counts.cancelled > 0 || counts.skipped > 0 || counts.todo > 0 || counts.flaky > 0);
+  const status = timedOut ? 'TIMEOUT' : exitCode === 0 && !spawnError && !missingTestEvidence ? 'PASSED' : 'FAILED';
+  return { command: [command.executable, ...command.args], exitCode, status, durationMs: Date.now() - start, counts: Object.keys(counts).length ? counts : null, log: logPath, ...(spawnError ? { error: spawnError } : {}), ...(status !== 'PASSED' ? { failure: timedOut ? 'Command timed out' : missingTestEvidence ? 'Missing, failed, cancelled or skipped test evidence; inspect log' : 'Command failed; inspect log' } : {}) };
+}
+
+async function main() {
+  const options = parseOptions(process.argv.slice(2));
+  if (!['rumah', 'kantor'].includes(process.env.STUDIOFLOW_LOCATION)) throw new Error('Set STUDIOFLOW_LOCATION=rumah|kantor first');
+  if (options.fingerprint) { console.log(JSON.stringify(await fingerprint(), null, 2)); return; }
+  const before = await fingerprint();
+  loadEnv({ path: `.env.${process.env.STUDIOFLOW_LOCATION}`, quiet: true });
+  const directory = join(root, '.verification', new Date().toISOString().replace(/[:.]/g, '-') + `-${process.pid}`);
+  await mkdir(directory, { recursive: true });
+  const results = [];
+  let failed = false;
+  for (const command of gateCommands(options)) {
+    if (failed) { results.push({ command: [command.executable, ...command.args], status: 'NOT_RUN', exitCode: null, counts: null }); continue; }
+    const result = await runCommand(command, join(directory, `${command.name}.log`), options.timeout);
+    results.push(result);
+    failed = result.status !== 'PASSED';
+  }
+  // Compare content only: commands intentionally inherit the selected env file.
+  const after = await fingerprint();
+  const changedDuringRun = before.content !== after.content;
+  const summary = { tier: options.tier, evidence: before, changedDuringRun, status: failed || changedDuringRun ? 'INCOMPLETE' : 'PASSED', results, summary: relative(root, join(directory, 'summary.json')) };
+  await writeFile(join(directory, 'summary.json'), JSON.stringify(summary, null, 2) + '\n');
+  console.log(JSON.stringify(summary, null, 2));
+  process.exitCode = summary.status === 'PASSED' ? 0 : 1;
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => { console.error(error.message); process.exitCode = 1; });
+}

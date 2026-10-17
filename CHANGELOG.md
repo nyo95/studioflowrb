@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.129 | 2026-10-18 | chore(harness): bound context and reuse risk-based verification
+
+- **Scope/audit:** development harness only, no application module changes. Recorded concrete unconditional-gate/browser contradictions and reporting/context gaps in `docs/agent/HARNESS-AUDIT.md`; preserved existing authority and safety invariants.
+- **Workflow:** one canonical low/medium/high verification policy; mandatory READY modules/risk/acceptance/gate fields; safe checkpoints and fresh-session handoffs; independent Reviewer diff/browser judgment with reuse of valid Executor evidence. No forced reset during incomplete data work.
+- **Tooling:** exact validated test selection retains full default discovery and serialized DB tests. Sequential gate runner has per-command timeouts, complete ignored local logs, concise exit/count/failure summaries and content/environment fingerprints. Missing tools, zero/skipped/cancelled tests, failures or changed content cannot produce a passing gate.
+- **Verification:** medium gate passed: full typecheck/lint, boundary and legacy-runtime scans, staged/unstaged whitespace and targeted runner/selection plus both checker-fixture suites (5 tests, 5 passed, 0 failed/skipped). Build/full application suite/e2e/browser are not applicable to this bounded harness slice; no production compilation/UI/DB behavior changed. Initial Windows path assertion corrected; an exploratory artifact detecting a concurrent documentation edit remained INCOMPLETE, not PASS. Final documentation-only clarification reuses this runtime evidence with a low gate and explicit diff review; both artifacts accompany the handoff.
+- **Limits:** temporary combined Lead/Executor work is not independent Claude acceptance. Existing browser backlog remains open. Benchmark equivalent tasks before/after (three task classes, repeated pairs); no measured token-saving claim. No migration, dependency, application behavior, permission, audit, legacy access, DB command, remote action or push.
+
 ## R9.128 | 2026-10-17 | fix(masterdata): remove the overview's nested canvas limit
 
 - The Master Data overview no longer reapplies its own narrower page container. It now inherits the full application canvas from the Master Data layout, matching BQ and the directory routes.

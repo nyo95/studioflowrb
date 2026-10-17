@@ -2,9 +2,10 @@ import { readdir } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { config as loadEnv } from "dotenv";
+import { selectTests } from "./test-selection.mjs";
 
-loadEnv({ path: ".env.test.local" });
-loadEnv({ path: ".env.test" });
+loadEnv({ path: ".env.test.local", quiet: true });
+loadEnv({ path: ".env.test", quiet: true });
 
 const testDatabaseUrl = process.env.PLATFORM_TEST_DATABASE_URL;
 const testEnvironment = testDatabaseUrl
@@ -14,6 +15,7 @@ const testEnvironment = testDatabaseUrl
 const fixtureSuites = [
   join("scripts", "test-boundaries-checker.mjs"),
   join("scripts", "test-legacy-runtime-checker.mjs"),
+  join("scripts", "verify.test.mjs"),
 ];
 
 const testFiles = [];
@@ -34,12 +36,14 @@ async function discoverTests(directory) {
     ) {
       // `node --test` reads its arguments as glob patterns, so a route folder such as `[projectId]` would be a
       // character class and the file would be skipped silently. Each bracket becomes a one-character class.
-      testFiles.push(path.replace(/[[\]]/g, (bracket) => `[${bracket}]`));
+      testFiles.push(path);
     }
   }
 }
 
 await discoverTests("src");
+const selected = selectTests([...testFiles, ...fixtureSuites], process.argv.slice(2));
+const escaped = selected.map((path) => path.replace(/[[\]]/g, (bracket) => `[${bracket}]`));
 
 // Serialized: several files share one disposable Postgres database and a single advisory lock
 // (test-support.ts) to keep their TRUNCATEs from colliding. Node's default file concurrency is
@@ -48,7 +52,7 @@ await discoverTests("src");
 // clients and never release it, hanging the whole run. Capping concurrency avoids the race entirely.
 const result = spawnSync(
   process.execPath,
-  ["--import", "tsx", "--import", "./scripts/test-server-only-loader.mjs", "--test", "--test-concurrency=1", ...testFiles, ...fixtureSuites],
+  ["--import", "tsx", "--import", "./scripts/test-server-only-loader.mjs", "--test", "--test-reporter=tap", "--test-concurrency=1", ...escaped],
   { stdio: "inherit", env: testEnvironment },
 );
 

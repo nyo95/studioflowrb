@@ -56,6 +56,34 @@ unless the active plan explicitly needs browser work to finish or diagnose the
 implementation. This keeps execution moving while preserving an independent
 user-facing gate before PASS.
 
+## Bounded sessions and checkpoints
+
+Use [VERIFICATION.md](VERIFICATION.md) as the single risk/gate and evidence-reuse
+policy. Role contracts link to it rather than restating command lists. Load it
+when planning gates or executing/reviewing checks; load extension/browser guides
+only when applicable. Dated reports and handoffs are navigation, not additional
+bootstrap contracts. Keep a compact list of authorities/paths already inspected
+and reload only changed sections or evidence needed to resolve a conflict.
+
+At a completed outcome or safe checkpoint, hand off: plan ID and location, base
+and result commit, exact remaining dirty files/ownership, decisions, completed
+criteria, gate summary/log paths, environment/fixture assumptions, unresolved
+risks and one next action. Store a short `## Checkpoint` in PLAN.md only when
+interruption needs recovery; otherwise the copy-ready handoff suffices. Never
+include credentials or paste full logs/contracts. A checkpoint is not acceptance
+and does not authorize a partial commit.
+
+Prefer a fresh session for an independent outcome or after a completed checkpoint
+when accumulated context no longer helps. Continue while unresolved schema/data
+work, active transactions, tests or incomplete coupled changes need their current
+context. Do not force compaction/reset, abandon processes/locks, or split by
+arbitrary token/file counts. On interruption, stop at a safe boundary and record
+process/lock state; resumption first checks HEAD, dirty ownership and evidence
+validity, then continues the next unresolved action rather than repeating audit.
+Agree a bounded command/time budget in PLAN.md; when exhausted, record the exact
+blocker/checkpoint instead of running exploratory retries indefinitely. A failed
+or timed-out gate remains incomplete until resolved.
+
 ## Extensions (companion apps)
 
 Work that adds a companion app or injected feature (SketchUp plugin sync, AI

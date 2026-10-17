@@ -1,13 +1,15 @@
 # Browser Acceptance Backlog
 
-Items collected here are **not** blocking Executor commits. They are batched and
+Ordinary Reviewer acceptance items here do **not** block Executor commits.
+Explicit PLAN.md browser diagnosis needed to finish implementation remains an
+Executor gate; this backlog cannot waive it. Acceptance items are batched and
 run by the Reviewer at phase gate close — typically once per SF phase or
 Reviewer acceptance session. The Reviewer records PASS per item before the
-phase gate closes.
+phase gate closes or the affected outcome receives acceptance.
 
-**Executor:** when a `PLAN.md` specifies browser verification, append each item
-here using the format below instead of blocking your commit. Report the
-additions in your handoff.
+**Executor:** append deferred Reviewer acceptance scenarios here using the format
+below and report additions in the handoff. Complete explicitly required
+implementation diagnosis before committing; report that evidence separately.
 
 **Reviewer:** run these in one authenticated session using the local fixture.
 Mark each item PASS or FAIL. A FAIL opens a new correction plan.

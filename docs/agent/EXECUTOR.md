@@ -38,41 +38,25 @@ commit.
 
 ## Mandatory commit gate
 
-All of the following must pass before an Executor commit. A skipped, cancelled,
-or unavailable check is **reported, not silently treated as passing**.
+Use the risk tier and explicit gate locked in READY PLAN.md under
+[VERIFICATION.md](VERIFICATION.md). Run the reusable gate once after meaningful
+edits, inspect failures in saved logs, and attach its summary/content fingerprint
+to the handoff. Do not run a full suite/build by habit for every ordinary commit.
+Missing, skipped, cancelled, failed or unavailable required checks are not PASS;
+finish or report the gate incomplete. Preserve regression and DB safety coverage.
 
-```
-npm test
-typecheck
-lint
-boundary check
-legacy-runtime check
-production build
-whitespace check (staged and unstaged)
-```
+## Browser work and acceptance
 
-**Browser acceptance is not in this list.** See below.
+Reviewer owns independent post-commit browser acceptance for affected user-facing
+behavior. Add deferred scenarios to BROWSER-ACCEPTANCE-BACKLOG.md, with revision
+and evidence, rather than treating pending acceptance as an implementation pass.
+The backlog does not waive acceptance before Reviewer PASS.
 
-## Browser acceptance — never blocks Executor commit
-
-Browser acceptance items — route rendering, workflow mutations, evidence
-operations, permission gates, signed-out redirects, and viewport checks — are
-**never** a mandatory Executor gate, even when a `PLAN.md` lists them under
-"Executor Verification".
-
-When a plan specifies browser checks, **append each item** to
-`docs/agent/BROWSER-ACCEPTANCE-BACKLOG.md` and report the additions in your
-handoff. Use the item format documented in that file. The Reviewer runs the
-backlog in a dedicated batch pass — typically once per phase gate — not
-per-commit and not by the Executor.
-
-Do not delay a commit or report a blocker solely because a browser check
-remains unverified. Report it as a backlog addition instead.
-
-Running browser checks is permitted when the active plan explicitly requires
-them to **diagnose or complete** the implementation (e.g. reproducing a
-rendering bug). In that case, report the evidence in your handoff without
-deciding Reviewer acceptance yourself.
+If READY PLAN.md explicitly requires browser diagnosis to complete implementation,
+that check is an Executor gate and must finish. Otherwise pending Reviewer browser
+acceptance alone does not block the Executor commit. This distinction follows
+AGENTS.md and PLANNER.md; batching acceptance must not delay an urgent in-scope
+security or user-flow regression check.
 
 ## Prohibited guessing
 
@@ -107,7 +91,8 @@ commit**. Do not create an empty or partial commit. Report every file written
 and mark them as awaiting batch commit. The next Codex session or the first
 session with a working shell collects all accumulated files, updates
 `CHANGELOG.md` for the combined change set, and creates **one commit** covering
-the full batch.
+the full coherent batch after reconciling ownership and completing its required
+verification. Until then the checkpoint is incomplete, never a completed outcome.
 
 ## Completion handoff
 

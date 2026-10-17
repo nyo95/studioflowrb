@@ -15,6 +15,20 @@ path, invalid input, permissions/security, persistence/lifecycle/transactions,
 audit/history, errors/recovery, UI states, cross-app boundaries, shared reuse,
 and regression risk. Depth follows risk, not a fixed checklist.
 
+## Reuse verified evidence, keep independent judgment
+
+Apply VERIFICATION.md evidence validity rules before rerunning checks. Inspect the
+actual commit/diff independently, confirm the tier and test selection cover the
+outcome and dependent consumers, and validate the recorded content/environment
+fingerprints and logs. Reuse trustworthy passing Executor artifacts when commit
+content, environment and fixture assumptions are unchanged. Repeat only affected
+checks for changed code, failures, missing evidence or uncovered regression risk;
+use the full gate at high-risk/integration/release checkpoints. Independent
+review does not require repeating an unchanged successful command or accepted
+audit. Record which evidence was reused and why it remains valid. Independent
+browser acceptance is still required where applicable. A temporary combined lane
+authorized by the owner must disclose that review is not independent Claude review.
+
 ## Review questions
 
 1. **Outcome** — does the real workflow and domain behavior satisfy the plan?
