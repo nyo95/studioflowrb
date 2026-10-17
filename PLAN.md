@@ -1,18 +1,18 @@
 # Active Plan
 
-Plan ID: WO-MD-CRUD-UX-01
-Scope: Master Data directory filters, record detail and price draft safety
+Plan ID: WO-MD-BRAND-FORM-GROUPING-01
+Scope: Master Data Brand form section grouping
 Module(s): masterdata; UI Engine interaction pattern
-Target revision: R9.132 (R9.131 is a pre-existing uncommitted StudioFlow candidate entry)
-Risk: high - shared UI interaction; existing permissions and server writes unchanged
-Status: IMPLEMENTED — scoped combined-lane review PASS; full high gate INCOMPLETE
+Target revision: R9.133 (R9.131 remains a pre-existing uncommitted StudioFlow candidate entry)
+Risk: medium - retained form layout and its validation focus behavior; server writes unchanged
+Status: IMPLEMENTED — scoped combined-lane review PASS
 Priority: P2
 Owner: Product Owner; temporary Lead + Executor authorized in this session
 Last updated: 2026-10-18
 
 ## Outcome
 
-Staff can filter Brand, Supplier, SKU and Pricing directories without a wall of dropdowns; inspect complete records without opening Edit; create missing references in context and understand when they are saved; and close or leave a price draft without silently discarding their work.
+Staff creating or editing a Brand see two meaningful sections instead of four: Profile groups the Brand's own catalog information and external links; Suppliers & contacts groups the suppliers with the people who work for them.
 
 ## Locked Decisions and Reuse
 
@@ -27,30 +27,25 @@ authorized and supplied to the directory.
 
 ## Implementation and UI Contract
 
-- Search and status remain inline; secondary searchable filters live in a drawer,
-  apply immediately, and appear as removable labelled chips.
-- Brand, Supplier and SKU names open read-only detail panels; Edit is explicit.
-- Owner steering: Brand/Supplier creation uses one tabbed dialog, never an optional-profile disclosure or a second completion step. All fields remain available, required identity stays visible, and switching tabs preserves the draft. Create-from-Pricing remains available for both Brand and Supplier, with existing permissions/validation and return to the price draft.
-- Price editing shows its SKU/Supplier identity; leaving for SKU editing uses the
-  existing discard guard. SKU identity and supplier identity remain immutable here.
-- Clearly show the Brand of a new SKU rather than deriving an invisible value
-  from a search filter. Reference quick-create selects the intended price row.
-- Multi-supplier matrix uses the same close/discard protection as other forms.
-- Preserve compact tables, clear result counts, keyboard focus, mobile internal
-  scrolling, and existing business meaning of sample and dictionary workflows.
+- Owner decision: Brand has exactly two retained tabs: **Profile** and
+  **Suppliers & contacts**. The standalone Contacts and Catalogs & links tabs
+  are removed in both Create and Edit.
+- Profile contains hashtags, product categories, notes and external catalog/site
+  links. Suppliers & contacts contains owner supplier, supplying organizations
+  and the contact editor. The editor remains disabled until an owner or supplier
+  exists; no permission, ownership, validation or write contract changes.
+- Keep Brand identity outside tabs. Switching tabs retains all values and an
+  invalid field still reveals its hidden tab.
 
 ## Verification
 
 Location rumah. Verify rebuild-only test target from the selected env before DB
 tests. High gate: node scripts/verify.mjs --tier high, per command 15 minutes.
-Then run npm run test:e2e -- e2e/masterdata-ux.spec.ts e2e/masterdata-acceptance.spec.ts e2e/masterdata-archive-samples.spec.ts e2e/screen-size.spec.ts. Use installed Chrome through PLAYWRIGHT_CHANNEL=chrome when bundled Chromium is absent.
-Shared UI, Master Data action/amount/findability and affected browser flows cover
-filtering, draft safety, readable detail, quick-create and price identity. Existing
-BQ test failure from the StudioFlow attempt must be independently isolated against
-unchanged baseline before any gate exception is assessed. No skipped check is PASS.
-Browser checks: Brands, Suppliers, SKUs, Material and work Pricing at desktop and
-375px; filter apply/remove/reset, details then Edit, matrix cancel/discard,
-price-to-SKU navigation, new-SKU Brand selection, quick Supplier returning to row.
+Run typecheck, lint and the affected Brand acceptance/browser scenarios. Use
+installed Chrome through PLAYWRIGHT_CHANNEL=chrome when bundled Chromium is absent.
+The browser checks cover retained profile links, supplier-contact relationship,
+contact addition remains unavailable without a supplier, and existing Brand-price
+relationship acceptance. No live owner data is used.
 Do not mutate the owner's real local data for browser fixtures.
 
 ## Acceptance and Recovery
@@ -61,43 +56,30 @@ no persisted change or data conversion is necessary.
 
 ## Execution and Scoped Review
 
-- Boundary, legacy-runtime, staged/unstaged whitespace, typecheck and lint passed.
-- Full high suite: 1,234 tests, 1,233 passed, one failed; zero skipped, cancelled or
-  TODO. The gate is INCOMPLETE. The only failure is the pre-existing BQ subsection
-  fixture calling lockProject with unpriced items before its audit-rollback test.
-  BQ sources, DB helpers and test runner are unchanged from HEAD; the service test
-  imports no changed UI code. It cannot conceal a regression in this UI slice.
-- Prisma generation and production build separately passed after the failed gate.
-- Final 38-case Master Data browser run passed. All 80 screen-size cases passed
-  in the preceding run; only CRUD assertions/locators changed afterwards and all
-  were rerun in the green 38-case run. Runtime source remained unchanged.
-- Owner-facing flows cover retained tab drafts, automatic hidden-error reveal,
-  Price-to-SKU discard confirmation, matrix close/cancel protection, per-row new
-  SKU Brand, Brand/Supplier creation from Pricing, correct Supplier row return,
-  filters, details, partial save, archive/restore and sample shelf workflows.
-- Existing shell hydration issue captured at /account, 840px after Units settings
-  remains a separate BUG. Combined Lead/Executor scoped review is not independent
-  Claude acceptance. No full-app/release PASS or remote publication is claimed.
-- Evidence: .verification/2026-10-17T18-02-09-612Z-28904/summary.json;
-  masterdata-uiux-e2e-accepted.log (38/38), masterdata-uiux-e2e.log (80/80 size
-  cases, four corrected CRUD assertion failures), masterdata-uiux-generate.log,
-  masterdata-uiux-build.log. Following checks, only docs/ledgers were updated;
-  generated next-env.d.ts returned to HEAD during build.
+- Typecheck and the changed-file lint pass.
+- 28 affected Master Data browser scenarios pass, including Brand create/edit,
+  a Profile link retained through tab switches, disabled contact addition before
+  supplier selection, existing Brand-price relationship behavior and narrow layout.
+- This is a small retained-form layout refinement after the R9.132 build and
+  full Master Data browser evidence. No server, data or shared component source
+  changed. Scoped combined-lane review is not independent Claude acceptance;
+  no full-app/release claim or remote publication is made.
+- Evidence: `.verification/masterdata-brand-grouping-e2e.log` (28/28).
 
 ## Checkpoint: prior StudioFlow work
 
 Uncommitted StudioFlow access implementation from WO-SF-WORKSPACE-ACCESS-01 is
 preserved, along with its R9.131 candidate ledger/backlog changes. Its high gate was
 incomplete (1233/1234 tests; BQ lock-price fixture failure); browser review and
-commit remain pending. Stage only the Master Data/UI files and the R9.132 ledger
+commit remain pending. Stage only the Master Data/UI files and the R9.133 ledger
 entry. Do not mix or claim completion of that prior security change.
-Once R9.132 is committed, finishing the prior candidate must use the next unused
+Once R9.133 is committed, finishing the prior candidate must use the next unused
 revision; the preserved draft entry is not permission to commit an older suffix.
 
 ## Executor Prompt
 
 Act as temporary Lead + Backend Executor, rumah. Read AGENTS.md and this READY
-plan. Finish the bounded Master Data UI/UX outcome, verify the explicit gate and
-browser scenarios, inspect the staged diff, update its changelog entry and create
-R9.132 locally. Preserve the unrelated StudioFlow dirty work and draft R9.131
-ledger entry; report actual evidence, limitations and remaining dirty files.
+plan. Finish the bounded Brand form grouping outcome, verify the explicit checks,
+inspect the staged diff, update its changelog entry and create R9.133 locally.
+Preserve the unrelated StudioFlow dirty work and draft R9.131 ledger entry;
+report actual evidence, limitations and remaining dirty files.

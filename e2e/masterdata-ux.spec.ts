@@ -3,20 +3,19 @@ import { expect, test } from "@playwright/test";
 
 const fixtures = () => JSON.parse(readFileSync("e2e/.tmp/owner.json", "utf8")).masterData as { sku1: string };
 
-test("Brand creation keeps one draft across profile, supplier and link tabs", async ({ page }) => {
+test("Brand creation keeps one draft across profile and supplier-contact tabs", async ({ page }) => {
   await page.goto("/masterdata/brands");
   await page.getByRole("button", { name: "New brand", exact: true }).click();
   const editor = page.getByRole("dialog", { name: "Create catalog brand", exact: true });
   await editor.getByLabel("Brand name").fill("UX tabbed brand");
-  await editor.getByRole("tab", { name: "Suppliers", exact: true }).click();
+  await editor.getByRole("tab", { name: "Suppliers & contacts", exact: true }).click();
   await expect(editor.getByRole("button", { name: "Owner supplier", exact: true })).toBeVisible();
+  await expect(editor.getByRole("button", { name: "Add contact", exact: true })).toBeDisabled();
   await expect(editor.getByRole("button", { name: "Hashtags", exact: true })).toBeHidden();
-  await editor.getByRole("tab", { name: "Catalogs & links", exact: true }).click();
+  await editor.getByRole("tab", { name: "Profile", exact: true }).click();
   await editor.getByPlaceholder("example.com or https://...").fill("https://example.test/ux-brand");
   await editor.getByRole("button", { name: "Add", exact: true }).click();
-  await editor.getByRole("tab", { name: "Profile", exact: true }).click();
   await expect(editor.getByLabel("Brand name")).toHaveValue("UX Tabbed Brand");
-  await editor.getByRole("tab", { name: "Catalogs & links", exact: true }).click();
   await expect(editor.getByText("WEBSITE: https://example.test/ux-brand", { exact: true })).toBeVisible();
   await editor.getByRole("button", { name: "Create brand", exact: true }).click();
   await expect(editor).toBeHidden();

@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.133 | 2026-10-18 | fix(masterdata): group Brand contacts with suppliers
+
+- **Scope:** Brand create/edit form grouping only. No schema, migration, dependency, server action, validation, permission or persisted-data change.
+- **Form:** reduced the Brand form from four tabs to two: Profile now includes external catalog/site links; Suppliers & contacts keeps the owner, supplying organizations and contacts together. Contacts remain unavailable until an owner or supplier is selected, so the relationship is clear at the point of entry.
+- **Verification:** typecheck and changed-file lint passed. All 28 affected Brand/Master Data browser scenarios passed, covering retained profile links, supplier-contact availability, existing Brand-price relationships, Price entry continuity and narrow layout. Evidence: `.verification/masterdata-brand-grouping-e2e.log`.
+- **Limits:** this is a scoped combined Lead/Executor review, not independent Claude acceptance. The previously recorded BQ test failure and uncommitted StudioFlow access work remain separate and unchanged; no remote publication.
+
 ## R9.132 | 2026-10-18 | fix(masterdata): simplify directory filters and connected entry flows
 
 - **Scope:** Master Data Brand, Supplier, SKU and Pricing UI, plus reusable UI Engine TableFilters and retained form tabs. No schema, migration, dependency, server write contract or permission change.

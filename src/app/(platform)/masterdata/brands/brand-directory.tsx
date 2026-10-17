@@ -442,28 +442,7 @@ export function BrandDirectory({
           </Field>
           <Field label="Notes">
             <SimpleTextEditor name="notes" placeholder="Additional specifications, authorized distributors, etc." rows={2} />
-          </Field></div>) },
-{ value: "suppliers", label: "Suppliers", content: (<div className="grid gap-4"><Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
-            <CreatableSearch
-              label="Owner supplier"
-              options={ownerVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
-              value={createOwnerVendorId}
-              onValueChange={setCreateOwnerVendorId}
-              placeholder="Select an owner supplier"
-              onCreate={canManageVendors ? (name) => { openVendorQuick("createOwner", name); return ""; } : undefined}
-              createLabel={(name) => `Create owner supplier "${name}"`}
-            />
           </Field>
-          <Field label="Suppliers" description="Organizations that supply this Brand. Managed here and shown read-only on Supplier.">
-            <div className="grid gap-1.5">
-              <CreatableMultiSelect label="Suppliers" options={materialVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={createSupplierIds} onValueChange={setCreateSupplierIds} placeholder="Select suppliers" />
-              {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("createSupplier", "")}>+ Create new supplier for this brand</Button> : null}
-            </div>
-          </Field>
-          </div>) },
-{ value: "contacts", label: `Contacts (${createContacts.length})`, content: (<div className="grid gap-4"><BrandContactsEditor value={createContacts} onChange={setCreateContacts} vendorChoices={contactVendorChoices(createOwnerVendorId, createSupplierIds)} />
-          </div>) },
-{ value: "links", label: "Catalogs & links", content: (<div className="grid gap-4">{/* Links builder */}
           <div className="grid gap-2 border-t border-line pt-3">
             <Text size="sm" weight="semibold">External links (Catalogs, Website)</Text>
             {linksList.map((link, idx) => (
@@ -486,8 +465,25 @@ export function BrandDirectory({
               <Button type="button" size="sm" variant="secondary" onClick={addLink}>Add</Button>
             </div>
             {linkError ? <InlineError>{linkError}</InlineError> : null}
-          </div>
-
+          </div></div>) },
+{ value: "suppliers", label: "Suppliers & contacts", content: (<div className="grid gap-4"><Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
+            <CreatableSearch
+              label="Owner supplier"
+              options={ownerVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
+              value={createOwnerVendorId}
+              onValueChange={setCreateOwnerVendorId}
+              placeholder="Select an owner supplier"
+              onCreate={canManageVendors ? (name) => { openVendorQuick("createOwner", name); return ""; } : undefined}
+              createLabel={(name) => `Create owner supplier "${name}"`}
+            />
+          </Field>
+          <Field label="Suppliers" description="Organizations that supply this Brand. Managed here and shown read-only on Supplier.">
+            <div className="grid gap-1.5">
+              <CreatableMultiSelect label="Suppliers" options={materialVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={createSupplierIds} onValueChange={setCreateSupplierIds} placeholder="Select suppliers" />
+              {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("createSupplier", "")}>+ Create new supplier for this brand</Button> : null}
+            </div>
+          </Field>
+          <BrandContactsEditor value={createContacts} onChange={setCreateContacts} vendorChoices={contactVendorChoices(createOwnerVendorId, createSupplierIds)} />
           </div>) },
 ]} />
 
@@ -567,28 +563,7 @@ export function BrandDirectory({
             </Field>
             <Field label="Notes">
               <SimpleTextEditor name="notes" defaultValue={editTarget.notes ?? ""} rows={2} />
-            </Field></div>) },
-{ value: "suppliers", label: "Suppliers", content: (<div className="grid gap-4"><Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
-              <CreatableSearch
-                label="Owner supplier"
-                options={ownerVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
-                value={editOwnerVendorId}
-                onValueChange={setEditOwnerVendorId}
-                placeholder="Select an owner supplier"
-                onCreate={canManageVendors ? (name) => { openVendorQuick("editOwner", name); return ""; } : undefined}
-                createLabel={(name) => `Create owner supplier "${name}"`}
-              />
             </Field>
-            <Field label="Suppliers" description="Organizations that supply this Brand. Changes are reflected read-only on Supplier.">
-              <div className="grid gap-1.5">
-                <CreatableMultiSelect label="Suppliers" options={materialVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={editSupplierIds} onValueChange={setEditSupplierIds} placeholder="Select suppliers" />
-                {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("editSupplier", "")}>+ Create new supplier for this brand</Button> : null}
-              </div>
-            </Field>
-            </div>) },
-{ value: "contacts", label: `Contacts (${editContacts.length})`, content: (<div className="grid gap-4"><BrandContactsEditor value={editContacts} onChange={setEditContacts} vendorChoices={contactVendorChoices(editOwnerVendorId, editSupplierIds)} />
-            </div>) },
-{ value: "links", label: "Catalogs & links", content: (<div className="grid gap-4">{/* Links builder */}
             <div className="grid gap-2 border-t border-line pt-3">
               <Text size="sm" weight="semibold">External links</Text>
               {linksList.map((link, idx) => (
@@ -611,8 +586,25 @@ export function BrandDirectory({
                 <Button type="button" size="sm" variant="secondary" onClick={addLink}>Add</Button>
               </div>
               {linkError ? <InlineError>{linkError}</InlineError> : null}
-            </div>
-
+            </div></div>) },
+{ value: "suppliers", label: "Suppliers & contacts", content: (<div className="grid gap-4"><Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
+              <CreatableSearch
+                label="Owner supplier"
+                options={ownerVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
+                value={editOwnerVendorId}
+                onValueChange={setEditOwnerVendorId}
+                placeholder="Select an owner supplier"
+                onCreate={canManageVendors ? (name) => { openVendorQuick("editOwner", name); return ""; } : undefined}
+                createLabel={(name) => `Create owner supplier "${name}"`}
+              />
+            </Field>
+            <Field label="Suppliers" description="Organizations that supply this Brand. Changes are reflected read-only on Supplier.">
+              <div className="grid gap-1.5">
+                <CreatableMultiSelect label="Suppliers" options={materialVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={editSupplierIds} onValueChange={setEditSupplierIds} placeholder="Select suppliers" />
+                {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("editSupplier", "")}>+ Create new supplier for this brand</Button> : null}
+              </div>
+            </Field>
+            <BrandContactsEditor value={editContacts} onChange={setEditContacts} vendorChoices={contactVendorChoices(editOwnerVendorId, editSupplierIds)} />
             </div>) },
 ]} />
 
