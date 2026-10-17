@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.130 | 2026-10-18 | docs(audit): record the Notes access defect and reject the BQ false positive
+
+- **Scope:** documentation only, StudioFlow backlog evidence; owner approved recording now and fixing in a later session. Added one `[BUG][P1]` for Notes/Workspace service reads that omit project assignment enforcement, with the existing contract, exact paths, database-free mocked reproduction, limitations and acceptance criteria. The contract is unchanged; a separate high-risk implementation plan must preserve permitted Schedule reads and reuse the existing project access policy.
+- **Rejected BQ finding:** `createBqService` in `src/apps/bq/service.ts` wraps `approveProjectDeletion` with `ctx.runTransaction`; `src/apps/bq/services/context.ts` routes database operations and the audit writer through that same transaction using AsyncLocalStorage, and `src/apps/bq/runtime.ts` supplies the Platform transaction runner. The protection also exists at the external audit's `45f956c` baseline. Separate statements inside the lifecycle helper do not prove separate transactions. No BQ bug entry or extra transaction layer is warranted by that report; reopen only with new contrary evidence.
+- **Verification:** low documentation gate: boundary scan, legacy-runtime scan and staged/unstaged whitespace checks. Prior source review and successful mocked reproduction are reused because the implementation is unchanged. No application tests, production build, browser or database commands are required for this documentation slice; no application behavior, schema, migration, dependency, permission or audit implementation change, remote action or push. The P1 remains unfixed; performance comparisons and the external numerical score are not measured defect evidence.
+
 ## R9.129 | 2026-10-18 | chore(harness): bound context and reuse risk-based verification
 
 - **Scope/audit:** development harness only, no application module changes. Recorded concrete unconditional-gate/browser contradictions and reporting/context gaps in `docs/agent/HARNESS-AUDIT.md`; preserved existing authority and safety invariants.
