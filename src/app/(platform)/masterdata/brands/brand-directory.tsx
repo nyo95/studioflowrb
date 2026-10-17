@@ -5,14 +5,15 @@ import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
 import { formatInstant } from "@platform/utilities/date";
-import { DirectoryShell,Pagination,RowActionMenu,RowActionsCell,RowActionsHead,Text,usePagination } from "@/platform/ui_engine";
+import { TableFilters,Drawer,DirectoryShell,Pagination,RowActionMenu,RowActionsCell,RowActionsHead,Text,usePagination } from "@/platform/ui_engine";
 ﻿
 
 import { Plus } from "lucide-react";
 import { useRef,useState } from "react";
 import { useRowAction } from "@/platform/ui_engine";
 
-import { Button,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
+import { Button,Tabs,ConfirmDialog,CreatableMultiSelect,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,InlineError,Input,Notice,SearchField,Select,SimpleTextEditor,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar,useFormDraftGuard,useOptionOverlay } from "@/platform/ui_engine";
+import { PhoneLinks } from "../phone-links";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
 import { createCategoryAction } from "../categories/actions";
 import {
@@ -81,6 +82,8 @@ export function BrandDirectory({
   canManageVendors: boolean;
   canManageCategories: boolean;
 }) {
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = brands.find((brand) => brand.id === detailId) ?? null;
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DirectoryStatus>("ACTIVE");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
@@ -124,6 +127,7 @@ export function BrandDirectory({
   const [vendorQuick, setVendorQuick] = useState<{ target: "createOwner" | "editOwner" | "createSupplier" | "editSupplier"; name: string; vendorTypeId: string } | null>(null);
   const [vendorQuickPending, setVendorQuickPending] = useState(false);
   const [vendorQuickError, setVendorQuickError] = useState<string | null>(null);
+  const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
   /** Who a Brand contact can belong to: the Brand's owner and its selected suppliers. */
   const contactVendorChoices = (ownerId: string, supplierIds: readonly string[]) => {
     const nameOf = (id: string) => [...ownerVendorOptions, ...materialVendorOptions].find((vendor) => vendor.id === id)?.name ?? "Supplier";
@@ -198,6 +202,7 @@ export function BrandDirectory({
   };
 
   const openCreateDialog = () => {
+    setReferenceNotice(null);
     setLinksList([]);
     setNewLinkUrl("");
     setNewLinkLabel("");
@@ -213,6 +218,7 @@ export function BrandDirectory({
   };
 
   const openEditDialog = (brand: BrandRow) => {
+    setReferenceNotice(null);
     setLinksList(brand.links.map((l) => ({ kind: l.kind, url: l.url, label: l.label ?? "" })));
     setNewLinkUrl("");
     setNewLinkLabel("");
@@ -268,6 +274,7 @@ export function BrandDirectory({
       else if (vendorQuick.target === "editOwner") setEditOwnerVendorId(option.id);
       else if (vendorQuick.target === "createSupplier") setCreateSupplierIds((current) => [...current, option.id]);
       else setEditSupplierIds((current) => [...current, option.id]);
+      setReferenceNotice(`Supplier “${option.name}” created and selected. It remains in the Supplier directory if you cancel this Brand form.`);
       setVendorQuick(null);
     } finally {
       setVendorQuickPending(false);
@@ -286,6 +293,7 @@ export function BrandDirectory({
     }
     const option = { id: result.data.categoryId, name: name.trim() };
     upsertCategoryOption(option);
+    setReferenceNotice(`Category “${option.name}” created. It remains available if you cancel this Brand form.`);
     return option.id;
   };
 
@@ -300,7 +308,13 @@ export function BrandDirectory({
             New brand
           </Button>
       ) : undefined}>
-        <div className="flex flex-wrap items-center gap-2"><SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search brands, suppliers, categories..." /><StatusFilterSelect value={statusFilter} onChange={setStatusFilter} /><Select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}><option value="ALL">All product categories</option>{productCategories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><Select value={supplierFilter} onChange={(e) => setSupplierFilter(e.target.value)}><option value="ALL">All suppliers</option>{[...ownerVendors, ...materialVendors].filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select><FilterSummary filtered={Boolean(query) || statusFilter !== "ACTIVE" || categoryFilter !== "ALL" || supplierFilter !== "ALL"} shown={filtered.length} total={brands.length} onClear={() => { setQuery(""); setStatusFilter("ACTIVE"); setCategoryFilter("ALL"); setSupplierFilter("ALL"); }} /></div>
+        <SearchField value={query} onChange={(event) => setQuery(event.target.value)} onClear={() => setQuery("")} placeholder="Search brands, suppliers, categories..." />
+        <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
+        <TableFilters resultLabel={`${filtered.length} of ${brands.length} brands`} filters={[
+          { id: "category", label: "Product category", value: categoryFilter, defaultValue: "ALL", onValueChange: setCategoryFilter, options: [{ id: "ALL", label: "All product categories" }, ...productCategories.map((item) => ({ id: item.id, label: item.name }))] },
+          { id: "supplier", label: "Supplier", value: supplierFilter, defaultValue: "ALL", onValueChange: setSupplierFilter, options: [{ id: "ALL", label: "All suppliers" }, ...[...ownerVendors, ...materialVendors].filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index).map((item) => ({ id: item.id, label: item.name }))] },
+        ]} />
+        <FilterSummary filtered={Boolean(query) || statusFilter !== "ACTIVE" || categoryFilter !== "ALL" || supplierFilter !== "ALL"} shown={filtered.length} total={brands.length} onClear={() => { setQuery(""); setStatusFilter("ACTIVE"); setCategoryFilter("ALL"); setSupplierFilter("ALL"); }} />
       </TableToolbar>}>
 
 
@@ -329,7 +343,7 @@ export function BrandDirectory({
 
               return (
                 <TableRow key={brand.id}>
- <TableCell wrap><EntityPrimaryCell tone={isArchived ? "danger" : "success"} statusLabel={isArchived ? "Archived" : "Active"} name={brand.name} /></TableCell>
+ <TableCell wrap><EntityPrimaryCell tone={isArchived ? "danger" : "success"} statusLabel={isArchived ? "Archived" : "Active"} name={<Button type="button" variant="ghost" size="sm" className="-ml-2 max-w-full justify-start text-left" onClick={() => setDetailId(brand.id)}>{brand.name}</Button>} /></TableCell>
  <TableCell><DiscoverySummary values={brand.categories.map(c => c.category.name)} limit={3} /></TableCell>
  <TableCell><DiscoverySummary values={brand.hashtags.map(h => `#${h.label.replace(/^#/, "")}`)} limit={2} /></TableCell>
  <TableCell><DiscoverySummary values={[...(brand.owner_vendor ? [`${brand.owner_vendor.name} (owner)`] : []), ...brand.suppliers.map((item) => item.vendor.name)]} limit={2} /></TableCell>
@@ -344,6 +358,29 @@ export function BrandDirectory({
           </TableBody>
         </DataTable>
       )}
+
+      {detail ? <Drawer open onOpenChange={(open) => { if (!open) setDetailId(null); }} title={detail.name} description={detail.deleted_at ? "Archived brand" : "Brand profile"} size="lg" footer={<>
+        <Button type="button" variant="ghost" onClick={() => setDetailId(null)}>Close</Button>
+        {canManage ? <Button type="button" variant="primary" onClick={() => { setDetailId(null); openEditDialog(detail); }}>Edit brand</Button> : null}
+      </>}>
+        <div className="grid gap-5">
+          <dl className="grid gap-4">
+            <div><dt className="text-sm text-ink-secondary">Owner supplier</dt><dd>{detail.owner_vendor?.name ?? "Not recorded"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Suppliers</dt><dd>{detail.suppliers.map((item) => item.vendor.name).join(", ") || "Not recorded"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Product categories</dt><dd>{detail.categories.map((item) => item.category.name).join(", ") || "Not recorded"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Hashtags</dt><dd>{detail.hashtags.map((tag) => tag.label).join(" · ") || "None"}</dd></div>
+          </dl>
+          <div className="grid gap-2"><Text weight="semibold">Supplier contacts</Text>{detail.contacts.length ? detail.contacts.map((contact) => <div key={contact.id} className="grid gap-1 border-b border-line-subtle pb-3">
+            <Text weight="semibold">{contact.person_name}{contact.job_title ? ` · ${contact.job_title}` : ""}</Text>
+            <Text size="sm" tone="secondary">{[detail.owner_vendor, ...detail.suppliers.map((item) => item.vendor)].find((vendor) => vendor?.id === contact.vendor_id)?.name ?? "Supplier"}</Text>
+            <PhoneLinks phones={[contact.phone, ...contact.extra_phones].filter((phone): phone is string => Boolean(phone))} keyPrefix={contact.id} />
+            {contact.email ? <a href={`mailto:${contact.email}`} className="break-all text-action underline">{contact.email}</a> : null}
+          </div>) : <Text tone="secondary">No contacts recorded.</Text>}</div>
+          <div className="grid gap-2"><Text weight="semibold">Catalogs &amp; links</Text>{detail.links.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="break-all text-action underline">{link.label || shortLinkLabel(link.kind)}</a>)}</div>
+          {detail.notes ? <div><Text weight="semibold">Notes</Text><Text as="p" className="whitespace-pre-wrap">{detail.notes}</Text></div> : null}
+          <a className="text-action underline" href={`/masterdata/pricing?brand=${detail.id}`}>View prices for this brand</a>
+        </div>
+      </Drawer> : null}
 
       {/* Create Brand Dialog */}
       <Dialog size="lg"
@@ -384,6 +421,7 @@ export function BrandDirectory({
           className="grid gap-4  pr-1"
         >
           {createError ? <div key={createError} ref={bringIntoView}><InlineError>{createError}</InlineError></div> : null}
+          {referenceNotice ? <Text role="status" size="sm" tone="secondary">{referenceNotice}</Text> : null}
           <Field label="Brand name" required>
             <Input name="name" textCase="title" required maxLength={64} placeholder="e.g. TACO, Blum, Hafele" autoFocus onChange={(e) => setCreateNameWarning(checkSimilarBrandName(e.target.value))} />
           </Field>
@@ -395,7 +433,17 @@ export function BrandDirectory({
           {createCategoryIds.map((id) => <input key={id} type="hidden" name="categoryIds" value={id} />)}
           {createSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
           <input type="hidden" name="hashtags" value={createHashtags.join(" ")} />
-          <Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
+<Tabs keepMounted label="Brand sections" items={[
+{ value: "profile", label: "Profile", content: (<div className="grid gap-4"><Field label="Hashtags" description="Search existing discovery tags or add a new one, such as #laminate or #finish.">
+            <CreatableMultiSelect label="Hashtags" options={buildBrandHashtagOptions(hashtagSuggestions, createHashtags)} value={createHashtags} onValueChange={setCreateHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
+          </Field>
+          <Field label="Product categories" description="Search a discovery category or create a missing one.">
+            <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={createCategoryIds} onValueChange={setCreateCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setCreateError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
+          </Field>
+          <Field label="Notes">
+            <SimpleTextEditor name="notes" placeholder="Additional specifications, authorized distributors, etc." rows={2} />
+          </Field></div>) },
+{ value: "suppliers", label: "Suppliers", content: (<div className="grid gap-4"><Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
             <CreatableSearch
               label="Owner supplier"
               options={ownerVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
@@ -406,20 +454,16 @@ export function BrandDirectory({
               createLabel={(name) => `Create owner supplier "${name}"`}
             />
           </Field>
-          <Field label="Hashtags" description="Search existing discovery tags or add a new one, such as #laminate or #finish.">
-            <CreatableMultiSelect label="Hashtags" options={buildBrandHashtagOptions(hashtagSuggestions, createHashtags)} value={createHashtags} onValueChange={setCreateHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
-          </Field>
-          <Field label="Product categories" description="Search a discovery category or create a missing one.">
-            <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={createCategoryIds} onValueChange={setCreateCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setCreateError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
-          </Field>
           <Field label="Suppliers" description="Organizations that supply this Brand. Managed here and shown read-only on Supplier.">
             <div className="grid gap-1.5">
               <CreatableMultiSelect label="Suppliers" options={materialVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={createSupplierIds} onValueChange={setCreateSupplierIds} placeholder="Select suppliers" />
               {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("createSupplier", "")}>+ Create new supplier for this brand</Button> : null}
             </div>
           </Field>
-          <BrandContactsEditor value={createContacts} onChange={setCreateContacts} vendorChoices={contactVendorChoices(createOwnerVendorId, createSupplierIds)} />
-          {/* Links builder */}
+          </div>) },
+{ value: "contacts", label: `Contacts (${createContacts.length})`, content: (<div className="grid gap-4"><BrandContactsEditor value={createContacts} onChange={setCreateContacts} vendorChoices={contactVendorChoices(createOwnerVendorId, createSupplierIds)} />
+          </div>) },
+{ value: "links", label: "Catalogs & links", content: (<div className="grid gap-4">{/* Links builder */}
           <div className="grid gap-2 border-t border-line pt-3">
             <Text size="sm" weight="semibold">External links (Catalogs, Website)</Text>
             {linksList.map((link, idx) => (
@@ -444,9 +488,8 @@ export function BrandDirectory({
             {linkError ? <InlineError>{linkError}</InlineError> : null}
           </div>
 
-          <Field label="Notes">
-            <SimpleTextEditor name="notes" placeholder="Additional specifications, authorized distributors, etc." rows={2} />
-          </Field>
+          </div>) },
+]} />
 
           <FormActions>
             <Button type="button" variant="ghost" onClick={() => void createDraftGuard.requestDiscard(() => setCreateOpen(false))}>
@@ -507,6 +550,7 @@ export function BrandDirectory({
             {editSupplierIds.map((id) => <input key={id} type="hidden" name="supplierIds" value={id} />)}
             <input type="hidden" name="hashtags" value={editHashtags.join(" ")} />
             {editError ? <div key={editError} ref={bringIntoView}><InlineError>{editError}{editErrorPrices ? <> <a href={editErrorPrices} className="underline">Show those prices</a></> : null}</InlineError></div> : null}
+            {referenceNotice ? <Text role="status" size="sm" tone="secondary">{referenceNotice}</Text> : null}
             <Field label="Brand name" required>
               <Input name="name" textCase="title" defaultValue={editTarget.name} required maxLength={64} autoFocus onChange={(e) => setEditNameWarning(checkSimilarBrandName(e.target.value, editTarget.id))} />
             </Field>
@@ -514,7 +558,17 @@ export function BrandDirectory({
               <Notice tone="warning">{editNameWarning}</Notice>
             ) : null}
             <input type="hidden" name="ownerVendorId" value={editOwnerVendorId} />
-          <Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
+<Tabs keepMounted label="Brand sections" items={[
+{ value: "profile", label: "Profile", content: (<div className="grid gap-4"><Field label="Hashtags" description="Search existing discovery tags or add a new one.">
+              <CreatableMultiSelect label="Hashtags" options={buildBrandHashtagOptions(hashtagSuggestions, editHashtags)} value={editHashtags} onValueChange={setEditHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
+            </Field>
+            <Field label="Product categories" description="Manual selections keep their own provenance.">
+              <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryIds} onValueChange={setEditCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setEditError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
+            </Field>
+            <Field label="Notes">
+              <SimpleTextEditor name="notes" defaultValue={editTarget.notes ?? ""} rows={2} />
+            </Field></div>) },
+{ value: "suppliers", label: "Suppliers", content: (<div className="grid gap-4"><Field label="Owner supplier" description="Optional registered manufacturer or brand owner supplier.">
               <CreatableSearch
                 label="Owner supplier"
                 options={ownerVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))}
@@ -525,20 +579,16 @@ export function BrandDirectory({
                 createLabel={(name) => `Create owner supplier "${name}"`}
               />
             </Field>
-            <Field label="Hashtags" description="Search existing discovery tags or add a new one.">
-              <CreatableMultiSelect label="Hashtags" options={buildBrandHashtagOptions(hashtagSuggestions, editHashtags)} value={editHashtags} onValueChange={setEditHashtags} onCreate={(tag) => tag.trim()} placeholder="Add hashtags" createLabel={(tag) => `Add hashtag "${tag}"`} />
-            </Field>
-            <Field label="Product categories" description="Manual selections keep their own provenance.">
-              <CreatableMultiSelect label="Product categories" options={categoryOptions.map((category) => ({ id: category.id, label: category.name }))} value={editCategoryIds} onValueChange={setEditCategoryIds} onCreate={canManageCategories ? (name) => createProductCategory(name, setEditError) : undefined} createLabel={(name) => `Create product category "${name}"`} />
-            </Field>
             <Field label="Suppliers" description="Organizations that supply this Brand. Changes are reflected read-only on Supplier.">
               <div className="grid gap-1.5">
                 <CreatableMultiSelect label="Suppliers" options={materialVendorOptions.map((vendor) => ({ id: vendor.id, label: vendor.name }))} value={editSupplierIds} onValueChange={setEditSupplierIds} placeholder="Select suppliers" />
                 {canManageVendors ? <Button type="button" size="sm" variant="ghost" className="justify-self-start" onClick={() => openVendorQuick("editSupplier", "")}>+ Create new supplier for this brand</Button> : null}
               </div>
             </Field>
-            <BrandContactsEditor value={editContacts} onChange={setEditContacts} vendorChoices={contactVendorChoices(editOwnerVendorId, editSupplierIds)} />
-            {/* Links builder */}
+            </div>) },
+{ value: "contacts", label: `Contacts (${editContacts.length})`, content: (<div className="grid gap-4"><BrandContactsEditor value={editContacts} onChange={setEditContacts} vendorChoices={contactVendorChoices(editOwnerVendorId, editSupplierIds)} />
+            </div>) },
+{ value: "links", label: "Catalogs & links", content: (<div className="grid gap-4">{/* Links builder */}
             <div className="grid gap-2 border-t border-line pt-3">
               <Text size="sm" weight="semibold">External links</Text>
               {linksList.map((link, idx) => (
@@ -563,9 +613,8 @@ export function BrandDirectory({
               {linkError ? <InlineError>{linkError}</InlineError> : null}
             </div>
 
-            <Field label="Notes">
-              <SimpleTextEditor name="notes" defaultValue={editTarget.notes ?? ""} rows={2} />
-            </Field>
+            </div>) },
+]} />
 
             {editTarget.updated_by_label ? (
               <p className="text-xs text-ink-tertiary px-0.5">

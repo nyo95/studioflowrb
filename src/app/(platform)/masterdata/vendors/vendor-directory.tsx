@@ -9,6 +9,8 @@ import { useDisplaySettings } from "@/platform/authenticated-shell/display-setti
 import { formatInstant } from "@platform/utilities/date";
 import {
   Checkbox,
+  TableFilters,
+  Drawer,
   DirectoryShell,
   Pagination,
   RowActionMenu,
@@ -261,6 +263,8 @@ export function VendorDirectory({
   canManageCategories: boolean;
 }) {
   const { options: categoryOptions, upsertOverlayOption: upsertCategoryOption } = useOptionOverlay(categories);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = vendors.find((vendor) => vendor.id === detailId) ?? null;
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DirectoryStatus>("ACTIVE");
   const [brandFilter, setBrandFilter] = useState("ALL");
@@ -473,27 +477,14 @@ export function VendorDirectory({
       ) : undefined}>
         <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search suppliers, brands, address, phone..." />
         <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
-        <div className="w-48">
-          <Select value={typeFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setTypeFilter(e.target.value)}>
-            <option value="ALL">All supplier types</option>
-            {vendorTypes.map((vt) => (
-              <option key={vt.id} value={vt.id}>
-                {vt.name}
-              </option>
-            ))}
-          </Select>
-        </div>
-        <Select value={productCategoryFilter} onChange={(e) => setProductCategoryFilter(e.target.value)}><option value="ALL">All product categories</option>{productCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select>
-        <Select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}><option value="ALL">All brands</option>{brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select>
-        <Select value={capabilityFilter} onChange={(e) => setCapabilityFilter(e.target.value)}><option value="ALL">Any capability</option><option value="MATERIAL">Material</option><option value="LABOR">Labor</option></Select>
+        <TableFilters resultLabel={`${filtered.length} of ${vendors.length} suppliers`} filters={[
+          { id: "type", label: "Supplier type", value: typeFilter, defaultValue: "ALL", onValueChange: setTypeFilter, options: [{ id: "ALL", label: "All supplier types" }, ...vendorTypes.map((type) => ({ id: type.id, label: type.name }))] },
+          { id: "product", label: "Brand product category", value: productCategoryFilter, defaultValue: "ALL", onValueChange: setProductCategoryFilter, options: [{ id: "ALL", label: "All product categories" }, ...productCategoryOptions.map((item) => ({ id: item.id, label: item.name }))] },
+          { id: "brand", label: "Brand", value: brandFilter, defaultValue: "ALL", onValueChange: setBrandFilter, options: [{ id: "ALL", label: "All brands" }, ...brands.map((item) => ({ id: item.id, label: item.name }))] },
+          { id: "capability", label: "Capability", value: capabilityFilter, defaultValue: "ALL", onValueChange: setCapabilityFilter, options: [{ id: "ALL", label: "Any capability" }, { id: "MATERIAL", label: "Material" }, { id: "LABOR", label: "Labor" }] },
+          { id: "category", label: "Supplier category", value: categoryFilter, defaultValue: "ALL", onValueChange: setCategoryFilter, options: [{ id: "ALL", label: "All categories" }, ...categoryOptions.map((item) => ({ id: item.id, label: `${item.name} · ${item.kind === "WORK" ? "Work" : "Product"}` }))] },
+        ]} />
         <FilterSummary filtered={Boolean(query) || statusFilter !== "ACTIVE" || typeFilter !== "ALL" || categoryFilter !== "ALL" || productCategoryFilter !== "ALL" || brandFilter !== "ALL" || capabilityFilter !== "ALL"} shown={filtered.length} total={vendors.length} onClear={() => { setQuery(""); setStatusFilter("ACTIVE"); setTypeFilter("ALL"); setCategoryFilter("ALL"); setProductCategoryFilter("ALL"); setBrandFilter("ALL"); setCapabilityFilter("ALL"); }} />
-        <div className="w-48">
-          <Select value={categoryFilter} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setCategoryFilter(e.target.value)}>
-            <option value="ALL">All categories</option>
-            <optgroup label="Work categories">{categoryOptions.filter((category) => category.kind === "WORK").map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</optgroup>
-            <optgroup label="Product categories">{categoryOptions.filter((category) => category.kind === "PRODUCT").map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</optgroup>
-          </Select>
-        </div>
       </TableToolbar>}>
 
 
@@ -511,9 +502,9 @@ export function VendorDirectory({
           <TableHeader>
             <TableRow>
               <TableHead>Supplier</TableHead>
+              <TableHead sortable sortDirection={sortKey === "Brands" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Brands"); setSortDirection(direction); }}>Brands</TableHead>
               <TableHead>Types &amp; Capabilities</TableHead>
               <TableHead>Categories</TableHead>
-              <TableHead sortable sortDirection={sortKey === "Brands" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Brands"); setSortDirection(direction); }}>Brands</TableHead>
               <TableHead>Contacts</TableHead>
               <TableHead align="end">Prices</TableHead>
               <TableHead>Updated</TableHead>
@@ -535,7 +526,7 @@ export function VendorDirectory({
                     <EntityPrimaryCell
                       tone={isArchived ? "danger" : "success"}
                       statusLabel={isArchived ? "Archived" : "Active"}
-                      name={vendor.name}
+                      name={<Button type="button" variant="ghost" size="sm" className="-ml-2 max-w-full justify-start text-left" onClick={() => setDetailId(vendor.id)}>{vendor.name}</Button>}
                       secondary={vendor.address ? <span className="text-xs text-ink-secondary">{vendor.address}</span> : undefined}
                     />
                   </TableCell>
@@ -604,6 +595,29 @@ export function VendorDirectory({
         </DataTable>
       )}
 
+      {detail ? <Drawer open onOpenChange={(open) => { if (!open) setDetailId(null); }} title={detail.name} description={detail.deleted_at ? "Archived supplier" : "Supplier profile"} size="lg" footer={<>
+        <Button type="button" variant="ghost" onClick={() => setDetailId(null)}>Close</Button>
+        {canManage ? <Button type="button" variant="primary" onClick={() => { setDetailId(null); openEditDialog(detail); }}>Edit supplier</Button> : null}
+      </>}>
+        <div className="grid gap-5">
+          <dl className="grid gap-4">
+            <div><dt className="text-sm text-ink-secondary">Legal name</dt><dd>{detail.legal_name || "Not recorded"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Address</dt><dd>{detail.address || "Not recorded"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Supplier types</dt><dd>{detail.types.map((item) => item.vendor_type.name).join(", ") || "Not recorded"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Brands supplied</dt><dd>{carriedBrandNames(detail.owned_brands, detail.brand_suppliers).join(", ") || "Not recorded"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Categories</dt><dd>{detail.categories.map((item) => item.category.name).join(", ") || "Not recorded"}</dd></div>
+          </dl>
+          <div className="grid gap-2"><Text weight="semibold">Contacts</Text>{detail.contacts.length ? detail.contacts.map((contact) => <div key={contact.id} className="grid gap-1 border-b border-line-subtle pb-3">
+            <Text weight="semibold">{contact.person_name}{contact.job_title ? ` · ${contact.job_title}` : ""}{contact.is_primary ? " · Primary" : ""}</Text>
+            <PhoneLinks phones={contactPhoneList(contact)} keyPrefix={contact.id} />
+            {contact.email ? <a href={`mailto:${contact.email}`} className="break-all text-action underline">{contact.email}</a> : null}
+            {contact.notes ? <Text size="sm" tone="secondary">{contact.notes}</Text> : null}
+          </div>) : <Text tone="secondary">No contacts recorded.</Text>}</div>
+          {detail.notes ? <div><Text weight="semibold">Notes</Text><Text as="p" className="whitespace-pre-wrap">{detail.notes}</Text></div> : null}
+          <a className="text-action underline" href={`/masterdata/pricing?supplier=${detail.id}`}>View prices from this supplier</a>
+        </div>
+      </Drawer> : null}
+
       {/* Create Vendor Dialog */}
       <Dialog size="lg"
         open={createOpen}
@@ -648,13 +662,20 @@ export function VendorDirectory({
           {createNameWarning ? (
             <Notice tone="warning">{createNameWarning}</Notice>
           ) : null}
-          <Field label="Legal entity name" description="Registered PT / CV name if applicable.">
+<Tabs keepMounted label="Supplier sections" items={[
+{ value: "profile", label: "Profile & types", content: (<div className="grid gap-4">          <Field label="Legal entity name" description="Registered PT / CV name if applicable.">
             <Input name="legalName" textCase="title" maxLength={128} placeholder="e.g. PT Mitra Kayu Nusantara" />
           </Field>
           <Field label="Supplier types" description="Search the controlled type vocabulary; assign role dimensions to grant pricing capabilities.">
             <CreatableMultiSelect label="Supplier types" options={vendorTypes.map((type) => ({ id: type.id, label: type.name, description: `${type.can_supply_material ? "Material" : ""}${type.can_supply_material && type.can_supply_labor ? " · " : ""}${type.can_supply_labor ? "Labor" : ""}` }))} value={createVendorTypeIds} onValueChange={setCreateVendorTypeIds} placeholder="Search supplier types" searchPlaceholder="Search supplier types…" />
+          </Field><Field label="Office / Workshop address">
+            <Input name="address" maxLength={256} placeholder="Address, City" />
           </Field>
-          <Field
+
+          <Field label="Notes">
+            <SimpleTextEditor name="notes" placeholder="Payment terms, workshop capacity, etc." rows={2} />
+          </Field></div>) },
+{ value: "catalog", label: "Brands & categories", content: (<div className="grid gap-4"><Field
             label="Brands supplied"
             description={
               createCanSupplyMaterial
@@ -678,11 +699,8 @@ export function VendorDirectory({
           <Field label="Product categories" description="The product lines this supplier sells, such as Flooring or Sanitary.">
             <CreatableMultiSelect label="Product categories" options={categoryOptions.filter((category) => category.kind === "PRODUCT").map((category) => ({ id: category.id, label: category.name }))} value={idsOfKind(createCategoryIds, "PRODUCT")} onValueChange={(next) => setCreateCategoryIds((current) => withKind(current, "PRODUCT", next))} onCreate={canManageCategories ? (name) => createCategory("PRODUCT", name, setCreateError) : undefined} createLabel={(name) => `Create product category "${name}"`} placeholder="Search product categories" searchPlaceholder="Search product categories…" />
           </Field>
-          <Field label="Office / Workshop address">
-            <Input name="address" maxLength={256} placeholder="Address, City" />
-          </Field>
-
-          <div className="grid gap-3 border-t border-line pt-3">
+          </div>) },
+{ value: "contacts", label: `Contacts (${contactsList.length})`, content: (<div className="grid gap-4"><div className="grid gap-3 border-t border-line pt-3">
             <div className="flex justify-between items-center">
               <Text size="sm" weight="semibold">Personnel &amp; Sales Contacts</Text>
               <Button type="button" size="sm" variant="secondary" onClick={addContactDraft}>
@@ -736,9 +754,8 @@ export function VendorDirectory({
             ))}
           </div>
 
-          <Field label="Notes">
-            <SimpleTextEditor name="notes" placeholder="Payment terms, workshop capacity, etc." rows={2} />
-          </Field>
+          </div>) }
+]} />
 
           <FormActions>
             <Button type="button" variant="ghost" onClick={() => void createDraftGuard.requestDiscard(() => setCreateOpen(false))}>

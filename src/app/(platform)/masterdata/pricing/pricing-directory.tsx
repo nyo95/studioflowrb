@@ -6,16 +6,16 @@ import { compareAmounts, groupPriceRows, isPriceOnRequest, matchesDirectoryStatu
 import { PhoneLinks } from "../phone-links";
 import { getPaginationSlice } from "@platform/utilities/pagination";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
+import { TableFilters,DirectoryShell,RowActionMenu,RowActionsCell,RowActionsHead } from "@/platform/ui_engine";
 
-import { Badge,Button,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,PrefixedInput,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar,PillTabPanels,Text,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
+import { Badge,Button,Combobox,Checkbox,ConfirmDialog,CreatableSearch,DataTable,Dialog,EmptyState,EntityPrimaryCell,Field,FormActions,IconButton,InlineError,Input,Pagination,PrefixedInput,SearchField,SectionCard,Select,SimpleTextEditor,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar,PillTabPanels,Text,useFormDraftGuard,useOptionOverlay,type SortDirection } from "@/platform/ui_engine";
 import { VendorQuickCreateDialog } from "../vendor-quick-create-dialog";
 import { blurDisplay, readTypedAmount, shouldShowAmountPrefix, storedAmountText } from "./amount-format";
 import { PriceMatrixDialog } from "./price-matrix-dialog";
 import { PriceEntryModes, type PriceEntry } from "./price-entry-modes";
 import { formatDecimal } from "@platform/utilities/decimal";
 import { createMoney,currencyPrefix,formatMoney } from "@platform/utilities/money";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2, X } from "lucide-react";
 import { useEffect,useRef,useState,useTransition,type FormEvent,type ReactNode } from "react";
 import { archivePriceAction,saveBulkWorkPricesAction,saveMaterialSkuPricesBulkAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
@@ -81,7 +81,7 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
   const changeSort = (key: PriceSortKey) => (direction: SortDirection) => { setSort({ key, direction }); setPage(1); };
   const sortableHead = (key: PriceSortKey, label: string, align: "start" | "end" = "start") => <TableHead align={align} sortable sortDirection={sort.key === key ? sort.direction : null} onSortChange={changeSort(key)} sortLabel={(direction) => `${label}, sort ${direction}`}>{label}</TableHead>;
   const pagination = (currentPage: number, pageCount: number) => pageCount > 1 ? <Pagination page={currentPage} pageCount={pageCount} onPageChange={setPage} label="Pricing pages" /> : null;
-  const filtersActive = Boolean(query) || status !== "ACTIVE" || supplierFilter !== "ALL" || brandFilter !== "ALL" || productCategoryFilter !== "ALL" || workCategoryFilter !== "ALL";
+  const filtersActive = Boolean(query) || status !== "ACTIVE" || supplierFilter !== "ALL" || (tab === "material" ? brandFilter !== "ALL" || productCategoryFilter !== "ALL" : workCategoryFilter !== "ALL");
   const clearFilters = () => { setQuery(""); setStatus("ACTIVE"); setSupplierFilter("ALL"); setBrandFilter("ALL"); setProductCategoryFilter("ALL"); setWorkCategoryFilter("ALL"); setPage(1); };
   const resetPage = <T,>(setter: (value: T) => void) => (value: T) => { setter(value); setPage(1); };
   const toolbarFor = (kind: Kind, shown: number, total: number) => (
@@ -89,15 +89,15 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
       <div className="flex flex-wrap items-center gap-2">
       <SearchField value={query} onChange={(event) => { setQuery(event.target.value); setPage(1); }} onClear={() => { setQuery(""); setPage(1); }} placeholder={kind === "material" ? "Search SKU, code, brand, category, supplier..." : "Search item, category, supplier..."} />
       <StatusFilterSelect value={status} onChange={resetPage(setStatus)} />
-      <div className="w-44"><Select aria-label="Supplier" value={supplierFilter} onChange={(event) => resetPage(setSupplierFilter)(event.target.value)}><option value="ALL">All suppliers</option>{props.vendors.map((vendor) => <option key={vendor.id} value={vendor.id}>{vendor.name}</option>)}</Select></div>
-      {kind === "material" ? (
-        <>
-          <div className="w-44"><Select aria-label="Brand" value={brandFilter} onChange={(event) => resetPage(setBrandFilter)(event.target.value)}><option value="ALL">All brands</option>{props.brands.map((brand) => <option key={brand.id} value={brand.id}>{brand.name}</option>)}</Select></div>
-          <div className="w-44"><Select aria-label="Product category" value={productCategoryFilter} onChange={(event) => resetPage(setProductCategoryFilter)(event.target.value)}><option value="ALL">All product categories</option>{props.productCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></div>
-        </>
-      ) : (
-        <div className="w-44"><Select aria-label="Work category" value={workCategoryFilter} onChange={(event) => resetPage(setWorkCategoryFilter)(event.target.value)}><option value="ALL">All work categories</option>{props.workCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></div>
-      )}
+      <TableFilters resultLabel={`${shown} of ${total} prices`} filters={[
+        { id: "supplier", label: "Supplier", value: supplierFilter, defaultValue: "ALL", onValueChange: resetPage(setSupplierFilter), options: [{ id: "ALL", label: "All suppliers" }, ...props.vendors.map((item) => ({ id: item.id, label: item.name }))] },
+        ...(kind === "material" ? [
+          { id: "brand", label: "Brand", value: brandFilter, defaultValue: "ALL", onValueChange: resetPage(setBrandFilter), options: [{ id: "ALL", label: "All brands" }, ...props.brands.map((item) => ({ id: item.id, label: item.name }))] },
+          { id: "product", label: "Product category", value: productCategoryFilter, defaultValue: "ALL", onValueChange: resetPage(setProductCategoryFilter), options: [{ id: "ALL", label: "All product categories" }, ...props.productCategories.map((item) => ({ id: item.id, label: item.name }))] },
+        ] : [
+          { id: "work", label: "Work category", value: workCategoryFilter, defaultValue: "ALL", onValueChange: resetPage(setWorkCategoryFilter), options: [{ id: "ALL", label: "All work categories" }, ...props.workCategories.map((item) => ({ id: item.id, label: item.name }))] },
+        ]),
+      ]} />
       <Checkbox label="Group by item" checked={groupByItem} onCheckedChange={(checked) => { setGroupByItem(Boolean(checked)); setPage(1); }} />
       <FilterSummary filtered={filtersActive} shown={shown} total={total} onClear={clearFilters} />
       </div>
@@ -230,7 +230,7 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
 type BulkRow = { key: number; name: string; unitId: string; amountDisplay: string; amount: string; notes: string; scopeNote: string };
 type BulkRowProblem = { rowIndex: number; message: string };
 /** A SKU typed in a row that does not exist yet (WO-MD-SKUBULK-01): saved with its first price in the same submit. */
-type NewSkuDraft = { name: string; categoryId: string; size: string };
+type NewSkuDraft = { brandId: string; name: string; categoryId: string; size: string };
 type MaterialBulkRow = { key: number; skuId: string; newSku: NewSkuDraft | null; vendorId: string; unitId: string; amountDisplay: string; amount: string; notes: string };
 function emptyMaterialRow(key: number, vendorId: string): MaterialBulkRow { return { key, skuId: "", newSku: null, vendorId, unitId: "", amountDisplay: "", amount: "", notes: "" }; }
 /** "1220 × 2440 × 0.7" → length, width, thickness (decimal comma accepted). */
@@ -270,6 +270,7 @@ function SkuMeasurementSummary({ sku }: { sku: SkuRef }) {
 }
 
 function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, onSwitch }: { pending: boolean; editor: Editor; refs: PriceEditorRefs; error: string | null; onCancel: () => void; onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>; modes?: (onChange: (next: PriceEntry) => void) => ReactNode; onSwitch: (next: PriceEntry) => void }) {
+  const router = useRouter();
   const edit = Boolean(editor.row);
   const material = editor.kind === "material";
   const row = editor.row;
@@ -284,6 +285,8 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   const currency = row?.currency ?? "IDR";
   const [amount, setAmount] = useState(row ? storedAmountText(row.amount, row.amount_label) : "");
   const [amountDisplay, setAmountDisplay] = useState(row ? blurDisplay(storedAmountText(row.amount, row.amount_label)) : "");
+  const [referenceNotice, setReferenceNotice] = useState<string | null>(null);
+  const [quickRowKey, setQuickRowKey] = useState<number | null>(null);
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickName, setQuickName] = useState("");
   const [quickVendorTypeId, setQuickVendorTypeId] = useState("");
@@ -311,6 +314,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
       if (result.ok) {
         upsertBrandOption({ id: result.data.brandId, name: result.data.name });
         setMaterialBrandFilter(result.data.brandId);
+        setReferenceNotice(`Brand “${result.data.name}” created. It remains in the catalog even if you cancel these prices.`);
         return result.data.brandId;
       }
       failureMessage = result.error.safeMessage;
@@ -343,23 +347,29 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   };
 
   const addVendor = async () => {
+    if (quickPending) return;
     setQuickError(null);
     setQuickPending(true);
-    const data = new FormData();
-    data.set("name", quickName);
-    data.set("vendorTypeId", quickVendorTypeId);
-    const result = await createPricingVendorQuickAction(editor.kind, data);
-    setQuickPending(false);
-    if (result.ok === false) {
-      setQuickError(result.error.safeMessage);
-      return;
+    try {
+      const data = new FormData();
+      data.set("name", quickName);
+      data.set("vendorTypeId", quickVendorTypeId);
+      const result = await createPricingVendorQuickAction(editor.kind, data);
+      if (!result.ok) { setQuickError(result.error.safeMessage); return; }
+      const name = quickName.trim();
+      upsertOverlayOption({ id: result.data.vendorId, name });
+      if (quickRowKey !== null) patchMRow(quickRowKey, { vendorId: result.data.vendorId });
+      else setVendorId(result.data.vendorId);
+      setReferenceNotice(`Supplier “${name}” created and selected. It remains in the directory even if you cancel these prices.`);
+      setQuickName("");
+      setQuickVendorTypeId("");
+      setQuickRowKey(null);
+      setQuickOpen(false);
+    } catch {
+      setQuickError("The supplier could not be created. Please try again.");
+    } finally {
+      setQuickPending(false);
     }
-    const name = quickName.trim();
-    upsertOverlayOption({ id: result.data.vendorId, name });
-    setVendorId(result.data.vendorId);
-    setQuickName("");
-    setQuickVendorTypeId("");
-    setQuickOpen(false);
   };
 
   const createWorkCategory = async (name: string) => {
@@ -404,7 +414,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           placeholder="Search or select supplier"
           searchPlaceholder="Search supplier…"
           emptyLabel="No supplier matches this search."
-          onCreate={refs.canManageVendors ? (name) => { setQuickName(name); setQuickOpen(true); return ""; } : undefined}
+          onCreate={refs.canManageVendors ? (name) => { setQuickRowKey(null); setQuickName(name); setQuickOpen(true); return ""; } : undefined}
           createLabel={(name) => `Add “${name}” as a new supplier`}
           className="w-full"
         />
@@ -545,8 +555,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           return {
             kind: "new" as const,
             name: entry.newSku.name.trim(),
-            // The brand is the one chosen above the table; no brand when it is on All brands.
-            brandId: filterBrand?.id ?? null,
+            brandId: entry.newSku.brandId || null,
             unitId: entry.unitId,
             dimensionLength: shape.length,
             dimensionWidth: shape.width,
@@ -683,7 +692,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
 
   const materialTable = bulkMaterial ? (
     <div className="grid gap-3">
-      <Field label="Brand" description="Narrows the SKU list to one brand, so a code such as TH001AA is clear. Leave on All brands to search everything.">
+      <Field label="Find SKUs by brand" description="Narrow the search for existing SKUs. Each new SKU shows its own Brand below.">
         <CreatableSearch
           label="Brand"
           options={[{ id: "ALL", label: "All brands" }, ...brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))]}
@@ -712,7 +721,8 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
           const draft = entry.newSku;
           const sku = draft ? undefined : refs.skus.find((candidate) => candidate.id === entry.skuId);
           const shape = draft ? newSkuShape(draft) : null;
-          const unlinked = Boolean(sku?.brand && entry.vendorId && !brandsOfVendor(entry.vendorId).includes(sku.brand.id));
+          const rowBrandId = draft?.brandId || sku?.brand?.id;
+          const unlinked = Boolean(rowBrandId && entry.vendorId && !brandsOfVendor(entry.vendorId).includes(rowBrandId));
           const match = existingMatch[entry.key] ? refs.skus.find((candidate) => candidate.id === existingMatch[entry.key]) : undefined;
           return (
             <div key={entry.key} className="grid gap-1">
@@ -728,7 +738,7 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
                     options={skuOptionsForTable}
                     value={entry.skuId}
                     onValueChange={(value) => patchMRow(entry.key, { skuId: value })}
-                    onCreate={refs.canManageSkus ? (name) => { patchMRow(entry.key, { skuId: "", newSku: { name, categoryId: newSkuCategoryId, size: "" } }); return ""; } : undefined}
+                    onCreate={refs.canManageSkus ? (name) => { patchMRow(entry.key, { skuId: "", newSku: { name, brandId: filterBrand?.id ?? "", categoryId: newSkuCategoryId, size: "" } }); return ""; } : undefined}
                     createLabel={(name) => `Create SKU “${name}”`}
                     placeholder="Search SKU name, code, or brand"
                     searchPlaceholder="Search SKU name, code, or brand…"
@@ -741,14 +751,14 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
                   options={supplierOptionsFor(sku)}
                   value={entry.vendorId}
                   onValueChange={(value) => patchMRow(entry.key, { vendorId: value })}
-                  onCreate={refs.canManageVendors ? (name) => { setQuickName(name); setQuickOpen(true); return ""; } : undefined}
+                  onCreate={refs.canManageVendors ? (name) => { setQuickRowKey(entry.key); setQuickName(name); setQuickError(null); setQuickOpen(true); return ""; } : undefined}
                   createLabel={(name) => `Add “${name}” as a new supplier`}
                   placeholder="Supplier"
                   searchPlaceholder="Search supplier…"
                   emptyLabel="No supplier matches this search."
                   className="w-full"
                 />
-                <Select aria-label={`Purchase unit, row ${index + 1}`} value={entry.unitId} onChange={(event) => patchMRow(entry.key, { unitId: event.target.value })} required>
+                <Select aria-label={`Purchase unit, row ${index + 1}`} value={entry.unitId} onChange={(event) => patchMRow(entry.key, { unitId: event.target.value })}>
                   <option value="">Unit</option>
                   {refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.code}</option>)}
                 </Select>
@@ -778,8 +788,9 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
                     className="w-full"
                   />
                   <Input aria-label={`Size of the new SKU, row ${index + 1} (optional)`} density="compact" inputMode="text" autoComplete="off" placeholder="Size, optional: 1220 × 2440 × 0.7" value={draft.size} onChange={(event) => patchMRow(entry.key, { newSku: { ...draft, size: event.target.value } })} />
+                  <div className="sm:col-span-3"><Combobox label={`Brand of the new SKU, row ${index + 1}`} options={[{ id: "", label: "No brand" }, ...brandOptions.map((brand) => ({ id: brand.id, label: brand.name }))]} value={draft.brandId} onValueChange={(brandId) => patchMRow(entry.key, { newSku: { ...draft, brandId } })} placeholder="No brand" searchPlaceholder="Search brands…" /></div>
                   <div className="text-xs text-ink-secondary sm:col-span-3">
-                    {filterBrand ? `Brand ${filterBrand.name} (from the filter above). ` : "No brand: choose a brand above the table to give it one. "}
+                    {draft.brandId ? `Brand: ${brandOptions.find((brand) => brand.id === draft.brandId)?.name ?? "Selected"}. ` : "This SKU will be created without a Brand. "}
                     {draft.size.trim() ? shape.valid ? "Size is SKU information only (mm); it does not convert the supplier's price." : <span className="text-danger">Write the size as length × width in mm, e.g. 1220 × 2440.</span> : "Size is optional. Choose the supplier's purchase unit in the price row."}
                   </div>
                   {productCategoryCreateError ? <InlineError>{productCategoryCreateError}</InlineError> : null}
@@ -815,10 +826,11 @@ function PriceEditor({ pending, editor, refs, error, onCancel, onSubmit, modes, 
   });
 
   return <>
-    <Dialog open size={anyBulk ? "xl" : "md"} dismissible={!pending && !bulkPending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={edit ? `Edit ${priceLabel}` : "New price"} description={material && edit ? "SKU and supplier identity are read-only." : edit ? "Choose only active and eligible catalog references." : material ? "One row per SKU and supplier, saved together." : "One supplier and category, one row per item, saved together."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={anyBulk ? submitBulk : onSubmit}>
+    <Dialog open size={anyBulk ? "xl" : "md"} dismissible={!pending && !bulkPending} onOpenChange={(open) => !open && !pending && void draftGuard.requestDiscard(onCancel)} title={material && edit ? `Edit price · ${materialRow!.sku.name ?? materialRow!.sku.code ?? "SKU"}` : edit ? `Edit ${priceLabel}` : "New price"} description={material && edit ? "SKU and supplier identity are read-only." : edit ? "Choose only active and eligible catalog references." : material ? "One row per SKU and supplier, saved together." : "One supplier and category, one row per item, saved together."}><form ref={formRef} onChange={draftGuard.onFormChange} className="grid gap-4" onSubmit={anyBulk ? submitBulk : onSubmit}>
       {modes ? modes((next) => void draftGuard.requestDiscard(() => onSwitch(next))) : null}
+      {referenceNotice ? <Text role="status" size="sm" tone="secondary">{referenceNotice}</Text> : null}
       {edit && <input type="hidden" name="id" value={row!.id} />}{error && <div role="alert" className="text-sm text-danger">{error}</div>}
-      {material ? (edit ? <><Field label="SKU"><Input value={materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"} readOnly /></Field><Field label="Supplier"><Input value={materialRow!.supplier_vendor.name} readOnly /></Field><Field label="Purchase unit" description="This supplier's quoted unit; changing it does not change the SKU or other suppliers' prices." required><Select name="unitId" defaultValue={materialRow!.unit.id} required>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{refs.canManageSkus ? <div><Link href={`/masterdata/skus?edit=${materialRow!.sku.id}`} className="text-sm text-accent underline">Edit SKU dimensions</Link></div> : null}</> : <>{materialTable}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
+      {material ? (edit ? <><div className="grid gap-2 rounded-control border border-line bg-surface-muted p-3"><Text weight="semibold">{materialRow!.sku.name ?? materialRow!.sku.code ?? "Unnamed SKU"}</Text><Text size="sm" tone="secondary">{[materialRow!.sku.code, materialRow!.sku.brand?.name, materialRow!.sku.size].filter(Boolean).join(" · ") || "SKU profile"}</Text><Text size="sm">Supplier: {materialRow!.supplier_vendor.name}</Text></div><Field label="Purchase unit" description="This supplier's quoted unit; changing it does not change the SKU or other suppliers' prices." required><Select name="unitId" defaultValue={materialRow!.unit.id} required>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{refs.canManageSkus ? <div><Button type="button" variant="ghost" size="sm" onClick={() => void draftGuard.requestDiscard(() => router.push(`/masterdata/skus?edit=${materialRow!.sku.id}`))}>Edit SKU profile</Button></div> : null}</> : <>{materialTable}</>) : bulk ? <>{vendorField}{categoryField}{bulkTable}</> : <><Field label="Name" required><Input name="name" textCase="title" defaultValue={workRow?.name} required /></Field>{edit ? <input type="hidden" name="vendorId" value={vendorId} required /> : vendorField}{categoryField}<Field label="Unit" required><Select name="unitId" defaultValue={workRow?.unit.id ?? ""} required><option value="">Select unit</option>{refs.units.map((unit) => <option key={unit.id} value={unit.id}>{unit.name} ({unit.code})</option>)}</Select></Field>{editor.kind === "material-labor" && <Field label="Scope note" description="Describe included work or materials. Use bullets for a clear scope."><SimpleTextEditor name="scopeNote" defaultValue={workRow?.scope_note ?? ""} placeholder={"Example:\n- Installation labor\n- Adhesive and grout"} maxLength={1000} rows={5} /></Field>}</>}
       {!anyBulk && <><input type="hidden" name="amount" value={amount} /><input type="hidden" name="currency" value={currency} />
       <Field label="Amount" description={`${currency} default currency. Use quotation marks for text, e.g. "call sales".`} required><PrefixedInput prefix={currencyPrefix(currency)} prefixVisible={shouldShowAmountPrefix(amount, amountDisplay)} aria-label="Amount" value={amountDisplay} onChange={(event) => updateAmount(event.target.value)} onBlur={() => setAmountDisplay(blurDisplay(amount))} inputMode="text" placeholder={`15.000 or "call sales"`} className="tabular-nums" required /></Field><Field label="Notes"><SimpleTextEditor name="notes" defaultValue={row?.notes ?? ""} placeholder="Additional pricing context..." maxLength={1000} rows={3} /></Field></>}{anyBulk && bulkError ? <div role="alert" className="text-sm text-danger">{bulkError}</div> : null}<FormActions><Button type="button" variant="ghost" disabled={pending} onClick={() => void draftGuard.requestDiscard(onCancel)}>Cancel</Button><Button type="submit" variant="primary" pending={pending || bulkPending}>{edit ? "Save changes" : anyBulk ? `Create ${filledCount || ""} ${filledCount === 1 ? "price" : "prices"}`.replace("  ", " ") : "Create price"}</Button></FormActions>
     </form></Dialog>

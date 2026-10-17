@@ -1,9 +1,9 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { useState, type ClipboardEvent, type FormEvent, type ReactNode } from "react";
+import { useRef, useState, type ClipboardEvent, type FormEvent, type ReactNode } from "react";
 
-import { Button, ConfirmDialog, CreatableMultiSelect, CreatableSearch, Dialog, Field, FormActions, IconButton, InlineError, Input, PrefixedInput, Select, Text } from "@/platform/ui_engine";
+import { Button, CreatableMultiSelect, CreatableSearch, Dialog, Field, FormActions, IconButton, InlineError, Input, PrefixedInput, Select, Text, useFormDraftGuard } from "@/platform/ui_engine";
 import { currencyPrefix } from "@platform/utilities/money";
 
 import { blurDisplay, parsePastedAmount, readTypedAmount, shouldShowAmountPrefix } from "./amount-format";
@@ -29,7 +29,6 @@ function emptyRow(key: number, unitId: string): MatrixRow {
  * columns are Name, Specification (goes to notes), then one amount per chosen supplier in the order shown.
  */
 export function PriceMatrixDialog({ kind, modes, onSwitch, vendors, categories, units, onClose }: { kind: "labor" | "material-labor"; modes: (onChange: (next: PriceEntry) => void) => ReactNode; onSwitch: (next: PriceEntry) => void; vendors: Ref[]; categories: Ref[]; units: Array<Ref & { code: string }>; onClose: () => void }) {
-  const [pendingSwitch, setPendingSwitch] = useState<PriceEntry | null>(null);
   const [categoryId, setCategoryId] = useState("");
   const [vendorIds, setVendorIds] = useState<string[]>([]);
   const [keyCounter, setKeyCounter] = useState(1);
@@ -47,7 +46,10 @@ export function PriceMatrixDialog({ kind, modes, onSwitch, vendors, categories, 
   const removeRow = (key: number) => setRows((current) => current.length === 1 ? [emptyRow(keyCounter, current[0]?.unitId ?? defaultUnit)] : current.filter((row) => row.key !== key));
   const isFilled = (row: MatrixRow) => row.name.trim() !== "" || chosen.some((vendor) => (row.cells[vendor.id]?.value ?? "") !== "");
   const filled = rows.filter(isFilled);
-  const requestSwitch = (next: PriceEntry) => { if (filled.length > 0 || vendorIds.length > 0 || categoryId) setPendingSwitch(next); else onSwitch(next); };
+  const formRef = useRef<HTMLFormElement>(null);
+  const draftGuard = useFormDraftGuard({ formRef, resetKey: kind, watchedValue: JSON.stringify([categoryId, vendorIds, rows]), title: "Discard this price draft?", description: "The suppliers and amounts entered here have not been saved." });
+  const requestSwitch = (next: PriceEntry) => { if (!pending) void draftGuard.requestDiscard(() => onSwitch(next)); };
+  const requestClose = () => { if (!pending) void draftGuard.requestDiscard(onClose); };
   const priceCount = filled.reduce((total, row) => total + chosen.filter((vendor) => (row.cells[vendor.id]?.value ?? "") !== "").length, 0);
 
   const onPaste = (event: ClipboardEvent<HTMLDivElement>) => {
@@ -138,8 +140,8 @@ export function PriceMatrixDialog({ kind, modes, onSwitch, vendors, categories, 
   const columns = `minmax(10rem,2fr) 6rem ${chosen.map(() => "minmax(7.5rem,1fr)").join(" ")} minmax(8rem,1.4fr) 2rem`;
 
   return (
-    <Dialog open size="full" dismissible={!pending} onOpenChange={(open) => { if (!open && !pending) onClose(); }} title="New price" description="Several suppliers: one item per row and one amount per supplier. Leave a cell blank when that supplier has no price.">
-      <form className="grid gap-4" onSubmit={submit}>
+    <><Dialog open size="full" dismissible={!pending} onOpenChange={(open) => { if (!open) requestClose(); }} title="New price" description="Several suppliers: one item per row and one amount per supplier. Leave a cell blank when that supplier has no price.">
+      <form ref={formRef} className="grid gap-4" onChange={draftGuard.onFormChange} onSubmit={submit}>
         {modes(requestSwitch)}
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
           <Field label="Pricing category" required>
@@ -188,19 +190,10 @@ export function PriceMatrixDialog({ kind, modes, onSwitch, vendors, categories, 
 
         {error ? <InlineError>{error}</InlineError> : null}
         <FormActions>
-          <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>Cancel</Button>
+          <Button type="button" variant="ghost" disabled={pending} onClick={requestClose}>Cancel</Button>
           <Button type="submit" variant="primary" pending={pending}>{priceCount > 0 ? `Create ${priceCount} ${priceCount === 1 ? "price" : "prices"}` : "Create prices"}</Button>
         </FormActions>
       </form>
-      <ConfirmDialog
-        open={pendingSwitch !== null}
-        onOpenChange={(open) => { if (!open) setPendingSwitch(null); }}
-        title="Discard this price draft?"
-        description="The suppliers and amounts entered here have not been saved."
-        confirmLabel="Discard"
-        tone="danger"
-        onConfirm={() => { const next = pendingSwitch; setPendingSwitch(null); if (next) onSwitch(next); }}
-      />
-    </Dialog>
+    </Dialog>{draftGuard.confirmDialog}</>
   );
 }

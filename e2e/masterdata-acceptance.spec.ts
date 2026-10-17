@@ -29,7 +29,9 @@ async function openBrandEditor(page: Page, brand: string) {
   await expect(page.getByText(brand, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: `Actions for ${brand}` }).click();
   await page.getByRole("menuitem", { name: "Edit" }).click();
-  return page.getByRole("dialog", { name: `Edit brand ${brand}` });
+  const dialog = page.getByRole("dialog", { name: `Edit brand ${brand}` });
+  await dialog.getByRole("tab", { name: "Suppliers", exact: true }).click();
+  return dialog;
 }
 
 test.beforeAll(() => mkdirSync(SHOTS, { recursive: true }));
@@ -49,7 +51,8 @@ test("2.1 material price links a new supplier to the Brand", async ({ page }) =>
   await expect(page.getByText("ZZ-Test Brand", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Actions for ZZ-Test Brand" }).click();
   await page.getByRole("menuitem", { name: "Edit" }).click();
-  await expect(page.getByLabel("Suppliers")).toContainText("ZZ-Test Mat B");
+  await page.getByRole("dialog", { name: "Edit brand ZZ-Test Brand" }).getByRole("tab", { name: "Suppliers", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Suppliers", exact: true })).toContainText("ZZ-Test Mat B");
 });
 
 test("2.3 quoted text material amount saves as text", async ({ page }) => {
@@ -101,9 +104,8 @@ test("2.5 removing a Brand supplier with live prices is refused and links to fil
   await expect(showPrices).toBeVisible();
   await showPrices.click();
   await expect(page).toHaveURL(/\/masterdata\/pricing\?supplier=.*&brand=.*/);
-  const filteredUrl = new URL(page.url());
-  await expect(page.getByRole("combobox", { name: "Supplier" })).toHaveValue(filteredUrl.searchParams.get("supplier")!);
-  await expect(page.getByRole("combobox", { name: "Brand" })).toHaveValue(filteredUrl.searchParams.get("brand")!);
+  await expect(page.getByRole("button", { name: "Remove Supplier filter" })).toContainText("ZZ-Test Mat B");
+  await expect(page.getByRole("button", { name: "Remove Brand filter" })).toContainText("ZZ-Test Guard Brand");
   await expect(page.getByText("ZZ-Test Guard SKU", { exact: true })).toBeVisible();
 });
 
@@ -246,6 +248,7 @@ test("4.1 duplicate Brand link and hashtag input normalizes on save", async ({ p
   await page.keyboard.press("Enter");
   await page.keyboard.press("Escape");
   const brandDialog = page.getByRole("dialog", { name: "Create catalog brand" });
+  await brandDialog.getByRole("tab", { name: "Catalogs & links", exact: true }).click();
   await brandDialog.getByPlaceholder("example.com or https://...").fill("https://example.test/zz");
   await brandDialog.getByRole("button", { name: "Add", exact: true }).click();
   await brandDialog.getByPlaceholder("example.com or https://...").fill("https://example.test/zz");

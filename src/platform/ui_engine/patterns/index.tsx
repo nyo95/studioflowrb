@@ -21,3 +21,4 @@ export * from "./print-format";
 export * from "./print-format-values";
 export * from "./pill-tabs";
 export * from "./guided-tour";
+export * from "./table-filters";

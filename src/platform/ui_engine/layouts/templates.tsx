@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs as RTabs } from "radix-ui";
-import type { HTMLAttributes, ReactNode } from "react";
+import { useState, type HTMLAttributes, type ReactNode } from "react";
 
 import { cx } from "../internal/cx";
 
@@ -98,10 +98,21 @@ export type TabsProps = {
   className?: string;
 };
 
-export function Tabs({ items, label = "Sections", distribution = "scroll", className, defaultValue, actions, keepMounted = false, fill = false, ...props }: TabsProps) {
+export function Tabs({ items, label = "Sections", distribution = "scroll", className, defaultValue, value, onValueChange, actions, keepMounted = false, fill = false }: TabsProps) {
   const fallbackValue = items.find((item) => !item.disabled)?.value;
+  const [localValue, setLocalValue] = useState(defaultValue ?? fallbackValue);
+  const select = (next: string) => { setLocalValue(next); onValueChange?.(next); };
   return (
-    <RTabs.Root className={cx("min-w-0", fill && "flex min-h-0 flex-1 flex-col", className)} defaultValue={defaultValue ?? fallbackValue} {...props}>
+    <RTabs.Root className={cx("min-w-0", fill && "flex min-h-0 flex-1 flex-col", className)} value={value ?? localValue} onValueChange={select} onInvalidCapture={(event) => {
+      const control = event.target;
+      if (!keepMounted || !(control instanceof HTMLInputElement || control instanceof HTMLSelectElement || control instanceof HTMLTextAreaElement)) return;
+      const panel = control.closest<HTMLElement>("[role=tabpanel]");
+      const section = panel?.dataset.tabValue;
+      if (!section || panel?.dataset.state !== "inactive") return;
+      event.preventDefault();
+      select(section);
+      window.requestAnimationFrame(() => { control.focus(); control.reportValidity(); });
+    }}>
       <div className="flex min-w-0 items-center border-b border-line">
         <RTabs.List
           className={cx(
@@ -131,7 +142,7 @@ export function Tabs({ items, label = "Sections", distribution = "scroll", class
         ) : null}
       </div>
       {items.map((item) => (
-        <RTabs.Content className={cx("pt-4", fill && "min-h-0 flex-1 data-[state=active]:flex data-[state=active]:flex-col")} value={item.value} key={item.value} forceMount={keepMounted || undefined}>
+        <RTabs.Content data-tab-value={item.value} className={cx("pt-4 data-[state=inactive]:hidden", fill && "min-h-0 flex-1 data-[state=active]:flex data-[state=active]:flex-col")} value={item.value} key={item.value} forceMount={keepMounted || undefined}>
           {item.content}
         </RTabs.Content>
       ))}

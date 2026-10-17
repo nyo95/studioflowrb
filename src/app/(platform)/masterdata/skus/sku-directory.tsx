@@ -3,7 +3,7 @@ import { FilterSummary, StatusFilterSelect } from "../directory-filters";
 import { RequestDeletionDialog } from "../request-deletion-dialog";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { isPriceOnRequest, lowestPricesByCurrencyUnit, matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
-import { DirectoryShell,DraftDialog,EntityPrimaryCell,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
+import { TableFilters,Drawer,DirectoryShell,DraftDialog,EntityPrimaryCell,Pagination,RowActionMenu,Text,usePagination } from "@/platform/ui_engine";
 
 
 import { useState } from "react";
@@ -61,6 +61,8 @@ export function SkuDirectory({
   canManage: boolean;
   initialEditId?: string;
 }) {
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = skus.find((sku) => sku.id === detailId) ?? null;
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<DirectoryStatus>("ACTIVE");
   const [priceFilter, setPriceFilter] = useState("ALL");
@@ -125,13 +127,13 @@ export function SkuDirectory({
         <div className="flex flex-wrap items-center gap-3">
           <SearchField value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} onClear={() => setQuery("")} placeholder="Search SKUs by name, code, brand..." />
           <StatusFilterSelect value={statusFilter} onChange={setStatusFilter} />
-          <div className="w-52">
-            <Combobox label="Brand filter" options={[{ id: "ALL", label: "All brands" }, ...brands.map((brand) => ({ id: brand.id, label: brand.name }))]} value={brandFilter} onValueChange={setBrandFilter} placeholder="All brands" searchPlaceholder="Search brands…" />
-          </div>
-          <div className="w-52">
-            <Combobox label="Product category filter" options={[{ id: "ALL", label: "All categories" }, ...productCategories.map((category) => ({ id: category.id, label: category.name }))]} value={categoryFilter} onValueChange={setCategoryFilter} placeholder="All categories" searchPlaceholder="Search product categories…" />
-          </div>
-          <Select value={priceFilter} onChange={(event) => setPriceFilter(event.target.value)}><option value="ALL">Any price</option><option value="YES">Has price</option><option value="NO">No price</option></Select><Select value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)}><option value="ALL">Any priced supplier</option>{[...new Map(skus.flatMap((sku) => sku.material_prices.map((price) => [price.supplier_vendor.id, price.supplier_vendor] as const))).values()].map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</Select><FilterSummary filtered={Boolean(query) || statusFilter !== "ACTIVE" || brandFilter !== "ALL" || categoryFilter !== "ALL" || priceFilter !== "ALL" || supplierFilter !== "ALL"} shown={filtered.length} total={skus.length} onClear={() => { setQuery(""); setStatusFilter("ACTIVE"); setBrandFilter("ALL"); setCategoryFilter("ALL"); setPriceFilter("ALL"); setSupplierFilter("ALL"); }} />
+          <TableFilters resultLabel={`${filtered.length} of ${skus.length} SKUs`} filters={[
+            { id: "brand", label: "Brand", value: brandFilter, defaultValue: "ALL", onValueChange: setBrandFilter, options: [{ id: "ALL", label: "All brands" }, ...brands.map((item) => ({ id: item.id, label: item.name }))] },
+            { id: "category", label: "Product category", value: categoryFilter, defaultValue: "ALL", onValueChange: setCategoryFilter, options: [{ id: "ALL", label: "All categories" }, ...productCategories.map((item) => ({ id: item.id, label: item.name }))] },
+            { id: "price", label: "Price availability", value: priceFilter, defaultValue: "ALL", onValueChange: setPriceFilter, options: [{ id: "ALL", label: "Any price" }, { id: "YES", label: "Has price" }, { id: "NO", label: "No price" }] },
+            { id: "supplier", label: "Priced supplier", value: supplierFilter, defaultValue: "ALL", onValueChange: setSupplierFilter, options: [{ id: "ALL", label: "Any priced supplier" }, ...[...new Map(skus.flatMap((sku) => sku.material_prices.map((price) => [price.supplier_vendor.id, price.supplier_vendor] as const))).values()].map((item) => ({ id: item.id, label: item.name }))] },
+          ]} />
+          <FilterSummary filtered={Boolean(query) || statusFilter !== "ACTIVE" || brandFilter !== "ALL" || categoryFilter !== "ALL" || priceFilter !== "ALL" || supplierFilter !== "ALL"} shown={filtered.length} total={skus.length} onClear={() => { setQuery(""); setStatusFilter("ACTIVE"); setBrandFilter("ALL"); setCategoryFilter("ALL"); setPriceFilter("ALL"); setSupplierFilter("ALL"); }} />
         </div>
       </TableToolbar>}>
 
@@ -165,7 +167,7 @@ export function SkuDirectory({
                     <EntityPrimaryCell
                       tone={isArchived ? "danger" : "success"}
                       statusLabel={isArchived ? "Archived" : "Active"}
-                      name={sku.name ?? sku.code ?? "Unnamed SKU"}
+                      name={<Button type="button" variant="ghost" size="sm" className="-ml-2 max-w-full justify-start text-left" onClick={() => setDetailId(sku.id)}>{sku.name ?? sku.code ?? "Unnamed SKU"}</Button>}
                       secondary={sku.code ? <div className="text-xs text-ink-secondary font-ui-mono">{sku.code}</div> : undefined}
                     />
                   </TableCell>
@@ -207,6 +209,24 @@ export function SkuDirectory({
           </TableBody>
         </DataTable>
       )}
+
+      {detail ? <Drawer open onOpenChange={(open) => { if (!open) setDetailId(null); }} title={detail.name ?? detail.code ?? "Unnamed SKU"} description={detail.deleted_at ? "Archived SKU" : "SKU profile & supplier prices"} size="lg" footer={<>
+        <Button type="button" variant="ghost" onClick={() => setDetailId(null)}>Close</Button>
+        {canManage ? <Button type="button" variant="primary" onClick={() => { setDetailId(null); openEditDialog(detail); }}>Edit SKU</Button> : null}
+      </>}>
+        <div className="grid gap-5">
+          <dl className="grid gap-4">
+            <div><dt className="text-sm text-ink-secondary">Code</dt><dd>{detail.code || "Not recorded"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Brand</dt><dd>{detail.brand?.name ?? "No brand"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Product category</dt><dd>{detail.categories.map((item) => item.category.name).join(", ") || "Not recorded"}</dd></div>
+            <div><dt className="text-sm text-ink-secondary">Dimensions</dt><dd>{detail.dimension_length && detail.dimension_width && detail.dimension_unit ? `${detail.dimension_length} × ${detail.dimension_width}${detail.dimension_thickness ? ` × ${detail.dimension_thickness}` : ""} ${detail.dimension_unit.code}` : "Not recorded"}</dd></div>
+          </dl>
+          {detail.notes ? <Text as="p" className="whitespace-pre-wrap">{detail.notes}</Text> : null}
+          <div className="grid gap-3"><Text weight="semibold">Supplier prices</Text>{detail.material_prices.length ? detail.material_prices.map((price) => <div key={price.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle pb-3">
+            <Text>{price.supplier_vendor.name}</Text><Text className="tabular-nums">{price.amount_label || (isPriceOnRequest(String(price.amount)) ? "By request" : formatMoney(createMoney(String(price.amount), price.currency), { locale }))} / {price.unit.code}</Text>
+          </div>) : <Text tone="secondary">No prices recorded.</Text>}</div>
+        </div>
+      </Drawer> : null}
 
       {/* Edit SKU Dialog */}
       {editTarget ? (

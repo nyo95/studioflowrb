@@ -7,11 +7,11 @@ import type { DirectoryStatus } from "./directory-findability";
 /** The Active / Archived / All control every Master Data list uses, so the wording and default match everywhere. */
 export function StatusFilterSelect({ value, onChange }: { value: DirectoryStatus; onChange: (value: DirectoryStatus) => void }) {
   return (
-    <div className="w-36">
+    <div className="w-36 shrink-0">
       <Select aria-label="Status" value={value} onChange={(event) => onChange(event.target.value as DirectoryStatus)}>
         <option value="ACTIVE">Active</option>
         <option value="ARCHIVED">Archived</option>
-        <option value="ALL">All status</option>
+        <option value="ALL">All statuses</option>
       </Select>
     </div>
   );
