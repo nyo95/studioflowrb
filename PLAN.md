@@ -1,87 +1,71 @@
 # Active Plan
 
-Plan ID: WO-BQ-SECTION-AND-SUBSECTION-ORGANIZATION-01
-Scope: Safe Section removal and optional Subsection organization
-Module(s): bq
-Target revision: R9.123
-Status: READY
+Plan ID: WO-MASTERDATA-FULL-CANVAS-01
+Scope: Align Master Data workspace width with Bill of Quantity
+Module(s): masterdata, platform-ui-engine
+Target revision: R9.128
+Status: IMPLEMENTED
 Priority: P2
 Owner: Product Owner
 Last updated: 2026-10-17
 
 ## Outcome
 
-An estimator can safely remove a Section or move its complete contents to
-another Section, and can organize Work Items into optional Subsections without
-changing any cost calculation.
+Every Master Data screen uses the same full application canvas as Bill of
+Quantity. Directory and overview pages use the available workspace width
+without changing data, access, controls, or responsive behavior.
 
 ## Locked Decisions
 
-- Removing an empty Section uses ordinary confirmation.
-- Removing a populated Section offers: move its contents to another Section of
-  the same project, preserving direct Work Items and Subsections with nested
-  data; or permanently delete all contents after count-aware confirmation.
-- Work Item selection is direct ↔ Subsection only inside its current Section.
-- Multiple Work Items under one Section can form a new named Subsection; no
-  Subsection nesting and empty Subsections remain until intentionally removed.
+- The Master Data application layout owns the canvas measure, as BQ does.
+- Pages must not introduce a nested narrower `PageShell` that defeats the app
+  layout's full canvas.
+- Existing UI Engine directory and table patterns remain the visual system of
+  record; this is a layout alignment, not a new table redesign.
 
 ## Business Rules and Architecture Constraints
 
-- EXTEND the BQ-owned project-tree service and its existing project detail
-  server-action boundary. No schema or shared capability change is needed.
-- Every mutation requires BQ project-management permission, an editable
-  project, atomic data and audit writes, and rejects stale, missing, or foreign
-  targets.
-- A Section move appends direct Work Items and Subsections to their respective
-  target sibling lists and preserves their relative order and nested data.
-- Subsections are only visual organization. They never alter quantities,
-  markup, pricing, or totals.
+- REUSE the UI Engine `PageShell` and its `measure="full"` behavior.
+- No schema, service, permission, route, data-table behavior, or dependency
+  change is allowed.
 
 ## Backend Contract
 
-- Provide audited project-tree commands to delete or move a Section, move one
-  or more Work Items between a Section's direct list and its Subsections, and
-  group selected Work Items into a newly named Subsection.
-- Expose validated server actions returning the refreshed project detail.
+- No backend contract changes.
 
 ## UI Contract
 
-- Struktur exposes Section deletion and organization. Destructive deletion is
-  explicit and only valid same-Section Work Item destinations are offered.
+- Master Data's shared layout uses the full canvas and its overview does not
+  reapply a narrower inner page shell.
 
 ## Boundaries and Non-goals
 
-- No change to BQ calculations, permissions, hierarchy depth, template
-  behavior, project deletion workflow, or quotation wording.
-- No cross-Section Work Item drag-and-drop.
+- No change to Master Data information architecture, copy, data operations,
+  directory controls, or mobile overflow behavior.
 
 ## Acceptance Criteria
 
-- An empty Section can be removed after confirmation.
-- A populated Section can either move all of its contents to another Section
-  in the same project or delete the entire owned hierarchy after a
-  count-aware confirmation.
-- Work Items can be moved direct ↔ Subsection within one Section and selected
-  Work Items can become a named Subsection, with preserved data and ordering.
-- Invalid targets, locked/archived projects, missing permission, and audit
-  failure leave data unchanged.
+- The Master Data overview and directory routes use the full available canvas,
+  matching BQ's workspace measure.
+- Existing controls remain intact and responsive behavior is unchanged.
 
 ## Verification
 
-- Focused BQ service integration tests for both Section outcomes and optional
-  Subsection organization.
-- `npm test`, typecheck, lint, boundary check, legacy-runtime check,
-  production build, and whitespace checks.
+- Typecheck, lint, production build, and whitespace checks: passed.
+- Desktop browser inspection: overview has one full canvas and no nested wide
+  measure; its workspace is 1856 px wide at the current desktop viewport.
+- Narrow browser inspection: at 375 px, the overview has no page-level
+  horizontal overflow (375 px client width and scroll width).
 
 ## Reviewer Acceptance
 
-- In Struktur, test empty and populated Section removal, including moving to a
-  peer Section and destructive confirmation.
-- Move a Work Item into and out of a Subsection, group multiple Work Items,
-  and confirm totals do not change.
+- Inspect Master Data overview and a directory on desktop and narrow viewport.
+- Confirm the workspace uses the full canvas without clipping, duplicated
+  gutters, or broken table overflow.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: rumah. Read `AGENTS.md`,
-`docs/agent/EXECUTOR.md`, and this READY `PLAN.md`, then implement the entire
-READY outcome, run required checks, update the changelog, and create R9.122.
+You are the Lead and Executor. Location: rumah. Read `AGENTS.md` and this
+READY `PLAN.md`, reuse the UI Engine `PageShell`, implement the bounded layout
+alignment, run the listed checks, update the browser backlog and changelog, and
+create R9.128.

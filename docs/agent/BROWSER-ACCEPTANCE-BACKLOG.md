@@ -30,6 +30,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.128] Master Data full application canvas
+- Surface: Master Data overview; Master Data → Brands
+- Fixture: authenticated Master Data account with at least one Brand
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Open the overview and Brands. 2. Compare each route's content measure to BQ Projects. 3. On Brands, use search, filter, a row action, and pagination when available. 4. Resize to 375 px and inspect horizontal-table behavior.
+- Acceptance: the overview and directory use the full available workspace without a nested narrow measure or doubled gutter; existing controls, row actions, keyboard focus, and narrow-screen overflow retain their prior behavior.
+- Status: PENDING
+
 ### [R9.125] Professional directory workspace
 - Surface: BQ → Projects; Master Data → Brands
 - Fixture: editable account; a BQ project and at least one Brand

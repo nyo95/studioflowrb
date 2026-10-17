@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.128 | 2026-10-17 | fix(masterdata): remove the overview's nested canvas limit
+
+- The Master Data overview no longer reapplies its own narrower page container. It now inherits the full application canvas from the Master Data layout, matching BQ and the directory routes.
+- Added the desktop and narrow-screen acceptance walkthrough for the full-canvas alignment.
+
+### Verification
+
+- `npm run typecheck`, `npm run lint`, and `npm run build`: passed.
+- Desktop browser inspection confirmed one full canvas with no nested wide measure; at 375 px, the overview has no page-level horizontal overflow.
+
 ## R9.127 | 2026-10-17 | fix(masterdata): use the full application canvas
 
 - Master Data now uses the same full-width application canvas as BQ. Directory workspaces can use the full available screen width while retaining their existing data, controls, and responsive behavior.

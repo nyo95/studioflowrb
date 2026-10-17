@@ -7,7 +7,7 @@ import { hasPermission } from "@platform/core/rbac";
 import { formatInstant } from "@platform/utilities/date";
 import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/service";
 import { masterDataService } from "@/apps/masterdata/runtime";
-import { PageHeader, PageShell, SectionCard, MetricValue, Text, Heading, Badge, buttonClasses, StatCard, StatGrid } from "@/platform/ui_engine";
+import { PageHeader, SectionCard, MetricValue, Text, Heading, Badge, buttonClasses, StatCard, StatGrid } from "@/platform/ui_engine";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +54,7 @@ export default async function MasterDataPage() {
   ] as const;
 
   return (
-    <PageShell size="wide">
+    <div className="grid gap-6">
       <PageHeader
         eyebrow="Operational catalog"
         title="What the studio specifies"
@@ -176,6 +176,6 @@ export default async function MasterDataPage() {
 
         </div>
       </div>
-    </PageShell>
+    </div>
   );
 }
