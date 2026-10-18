@@ -3918,6 +3918,46 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     return { projectId, moodboard, cd, base: { ...as(designer), projectId } };
   }
 
+  it("keeps Notes and Workspace reads private to assigned PICs and managers while Schedule item search stays readable", async () => {
+    const { projectId, moodboard, base } = await setup("Private workspace reads");
+    const entry = await sf.schedule.createEntry({ ...base, section: "MATERIAL", category: "Paint", snapshot: { productName: "Private palette" } });
+    await sf.workspace.createWorkspaceCard({ ...base, body: "Private note", tags: ["palette"], itemEntryIds: [entry.entryId] });
+    await sf.workspace.createWorkspaceImage({ ...base, file: png() });
+    await sf.workspace.postThreadMessage({ ...base, phaseId: moodboard.id, thread: { x: 10, y: 20 }, body: "Private thread" });
+
+    const readGrants = [P.access, P.projectRead];
+    const outsider = await seedUser("Workspace read outsider", readGrants);
+    const restricted = { grants: readGrants, actorId: outsider.id, projectId };
+    const signedRead = mock.method(storage, "createSignedReadUrl", async () => "https://test.invalid/private");
+    try {
+      for (const read of [
+        () => sf.workspace.readWorkspace(restricted),
+        () => sf.workspace.listWorkspaceThreads(restricted),
+        () => sf.workspace.listProjectNotes(restricted),
+        () => sf.workspace.listNoteTags(restricted),
+        () => sf.workspace.listNotesForItem({ ...restricted, entryId: entry.entryId }),
+      ]) await rejectsWith(read(), "PERMISSION_DENIED");
+      assert.equal(signedRead.mock.callCount(), 0, "assignment refusal happens before private asset URLs are signed");
+    } finally {
+      signedRead.mock.restore();
+    }
+
+    assert.equal((await sf.workspace.searchNoteItems({ grants: readGrants, projectId, query: "palette" }))[0]?.entryId, entry.entryId, "Schedule-derived search retains its read-only contract");
+
+    const manager = await seedUser("Workspace read manager", [...readGrants, P.projectManage]);
+    for (const allowed of [
+      { grants: readGrants, actorId: designer.id, projectId },
+      { grants: readGrants, actorId: drafter.id, projectId },
+      { grants: [...readGrants, P.projectManage], actorId: manager.id, projectId },
+    ]) {
+      assert.equal((await sf.workspace.readWorkspace(allowed)).length, 2);
+      assert.equal((await sf.workspace.listWorkspaceThreads(allowed)).length, 1);
+      assert.equal((await sf.workspace.listProjectNotes(allowed)).notes.length, 3);
+      assert.deepEqual(await sf.workspace.listNoteTags(allowed), [{ name: "palette", count: 1 }]);
+      assert.equal((await sf.workspace.listNotesForItem({ ...allowed, entryId: entry.entryId }))[0]?.body, "Private note");
+    }
+  });
+
   it("holds every element in the project's one default section, created once even for concurrent first elements", async () => {
     const { projectId, moodboard, base } = await setup();
     const [first, second] = await Promise.all([
@@ -3931,7 +3971,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     assert.equal(labelledRow.section_id, sections[0]!.id);
     assert.equal(labelledRow.iteration_id, (await openIteration(moodboard.id)).id, "a phase-labelled card takes the phase's latest round as its round label");
 
-    const board = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    const board = await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId });
     assert.deepEqual(board.map((card) => card.id).sort(), [first.cardId, second.cardId, labelled.cardId].sort());
     assert.deepEqual(board.map((card) => card.sortOrder).sort(), [0, 1, 2]);
     assert.ok(!("sectionId" in board[0]!), "the board read has no sections");
@@ -3947,7 +3987,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     const { projectId, moodboard, cd, base } = await setup();
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Palette" });
     await sf.workspace.createWorkspaceCard({ ...base, body: "General" });
-    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, projectId, phaseId: moodboard.id })).map((card) => card.id), [cardId]);
+    assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId, phaseId: moodboard.id })).map((card) => card.id), [cardId]);
     assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: moodboard.id })).notes.length, 1, "the phase notes feed shows only its own cards");
 
     let version = (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } })).version;
@@ -3969,7 +4009,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
   it("refuses a write naming an older version and changes nothing", async () => {
     const { projectId, base } = await setup();
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, body: "First" });
-    const read = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
+    const read = (await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId }))[0]!;
     const saved = await sf.workspace.updateWorkspaceCardText({ ...base, cardId, body: "Second", version: read.version });
     assert.equal(saved.version, read.version + 1);
     await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...base, cardId, body: "Stale edit", version: read.version }), "WORKSPACE_CARD_STALE");
@@ -3995,7 +4035,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     const general = await sf.workspace.createWorkspaceCard({ ...base, body: "Designer general" });
     const version = (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: general.cardId } })).version;
     await rejectsWith(sf.workspace.setWorkspaceCardPhase({ ...as(drafter, DRAFTER_GRANTS), projectId, cardId: general.cardId, phaseId: moodboard.id, version }), "PERMISSION_DENIED");
-    assert.equal((await sf.workspace.readWorkspace({ grants: [P.access, P.projectRead], projectId })).length, 3, "readers see every card");
+    assert.equal((await sf.workspace.readWorkspace({ grants: [P.access, P.projectRead], actorId: designer.id, projectId })).length, 3, "assigned readers see every card");
     await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: clock } });
     await assert.rejects(sf.workspace.createWorkspaceCard({ ...base, body: "after archive" }));
   });
@@ -4041,7 +4081,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     const rows = await testDb.prisma.sfWorkspaceCard.findMany({ where: { id: { in: [answered.noteId!, more.noteId, shot.imageId] } } });
     for (const row of rows) assert.deepEqual([row.origin, row.workflow_record, row.phase_id, row.iteration_id], ["CLIENT_ANSWER", true, moodboard.id, iteration.id], row.kind);
 
-    const read = (await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((item) => item.id === answered.noteId)!;
+    const read = (await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId })).find((item) => item.id === answered.noteId)!;
     assert.equal(read.workflowRecord, true);
     await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...base, cardId: read.id, clientAnswer: false, version: read.version }), "WORKSPACE_RECORD_LOCKED");
     await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...phaseBase, cardId: read.id, clientAnswer: false, version: await noteVersion(read.id) }), "WORKSPACE_RECORD_LOCKED");
@@ -4080,7 +4120,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
       ],
     });
 
-    const board = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    const board = await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId });
     assert.deepEqual(board.map((card) => [card.id, card.sortOrder, card.canvas]), [
       [placed.cardId, 0, { x: 80, y: 120, w: 256 }],
       [moving.cardId, 1, { x: 40, y: 400, w: 288 }],
@@ -4137,7 +4177,7 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     const row = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
     assert.deepEqual([row.kind, row.body, row.origin, row.phase_id, row.canvas_x, row.canvas_y, row.canvas_w, row.content_type, row.uploaded_by_name], ["IMAGE", "", "CLIENT_ANSWER", moodboard.id, 40, 80, 120, "image/png", "Dina Designer"]);
     assert.ok(row.storage_key!.startsWith(`studioflow/notes/${projectId}/`) && storage.objects.has(row.storage_key!));
-    const view = (await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((card) => card.id === cardId)!;
+    const view = (await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId })).find((card) => card.id === cardId)!;
     assert.deepEqual([view.kind, view.file, view.images.map((image) => [image.id, image.contentType, image.url?.startsWith("https://storage.invalid/")])], ["IMAGE", null, [[cardId, "image/png", true]]]);
     await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...base, cardId, body: "Caption", version: row.version }), "WORKSPACE_ELEMENT_NOT_TEXT");
     await rejectsWith(sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "HEADING", version: row.version }), "WORKSPACE_ELEMENT_NOT_TEXT");
@@ -4152,7 +4192,7 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     const row = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
     assert.deepEqual([row.kind, row.file_name, row.content_type, row.bytes, row.body], ["FILE", "DED Dapur R2.pdf", "application/pdf", PDF().byteLength, ""]);
     assert.ok(row.storage_key!.startsWith(`studioflow/workspace-files/${projectId}/`) && row.storage_key!.endsWith(".pdf"));
-    const view = (await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((card) => card.id === cardId)!;
+    const view = (await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId })).find((card) => card.id === cardId)!;
     assert.deepEqual([view.kind, view.images, view.file?.name, view.file?.contentType, view.file?.url?.startsWith("https://storage.invalid/")], ["FILE", [], "DED Dapur R2.pdf", "application/pdf", true]);
     assert.equal(JSON.stringify(view).includes(row.storage_key!), false, "the storage key never leaks into a read");
 
@@ -4180,11 +4220,11 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
   it("keeps a text element's style and lets it be as narrow as an image", async () => {
     const { projectId, base } = await setup();
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, body: "Dapur dan ruang makan", textStyle: "HEADING", x: 0, y: 0, w: 120 });
-    let view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
+    let view = (await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId }))[0]!;
     assert.deepEqual([view.kind, view.textStyle, view.canvas?.w], ["TEXT", "HEADING", 120]);
     const changed = await sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "STICKY", version: view.version });
     assert.equal(changed.version, view.version + 1);
-    view = (await sf.workspace.readWorkspace({ grants: ALL, projectId }))[0]!;
+    view = (await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId }))[0]!;
     assert.equal(view.textStyle, "STICKY");
     await rejectsWith(sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "HEADING", version: view.version - 1 }), "WORKSPACE_CARD_STALE");
     await rejectsWith(sf.workspace.setWorkspaceTextStyle({ ...base, cardId, textStyle: "LOUD", version: view.version }), "WORKSPACE_TEXT_STYLE_INVALID");
@@ -4205,7 +4245,7 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     ]);
     const text = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
     assert.deepEqual([text.kind, text.body], ["TEXT", "Backsplash too busy"], "the text stays text");
-    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, projectId })).length, 3);
+    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId })).length, 3);
     // Beside an element of another project: not reachable.
     const other = await setup("Other board project");
     await rejectsWith(sf.workspace.createWorkspaceImage({ ...other.base, besideId: cardId, file: png() }), "PHASE_NOTE_NOT_FOUND");
@@ -4217,7 +4257,7 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     const entry = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Homogeneous Tile", snapshot: { productName: "Ivory Tile" } });
     const root = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Root message", tags: ["#lampu"] });
     const reply = await sf.workspace.createWorkspaceCard({ ...base, phaseId: layout.id, body: "Reply message", replyToId: root.cardId, tags: ["Lampu"], itemEntryIds: [entry.entryId] });
-    const stream = await sf.workspace.listProjectNotes({ grants: ALL, projectId });
+    const stream = await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId });
     const note = stream.notes.find((item) => item.id === reply.cardId)!;
     assert.deepEqual(note.replyTo, { id: root.cardId, kind: "TEXT", excerpt: "Root message", authorName: "Dina Designer", clientFeedback: false });
     // A tag keeps the spelling it was first written with; "Lampu" finds the existing "lampu".
@@ -4226,12 +4266,12 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     const entryRow = await testDb.prisma.sfScheduleEntry.findUniqueOrThrow({ where: { id: entry.entryId } });
     const code = `${entryRow.prefix}-${String(entryRow.increment).padStart(2, "0")}`;
     assert.deepEqual(note.items.map((item) => [item.code, item.name]), [[code, "Ivory Tile"]]);
-    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, tag: "#lampu" })).notes.map((item) => item.id).sort(), [reply.cardId, root.cardId].sort());
-    assert.deepEqual((await sf.workspace.listNotesForItem({ grants: ALL, projectId, entryId: entry.entryId })).map((item) => item.id), [reply.cardId]);
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, tag: "#lampu" })).notes.map((item) => item.id).sort(), [reply.cardId, root.cardId].sort());
+    assert.deepEqual((await sf.workspace.listNotesForItem({ grants: ALL, actorId: designer.id, projectId, entryId: entry.entryId })).map((item) => item.id), [reply.cardId]);
     assert.deepEqual((await sf.workspace.searchNoteItems({ grants: ALL, projectId, query: `${entryRow.prefix.toLowerCase()}${entryRow.increment}` })).map((item) => item.entryId), [entry.entryId]);
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Bad", tags: ["feedback"] }), "NOTE_TAG_RESERVED");
     await sf.workspace.deleteWorkspaceCard({ ...base, cardId: root.cardId, version: (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: root.cardId } })).version });
-    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId })).notes.find((item) => item.id === reply.cardId)!.replyTo, null);
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId })).notes.find((item) => item.id === reply.cardId)!.replyTo, null);
   });
 
   it("enforces project chat boundaries, cleans only local orphan tags, filters and pages its stream", async () => {
@@ -4245,18 +4285,18 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
     const phaseB = await sf.workspace.createWorkspaceCard({ ...base, phaseId: layout.id, body: "three" });
     await sf.workspace.setWorkspaceCardFlags({ ...base, cardId: phaseB.cardId, pinned: true, version: (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: phaseB.cardId } })).version });
     await sf.workspace.createWorkspaceCard({ ...other.base, phaseId: other.moodboard.id, body: "other", tags: ["local"] });
-    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "foreign reply", replyToId: (await sf.workspace.readWorkspace({ grants: ALL, projectId: other.projectId }))[0]!.id }), "NOTE_REPLY_INVALID");
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "foreign reply", replyToId: (await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId: other.projectId }))[0]!.id }), "NOTE_REPLY_INVALID");
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "foreign item", itemEntryIds: [foreignEntry.entryId] }), "NOTE_ITEM_INVALID");
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "bad tag", tags: ["bad tag"] }), "NOTE_TAG_INVALID");
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "many tags", tags: ["a", "b", "c", "d", "e", "f"] }), "NOTE_TAG_LIMIT");
     await rejectsWith(sf.workspace.createWorkspaceCard({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: layout.id, body: "wrong phase" }), "PERMISSION_DENIED");
     assert.equal((await testDb.prisma.sfNoteItemLink.findUniqueOrThrow({ where: { card_id_entry_id: { card_id: feedback.cardId, entry_id: ownEntry.entryId } } })).code_snapshot, "TI-01");
-    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, phaseId: moodboard.id })).notes.map((note) => note.id).sort(), [feedback.cardId, root.cardId].sort());
-    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, clientFeedback: true })).notes.map((note) => note.id), [feedback.cardId]);
-    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, starred: true })).notes.map((note) => note.id), [phaseB.cardId]);
-    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, entryId: ownEntry.entryId })).notes.map((note) => note.id), [feedback.cardId]);
-    const first = await sf.workspace.listProjectNotes({ grants: ALL, projectId, limit: 1 });
-    const second = await sf.workspace.listProjectNotes({ grants: ALL, projectId, limit: 10, cursor: first.cursor! });
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, phaseId: moodboard.id })).notes.map((note) => note.id).sort(), [feedback.cardId, root.cardId].sort());
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, clientFeedback: true })).notes.map((note) => note.id), [feedback.cardId]);
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, starred: true })).notes.map((note) => note.id), [phaseB.cardId]);
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, entryId: ownEntry.entryId })).notes.map((note) => note.id), [feedback.cardId]);
+    const first = await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, limit: 1 });
+    const second = await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, limit: 10, cursor: first.cursor! });
     assert.equal(new Set([...first.notes, ...second.notes].map((note) => note.id)).size, 3);
     const rootRow = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: root.cardId } });
     await sf.workspace.setNoteTags({ ...base, cardId: root.cardId, tags: [], version: rootRow.version });
@@ -4272,7 +4312,7 @@ describe("WO-SF-WORKSPACE-04 standalone board elements", () => {
       { entry_id: entry.id, label: "A10", product_name: "Final option", search_key: "final", is_final: true },
     ] });
     const note = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Uses final", itemEntryIds: [entry.id] });
-    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId })).notes.find((item) => item.id === note.cardId)!.items[0]!.name, "Final option");
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId })).notes.find((item) => item.id === note.cardId)!.items[0]!.name, "Final option");
     assert.equal((await sf.workspace.searchNoteItems({ grants: ALL, projectId, query: "final" })).find((item) => item.entryId === entry.id)!.name, "Final option");
   });
 });
@@ -4301,22 +4341,22 @@ describe("WO-SF-BOARD-THREADS-01", () => {
     const reply = await sf.workspace.postThreadMessage({ ...base, thread: { threadId: first.threadId }, body: "Reply", replyToId: first.noteId, clientFeedback: true });
     const anchored = await sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: anchorId, offsetX: 20, offsetY: -10 }, body: "Attached" });
     const unplaced = await sf.workspace.postThreadMessage({ ...base, thread: { anchorCardId: loose.cardId, offsetX: 12, offsetY: 13 }, body: "Unplaced attached" });
-    const rows = await sf.workspace.listWorkspaceThreads({ grants: ALL, projectId });
+    const rows = await sf.workspace.listWorkspaceThreads({ grants: ALL, actorId: designer.id, projectId });
     assert.equal(rows.length, 3);
     assert.deepEqual(rows.find((row) => row.id === first.threadId), { id: first.threadId, version: 1, x: 0, y: 100_000, anchorCardId: null, offsetX: null, offsetY: null, messageCount: 2, clientFeedback: true, lastMessageAt: clock });
     assert.deepEqual(rows.filter((row) => row.anchorCardId).map((row) => [row.x, row.y]).sort((a, b) => a[0] - b[0]), [[12, 13], [120, 190]]);
-    const board = await sf.workspace.readWorkspace({ grants: ALL, projectId });
+    const board = await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId });
     assert.deepEqual(board.map((row) => row.id).sort(), [anchorId, loose.cardId].sort());
     assert.equal(board.find((row) => row.id === anchorId)!.anchoredThreadMessages, 1);
-    const all = await sf.workspace.listProjectNotes({ grants: ALL, projectId });
+    const all = await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId });
     assert.equal(all.notes.length, 6);
     assert.equal(all.notes.find((row) => row.id === first.noteId)!.threadId, first.threadId);
     assert.deepEqual(all.notes.find((row) => row.id === first.noteId)!.tags, ["tile"]);
     assert.equal(all.notes.find((row) => row.id === first.noteId)!.items[0].entryId, entry.id);
     assert.equal(all.notes.find((row) => row.id === reply.noteId)!.replyTo?.id, first.noteId);
-    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, projectId, threadId: first.threadId })).notes.map((row) => row.id), [reply.noteId, first.noteId]);
-    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId, inThreads: true })).notes.length, 4);
-    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId, inThreads: true, clientFeedback: true })).notes[0].id, reply.noteId);
+    assert.deepEqual((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, threadId: first.threadId })).notes.map((row) => row.id), [reply.noteId, first.noteId]);
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, inThreads: true })).notes.length, 4);
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, inThreads: true, clientFeedback: true })).notes[0].id, reply.noteId);
     const stored = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: unplaced.noteId } });
     assert.deepEqual([stored.canvas_x, stored.canvas_y, stored.canvas_w], [null, null, null]);
     await rejectsWith(sf.workspace.placeWorkspaceItems({ ...base, cards: [{ id: first.noteId, x: 1, y: 2, w: 240 }] }), "WORKSPACE_THREAD_MESSAGE");
@@ -4336,7 +4376,7 @@ describe("WO-SF-BOARD-THREADS-01", () => {
     const loose = await sf.workspace.createWorkspaceCard({ ...base, body: "Loose image anchor" });
     await sf.workspace.postThreadImage({ ...base, thread: { anchorCardId: loose.cardId, offsetX: 5, offsetY: 6 }, file: image });
     assert.equal(reply.threadId, first.threadId);
-    const notes = (await sf.workspace.listProjectNotes({ grants: ALL, projectId, inThreads: true })).notes;
+    const notes = (await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, inThreads: true })).notes;
     assert.equal(notes.length, 4);
     assert.equal(notes.find((note) => note.id === first.imageId)!.origin, "CLIENT_ANSWER");
     assert.deepEqual(notes.find((note) => note.id === first.imageId)!.tags, ["photos"]);
@@ -4366,7 +4406,7 @@ describe("WO-SF-BOARD-THREADS-01", () => {
     }
     await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { x: 8, y: 9 }, body: "New thread reply", replyToId: own.noteId }), "NOTE_REPLY_INVALID");
     await rejectsWith(sf.workspace.postThreadImage({ ...base, thread: { x: 8, y: 9 }, file: image, replyToId: own.noteId }), "NOTE_REPLY_INVALID");
-    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId, threadId: foreign.threadId })).notes.length, 0);
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, threadId: foreign.threadId })).notes.length, 0);
     assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { project_id: projectId } }), 1);
     assert.equal(storage.objects.size, 0);
   });
@@ -4402,7 +4442,7 @@ describe("WO-SF-BOARD-THREADS-01", () => {
       await rejectsWith(sf.workspace.moveThread({ ...base, threadId: free.threadId, version: 2, x, y: 0 }), "WORKSPACE_CANVAS_INVALID");
       await rejectsWith(sf.workspace.postThreadMessage({ ...base, thread: { x, y: 0 }, body: "Bad point" }), "WORKSPACE_CANVAS_INVALID");
     }
-    assert.equal((await sf.workspace.listWorkspaceThreads({ grants: ALL, projectId })).find((row) => row.id === free.threadId)!.x, 100_000);
+    assert.equal((await sf.workspace.listWorkspaceThreads({ grants: ALL, actorId: designer.id, projectId })).find((row) => row.id === free.threadId)!.x, 100_000);
     assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { project_id: projectId } }), 2);
   });
 
@@ -4416,7 +4456,7 @@ describe("WO-SF-BOARD-THREADS-01", () => {
     const first = await sf.workspace.postThreadImage({ ...base, thread: { x: 3, y: 4 }, file: image });
     const second = await sf.workspace.postThreadImage({ ...base, thread: { threadId: first.threadId }, file: image });
     await remove(projectId, first.imageId);
-    assert.equal((await sf.workspace.listWorkspaceThreads({ grants: ALL, projectId }))[0].messageCount, 1);
+    assert.equal((await sf.workspace.listWorkspaceThreads({ grants: ALL, actorId: designer.id, projectId }))[0].messageCount, 1);
     const row = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: second.imageId } });
     const failedDelete = mock.method(storage, "remove", async () => { throw Error("storage unavailable"); });
     try { await remove(projectId, second.imageId); } finally { failedDelete.mock.restore(); }
@@ -4440,7 +4480,7 @@ describe("WO-SF-BOARD-THREADS-01", () => {
     assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { id: { in: [anchor.cardId, first.noteId, second.imageId, more.noteId] } } }), 4);
     assert.equal(await testDb.prisma.sfWorkspaceThread.count({ where: { anchor_card_id: anchor.cardId } }), 2);
     assert.equal(storage.objects.size, 1);
-    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, projectId })).find((row) => row.id === anchor.cardId)!.anchoredThreadMessages, 3);
+    assert.equal((await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId })).find((row) => row.id === anchor.cardId)!.anchoredThreadMessages, 3);
     await rejectsWith(sf.workspace.deleteWorkspaceCard({ ...base, cardId: anchor.cardId, version: 99 }), "WORKSPACE_CARD_STALE");
     await remove(projectId, anchor.cardId);
     assert.equal(await testDb.prisma.sfWorkspaceCard.count({ where: { id: { in: [anchor.cardId, first.noteId, second.imageId, more.noteId] } } }), 0);
@@ -4459,7 +4499,7 @@ describe("WO-SF-BOARD-THREADS-01", () => {
       sf.workspace.postThreadMessage({ ...base, thread: { threadId: first.threadId }, body: "Concurrent" }),
     ]);
     assert.equal(results[0].status, "fulfilled");
-    const threads = await sf.workspace.listWorkspaceThreads({ grants: ALL, projectId });
+    const threads = await sf.workspace.listWorkspaceThreads({ grants: ALL, actorId: designer.id, projectId });
     assert.equal(threads.length, results[1].status === "fulfilled" ? 1 : 0);
     assert.ok(threads.every((row) => row.messageCount > 0));
   });
@@ -4536,7 +4576,7 @@ describe("WO-SF-NOTES-PRESENTATION-IMAGE-01 slice B", () => {
     ] });
     const note = await sf.workspace.createWorkspaceCard({ ...as(designer), projectId, phaseId: phase.id, body: "Use @HT-01", itemEntryIds: [entry.id] });
     const search = () => sf.workspace.searchNoteItems({ grants: ALL, projectId, query: "HT" });
-    const read = async () => (await sf.workspace.listProjectNotes({ grants: ALL, projectId })).notes.find((item) => item.id === note.cardId)!.items[0];
+    const read = async () => (await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId })).notes.find((item) => item.id === note.cardId)!.items[0];
     assert.equal((await search())[0].name, "Final name");
     assert.match((await search())[0].thumbnailUrl!, /notes%2Ffinal\?expires=900$/);
     assert.equal((await read()).entryId, entry.id);
@@ -4557,7 +4597,7 @@ describe("WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A", () => {
     const phase = await phaseOf(projectId, "moodboard");
     const { noteId } = await sf.phases.postPhaseNote({ ...as(designer), projectId, phaseId: phase.id, body: "Before" });
     const base = { ...as(designer), projectId, cardId: noteId };
-    const read = (await sf.workspace.listProjectNotes({ grants: ALL, projectId })).notes[0]!;
+    const read = (await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId })).notes[0]!;
     await sf.workspace.updateWorkspaceCardText({ ...base, body: "First editor", version: read.version, itemEntryIds: [] });
     await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...base, body: "Old second draft", version: read.version, itemEntryIds: [] }), "WORKSPACE_CARD_STALE");
     await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...base, pinned: true, version: read.version }), "WORKSPACE_CARD_STALE");
@@ -4573,7 +4613,7 @@ describe("WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A", () => {
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, body: "General" });
     const saved = await sf.workspace.updateWorkspaceCardText({ ...base, cardId, body: "Edited General", version: await noteVersion(cardId), itemEntryIds: [] });
     const starred = await sf.workspace.setWorkspaceCardFlags({ ...base, cardId, pinned: true, version: saved.version });
-    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, projectId, starred: true })).notes[0]!.id, cardId);
+    assert.equal((await sf.workspace.listProjectNotes({ grants: ALL, actorId: designer.id, projectId, starred: true })).notes[0]!.id, cardId);
     const grants = [P.access, P.projectRead, P.phaseWork];
     const unassigned = await seedUser("Unassigned phase-work holder", grants);
     const viewer = await seedUser("Notes viewer", [P.access, P.projectRead]);

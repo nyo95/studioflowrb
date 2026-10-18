@@ -20,6 +20,7 @@ import {
   requireCommand,
   requireProjectAccess,
   requireRead,
+  requireWorkSectionAccess,
   requiredText,
   writeAudit,
   type CommandContext,
@@ -27,6 +28,7 @@ import {
   type ReadContext,
   type StudioFlowPorts,
   type TxClient,
+  type WorkSectionReadContext,
 } from "../shared";
 import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
 
@@ -713,10 +715,9 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
 
   const reads = {
     /** The project's board: every element in stored order (top to bottom); optionally only those labelled with one phase. */
-    async readWorkspace(input: ReadContext & { projectId: string; phaseId?: string | null }) {
+    async readWorkspace(input: WorkSectionReadContext & { projectId: string; phaseId?: string | null }) {
       requireRead(input.grants);
-      const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true } });
-      if (!project) throw notFound("project");
+      await requireWorkSectionAccess(db, input);
       const rows = await db.sfWorkspaceCard.findMany({
         where: { project_id: input.projectId, thread_id: null, ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
         orderBy: [{ sort_order: "asc" }, { id: "asc" }],
@@ -732,17 +733,16 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         .map((phase) => ({ id: phase.id, name: phase.name_snapshot }));
     },
 
-    async listWorkspaceThreads(input: ReadContext & { projectId: string }) {
+    async listWorkspaceThreads(input: WorkSectionReadContext & { projectId: string }) {
       requireRead(input.grants);
-      if (!await db.sfProject.count({ where: { id: input.projectId } })) throw notFound("project");
+      await requireWorkSectionAccess(db, input);
       const rows = await db.sfWorkspaceThread.findMany({ where: { project_id: input.projectId }, orderBy: [{ created_at: "asc" }, { id: "asc" }], include: { messages: { select: { origin: true, created_at: true }, orderBy: [{ created_at: "desc" }, { id: "desc" }] } } });
       return rows.map((row) => ({ id: row.id, version: row.version, x: row.x, y: row.y, anchorCardId: row.anchor_card_id, offsetX: row.offset_x, offsetY: row.offset_y, messageCount: row.messages.length, clientFeedback: row.messages.some((message) => message.origin === "CLIENT_ANSWER"), lastMessageAt: row.messages[0]?.created_at ?? null }));
     },
 
-    async listProjectNotes(input: ReadContext & { projectId: string; threadId?: string; inThreads?: true; phaseId?: string; clientFeedback?: boolean; starred?: boolean; tag?: string; entryId?: string; cursor?: string; limit?: number }) {
+    async listProjectNotes(input: WorkSectionReadContext & { projectId: string; threadId?: string; inThreads?: true; phaseId?: string; clientFeedback?: boolean; starred?: boolean; tag?: string; entryId?: string; cursor?: string; limit?: number }) {
       requireRead(input.grants);
-      const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true } });
-      if (!project) throw notFound("project");
+      await requireWorkSectionAccess(db, input);
       const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
       const cursor = input.cursor ? (() => { try { return JSON.parse(Buffer.from(input.cursor, "base64url").toString("utf8")) as { createdAt: string; id: string }; } catch { throw invalid("NOTE_CURSOR_INVALID", "The notes cursor is invalid."); } })() : null;
       const rows = await db.sfWorkspaceCard.findMany({
@@ -774,13 +774,14 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       }));
     },
 
-    async listNoteTags(input: ReadContext & { projectId: string; query?: string }) {
+    async listNoteTags(input: WorkSectionReadContext & { projectId: string; query?: string }) {
       requireRead(input.grants);
+      await requireWorkSectionAccess(db, input);
       const tags = await db.sfNoteTag.findMany({ where: { project_id: input.projectId, ...(input.query ? { key: { contains: input.query.replace(/^#/, "").toLocaleLowerCase("id-ID"), mode: "insensitive" } } : {}) }, include: { _count: { select: { links: true } } } });
       return tags.sort((a, b) => b._count.links - a._count.links || a.name.localeCompare(b.name)).slice(0, 20).map((tag) => ({ name: tag.name, count: tag._count.links }));
     },
 
-    async listNotesForItem(input: ReadContext & { projectId: string; entryId: string }) {
+    async listNotesForItem(input: WorkSectionReadContext & { projectId: string; entryId: string }) {
       return (await reads.listProjectNotes({ ...input, entryId: input.entryId, limit: 100 })).notes;
     },
   };

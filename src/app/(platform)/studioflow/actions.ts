@@ -432,16 +432,25 @@ export async function setPhaseNoteTagsAction(input: z.infer<typeof NoteTagsInput
 
 const ProjectNotesQuery = z.strictObject({ projectId: Id, threadId: Id.optional(), inThreads: z.literal(true).optional(), phaseId: Id.optional(), clientFeedback: z.boolean().optional(), starred: z.boolean().optional(), tag: z.string().max(32).optional(), entryId: Id.optional(), cursor: z.string().max(500).optional(), limit: z.number().int().min(1).max(100).optional() });
 export async function listProjectNotesAction(input: z.infer<typeof ProjectNotesQuery>) {
-  return runSafeAction(async () => studioFlow.workspace.listProjectNotes({ grants: (await context()).grants, ...parse(ProjectNotesQuery, input) }));
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.workspace.listProjectNotes({ grants: ctx.grants, actorId: ctx.userId, ...parse(ProjectNotesQuery, input) });
+  });
 }
 export async function searchNoteItemsAction(projectId: string, query: string) {
   return runSafeAction(async () => studioFlow.workspace.searchNoteItems({ grants: (await context()).grants, projectId: parse(Id, projectId), query: parse(z.string().max(200), query) }));
 }
 export async function listNoteTagsAction(projectId: string, query?: string) {
-  return runSafeAction(async () => studioFlow.workspace.listNoteTags({ grants: (await context()).grants, projectId: parse(Id, projectId), query: parse(z.string().max(32).optional(), query) }));
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.workspace.listNoteTags({ grants: ctx.grants, actorId: ctx.userId, projectId: parse(Id, projectId), query: parse(z.string().max(32).optional(), query) });
+  });
 }
 export async function listNotesForItemAction(projectId: string, entryId: string) {
-  return runSafeAction(async () => studioFlow.workspace.listNotesForItem({ grants: (await context()).grants, projectId: parse(Id, projectId), entryId: parse(Id, entryId) }));
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.workspace.listNotesForItem({ grants: ctx.grants, actorId: ctx.userId, projectId: parse(Id, projectId), entryId: parse(Id, entryId) });
+  });
 }
 
 // ── Project Workspace (WO-SF-WORKSPACE-01) ─────────────────────────────────
@@ -495,7 +504,7 @@ export async function listWorkspaceThreadsAction(projectId: string) {
   return runSafeAction(async () => {
     await requireModuleEnabled(WORKSPACE_BOARD);
     const ctx = await context();
-    return studioFlow.workspace.listWorkspaceThreads({ grants: ctx.grants, projectId: parse(Id, projectId) });
+    return studioFlow.workspace.listWorkspaceThreads({ grants: ctx.grants, actorId: ctx.userId, projectId: parse(Id, projectId) });
   });
 }
 

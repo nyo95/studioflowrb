@@ -111,6 +111,7 @@ it("thread marker reads remain gated but thread-filtered Notes reads and existin
   assert.equal(test.moduleChecks(), 0);
   assert.equal(test.calls[0].input.threadId, noteId);
   assert.equal(test.calls[0].input.inThreads, true);
+  assert.equal(test.calls[0].input.actorId, "actor");
   assert.equal((await test.actions.noteAction({ command: "delete", projectId, noteId, version: 1 })).ok, true);
   const result = await test.actions.listWorkspaceThreadsAction(projectId);
   assert.equal(result.ok, false);
@@ -118,6 +119,7 @@ it("thread marker reads remain gated but thread-filtered Notes reads and existin
   test.enableBoard();
   assert.deepEqual(await test.actions.listWorkspaceThreadsAction(projectId), { ok: true, data: [] });
   assert.equal(test.calls.at(-1)!.input.projectId, projectId);
+  assert.equal(test.calls.at(-1)!.input.actorId, "actor");
 });
 
 it("noteAction requires a positive integer read version on edit, flags and delete before dispatch", async () => {

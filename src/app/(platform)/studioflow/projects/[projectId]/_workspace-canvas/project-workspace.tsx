@@ -25,11 +25,11 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
 }) {
   const { grants, userId } = await pageSession();
   const [elements, phases, access, phaseList, threads] = await Promise.all([
-    studioFlow.workspace.readWorkspace({ grants, projectId }),
+    studioFlow.workspace.readWorkspace({ grants, actorId: userId, projectId }),
     studioFlow.workspace.listWorkspacePhaseLabels({ grants, projectId }),
     pageProjectAccess(projectId),
     studioFlow.phases.listProjectPhases({ grants, projectId }),
-    studioFlow.workspace.listWorkspaceThreads({ grants, projectId }),
+    studioFlow.workspace.listWorkspaceThreads({ grants, actorId: userId, projectId }),
   ]);
   const caps = studioFlow.phases.capabilities(grants);
   const writable = !archived && status === "ACTIVE" && caps.work;

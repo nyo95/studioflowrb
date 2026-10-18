@@ -1,85 +1,53 @@
 # Active Plan
 
-Plan ID: WO-MD-BRAND-FORM-GROUPING-01
-Scope: Master Data Brand form section grouping
-Module(s): masterdata; UI Engine interaction pattern
-Target revision: R9.133 (R9.131 remains a pre-existing uncommitted StudioFlow candidate entry)
-Risk: medium - retained form layout and its validation focus behavior; server writes unchanged
-Status: IMPLEMENTED — scoped combined-lane review PASS
-Priority: P2
-Owner: Product Owner; temporary Lead + Executor authorized in this session
+Plan ID: WO-SF-WORKSPACE-ACCESS-01
+Scope: StudioFlow Notes/Workspace read authorization
+Module(s): studioflow; workspace-board consumer
+Target revision: R9.134
+Risk: high — project assignment authorization and private asset URLs
+Status: IMPLEMENTED — Executor gate incomplete at the pre-existing BQ fixture
+Priority: P1
+Owner: Product Owner
 Last updated: 2026-10-18
 
 ## Outcome
 
-Staff creating or editing a Brand see two meaningful sections instead of four: Profile groups the Brand's own catalog information and external links; Suppliers & contacts groups the suppliers with the people who work for them.
+Notes and Workspace data cannot be read through a direct service or server-action call by a staff member who is neither the project's assigned Designer/Drafter nor a StudioFlow manager. Assigned PICs and managers retain access. Schedule-derived item search stays available under its existing Schedule/read contract.
 
 ## Locked Decisions and Reuse
 
-REUSE UI Engine Drawer, Combobox, FilterChip, Dialog, Field and draft guards.
-EXTEND UI Engine with a generic live TableFilters composition whose options,
-defaults and data filtering remain consumer-owned. No domain policy in shared UI.
-Brand/Supplier/SKU remain Master Data features, not new installable capabilities.
-Keep all current creation permissions, identity and validation rules, partial-save
-semantics, archive/deletion approval and source ownership. No dependencies,
-schema, migrations or new server data exposure. Detail panels use facts already
-authorized and supplied to the directory.
+- REUSE `requireWorkSectionAccess` and the canonical `projectAccessFromFacts` policy. Do not create a second assignment policy.
+- The restricted read contract requires the authenticated caller's user id at the service boundary and fails closed when it is absent.
+- Gate `readWorkspace`, `listWorkspaceThreads`, `listProjectNotes`, `listNoteTags`, and the `listNotesForItem` path before querying restricted rows or creating signed asset URLs.
+- Keep `searchNoteItems` outside the assignment gate because its result is Schedule-derived and Schedule remains visible to permitted read-only users.
+- Keep phase-label/Schedule reads unchanged. No schema, migration, dependency, UI, or product-flow change.
 
-## Implementation and UI Contract
+## Implementation
 
-- Owner decision: Brand has exactly two retained tabs: **Profile** and
-  **Suppliers & contacts**. The standalone Contacts and Catalogs & links tabs
-  are removed in both Create and Edit.
-- Profile contains hashtags, product categories, notes and external catalog/site
-  links. Suppliers & contacts contains owner supplier, supplying organizations
-  and the contact editor. The editor remains disabled until an owner or supplier
-  exists; no permission, ownership, validation or write contract changes.
-- Keep Brand identity outside tabs. Switching tabs retains all values and an
-  invalid field still reveals its hidden tab.
+- Add one assigned-read context type beside the existing StudioFlow read context.
+- Pass the authenticated user id from server actions and server components into every restricted read.
+- Add service integration regressions for refusal of an unassigned non-manager before any Notes/Workspace data is returned, plus retained Designer, Drafter, and manager access.
+- Add action-level regression assertions that the authenticated identity reaches the service boundary.
+- Move the P1 backlog entry to `[UNVERIFIED]` until the full gate and independent browser acceptance close it; record exact evidence and limitations in `CHANGELOG.md`.
 
 ## Verification
 
-Location rumah. Verify rebuild-only test target from the selected env before DB
-tests. High gate: node scripts/verify.mjs --tier high, per command 15 minutes.
-Run typecheck, lint and the affected Brand acceptance/browser scenarios. Use
-installed Chrome through PLAYWRIGHT_CHANNEL=chrome when bundled Chromium is absent.
-The browser checks cover retained profile links, supplier-contact relationship,
-contact addition remains unavailable without a supplier, and existing Brand-price
-relationship acceptance. No live owner data is used.
-Do not mutate the owner's real local data for browser fixtures.
+Location `rumah` when a matching rebuild-only configuration exists. High gate: `node scripts/verify.mjs --tier high`. Before database-backed tests, verify the target is explicitly disposable/rebuild-only. Browser acceptance is required after implementation for the affected Notes and Workspace page reads; if browser prerequisites are unavailable in this cloud checkout, record it as pending rather than claiming acceptance.
 
 ## Acceptance and Recovery
 
-Review actual staged diff and evidence; disclose combined-lane rather than
-independent Claude acceptance. No publishing/push. Revert the UI revision to undo;
-no persisted change or data conversion is necessary.
+- Direct service reads and server actions refuse an unassigned caller with `PERMISSION_DENIED`.
+- Assigned Designer/Drafter and a manager can still read Notes/Workspace.
+- Refusal happens before note/thread/tag rows or signed asset URLs are returned.
+- `searchNoteItems` retains its current read-only Schedule behavior.
+- Revert R9.134 to recover; no data conversion is involved. No push, publication, deployment, or remote mutation.
 
-## Execution and Scoped Review
+## Execution Checkpoint
 
-- Typecheck and the changed-file lint pass.
-- 28 affected Master Data browser scenarios pass, including Brand create/edit,
-  a Profile link retained through tab switches, disabled contact addition before
-  supplier selection, existing Brand-price relationship behavior and narrow layout.
-- This is a small retained-form layout refinement after the R9.132 build and
-  full Master Data browser evidence. No server, data or shared component source
-  changed. Scoped combined-lane review is not independent Claude acceptance;
-  no full-app/release claim or remote publication is made.
-- Evidence: `.verification/masterdata-brand-grouping-e2e.log` (28/28).
-
-## Checkpoint: prior StudioFlow work
-
-Uncommitted StudioFlow access implementation from WO-SF-WORKSPACE-ACCESS-01 is
-preserved, along with its R9.131 candidate ledger/backlog changes. Its high gate was
-incomplete (1233/1234 tests; BQ lock-price fixture failure); browser review and
-commit remain pending. Stage only the Master Data/UI files and the R9.133 ledger
-entry. Do not mix or claim completion of that prior security change.
-Once R9.133 is committed, finishing the prior candidate must use the next unused
-revision; the preserved draft entry is not permission to commit an older suffix.
+- Focused StudioFlow integration passed 226/226; Notes action transport passed 7/7; typecheck passed.
+- The high gate passed boundaries, legacy-runtime, whitespace, typecheck and lint. Its test command passed 1,234/1,235 and reproduced only the recorded BQ `lock-empty-prices` fixture failure; generation/build were not run after the runner stopped.
+- Implementation is ready for its local R9.134 checkpoint. Independent browser acceptance and a fully green high gate remain before Reviewer closure; the BQ fixture is the next separate correction.
 
 ## Executor Prompt
 
-Act as temporary Lead + Backend Executor, rumah. Read AGENTS.md and this READY
-plan. Finish the bounded Brand form grouping outcome, verify the explicit checks,
-inspect the staged diff, update its changelog entry and create R9.133 locally.
-Preserve the unrelated StudioFlow dirty work and draft R9.131 ledger entry;
-report actual evidence, limitations and remaining dirty files.
+Implement this READY security correction as Backend Executor. Preserve the canonical assignment policy, add the required service/action regressions, run the high gate against an explicitly disposable rebuild-only target, inspect the staged diff, update the ledgers, and create one local R9.134 commit. Report browser acceptance separately and do not push.

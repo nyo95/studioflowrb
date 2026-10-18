@@ -40,6 +40,8 @@ export type StudioFlowPorts = {
 
 export type CommandContext = { grants: PermissionGrants; actor: AuditActor };
 export type ReadContext = { grants: PermissionGrants };
+/** Project work-section reads need caller identity as well as grants so assignment is enforced at the service boundary. */
+export type WorkSectionReadContext = ReadContext & { actorId: string };
 
 export const P = STUDIOFLOW_PERMISSIONS;
 export { hasPermission, requirePermission };

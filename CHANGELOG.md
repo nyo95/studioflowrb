@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.134 | 2026-10-18 | fix(studioflow): enforce assignment on Notes reads
+
+- **Scope/security:** Notes and Workspace read services now require authenticated caller identity and reuse the canonical project work-section assignment policy before reading private cards, threads, tags and item-linked notes or creating signed asset URLs. Direct service access and server actions no longer rely on the project page redirect as their only assignment guard.
+- **Access retained:** assigned Designer and Drafter PICs and StudioFlow managers retain their contract-authorized reads. Schedule-derived `searchNoteItems` deliberately keeps its existing read-only contract and is not incorrectly hidden with Notes. No schema, migration, dependency, write behavior or UI design change.
+- **Coverage:** real disposable-database regression proves an unassigned holder of `studioflow.access` + `studioflow.project.read` is refused across board, threads, note stream, tags and item-note reads before storage signing; the same regression proves PIC/manager access and Schedule search. Action transport asserts the authenticated id reaches both Notes and thread services.
+- **Verification:** focused StudioFlow integration 226/226 and action transport 7/7 passed; typecheck passed. The high gate passed boundaries, legacy-runtime, whitespace, typecheck and full lint, then ran 1,235 tests: 1,234 passed and the already recorded BQ `lock-empty-prices` fixture failed at `src/apps/bq/service.integration.test.ts:355`; Prisma generation/build were not run because the runner stopped. Evidence: `.verification/2026-10-18T15-42-23-831Z-2110/summary.json`.
+- **Limits:** the security implementation is complete but remains `[UNVERIFIED]` pending a repaired full high gate and independent affected-flow browser acceptance. No remote publication or push.
+
 ## R9.133 | 2026-10-18 | fix(masterdata): group Brand contacts with suppliers
 
 - **Scope:** Brand create/edit form grouping only. No schema, migration, dependency, server action, validation, permission or persisted-data change.

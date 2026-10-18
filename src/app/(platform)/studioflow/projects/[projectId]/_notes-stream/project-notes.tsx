@@ -25,7 +25,7 @@ export async function ProjectNotes({ projectId, projectName, selectedPhaseId, pe
   const [access, phaseList, initial] = await Promise.all([
     pageProjectAccess(projectId),
     studioFlow.phases.listProjectPhases({ grants, projectId }),
-    studioFlow.workspace.listProjectNotes({ grants, projectId, limit: 100 }),
+    studioFlow.workspace.listProjectNotes({ grants, actorId: userId, projectId, limit: 100 }),
   ]);
   const caps = studioFlow.phases.capabilities(grants);
   const open = !archived && status === "ACTIVE" && caps.work;
