@@ -1,43 +1,47 @@
 # Active Plan
 
-Plan ID: WO-BQ-LOCK-FIXTURE-01
-Scope: BQ Subsection-deletion integration fixture and full verification gate
-Module(s): bq tests only; no runtime module change
-Target revision: R9.135
-Risk: low fixture correction; high verification checkpoint
-Status: IMPLEMENTED — high gate PASS
-Priority: P1 verification blocker
+Plan ID: WO-UI-SHELL-HYDRATION-01
+Scope: authenticated AppShell hydration at the 840px boundary
+Module(s): UI Engine shell; platform route integration
+Target revision: R9.136
+Risk: medium — shared authenticated shell and route transitions
+Status: IMPLEMENTED — target browser and medium gates pass
+Priority: P2
 Owner: Product Owner
 Last updated: 2026-10-18
 
 ## Outcome
 
-The Subsection-deletion rollback regression reaches the locked-project and failing-audit behavior it claims to test instead of being stopped earlier by the valid empty-price lock policy. The full repository high gate completes.
+Direct loads and route history transitions into `/account` at exactly 840px hydrate without React server/client mismatch, including the sequence that previously surfaced after `/masterdata/settings/units`. Desktop/mobile rail and account placement remain unchanged.
 
-## Locked Decisions
+## Locked Decisions and Reuse
 
-- Keep `bq.project.lock-empty-prices` unchanged; the production policy is correct and has its own passing regressions.
-- Price the two setup Work Items used by this test before locking. Do not bypass, acknowledge, weaken or reorder the lock policy.
-- Change only the faulty fixture, its plan/changelog evidence and the StudioFlow verification ledger after the final gate. No schema, migration, dependency or runtime behavior change.
-
-## Verification
-
-Use the same explicitly disposable `studioflow_rebuild_test` PostgreSQL target and `STUDIOFLOW_LOCATION=rumah`. Run the focused BQ integration file, then `node scripts/verify.mjs --tier high --timeout-minutes 15`. A complete pass requires all tests, typecheck/lint, boundary/legacy scans, Prisma generation, production build and whitespace checks.
-
-## Acceptance and Recovery
-
-- The named BQ test reaches its intended assertions and passes.
-- Existing empty-price lock tests still pass unchanged.
-- The high gate has no failed/skipped/cancelled/TODO checks.
-- If the gate is green, update the R9.134 StudioFlow `[UNVERIFIED]` entry to leave only independent browser acceptance pending.
-- Revert R9.135 to recover. No data conversion, push, publication or deployment.
+- Preserve the 840px contract: CSS and JavaScript both treat exactly 840px as desktop; below 840px is narrow.
+- Do not suppress hydration warnings or hide a mismatch. Server and first client render must have the same AppShell tree.
+- REUSE the existing AppShell, route rules and hydration-safe external-store pattern where applicable. No dependency or visual redesign.
+- Add a focused browser regression that listens to console and page errors before navigation and exercises direct load, back and forward at 840px.
 
 ## Execution
 
-- Focused BQ integration passed 51/51, including the unchanged empty-price policy coverage.
-- Full high gate passed all 1,235 tests with zero failed/skipped/cancelled/TODO, plus typecheck, full lint, boundary and legacy-runtime scans, Prisma generation, production build and whitespace.
-- Evidence: `.verification/2026-10-18T15-47-03-301Z-5288/summary.json`.
+1. Extend the existing shell hydration browser probe with the captured `/masterdata/settings/units` → `/account` sequence at 840px and repeat it to establish reproduction.
+2. Trace the mismatched boundary to the smallest shell/route source and implement a deterministic first render.
+3. Run focused component/unit checks, focused browser regression with repetitions, `npm run test:e2e` because the shared shell changes, and a medium gate with production build and exact affected tests. Escalate to high only if evidence crosses auth/data boundaries.
+4. Remove the hydration backlog item only after the browser reproduction remains clean and the full screen-size matrix passes.
+
+## Acceptance and Recovery
+
+- No hydration/server-render mismatch is captured on `/account` at 840px through direct load and history navigation.
+- Rail exists and stays desktop-collapsed at 840px; topbar account remains hidden. At 839px the rail is horizontal and topbar account visible.
+- No sideways overflow or regression across the screen-size route matrix.
+- Revert R9.136 to recover; no schema/data change, push, publication or deployment.
+
+## Execution Evidence
+
+- Shell/UI Engine unit regressions passed 64/64.
+- The focused 840px hydration/history regression passed 10/10 repeated runs; the complete screen-size matrix passed 80/80, including 839px, 840px and 841px account/rail contracts.
+- The full browser suite completed with 179 passed, 5 intentionally skipped workbook scenarios and 6 failures outside the shell slice. The hydration regression and every screen-size scenario passed in that same run. The relevant Notes sender scenario also passed when rerun from a fresh global setup, confirming its full-suite failure was order-dependent fixture state rather than the shell change.
+- The final medium gate includes exact affected unit files and a production build. Its evidence path is recorded in `CHANGELOG.md`.
 
 ## Executor Prompt
 
-Correct only the stale BQ fixture, prove the focused BQ suite and full high gate against the disposable rebuild database, update exact ledger evidence, inspect the staged diff and create local R9.135. Do not change the production lock policy or push.
+Reproduce and repair the captured AppShell hydration mismatch using the installed Next 16 documentation and the existing shell contracts. Add deterministic browser coverage, run the shell unit/e2e/build gates, update ledgers, inspect the staged diff and create local R9.136. Do not suppress errors or redesign the shell; do not push.

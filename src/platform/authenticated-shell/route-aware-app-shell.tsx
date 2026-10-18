@@ -1,19 +1,18 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-
 import { AppShell, type AppShellProps } from "@/platform/ui_engine";
+import { useHydratedPathname } from "./hydrated-pathname";
 import { isRailPath } from "./shell-rules";
 
 export function RouteAwareAppShell({ appRootPaths, ...shellProps }: AppShellProps & {
   appRootPaths: readonly string[];
 }) {
-  const pathname = usePathname();
+  const pathname = useHydratedPathname();
 
   return (
     <AppShell
       {...shellProps}
-      railVisible={isRailPath(pathname, appRootPaths)}
+      railVisible={pathname === null || isRailPath(pathname, appRootPaths)}
     />
   );
 }

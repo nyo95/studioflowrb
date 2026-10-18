@@ -7,6 +7,7 @@ import { DropdownMenu } from "radix-ui";
 import { ChevronRight, CircleHelp, LogOut, SlidersHorizontal, UserRound } from "lucide-react";
 import { initialsOf, NavAction, NavItem } from "@/platform/ui_engine";
 
+import { useHydratedPathname } from "./hydrated-pathname";
 import { isRailPath } from "./shell-rules";
 import { useTour } from "./tour";
 
@@ -98,6 +99,7 @@ export function RailGeneral({ logoutAction, showSettings }: { logoutAction: () =
  * shows only below 840px; a surface without a rail (the launcher) keeps it at every width.
  */
 export function TopbarAccount({ appRootPaths, ...menu }: { appRootPaths: readonly string[] } & Parameters<typeof AccountMenu>[0]) {
-  const withRail = isRailPath(usePathname(), appRootPaths);
+  const pathname = useHydratedPathname();
+  const withRail = pathname === null || isRailPath(pathname, appRootPaths);
   return <div className={withRail ? "flex min-[840px]:hidden" : "flex"}><AccountMenu {...menu} /></div>;
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.136 | 2026-10-18 | fix(shell): stabilize route-aware hydration
+
+- **Cause and fix:** route-dependent shell structure read `usePathname()` directly, so a streamed server pathname and the browser's first pathname could disagree about whether the rail existed. A small shared hook now uses React's hydration-aware external-store snapshots: the server and first client render the same rail-bearing fallback, then switch to the live Next pathname after hydration. Both `RouteAwareAppShell` and the topbar account placement use the same value; no hydration warning is suppressed.
+- **Responsive contract:** exactly 840px remains desktop: the collapsed rail is visible and the topbar account is hidden. At 839px the horizontal rail/topbar account behavior remains intact. No visual redesign, schema, migration, dependency, permission or persisted-data change.
+- **Target verification:** shell/UI Engine tests passed 64/64; the new `/masterdata/settings/units` → `/account` direct-load/reload/back/forward regression passed 10/10 repeated runs at 840px; the complete screen-size matrix passed 80/80. The full browser run also passed the new hydration scenario and all screen-size cases, finishing 179 passed, 5 intentionally skipped workbook scenarios and 6 unrelated/order-sensitive failures; the affected Notes sender case passed separately from fresh setup. The incomplete full-browser result is recorded, not called green.
+- **Gate:** the final medium gate passed boundary/legacy scans, whitespace, typecheck, full lint, the exact affected unit files, Prisma generation and production build. Evidence: `.verification/2026-10-18T16-14-54-214Z-15968/summary.json`. The captured hydration backlog item is removed on the repeated focused and complete responsive evidence; R9.134 independent access review remains separate. No push or remote publication.
+
 ## R9.135 | 2026-10-18 | test(bq): repair Subsection rollback fixture
 
 - **Fixture correction:** the Subsection deletion safety/rollback regression now gives both setup Work Items valid prices before locking its project. The test therefore reaches the locked-project refusal and failing-audit rollback assertions it names, instead of stopping at the valid `bq.project.lock-empty-prices` policy.

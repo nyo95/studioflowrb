@@ -138,6 +138,30 @@ test("shell route transitions do not hydrate against a different rail", async ({
   expect(mismatches).toEqual([]);
 });
 
+test("Account shell hydrates after Master Data settings at the 840px rail boundary", async ({ page }) => {
+  const mismatches: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydrat|server rendered html|server rendered.*client/i.test(message.text())) mismatches.push(`${page.url()}: ${message.text()}`);
+  });
+  page.on("pageerror", (error) => {
+    if (/hydrat|server rendered html|server rendered.*client/i.test(error.message)) mismatches.push(`${page.url()}: ${error.message}`);
+  });
+
+  await page.setViewportSize({ width: 840, height: 900 });
+  await open(page, "/masterdata/settings/units");
+  await open(page, "/account");
+  await page.reload();
+  await page.locator("main").first().waitFor();
+  await page.goBack();
+  await page.locator("main").first().waitFor();
+  await page.goForward();
+  await page.locator("main").first().waitFor();
+
+  await expect(page.locator("aside[aria-label]")).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Account menu for/ })).toBeHidden();
+  expect(mismatches).toEqual([]);
+});
+
 test("Role matrix follows the Developer module ceiling without hiding core apps", async ({ page }) => {
   const connectionString = process.env.PLATFORM_TEST_DATABASE_URL;
   if (!connectionString) throw new Error("PLATFORM_TEST_DATABASE_URL is required.");
