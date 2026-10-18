@@ -344,9 +344,10 @@ describe("BQ R6.1 invariants", () => {
   });
 
   it("rejects unsafe Subsection deletion and rolls it back when audit fails", async () => {
-    const { project, section } = await projectTree();
+    const { project, section, item: directItem } = await projectTree();
     const subsection = await service.addSubsection({ grants: GRANTS, actor: ACTOR, sectionId: section.id, name: "Floor" });
-    const item = await service.addItem({ grants: GRANTS, actor: ACTOR, subsectionId: subsection.id, name: "Tile", qty: "1", unit: "M2" });
+    const item = await service.addItem({ grants: GRANTS, actor: ACTOR, subsectionId: subsection.id, name: "Tile", qty: "1", unit: "M2", hargaSnapshot: "100" });
+    await service.updateItem({ grants: GRANTS, actor: ACTOR, id: directItem.id, hargaSnapshot: "100" });
     const original = await testDb.prisma.bqItem.findUniqueOrThrow({ where: { id: item.id } });
     for (const operation of [
       () => service.deleteSubsection({ grants: GRANTS.filter((grant) => grant !== BQ_PERMISSIONS.projectManage), actor: ACTOR, id: subsection.id }),

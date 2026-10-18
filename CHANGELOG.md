@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.135 | 2026-10-18 | test(bq): repair Subsection rollback fixture
+
+- **Fixture correction:** the Subsection deletion safety/rollback regression now gives both setup Work Items valid prices before locking its project. The test therefore reaches the locked-project refusal and failing-audit rollback assertions it names, instead of stopping at the valid `bq.project.lock-empty-prices` policy.
+- **Production behavior:** no runtime code, lock policy, schema, migration or dependency changed. The dedicated empty-price regression remains unchanged and passes; no acknowledgement or bypass was added.
+- **Verification:** focused BQ integration 51/51 passed. The full high gate passed boundaries, legacy-runtime, staged/unstaged whitespace, typecheck, full lint, all 1,235 tests with zero failed/skipped/cancelled/TODO, Prisma generation and production build. Evidence: `.verification/2026-10-18T15-47-03-301Z-5288/summary.json`. The final ledger-only update reuses this exact runtime evidence after diff review.
+- **Effect on R9.134:** the repaired full gate covers the committed StudioFlow assignment-read correction as well as this fixture. R9.134 now waits only for independent affected-flow browser acceptance; no push or remote publication.
+
 ## R9.134 | 2026-10-18 | fix(studioflow): enforce assignment on Notes reads
 
 - **Scope/security:** Notes and Workspace read services now require authenticated caller identity and reuse the canonical project work-section assignment policy before reading private cards, threads, tags and item-linked notes or creating signed asset URLs. Direct service access and server actions no longer rely on the project page redirect as their only assignment guard.
