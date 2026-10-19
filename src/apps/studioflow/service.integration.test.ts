@@ -33,6 +33,8 @@ import { createPresentationService, type PresentationService } from "@/apps/pres
 import { createStudioFlowPresentationBridge } from "./public/presentation-bridge";
 
 const ALL = [...Object.values(P)];
+/** ALL holds project.manage, so detail reads are manager reads whatever the actor id. */
+const MANAGER_READER = "manager-reader";
 const DRAFTER_GRANTS = [P.access, P.projectRead, P.phaseWork, P.taskManage, P.projectPicDrafter, P.ideasManage];
 
 let testDb: TestDb;
@@ -323,7 +325,7 @@ describe("WO-SF-PHASE-MENU-01 skip lifecycle", () => {
     await sf.phases.bypassPhase({ ...as(designer), projectId, phaseId: phase.id, reason: "Client supplied the concept" });
     assert.equal(await testDb.prisma.sfRevision.count({ where: { id: open.id } }), 0);
     assert.deepEqual(await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: phase.id }, select: { status: true, is_locked: true } }), { status: "DONE", is_locked: true });
-    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id })).skippedReason, "Client supplied the concept");
+    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id })).skippedReason, "Client supplied the concept");
     assert.equal((await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((card) => card.id === projectId)!.phases[0]!.skipped_reason, "Client supplied the concept");
   });
 
@@ -913,7 +915,7 @@ describe("WO-BE-01 backend regressions", () => {
     const first = await sf.phases.postPhaseNote({ ...as(designer), projectId, phaseId: phase.id, body: "- Warmer palette\n- Keep the marble", clientFeedback: true });
     clock = new Date(clock.getTime() + 60_000);
     const second = await sf.phases.postPhaseNote({ ...as(designer), projectId, phaseId: phase.id, body: "Supplier called back" });
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
     assert.deepEqual(detail.notes.map((note) => [note.id, note.body, note.clientFeedback, note.starred, note.iterationId, note.iterationLabel, note.authorName]), [
       [first.noteId, "- Warmer palette\n- Keep the marble", true, false, detail.currentIteration!.id, detail.currentIteration!.shortName, designer.actor.label],
       [second.noteId, "Supplier called back", false, false, detail.currentIteration!.id, detail.currentIteration!.shortName, designer.actor.label],
@@ -1175,7 +1177,7 @@ describe("Iteration workflow (WO-SF-ITER-01)", () => {
     await sf.phases.addIteration({ ...as(designer), projectId, phaseId: layout.id });
     await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: supervision.id }), "PHASE_SEQUENTIAL");
     await rejectsWith(sf.phases.createSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, visitDate: "2026-09-20" }), "PHASE_SEQUENTIAL");
-    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: supervision.id })).canStart, false);
+    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: supervision.id })).canStart, false);
     const cd = await phaseOf(projectId, "cd");
     await sf.projects.setProjectStatus({ ...as(designer), projectId, status: "ON_HOLD" });
     await rejectsWith(sf.phases.addIteration({ ...as(designer), projectId, phaseId: cd.id }), "PROJECT_NOT_ACTIVE");
@@ -2239,13 +2241,13 @@ describe("Phase Template V2 invariants", () => {
 describe("Snapshot runtime truth", () => {
   it("custom phase name used in reads", async () => {
     const { projectId } = await newProject();
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: (await phaseOf(projectId, "moodboard")).id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: (await phaseOf(projectId, "moodboard")).id });
     assert.equal(detail.label, "Moodboard", "detail uses snapshot label");
   });
 
   it("custom prefix used in revision labels", async () => {
     const { projectId } = await newProject();
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: (await phaseOf(projectId, "moodboard")).id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: (await phaseOf(projectId, "moodboard")).id });
     assert.ok(detail.activeRevision?.label.startsWith("MB"), "revision uses snapshot prefix");
   });
 
@@ -2253,14 +2255,14 @@ describe("Snapshot runtime truth", () => {
     const { projectId } = await newProject();
     const cd = await phaseOf(projectId, "cd");
     await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: cd.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: cd.id });
     assert.equal(detail.seatUserId, drafter.id, "CD belongs to the drafter seat from the snapshot");
   });
 
   it("getPhaseDetail returns warnings with deliverable status and open optional count", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
     assert.ok(detail.warnings, "warnings field present");
     assert.equal(typeof detail.warnings.optionalOpen, "number");
     assert.ok(["MISSING", "CURRENT", "OUTDATED"].includes(detail.warnings.deliverableStatus), "deliverableStatus is a valid enum value");
@@ -2296,7 +2298,7 @@ describe("Deliverable reference revision", () => {
   it("deliverable status: no file → MISSING", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
-    const result = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    const result = await sf.phases.listDeliverables({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
     assert.equal(result.status, "MISSING");
   });
 
@@ -2305,7 +2307,7 @@ describe("Deliverable reference revision", () => {
     const phase = await phaseOf(projectId, "moodboard");
     const base = { ...as(designer), projectId, phaseId: phase.id };
     await sf.phases.uploadDeliverable({ ...base, name: "design.pdf", file: { body: new Uint8Array(100), contentType: "application/pdf" } });
-    const result = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    const result = await sf.phases.listDeliverables({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
     assert.equal(result.status, "CURRENT");
     assert.equal(result.items.length, 1);
   });
@@ -2315,10 +2317,10 @@ describe("Deliverable reference revision", () => {
     const phase = await phaseOf(projectId, "moodboard");
     const base = { ...as(designer), projectId, phaseId: phase.id };
     await sf.phases.uploadDeliverable({ ...base, name: "design.pdf", file: { body: new Uint8Array(100), contentType: "application/pdf" } });
-    const before = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    const before = await sf.phases.listDeliverables({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
     assert.equal(before.status, "CURRENT");
     await clientRound(base, "REVISION");
-    const after = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    const after = await sf.phases.listDeliverables({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
     assert.equal(after.status, "OUTDATED", "files belong to old revision after reject");
   });
 
@@ -2329,7 +2331,7 @@ describe("Deliverable reference revision", () => {
     await sf.phases.uploadDeliverable({ ...base, name: "draft.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
     const first = await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { phase_id: phase.id } });
     await sf.phases.uploadDeliverable({ ...base, name: "final.zip", file: { body: new Uint8Array([2]), contentType: "application/zip" } });
-    const listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    const listed = await sf.phases.listDeliverables({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
     assert.equal(listed.items.length, 1);
     assert.equal(listed.items[0]?.name, "final.zip");
     assert.equal(await testDb.prisma.sfDeliverable.count({ where: { phase_id: phase.id } }), 1);
@@ -2548,7 +2550,7 @@ describe("SF-V2-E phase definitions", () => {
     await seedTemplate("Studio flow", SIX_PHASES);
     const { projectId } = await newProject();
     const [concept, planning, , documentation] = await phasesOf(projectId);
-    const detail = (phaseId: string) => sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId });
+    const detail = (phaseId: string) => sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId });
     const run = { ...as(designer), projectId };
 
     const first = await openIteration(concept.id);
@@ -2581,7 +2583,7 @@ describe("SF-V2-E phase definitions", () => {
     const [conceptPhase, namedSupervision] = await phasesOf(customProject.projectId);
     const run = { ...as(designer), projectId: customProject.projectId };
     await clientRound({ ...run, phaseId: conceptPhase.id }, "DONE");
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId: customProject.projectId, phaseId: namedSupervision.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId: customProject.projectId, phaseId: namedSupervision.id });
     assert.equal(detail.isSupervision, false, "a custom phase called Supervision is an ordinary phase");
     assert.deepEqual(detail.currentIteration?.choices, ["send"]);
     await rejectsWith(sf.phases.createSupervisionVisit({ ...run, phaseId: namedSupervision.id, visitDate: "2026-09-20" }), "PHASE_INVALID_STATE");
@@ -2596,7 +2598,7 @@ describe("SF-V2-E phase definitions", () => {
       await sf.phases.bypassPhase({ ...as(designer), projectId: standard.projectId, phaseId: (await phaseOf(standard.projectId, key)).id, reason: "Skip" });
     }
     const visit = await sf.phases.createSupervisionVisit({ ...as(designer), projectId: standard.projectId, phaseId: supervision.id, visitDate: "2026-09-20" });
-    const visitDetail = await sf.phases.getPhaseDetail({ grants: ALL, projectId: standard.projectId, phaseId: supervision.id });
+    const visitDetail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId: standard.projectId, phaseId: supervision.id });
     assert.equal(visitDetail.isSupervision, true);
     assert.deepEqual(visitDetail.currentIteration?.choices, ["next_visit", "done"]);
     await sf.phases.chooseSupervisionVisit({ ...as(designer), projectId: standard.projectId, phaseId: supervision.id, iterationId: visit.iterationId, outcome: "DONE" });
@@ -2616,7 +2618,7 @@ describe("SF-V2-E phase definitions", () => {
     // Another iteration on a finished phase stays phase-local; project completion is an explicit command.
     await sf.phases.addIteration({ ...run, phaseId: handover.id });
     assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId })).status, "ACTIVE");
-    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: handover.id })).status, "ACTIVE");
+    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: handover.id })).status, "ACTIVE");
   });
 
   it("keeps a visit's notes on the visit when the last Supervision visit closes the phase", async () => {
@@ -2647,7 +2649,7 @@ describe("SF-V2-E phase definitions", () => {
     }
     const supervision = await phaseOf(projectId, "supervision");
     const base = { ...as(designer), projectId, phaseId: supervision.id };
-    const flag = async () => (await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: supervision.id })).canFinishSupervision;
+    const flag = async () => (await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: supervision.id })).canFinishSupervision;
 
     // No visit yet: nothing to hand over from.
     assert.equal(await flag(), false);
@@ -3012,7 +3014,7 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     assert.equal(await name(second.nextIterationId), "2026-474 Sociolla SBW R1 D2", "the number continues, whatever the first one is called");
     await sf.phases.renameIteration({ ...as(designer), projectId, phaseId: d3.id, iterationId: first.iterationId, name: "   " });
     assert.equal(await name(first.iterationId), "2026-474 Sociolla SBW R1 D1", "an empty name resets to the default");
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: d3.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: d3.id });
     assert.deepEqual(detail.iterations.map((it) => it.shortName).sort(), ["D1", "D2"]);
   });
 
@@ -3086,7 +3088,7 @@ describe("WO-SF-ITER-01 review regressions (undo, CD chain, carry-forward, acces
     await sf.phases.sendIteration(base);
     await sf.phases.recordClientAnswer(base);
     await assert.rejects(sf.phases.chooseIterationOutcome({ ...base, outcome: "DONE" }), (error: unknown) => error instanceof AppError && error.code === "PHASE_INVALID_STATE" && /Concept Study must be revised or continued to Final Concept/.test(error.message));
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: moodboard.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: moodboard.id });
     assert.equal(detail.currentIteration!.nextStepName, "Final Concept");
     const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((c) => c.id === projectId)!.phases.find((p) => p.id === moodboard.id)!;
     assert.equal(card.current_iteration!.next_step_name, "Final Concept");
@@ -3156,7 +3158,7 @@ describe("WO-SF-ITER-01 screens support (Lead)", () => {
     const visit = await sf.phases.createSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, visitDate: "2026-09-20", note: "Site check" });
     const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((item) => item.id === projectId)!;
     assert.deepEqual(card.phases.find((item) => item.id === supervision.id)!.current_iteration!.available_choices, ["next_visit", "done"]);
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: supervision.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: supervision.id });
     assert.deepEqual(detail.currentIteration?.choices, ["next_visit", "done"]);
     assert.equal(detail.isSupervision, true);
     await sf.phases.chooseSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, iterationId: visit.iterationId, outcome: "NEXT_VISIT" });
@@ -3319,6 +3321,17 @@ describe("WO-SF-PLAN-01 working-time planning from Fit Out Start", () => {
     await rejectsWith(sf.projects.applyProjectPlan({ ...as(drafter, DRAFTER_GRANTS), projectId }), "PERMISSION_DENIED");
     await rejectsWith(sf.projects.setPlanOverrides({ ...as(drafter, DRAFTER_GRANTS), projectId, overrides: { gap: 3 } }), "PERMISSION_DENIED");
     await rejectsWith(sf.projects.setPlanOverrides({ ...as(designer), projectId, overrides: { gap: 0 } }), "PLAN_OVERRIDES_INVALID");
+  });
+
+  it("lists the same plan milestones the project plan computes, including overrides", async () => {
+    const { projectId } = await newProject("Plan list milestones");
+    const listed = async () => (await sf.projects.listProjects({ grants: ALL })).find((project) => project.id === projectId)!;
+    assert.equal((await listed()).planMilestones, null, "no anchor, no computed milestones");
+    await sf.projects.setDesignHandover({ ...as(designer), projectId, designHandoverDate: "2026-12-28" });
+    await sf.projects.setPlanOverrides({ ...as(designer), projectId, overrides: { cdFinal: 10 } });
+    const plan = (await sf.projects.getProjectPlan({ grants: ALL, projectId })).milestones!;
+    assert.deepEqual((await listed()).planMilestones, plan);
+    assert.notEqual(plan.cdFinalStart, plan.end, "CD Final and END are distinct milestones");
   });
 
   it("a project override moves only the dates that depend on that interval", async () => {
@@ -3494,7 +3507,7 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
     const two = await sf.phases.postPhaseImage({ ...base, file: jpeg() });
     const noteId = one.imageId;
     await sf.workspace.setWorkspaceCardFlags({ ...base, cardId: noteId, pinned: true, version: await noteVersion(noteId) });
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: phase.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
     const shape = (images: ReadonlyArray<{ id: string; url: string | null; contentType: string; bytes: number }>) => images.map((image) => [image.id, image.contentType, image.bytes, image.url?.startsWith("https://storage.invalid/")]);
     const byType = (rows: unknown[][]) => rows.sort((x, y) => String(x[1]).localeCompare(String(y[1])));
     assert.deepEqual(byType(detail.notes.flatMap((note) => shape(note.images))), [[two.imageId, "image/jpeg", 8, true], [one.imageId, "image/png", PNG.byteLength, true]]);
@@ -3823,7 +3836,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     return { projectId, moodboard, cd, base: { ...as(designer), projectId } };
   }
 
-  it("keeps Notes and Workspace reads private to assigned PICs and managers while Schedule item search stays readable", async () => {
+  it("keeps Notes, Workspace, phase detail and Deliverable reads private to assigned PICs and managers while Schedule item search stays readable", async () => {
     const { projectId, moodboard, base } = await setup("Private workspace reads");
     const entry = await sf.schedule.createEntry({ ...base, section: "MATERIAL", category: "Paint", snapshot: { productName: "Private palette" } });
     await sf.workspace.createWorkspaceCard({ ...base, body: "Private note", tags: ["palette"], itemEntryIds: [entry.entryId] });
@@ -3841,6 +3854,8 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
         () => sf.workspace.listProjectNotes(restricted),
         () => sf.workspace.listNoteTags(restricted),
         () => sf.workspace.listNotesForItem({ ...restricted, entryId: entry.entryId }),
+        () => sf.phases.getPhaseDetail({ ...restricted, phaseId: moodboard.id }),
+        () => sf.phases.listDeliverables({ ...restricted, phaseId: moodboard.id }),
       ]) await rejectsWith(read(), "PERMISSION_DENIED");
       assert.equal(signedRead.mock.callCount(), 0, "assignment refusal happens before private asset URLs are signed");
     } finally {
@@ -3860,6 +3875,8 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
       assert.equal((await sf.workspace.listProjectNotes(allowed)).notes.length, 3);
       assert.deepEqual(await sf.workspace.listNoteTags(allowed), [{ name: "palette", count: 1 }]);
       assert.equal((await sf.workspace.listNotesForItem({ ...allowed, entryId: entry.entryId }))[0]?.body, "Private note");
+      assert.equal((await sf.phases.getPhaseDetail({ ...allowed, phaseId: moodboard.id })).id, moodboard.id);
+      assert.deepEqual((await sf.phases.listDeliverables({ ...allowed, phaseId: moodboard.id })).items, []);
     }
   });
 
@@ -3893,7 +3910,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Palette" });
     await sf.workspace.createWorkspaceCard({ ...base, body: "General" });
     assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId, phaseId: moodboard.id })).map((card) => card.id), [cardId]);
-    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: moodboard.id })).notes.length, 1, "the phase notes feed shows only its own cards");
+    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: moodboard.id })).notes.length, 1, "the phase notes feed shows only its own cards");
 
     let version = (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } })).version;
     ({ version } = await sf.workspace.setWorkspaceCardPhase({ ...base, cardId, phaseId: cd.id, version }));

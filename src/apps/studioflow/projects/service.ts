@@ -453,6 +453,26 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         },
       });
       const people = await namesFor(rows.flatMap((row) => [row.pic_designer_id, row.pic_drafter_id]));
+      // The Timeline table shows the plan's milestones; settings and holidays are read once for every row.
+      const [settings, holidayRows] = rows.length ? await Promise.all([readSettings(db), db.sfHoliday.findMany({ select: { date: true } })]) : [null, []];
+      const holidays = new Set(holidayRows.map((holiday) => dateToDateOnly(holiday.date)!));
+      const today = dateToDateOnly(nowOf(ports))!;
+      const planMilestones = (row: (typeof rows)[number]) => {
+        if (!settings) return null;
+        const overrides = (row.plan_overrides ?? {}) as Partial<PlanIntervals>;
+        const pick = (key: keyof PlanIntervals) => overrides[key] ?? settings[key];
+        const cd = row.phases.find((phase) => phase.definition_id === LEGACY_PHASE_DEFINITION_IDS.cd);
+        return computeProjectPlan({
+          fitOutStart: dateToDateOnly(row.fit_out_start_date),
+          designHandover: dateToDateOnly(row.design_handover_date),
+          intervals: { cdMall: pick("cdMall"), cdFinal: pick("cdFinal"), gap: pick("gap"), fitOutToHandover: pick("fitOutToHandover"), handoverToOpening: pick("handoverToOpening") },
+          holidays,
+          openingDate: dateToDateOnly(row.opening_date),
+          timelineStart: dateToDateOnly(row.timeline_start_date),
+          cdDoneDate: cd?.status === "DONE" ? dateToDateOnly(cd.status_changed_at) : null,
+          today,
+        })?.milestones ?? null;
+      };
       return rows.map((row) => ({
         id: row.id,
         name: row.name,
@@ -483,6 +503,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           return due < today ? "OVERDUE" as const : due === today ? "DUE_TODAY" as const : "ON_TRACK" as const;
         })(),
         activePhaseLabel: row.phases.find((phase) => phase.status === "ACTIVE")?.name_snapshot ?? null,
+        /** Computed plan milestones (same chain as Apply plan), or null without Design Handover / Fit Out Start. */
+        planMilestones: planMilestones(row),
         phases: row.phases.map((phase) => ({ id: phase.id, definitionId: phase.definition_id, status: phase.status as PhaseStatus, isLocked: phase.is_locked, statusChangedAt: phase.status_changed_at, label: phase.name_snapshot, plannedStartDate: dateToDateOnly(phase.planned_start_date), plannedEndDate: dateToDateOnly(phase.planned_end_date) })),
         openItems: row._count.checklist_items,
       }));

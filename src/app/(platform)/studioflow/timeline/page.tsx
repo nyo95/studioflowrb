@@ -65,8 +65,8 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
       <PageHeader
         title="Timeline"
         description={canOverrideTimeline
-          ? "Every project's phase schedule in one Gantt — filter by client, PIC, status, or date range; click a segment to set its planned dates."
-          : "Every project's phase schedule in one read-only Gantt — filter by client, PIC, status, or date range."}
+          ? "Every project's schedule as a table or Gantt — filter by client, PIC, status, or date range; use “Dates & plan” on a project to set Design Handover and its planned dates."
+          : "Every project's schedule as a read-only table or Gantt — filter by client, PIC, status, or date range."}
         divider
       />
       <TimelineDirectory

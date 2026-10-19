@@ -32,6 +32,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.162] Lead takeover corrections: Timeline milestones, Deliverables, phase names
+- Surface: StudioFlow → Timeline (Table and Gantt); project → Deliverables; project → Phases strip; project → Timeline tab
+- Fixture: a project with Design Handover set and a cdFinal override; a project with no anchor; a project whose first phase is active and later phases not started; a non-assigned staff reader
+- Viewport: desktop 1440×900 (short-window strip mode) and 375 px
+- Steps: 1. In Timeline Table compare Design Final, CD, CD Final, END, Start Fit Out and Design Handover with the project's Dates & plan dialog. 2. Confirm the edit button reads "Dates & plan" in both lenses. 3. Open Deliverables: Upload appears only on phases with an open iteration; Delete uses the shared icon button and confirmation. 4. At 1440×900 confirm phase names in the strip are readable (notes shorten first). 5. Open a project's Timeline tab with no Handover: the empty rows ask for Design Handover, not Fit Out Start. 6. As a non-assigned reader, project detail, phase detail and Deliverables stay unavailable.
+- Acceptance: Table dates equal the computed plan; CD Final and END differ when the CD Final gap is non-zero; no Upload control leads to a guaranteed refusal; phase names are not cut to one letter; copy matches the Design-Handover model; access boundaries hold. Known limitation: at 375 px the Deliverables Status/Actions columns sit behind the table's horizontal scroll.
+- Status: PENDING (automated: StudioFlow integration 259/259 and full e2e; owner walk on real data outstanding)
+
 ### [R9.160] StudioFlow role profile matrix
 - Surface: Settings → Access → Roles, plus StudioFlow navigation/project access
 - Fixture: Platform Owner with Designer assignment; Designer, Drafter, and Manager role fixtures; a project with Designer and Drafter PICs

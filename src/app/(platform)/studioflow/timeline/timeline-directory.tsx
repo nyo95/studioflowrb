@@ -26,6 +26,8 @@ export type TimelineProject = {
   fitOutStartDate: string | null;
   scheduleStatus: "ON_TRACK" | "DUE_TODAY" | "OVERDUE" | "PENDING" | "ON_HOLD" | "COMPLETED";
   activePhaseLabel: string | null;
+  /** The plan's computed milestones; null until Design Handover (or a legacy Fit Out Start) anchors the plan. */
+  planMilestones: { designFinal: string; cdMallStart: string; cdFinalStart: string; end: string; fitOutStart: string; handover: string } | null;
   phases: TimelinePhase[];
 };
 
@@ -162,9 +164,39 @@ export function TimelineDirectory({
 }
 
 function ScheduleTable({ projects, canManage, editable, onEdit }: { projects: TimelineProject[]; canManage: boolean; editable: Record<string, { project: boolean; phaseIds: string[] }>; onEdit: (project: TimelineProject) => void }) {
-  const phaseEnd = (project: TimelineProject, definition: string) => project.phases.find((phase) => phase.definitionId === definition)?.plannedEndDate ?? "—";
-  const phaseStart = (project: TimelineProject, definition: string) => project.phases.find((phase) => phase.definitionId === definition)?.plannedStartDate ?? "—";
-  const defs = { design: LEGACY_PHASE_DEFINITION_IDS.design3d, cd: LEGACY_PHASE_DEFINITION_IDS.cd };
+  const phase = (project: TimelineProject, definition: string) => project.phases.find((item) => item.definitionId === definition);
+  // Plan milestones first (the same chain Apply plan writes); a project without an anchor falls back to its phase dates.
+  const columns: Array<{ header: string; value: (project: TimelineProject) => string | null | undefined }> = [
+    { header: "Start", value: (project) => project.timelineStartDate },
+    { header: "Design Final", value: (project) => project.planMilestones?.designFinal ?? phase(project, LEGACY_PHASE_DEFINITION_IDS.design3d)?.plannedEndDate },
+    { header: "CD", value: (project) => project.planMilestones?.cdMallStart ?? phase(project, LEGACY_PHASE_DEFINITION_IDS.cd)?.plannedStartDate },
+    { header: "CD Final", value: (project) => project.planMilestones?.cdFinalStart },
+    { header: "END", value: (project) => project.planMilestones?.end ?? phase(project, LEGACY_PHASE_DEFINITION_IDS.cd)?.plannedEndDate },
+    { header: "Start Fit Out", value: (project) => project.planMilestones?.fitOutStart ?? project.fitOutStartDate },
+    { header: "Design Handover", value: (project) => project.designHandoverDate ?? project.planMilestones?.handover },
+    { header: "Opening", value: (project) => project.openingDate },
+  ];
   const status = (project: TimelineProject) => project.scheduleStatus.replaceAll("_", " ").toLowerCase();
-  return <DataTable aria-label="Project timeline table" minWidth={1560} density="compact"><TableHeader><TableRow><TableHead>Project</TableHead><TableHead>Start</TableHead><TableHead>Design Final</TableHead><TableHead>CD</TableHead><TableHead>CD Final</TableHead><TableHead>END</TableHead><TableHead>Start Fit Out</TableHead><TableHead>Design Handover</TableHead><TableHead>Opening</TableHead><TableHead>Status / progress</TableHead>{canManage ? <TableHead>Plan</TableHead> : null}</TableRow></TableHeader><TableBody>{projects.map((project) => <TableRow key={project.id}><TableCell><Link href={STUDIOFLOW_ROUTES.projectTimeline(project.id)} prefetch={false}>{project.name}</Link></TableCell><TableCell>{project.timelineStartDate}</TableCell><TableCell>{phaseEnd(project, defs.design)}</TableCell><TableCell>{phaseStart(project, defs.cd)}</TableCell><TableCell>{phaseEnd(project, defs.cd)}</TableCell><TableCell>{phaseEnd(project, defs.cd)}</TableCell><TableCell>{project.fitOutStartDate ?? "—"}</TableCell><TableCell>{project.designHandoverDate ?? "—"}</TableCell><TableCell>{project.openingDate ?? "—"}</TableCell><TableCell>{status(project)}{project.activePhaseLabel ? ` · ${project.activePhaseLabel}` : ""}</TableCell>{canManage ? <TableCell>{editable[project.id]?.project ? <Button type="button" size="sm" variant="ghost" onClick={() => onEdit(project)}>Edit dates</Button> : "—"}</TableCell> : null}</TableRow>)}</TableBody></DataTable>;
+  return (
+    <DataTable aria-label="Project timeline table" minWidth={1560} density="compact">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Project</TableHead>
+          {columns.map((column) => <TableHead key={column.header}>{column.header}</TableHead>)}
+          <TableHead>Status / progress</TableHead>
+          {canManage ? <TableHead>Plan</TableHead> : null}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {projects.map((project) => (
+          <TableRow key={project.id}>
+            <TableCell><Link href={STUDIOFLOW_ROUTES.projectTimeline(project.id)} prefetch={false}>{project.name}</Link></TableCell>
+            {columns.map((column) => <TableCell key={column.header}>{column.value(project) ?? "—"}</TableCell>)}
+            <TableCell>{status(project)}{project.activePhaseLabel ? ` · ${project.activePhaseLabel}` : ""}</TableCell>
+            {canManage ? <TableCell>{editable[project.id]?.project ? <Button type="button" size="sm" variant="ghost" onClick={() => onEdit(project)}>Dates &amp; plan</Button> : "—"}</TableCell> : null}
+          </TableRow>
+        ))}
+      </TableBody>
+    </DataTable>
+  );
 }

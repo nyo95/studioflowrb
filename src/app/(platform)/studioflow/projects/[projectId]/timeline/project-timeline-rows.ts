@@ -34,7 +34,7 @@ export function buildProjectTimelineRows(project: ProjectInput, phases: PhaseInp
   if (project.openingDate) markers.push({ id: "opening", date: project.openingDate, label: "Opening", tone: "opening" });
   if (m && (!project.openingDate || m.openingForecast > project.openingDate)) markers.push({ id: "forecast", date: m.openingForecast, label: "Opening (forecast)", tone: project.openingDate ? "warning" : "milestone" });
 
-  const rows: GanttRowData[] = [{ id: "milestones", title: "Milestones", subtitle: "From the plan", bars: [], markers, emptyText: "Set a Fit Out Start" }];
+  const rows: GanttRowData[] = [{ id: "milestones", title: "Milestones", subtitle: "From the plan", bars: [], markers, emptyText: "Set Design Handover" }];
   for (const phase of phases) {
     const { bars, markers: own, undated } = phaseBarsAndMarkers([phase]);
     const planned = phase.definitionId !== null && PLANNED_DEFINITIONS.has(phase.definitionId);
@@ -52,7 +52,7 @@ export function buildProjectTimelineRows(project: ProjectInput, phases: PhaseInp
       subtitle: phase.manual && planned ? "Dates set by hand" : planned && (finalBars.length > 0 || own.length > 0) ? "Dates from the plan" : undated ? "No dates" : undefined,
       bars: finalBars,
       markers: own,
-      emptyText: planned ? "Set a Fit Out Start and apply the plan" : "Not part of the plan — no dates",
+      emptyText: planned ? "Set Design Handover in Timeline and apply the plan" : "Not part of the plan — no dates",
     });
   }
   return rows;

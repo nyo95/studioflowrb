@@ -15,7 +15,7 @@ export async function ConstructionDrawingWorkspace({ projectId, phaseId, archive
   const [items, people, detail, access] = await Promise.all([
     studioFlow.cdList.list({ grants, actorId: userId, projectId, phaseId }),
     studioFlow.projects.listAssignablePeople({ grants, seat: "drafter" }),
-    studioFlow.phases.getPhaseDetail({ grants, projectId, phaseId }),
+    studioFlow.phases.getPhaseDetail({ grants, actorId: userId, projectId, phaseId }),
     pageProjectAccess(projectId),
   ]);
   const canEdit = !archived

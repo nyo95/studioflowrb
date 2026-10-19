@@ -7,14 +7,14 @@ import {
   notFound,
   requireCommand,
   requireProjectAccess,
-  requireRead,
+  requireProjectDetailAccess,
   requiredText,
   writeAudit,
   type CommandContext,
   type Db,
-  type ReadContext,
   type StudioFlowPorts,
   type TxClient,
+  type WorkSectionReadContext,
 } from "../shared";
 import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
 
@@ -110,8 +110,9 @@ export function createDeliverableService(
   }
 
   const deliverables = {
-    async listDeliverables(input: ReadContext & { projectId: string; phaseId: string }) {
-      requireRead(input.grants);
+    async listDeliverables(input: WorkSectionReadContext & { projectId: string; phaseId: string }) {
+      // Private files: refuse before any read URL is signed for someone outside the assigned team and managers.
+      await requireProjectDetailAccess(db, input);
       const rows = await db.sfDeliverable.findMany({ where: { project_id: input.projectId, phase_id: input.phaseId }, orderBy: { created_at: "desc" } });
       const refId = await referenceRevisionId(db, input.phaseId);
       const status = computeDeliverableStatus(rows, refId);

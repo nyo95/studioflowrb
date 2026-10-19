@@ -33,6 +33,7 @@ import {
   requireCommand,
   requirePermission,
   requireProjectAccess,
+  requireProjectDetailAccess,
   requireRead,
   optionalText,
   requiredText,
@@ -42,6 +43,7 @@ import {
   type ReadContext,
   type StudioFlowPorts,
   type TxClient,
+  type WorkSectionReadContext,
 } from "../shared";
 import { readBlockerCounts, readBlockerCountsBatch, readBlockerItems } from "./blocker-query";
 import { assertProjectCompletionReady, readProjectCompletionReadiness } from "../projects/completion";
@@ -588,8 +590,9 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       }));
     },
 
-    async getPhaseDetail(input: ReadContext & { projectId: string; phaseId: string }) {
-      requireRead(input.grants);
+    async getPhaseDetail(input: WorkSectionReadContext & { projectId: string; phaseId: string }) {
+      // The detail carries the phase's private notes, so it follows the same assignment rule as Notes reads.
+      await requireProjectDetailAccess(db, input);
       const phase = await db.sfPhase.findUnique({
         where: { id: input.phaseId },
         select: {

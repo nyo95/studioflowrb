@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.162 | 2026-10-19 | fix(studioflow): close Lead takeover review findings (Lead)
+
+- **Access (security, defence in depth):** `getPhaseDetail` (it returns the phase's private notes) and `listDeliverables` (it signs private file URLs) now take the caller and reuse `requireProjectDetailAccess`, the same assigned-team-or-manager rule R9.134 applied to Notes reads. Pages already redirected outsiders; the services now refuse too, before any URL is signed. All four page callers pass the signed-in user.
+- **Sample race:** Schedule "Mark received" now uses a status-guarded update like Master Data's refusal relay, so a refusal committed between read and write is never overwritten by a late receipt.
+- **Timeline Table (business logic):** the Table showed CD Final and END as the same phase end date and the stored Fit Out Start even when Design Handover drives the plan. `listProjects` now returns the computed plan milestones (settings and holidays read once) and the Table shows those, falling back to phase dates only for a project without an anchor. Its action reads "Dates & plan" in both lenses; the page description describes Table and Gantt.
+- **UI (UI Engine alignment):** the Deliverables row uses the shared `IconButton` and `buttonClasses` instead of hand-styled controls and shows Upload only for a phase with an open iteration (the server refused every other upload). The project Timeline tab asks for Design Handover instead of the retired Fit Out Start anchor. In the short-desktop phase strip the phase name keeps priority and the note truncates first, so names no longer read "M…".
+- **Checks:** see R9.161 (one combined high-tier gate on the final tree; e2e specs for the changed Timeline copy updated). Focused StudioFlow integration + Timeline/Deliverables/Schedule suites 259/259 including new outsider-refusal and list/plan milestone parity regressions.
+- **Limitation:** owner browser acceptance on real data is queued in `BROWSER-ACCEPTANCE-BACKLOG.md` [R9.162]; at 375 px Deliverables Status/Actions sit behind horizontal table scroll.
+
 ## R9.161 | 2026-10-19 | review(lead): accept takeover revisions and repair verification harness (Lead)
 
 - **Review:** Lead takeover review of R9.99–R9.160 (Codex acting Lead/Executor since R9.101). Backend, migrations and business rules were read against their work orders: SKU informational dimensions and per-supplier price unit, sample refusal relay, one Deliverable per phase and its destructive migration, Manager Deliverable deletion, role/CD ownership, Notes assignment reads, BQ section/subsection removal (whole-method transaction confirmed), Design-Handover plan chain, and the R9.160 role-profile migration. Verdict: **PASS with corrections**; the corrections are R9.162. R9.160's commit `03294fe` lacks the `R9.160 |` subject prefix and recorded no executed checks; this Lead gate now supplies that evidence. Pushed history is not rewritten.

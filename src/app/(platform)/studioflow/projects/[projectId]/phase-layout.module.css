@@ -5,8 +5,10 @@
     padding-block: 0.5rem;
   }
 
+  /* The phase name keeps priority over its one-line note: the note shrinks first, so names are not cut to "M…". */
   .phasePage [data-variant="track"] li > button {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+    column-gap: 0.5rem;
     align-items: center;
   }
 
@@ -16,7 +18,7 @@
 
   .phasePage [data-variant="track"] li > button > span:nth-child(3) {
     grid-column: 2;
-    max-width: 6rem;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

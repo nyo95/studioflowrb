@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { FileDown, Trash2, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 
-import { Badge, InlineError, SectionCard, TableCell, TableRow, Text, Tooltip, useConfirm } from "@/platform/ui_engine";
+import { Badge, IconButton, InlineError, SectionCard, TableCell, TableRow, Text, Tooltip, buttonClasses, useConfirm } from "@/platform/ui_engine";
 import { useCommand } from "../../../../_components/use-command";
 import { deleteDeliverableAction } from "../../../../actions";
 
@@ -133,9 +133,11 @@ export function DeliverablesPanel({
   const uploadLabel = (
     <label
       htmlFor={`deliverable-upload-${phaseId}`}
-      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:border-line-emphasis hover:text-ink ${command.pending || progress !== null ? "pointer-events-none opacity-60" : ""}`}
+      // A native file input needs a label as its trigger; it takes the shared button chrome instead of local styling.
+      className={`${buttonClasses("secondary", "sm")} ${command.pending || progress !== null ? "pointer-events-none opacity-50" : ""}`}
+      aria-disabled={command.pending || progress !== null || undefined}
     >
-      <Upload className="size-3.5" />
+      <Upload aria-hidden="true" />
       {progress !== null ? `Uploading… ${progress}%` : deliverables.length ? "Replace" : "Upload"}
     </label>
   );
@@ -155,7 +157,7 @@ export function DeliverablesPanel({
           <div className="flex min-w-[11rem] flex-col items-end gap-1.5">
             <div className="flex items-center gap-1.5">
               {canWork ? <>{uploadInput}{uploadLabel}</> : null}
-              {file && canManage ? <button type="button" disabled={command.isPending(`deliverable:${file.id}`)} onClick={() => void remove(file)} className="inline-flex h-8 w-8 items-center justify-center rounded-action text-ink-tertiary hover:bg-surface-muted hover:text-danger disabled:opacity-60" aria-label={`Delete ${file.name}`}><Trash2 className="size-3.5" /></button> : null}
+              {file && canManage ? <IconButton variant="ghost" size="sm" label={`Delete ${file.name}`} icon={<Trash2 aria-hidden="true" />} pending={command.isPending(`deliverable:${file.id}`)} onClick={() => void remove(file)} /> : null}
             </div>
             {progress !== null ? <progress className="block h-1.5 w-full" max={100} value={progress} aria-label="Upload progress" /> : null}
             {uploadError ? <p className="max-w-56 text-right text-xs text-danger">{uploadError}</p> : null}

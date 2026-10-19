@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ProjectDeliverablesPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const { grants } = await pageSession();
+  const { grants, userId } = await pageSession();
   const [access, phases] = await Promise.all([
     pageProjectAccess(projectId),
     studioFlow.phases.listProjectPhases({ grants, projectId }),
@@ -23,14 +23,15 @@ export default async function ProjectDeliverablesPage({ params }: { params: Prom
   const canManage = hasPermission(grants, P.projectManage) && access.canEditProject;
   const rows = await Promise.all(phases.map(async (phase) => {
     const [detail, result] = await Promise.all([
-      studioFlow.phases.getPhaseDetail({ grants, projectId, phaseId: phase.id }),
-      studioFlow.phases.listDeliverables({ grants, projectId, phaseId: phase.id }),
+      studioFlow.phases.getPhaseDetail({ grants, actorId: userId, projectId, phaseId: phase.id }),
+      studioFlow.phases.listDeliverables({ grants, actorId: userId, projectId, phaseId: phase.id }),
     ]);
     const phaseAccess = access.phases.find((item) => item.phaseId === phase.id);
     return {
       phase,
       deliverables: result,
-      canWork: detail.modifiable && caps.work && (phaseAccess?.canEditContent ?? false),
+      // Upload needs an open iteration (the server refuses otherwise), so a phase that has not started shows no Upload.
+      canWork: detail.modifiable && detail.activeRevision !== null && caps.work && (phaseAccess?.canEditContent ?? false),
     };
   }));
 

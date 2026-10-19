@@ -49,7 +49,7 @@ test("Studio Manager sees operations and portfolio Timeline without date editing
     const appNav = page.getByRole("group", { name: "StudioFlow navigation" });
     await expect(appNav.getByRole("link", { name: "Clients" })).toBeVisible();
     await expect(appNav.getByRole("link", { name: "Timeline" })).toBeVisible();
-    await expect(page.getByText(/read-only Gantt/).filter({ visible: true })).toBeVisible();
+    await expect(page.getByText(/read-only table or Gantt/).filter({ visible: true })).toBeVisible();
     await expect(page.getByText(/open Dates & plan/)).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Dates & plan" })).toHaveCount(0);
     await page.goto(`/studioflow/projects/${fixture.roleProject.projectId}`);

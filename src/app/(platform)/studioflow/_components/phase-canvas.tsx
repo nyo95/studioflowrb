@@ -9,10 +9,10 @@ import { pageProjectAccess, pageSession } from "./session";
 
 /** The selected phase's workflow bar (round, state, steps). Its requirements and files are `PhaseAside`. */
 export async function PhaseCanvas({ projectId, phaseId, archived }: { projectId: string; phaseId: string; archived: boolean }) {
-  const { grants } = await pageSession();
+  const { grants, userId } = await pageSession();
   const caps = studioFlow.phases.capabilities(grants);
   const access = await pageProjectAccess(projectId);
-  const phase = await studioFlow.phases.getPhaseDetail({ grants, projectId, phaseId }).catch((error) => {
+  const phase = await studioFlow.phases.getPhaseDetail({ grants, actorId: userId, projectId, phaseId }).catch((error) => {
     if (error instanceof AppError && error.kind === "NOT_FOUND") return null;
     throw error;
   });

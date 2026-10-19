@@ -13,9 +13,9 @@ import { pageProjectAccess, pageSession } from "./session";
  * follow the phase chosen on the strip and stay in view while writing, instead of behind a "Phase details" drawer.
  */
 export async function PhaseAside({ projectId, phaseId, archived }: { projectId: string; phaseId: string; archived: boolean }) {
-  const { grants } = await pageSession();
+  const { grants, userId } = await pageSession();
   const access = await pageProjectAccess(projectId);
-  const phase = await studioFlow.phases.getPhaseDetail({ grants, projectId, phaseId }).catch((error) => {
+  const phase = await studioFlow.phases.getPhaseDetail({ grants, actorId: userId, projectId, phaseId }).catch((error) => {
     if (error instanceof AppError && error.kind === "NOT_FOUND") return null;
     throw error;
   });

@@ -155,7 +155,7 @@ test("8.1 project Timeline is read-only; portfolio Timeline owns Dates & plan", 
   await openProject(page, sf.notes, "/timeline");
   await expect(page.getByRole("link", { name: "Edit dates and plan" })).toHaveCount(0);
   await page.goto("/studioflow/timeline");
-  await page.getByRole("button", { name: "Edit dates" }).first().click();
+  await page.getByRole("button", { name: "Dates & plan" }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await dialog.getByLabel("Design Handover").fill("");
