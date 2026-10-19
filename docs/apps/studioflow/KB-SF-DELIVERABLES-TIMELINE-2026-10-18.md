@@ -148,3 +148,18 @@ the approved working-day chain backward around recorded Start/Opening; expose
 one Table and one Gantt view over the same real progress and schedule facts;
 and keep date mutations Platform Owner-only. The work order, not this KB,
 contains the executable verification and migration contract.
+
+## 6. StudioFlow work canvas and Timeline edit location
+
+Owner direction, 2026-10-19: StudioFlow uses the same broad work canvas as BQ
+and Master Data. This applies to its home, directories, settings, portfolio
+Timeline, and project tabs; shared page padding still protects narrow screens.
+
+Owner direction, 2026-10-19: a project's own Timeline tab is read-only. The
+Platform Owner changes dates and applies a plan only from the portfolio
+Timeline, whether using its Table or Gantt lens. The project tab never exposes
+a shortcut or control for that editor.
+
+Automated type checking passed for this change. The broader browser and
+end-to-end screen suite is owner-deferred and remains recorded in the browser
+acceptance backlog; it is not a browser acceptance PASS.

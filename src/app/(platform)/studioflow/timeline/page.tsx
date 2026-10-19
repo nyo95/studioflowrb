@@ -61,7 +61,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
   }
 
   return (
-    <PageShell measure="wide">
+    <PageShell measure="full">
       <PageHeader
         title="Timeline"
         description={canOverrideTimeline

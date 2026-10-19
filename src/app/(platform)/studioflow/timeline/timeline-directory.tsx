@@ -149,7 +149,7 @@ export function TimelineDirectory({
           <EmptyState title={filters.archived ? "No archived projects match" : "No projects match"} />
         </SectionCard>
       ) : (
-        mode === "table" ? <ScheduleTable projects={projects} /> : <SectionCard padded={false}><GanttChart label="Project timeline" rows={rows} today={today} zoom={zoom} /></SectionCard>
+        mode === "table" ? <ScheduleTable projects={projects} canManage={canManage} editable={editable} onEdit={setEditingProject} /> : <SectionCard padded={false}><GanttChart label="Project timeline" rows={rows} today={today} zoom={zoom} /></SectionCard>
       )}
 
       {editingProject ? <EditProjectDatesDialog project={editingProject} onClose={closeProjectDialog} /> : null}
@@ -161,10 +161,10 @@ export function TimelineDirectory({
   );
 }
 
-function ScheduleTable({ projects }: { projects: TimelineProject[] }) {
+function ScheduleTable({ projects, canManage, editable, onEdit }: { projects: TimelineProject[]; canManage: boolean; editable: Record<string, { project: boolean; phaseIds: string[] }>; onEdit: (project: TimelineProject) => void }) {
   const phaseEnd = (project: TimelineProject, definition: string) => project.phases.find((phase) => phase.definitionId === definition)?.plannedEndDate ?? "—";
   const phaseStart = (project: TimelineProject, definition: string) => project.phases.find((phase) => phase.definitionId === definition)?.plannedStartDate ?? "—";
   const defs = { design: LEGACY_PHASE_DEFINITION_IDS.design3d, cd: LEGACY_PHASE_DEFINITION_IDS.cd };
   const status = (project: TimelineProject) => project.scheduleStatus.replaceAll("_", " ").toLowerCase();
-  return <DataTable aria-label="Project timeline table" minWidth={1500} density="compact"><TableHeader><TableRow><TableHead>Project</TableHead><TableHead>Start</TableHead><TableHead>Design Final</TableHead><TableHead>CD</TableHead><TableHead>CD Final</TableHead><TableHead>END</TableHead><TableHead>Start Fit Out</TableHead><TableHead>Design Handover</TableHead><TableHead>Opening</TableHead><TableHead>Status / progress</TableHead></TableRow></TableHeader><TableBody>{projects.map((project) => <TableRow key={project.id}><TableCell><Link href={STUDIOFLOW_ROUTES.projectTimeline(project.id)} prefetch={false}>{project.name}</Link></TableCell><TableCell>{project.timelineStartDate}</TableCell><TableCell>{phaseEnd(project, defs.design)}</TableCell><TableCell>{phaseStart(project, defs.cd)}</TableCell><TableCell>{phaseEnd(project, defs.cd)}</TableCell><TableCell>{phaseEnd(project, defs.cd)}</TableCell><TableCell>{project.fitOutStartDate ?? "—"}</TableCell><TableCell>{project.designHandoverDate ?? "—"}</TableCell><TableCell>{project.openingDate ?? "—"}</TableCell><TableCell>{status(project)}{project.activePhaseLabel ? ` · ${project.activePhaseLabel}` : ""}</TableCell></TableRow>)}</TableBody></DataTable>;
+  return <DataTable aria-label="Project timeline table" minWidth={1560} density="compact"><TableHeader><TableRow><TableHead>Project</TableHead><TableHead>Start</TableHead><TableHead>Design Final</TableHead><TableHead>CD</TableHead><TableHead>CD Final</TableHead><TableHead>END</TableHead><TableHead>Start Fit Out</TableHead><TableHead>Design Handover</TableHead><TableHead>Opening</TableHead><TableHead>Status / progress</TableHead>{canManage ? <TableHead>Plan</TableHead> : null}</TableRow></TableHeader><TableBody>{projects.map((project) => <TableRow key={project.id}><TableCell><Link href={STUDIOFLOW_ROUTES.projectTimeline(project.id)} prefetch={false}>{project.name}</Link></TableCell><TableCell>{project.timelineStartDate}</TableCell><TableCell>{phaseEnd(project, defs.design)}</TableCell><TableCell>{phaseStart(project, defs.cd)}</TableCell><TableCell>{phaseEnd(project, defs.cd)}</TableCell><TableCell>{phaseEnd(project, defs.cd)}</TableCell><TableCell>{project.fitOutStartDate ?? "—"}</TableCell><TableCell>{project.designHandoverDate ?? "—"}</TableCell><TableCell>{project.openingDate ?? "—"}</TableCell><TableCell>{status(project)}{project.activePhaseLabel ? ` · ${project.activePhaseLabel}` : ""}</TableCell>{canManage ? <TableCell>{editable[project.id]?.project ? <Button type="button" size="sm" variant="ghost" onClick={() => onEdit(project)}>Edit dates</Button> : "—"}</TableCell> : null}</TableRow>)}</TableBody></DataTable>;
 }

@@ -14,7 +14,7 @@ export default async function StudioFlowSettingsIndex() {
   const first = firstSettingsHref(studioFlowSettingsGroups(grants));
   if (first) redirect(first);
   return (
-    <PageShell measure="expanded">
+    <PageShell measure="full">
       <SectionCard>
         <ErrorState title="Access denied" description="You do not have permission to change StudioFlow settings." />
       </SectionCard>

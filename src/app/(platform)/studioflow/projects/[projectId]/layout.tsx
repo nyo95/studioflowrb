@@ -45,7 +45,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
       {/* Only the Phases page (marked `data-fill-page`) fills the window with its own scrolling notes; every other
           tab keeps its natural height and scrolls with the page. A fill shell for all tabs let their cards shrink
           to the window and clip (Schedule could not scroll). */}
-      <PageShell measure="wide" className="has-[[data-fill-page]]:flex has-[[data-fill-page]]:min-h-0 has-[[data-fill-page]]:flex-1 has-[[data-fill-page]]:flex-col">
+      <PageShell measure="full" className="has-[[data-fill-page]]:flex has-[[data-fill-page]]:min-h-0 has-[[data-fill-page]]:flex-1 has-[[data-fill-page]]:flex-col">
         <Suspense fallback={<ProjectHeaderSkeleton projectId={projectId} presentationEnabled={presentationEnabled} showWorkSections={showWorkSections} />}>
           <ProjectHeader grants={grants} userId={userId} projectId={projectId} presentationEnabled={presentationEnabled} showWorkSections={showWorkSections} />
         </Suspense>

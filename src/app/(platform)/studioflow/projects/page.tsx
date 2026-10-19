@@ -37,7 +37,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
   const openableProjectIds = projects.filter((project) => access.get(project.id)?.canSeeWorkSections).map((project) => project.id);
 
   return (
-    <PageShell measure="wide">
+    <PageShell measure="full">
       <PageHeader title="Projects" description="Every studio project, its phases, and who holds it." divider />
       <ProjectDirectory
         projects={projects}

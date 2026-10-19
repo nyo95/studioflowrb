@@ -17,7 +17,7 @@ export default async function StudioFlowLayout({ children }: { children: ReactNo
   if (!hasPermission(principalGrants.grants, STUDIOFLOW_PERMISSIONS.access)) redirect("/");
   if (!hasPermission(principalGrants.grants, STUDIOFLOW_PERMISSIONS.projectRead)) {
     return (
-      <PageShell size="wide">
+      <PageShell measure="full">
         <ErrorState title="Access denied" description="Your role can open StudioFlow but cannot read projects. Ask an administrator for project access." />
       </PageShell>
     );

@@ -14,7 +14,7 @@ export default async function ClientsPage() {
   if (!hasPermission(grants, P.projectManage)) redirect(STUDIOFLOW_ROUTES.projects);
   const clients = await studioFlow.projects.listClients({ grants, includeArchived: true });
   return (
-    <PageShell measure="wide">
+    <PageShell measure="full">
       <PageHeader title="Clients" description="Who the studio works for. Clients are records, not users." divider />
       <ClientDirectory clients={clients} canManage={hasPermission(grants, P.projectManage)} />
     </PageShell>

@@ -1,9 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
-import { hasPermission } from "@platform/core/rbac";
 import { currentDateOnly } from "@platform/utilities/date";
-import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 
 import { pageSession } from "../../../_components/session";
@@ -44,7 +42,6 @@ export default async function ProjectTimelinePage({ params }: { params: Promise<
         manual: phase.plannedDatesManual,
       }))}
       plan={plan}
-      canEdit={hasPermission(grants, P.projectManage) && hasPermission(grants, P.projectOverride) && project.archivedAt === null}
       today={currentDateOnly()}
     />
   );

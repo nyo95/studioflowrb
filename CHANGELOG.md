@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.154 | 2026-10-19 | ui(studioflow): use the full work canvas
+
+- **Layout:** StudioFlow Home, Projects, clients, library, Timeline, settings, and every project tab now use the same full-width work canvas as BQ and Master Data. Existing page padding and narrow-screen behavior remain provided by the shared UI Engine shell.
+- **Timeline location:** the project Timeline tab is read-only. Platform Owner opens the dates-and-plan editor only from portfolio Timeline, in either Table or Gantt view.
+- **Verification limit:** type checking and boundary checks passed. The full browser/end-to-end suite is intentionally deferred by the owner and is recorded for later acceptance; no browser PASS is claimed.
+
 ## R9.153 | 2026-10-19 | docs(backlog): defer StudioFlow extension work
 
 - **Priority:** Workspace board, Ideas board, and SketchUp plugin sync are parked by the owner. Their accepted descriptions remain available for a later dedicated work order; no product behavior changed.

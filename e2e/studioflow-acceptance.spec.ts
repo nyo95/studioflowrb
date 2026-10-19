@@ -151,14 +151,16 @@ test("8.3 an iteration goes to the client, comes back answered, and a revision o
   await expect(notes(page).getByText("Client wants a warmer palette")).toBeVisible();
 });
 
-test("8.1 the project Timeline tab leads to the Dates & plan dialog, which saves", async ({ page }) => {
+test("8.1 project Timeline is read-only; portfolio Timeline owns Dates & plan", async ({ page }) => {
   await openProject(page, sf.notes, "/timeline");
-  await page.getByRole("link", { name: "Edit dates and plan" }).click();
+  await expect(page.getByRole("link", { name: "Edit dates and plan" })).toHaveCount(0);
+  await page.goto("/studioflow/timeline");
+  await page.getByRole("button", { name: "Edit dates" }).first().click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await dialog.getByLabel("Fit Out Start").fill("");
+  await dialog.getByLabel("Design Handover").fill("");
   await expect(dialog.getByRole("button", { name: "Save and apply plan" })).toBeDisabled();
-  await expect(dialog.getByText("Enter Fit Out Start to enable Save and apply plan.", { exact: false })).toBeVisible();
+  await expect(dialog.getByText("Enter Design Handover to enable Save and apply plan.", { exact: false })).toBeVisible();
   await page.screenshot({ path: `${SHOTS}/8.1-dates-and-plan.png` });
   await dialog.getByRole("button", { name: /^Save$/ }).click();
   await expect(dialog).toBeHidden();

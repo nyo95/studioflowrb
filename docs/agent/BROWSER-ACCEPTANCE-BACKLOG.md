@@ -32,12 +32,20 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.154] StudioFlow full-width work canvas
+- Surface: StudioFlow Home, Projects, Timeline, Settings, and a project tab
+- Fixture: any signed-in StudioFlow user with at least one accessible project
+- Viewport: desktop (default), 1280 px, and 375 px
+- Steps: 1. Open each listed surface and compare its usable width with BQ and Master Data. 2. On a project tab, open content that fills the workspace. 3. Repeat at 375 px.
+- Acceptance: StudioFlow uses the same broad content canvas as BQ/Master Data without horizontal page overflow, clipped project content, or changed access/navigation behavior.
+- Status: PENDING
+
 ### [R9.152] Design-Handover Timeline Table and Gantt
 - Surface: StudioFlow → Timeline, plus a project Timeline tab
 - Fixture: an isolated rebuild-only project with Design Handover and Opening dates, one active dated phase, and a second project without Handover; Platform Owner and Studio Manager accounts
 - Viewport: desktop (default) and 375 px
-- Steps: 1. As Platform Owner, set Design Handover and Opening, apply the plan, then compare Table and Gantt. 2. Confirm Start stays the recorded project date and the calculated milestones lead back from Handover. 3. Use an Opening that conflicts and a Handover whose generated date is before today. 4. Check active phase status before/on/after planned end. 5. Open as Manager and attempt date changes. 6. Open the no-Handover project.
-- Acceptance: Table/Gantt show the same dates and real active-phase status; warnings never move dates; only Platform Owner can write; the no-Handover project remains readable with existing dates.
+- Steps: 1. As Platform Owner, set Design Handover and Opening from portfolio Timeline, apply the plan, then compare Table and Gantt. 2. Confirm the project Timeline tab offers no date-edit action. 3. Confirm Start stays the recorded project date and the calculated milestones lead back from Handover. 4. Use an Opening that conflicts and a Handover whose generated date is before today. 5. Check active phase status before/on/after planned end. 6. Open as Manager and attempt date changes. 7. Open the no-Handover project.
+- Acceptance: Table/Gantt show the same dates and real active-phase status; portfolio Timeline is the only date-editor location; warnings never move dates; only Platform Owner can write; the no-Handover project remains readable with existing dates.
 - Status: PENDING
 
 ### [R9.139] One private Deliverable file per phase

@@ -27,7 +27,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const completed = cards.filter((card) => card.status === "COMPLETED");
   const shown = statusView === "running" ? running : completed;
   return (
-    <PageShell measure="wide">
+    <PageShell measure="full">
       <PageHeader
         title="Home"
         description={`${firstName}, these are your projects`}
