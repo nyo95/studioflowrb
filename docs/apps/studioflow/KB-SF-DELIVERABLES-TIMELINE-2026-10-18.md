@@ -107,13 +107,17 @@ Owner confirmation, 2026-10-19: office-table `Handover Radiant` and
 Handover. It needs its own stored field: it must not overwrite the differently
 meaningful Opening or Fit Out Start date.
 
+Owner confirmation, 2026-10-19: working-day gaps are Studio-wide configurable
+defaults. A Platform Owner may retain a one-phase exception for an exceptional
+project; it does not change the studio default or other projects.
+
 R9.137 applies only the clear authority slice: portfolio Timeline is a Studio Manager view, and mutation controls/services require `project.manage + project.override` (Platform Owner authority). It intentionally does not replace the Fit Out Start calculation or redesign the Gantt.
 
 ## 5. Timeline — remaining contract required before runtime redesign
 
 The next Work Order must settle:
 
-1. Exact dependency graph and duration source for every table column and phase, including parallel phases and two-step Construction Drawing. The owner must choose whether working-day gaps are Studio-wide configurable defaults with per-phase Platform Owner exceptions (recommended), or every project date is entered manually.
+1. Default working-day gaps for each office-table handoff: Design Final → CD, CD → CD Final, CD Final → END, END → Submission/Start Fit Out, Start Fit Out → Design Handover, and Design Handover → Opening. Current values (5, 5, 5, 40, 10) do not cover every named handoff and are not approved for the new model.
 2. Presentation for on-track, due-today, and overdue states on Home, project Timeline, and portfolio Timeline.
 
 Until then, preserve existing dates and audits; do not destructively rewrite or silently reinterpret them.

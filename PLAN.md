@@ -24,10 +24,11 @@ Last updated: 2026-10-19
 
 - Office-table `Handover Radiant` and the owner-directed `Handover Desain` are the same business date: the project's canonical Handover.
 - Handover requires its own persisted StudioFlow date. It must not overwrite the existing Opening or Fit Out Start date, whose historical meaning remains intact.
+- Working-day gaps are Studio-wide configurable defaults. A Platform Owner may override one phase for an exceptional project; the override survives automatic recalculation and does not alter another project.
 
 ## Blocking Decision
 
-Choose the source of standard working-day gaps between the Table columns and phases. Recommended: one Studio-wide configurable default set, with a Platform Owner allowed to override one phase for an exceptional project. The alternative is entering every project date manually, which conflicts with the requested automatic plan.
+Confirm the default working-day gap for each office-table handoff: Design Final → CD, CD → CD Final, CD Final → END, END → Submission/Start Fit Out, Start Fit Out → Design Handover, and Design Handover → Opening. The current application values (5, 5, 5, 40, 10) do not cover every named table handoff and are not yet approved for the new model.
 
 ## Non-goals Until Unblocked
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.146 | 2026-10-19 | plan(studioflow): lock studio Timeline gap defaults
+
+- **Planning authority:** standard Timeline working-day gaps will be Studio-wide configurable defaults. Platform Owner may retain a one-phase project exception without changing any other project.
+- **Blocker:** the office-table gaps still need their explicit default values, including the newly distinct END → Submission/Start Fit Out handoff.
+
 ## R9.145 | 2026-10-19 | plan(studioflow): define canonical Design Handover
 
 - **Date meaning:** the office-table `Handover Radiant` is confirmed as the owner-directed Design Handover. Timeline will store it as its own canonical Handover date; it will not reinterpret Opening or Fit Out Start.
