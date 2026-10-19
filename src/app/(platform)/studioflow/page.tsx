@@ -45,7 +45,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
         />
       ) : (
         <div className="grid gap-4">
-          {shown.map((card) => <ProjectCard key={card.id} card={card} viewer={{ userId, canManageProjects: hasPermission(grants, P.projectManage), canOverride: hasPermission(grants, P.projectManage) && hasPermission(grants, P.projectOverride), canWork: hasPermission(grants, P.phaseWork), canReview: hasPermission(grants, P.phaseReview) }} defaultExpanded={shown.length <= 3} />)}
+          {shown.map((card) => <ProjectCard key={card.id} card={card} viewer={{ userId, canManageProjects: hasPermission(grants, P.projectManage), canOverride: hasPermission(grants, P.projectManage) && hasPermission(grants, P.projectOverride), canWork: hasPermission(grants, P.phaseWork), canReview: hasPermission(grants, P.phaseReview) }} defaultExpanded />)}
         </div>
       )}
     </PageShell>

@@ -1,5 +1,9 @@
 # Changelog
 
+## R9.155 | 2026-10-19 | ui(studioflow): expand Home projects by default
+
+- **Home:** every visible project opens its phase strip by default. Each project can still be collapsed independently for a compact scan.
+
 ## R9.154 | 2026-10-19 | ui(studioflow): use the full work canvas
 
 - **Layout:** StudioFlow Home, Projects, clients, library, Timeline, settings, and every project tab now use the same full-width work canvas as BQ and Master Data. Existing page padding and narrow-screen behavior remain provided by the shared UI Engine shell.

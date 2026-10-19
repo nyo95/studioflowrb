@@ -37,7 +37,7 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Fixture: any signed-in StudioFlow user with at least one accessible project
 - Viewport: desktop (default), 1280 px, and 375 px
 - Steps: 1. Open each listed surface and compare its usable width with BQ and Master Data. 2. On a project tab, open content that fills the workspace. 3. Repeat at 375 px.
-- Acceptance: StudioFlow uses the same broad content canvas as BQ/Master Data without horizontal page overflow, clipped project content, or changed access/navigation behavior.
+- Acceptance: StudioFlow uses the same broad content canvas as BQ/Master Data without horizontal page overflow, clipped project content, or changed access/navigation behavior; visible Home projects start expanded and each can still be collapsed independently.
 - Status: PENDING
 
 ### [R9.152] Design-Handover Timeline Table and Gantt
