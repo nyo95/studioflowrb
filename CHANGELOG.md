@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.149 | 2026-10-19 | plan(studioflow): anchor pre-handover schedule backward
+
+- **Calculation direction:** all work before canonical Design Handover will calculate backward to project Start. Opening independently calculates backward through its approved 10-day gap and any conflict remains visible.
+- **Blocker:** the office table also needs a Studio-wide working-day duration from Start to Design Final; no existing configuration supplies it.
+
 ## R9.148 | 2026-10-19 | plan(studioflow): lock real phase schedule status
 
 - **Progress state:** the timeline's schedule label will derive from the actual active phase: On track before its planned end, Due today on it, and Overdue afterward. Completed, pending and paused phases retain their true workflow state.

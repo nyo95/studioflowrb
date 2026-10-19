@@ -118,6 +118,11 @@ Fit Out = 5; Start Fit Out → Design Handover = 40; and Design Handover →
 Opening = 10. This makes explicit that Design Final and the start of CD are
 the same default planning day.
 
+Owner confirmation, 2026-10-19: work before Handover calculates backward from
+the canonical Design Handover to project Start. Opening independently
+calculates backward by its 10-day gap; a disagreement is visible rather than
+silently resolved.
+
 Owner confirmation, 2026-10-19: schedule state is derived from the actual
 active phase. It is **On track** before its planned end, **Due today** on that
 day, and **Overdue** afterward. Completed, pending and paused phases retain
@@ -129,6 +134,6 @@ R9.137 applies only the clear authority slice: portfolio Timeline is a Studio Ma
 
 The next Work Order must settle:
 
-1. Planning anchor for the work before Design Handover: calculate backward from the canonical Handover to project Start (recommended), or forward from a manually set project Start until Handover. Opening independently calculates backward by its 10-day gap; disagreement must be visible.
+1. Studio-wide default working-day duration from project Start to Design Final. The current plan has no such interval, while the office table shows both columns. A project-specific Platform Owner exception follows the locked rule.
 
 Until then, preserve existing dates and audits; do not destructively rewrite or silently reinterpret them.

@@ -27,10 +27,11 @@ Last updated: 2026-10-19
 - Working-day gaps are Studio-wide configurable defaults. A Platform Owner may override one phase for an exceptional project; the override survives automatic recalculation and does not alter another project.
 - The initial Studio defaults retain the current planning values: Design Final → CD = 0, CD → CD Final = 5, CD Final → END = 5, END → Submission/Start Fit Out = 5, Start Fit Out → Design Handover = 40, and Design Handover → Opening = 10 working days.
 - The schedule state reads the actual active phase only: On track before its planned end, Due today on its planned end, and Overdue after it. Completed, pending and paused phases retain their workflow state.
+- Work before Handover calculates backward from canonical Design Handover to project Start. Opening independently calculates backward by its 10-day gap; disagreement is visible.
 
 ## Blocking Decision
 
-Choose the planning anchor for the work before Design Handover: either calculate backward from the canonical Design Handover to the project Start (recommended), or calculate forward from a manually set project Start until Design Handover. Opening independently calculates backward by its 10-day gap and any disagreement must be visible.
+Set the Studio-wide default working-day duration from project Start to Design Final. The current plan has no such interval, while the office table shows both columns. A project-specific Platform Owner exception follows the already locked rule.
 
 ## Non-goals Until Unblocked
 
