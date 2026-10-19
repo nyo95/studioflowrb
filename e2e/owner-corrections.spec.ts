@@ -20,7 +20,7 @@ test("Notes identifies both senders and places my messages on the left", async (
   expect(myBox && theirBox && myBox.x < theirBox.x).toBeTruthy();
 });
 
-test("a non-PIC override viewer sees four read-only sections and cannot open hidden work sections", async ({ browser }) => {
+test("a non-PIC Designer sees the project list but cannot open project detail", async ({ browser }) => {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] }, baseURL: "http://localhost:3101" });
   try {
     const page = await context.newPage();
@@ -29,19 +29,12 @@ test("a non-PIC override viewer sees four read-only sections and cannot open hid
     await page.getByLabel("Password").fill(viewer.password);
     await page.getByRole("button", { name: "Sign in" }).click();
     await page.waitForURL((url) => !url.pathname.startsWith("/login"));
-    await page.goto(`/studioflow/projects/${sf.notesChat}/schedule`);
-    const sections = page.getByRole("navigation", { name: "Project sections" });
-    await expect(sections.getByRole("link", { name: /^Schedule/ })).toBeVisible();
-    await expect(sections.getByRole("link", { name: "Presentation" })).toBeVisible();
-    await expect(sections.getByRole("link", { name: "Timeline" })).toBeVisible();
-    await expect(sections.getByRole("link", { name: "History" })).toBeVisible();
-    await expect(sections.getByRole("link", { name: "Phases" })).toHaveCount(0);
-    await expect(sections.getByRole("link", { name: "MOM" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: /Add item|New item|Create entry/ })).toHaveCount(0);
+    await page.goto("/studioflow/projects");
+    const row = page.getByRole("row").filter({ hasText: "ZZ-Test SF Notes Chat" });
+    await expect(row).toContainText("Project list only");
+    await expect(row.getByRole("link", { name: /ZZ-Test SF Notes Chat/ })).toHaveCount(0);
     await page.goto(`/studioflow/projects/${sf.notesChat}`);
-    await expect(page).toHaveURL(new RegExp(`/studioflow/projects/${sf.notesChat}/schedule$`));
-    await page.goto(`/studioflow/projects/${sf.notesChat}/mom`);
-    await expect(page).toHaveURL(new RegExp(`/studioflow/projects/${sf.notesChat}/schedule$`));
+    await expect(page).toHaveURL(/\/studioflow\/projects$/);
   } finally {
     await context.close();
   }

@@ -92,9 +92,9 @@ owns grant mechanics.
 | Permission | Grants |
 |---|---|
 | `studioflow.access` | Open the app |
-| `studioflow.project.read` | Read projects, clients, phases, rounds, requirements, files, MOM, schedule, presentation, library, timeline |
-| `studioflow.project.manage` | Create/edit clients and projects, PICs, priority, status, archive/restore, mark completed; see every running project on Home; edit planned phase dates |
-| `studioflow.project.override` | Together with `studioflow.project.manage`, pass assignment gates (replaces legacy "admin always allowed"); alone it gives no write bypass |
+| `studioflow.project.read` | Open Home, the project-directory summary and Library; assigned project detail remains assignment-scoped |
+| `studioflow.project.manage` | Studio Manager operations: Clients, create/edit/archive all projects, PIC assignment, and read-only portfolio Timeline |
+| `studioflow.project.override` | Together with `studioflow.project.manage`, Platform Owner recovery and manual Timeline override authority; alone it gives no bypass |
 | `studioflow.project.pic-designer` / `.pic-drafter` | Positions: who may be picked for each PIC seat |
 | `studioflow.phase.work` | Round commands (add, send, client answered, outcome, visits, rename, delete unsent), phase notes (post, edit, star, mark client feedback, delete, images), dismiss requirement, undo of the round commands, CD list, files |
 | `studioflow.phase.review` | Skip a phase that is pending or active (bypass, reason required) and undo that skip |
@@ -111,20 +111,23 @@ Rules:
 
 - One grant decision plus one assignment decision per mutating operation
   (owner, 2026-09-30), in one shared helper (`requireProjectAccess`): project
-  data = PIC designer; phase transitions = PIC designer on every phase, PIC
+  data = Studio Manager; phase transitions = PIC designer on every phase, PIC
   drafter only on a drafter-seat phase; phase content = drafter-seat phase:
   drafter or designer, other phases: designer; project documents (MOM,
-  Schedule, Presentation) = designer or drafter. Both `studioflow.project.manage`
-  and `studioflow.project.override` are required to pass assignment gates.
-  Reading needs only `studioflow.project.read`. A non-PIC without manager rights
-  sees Schedule, Presentation (when enabled), Timeline, and History as read-only
-  project sections; Phases and MOM are unavailable even by direct link.
+  Schedule, Presentation) = designer or drafter. A Studio Manager may read every
+  project detail but does not gain project-document or phase-work mutation from
+  `project.manage` alone. Both `studioflow.project.manage` and
+  `studioflow.project.override` are required for Platform Owner workflow bypass
+  and manual Timeline changes. `project.read` exposes the broad project list,
+  but a non-PIC without manager rights cannot open project detail by direct link.
   Workspace images also cannot be copied into Ideas or Presentation through
   their public bridges by a viewer who cannot see those work sections.
 - Suggested role configuration (owner configures in Platform Access):
   Designer = access, read, pic-designer, phase.work, phase.review, task.manage,
   mom.manage, schedule.manage, presentation.manage; Drafter = access, read,
-  pic-drafter, phase.work, task.manage; Admin = all.
+  pic-drafter, phase.work, task.manage; Studio Manager = access, read,
+  project.manage plus delegated settings/document standards; Platform Owner =
+  all, including project.override.
 
 ## 4. Client and Project
 
@@ -272,8 +275,12 @@ reconstructed from the retained rows.
 ### 5.5 Drawing list (CD list)
 
 On a drafter-seat phase only: drawings with code, name, status and optional
-assignee, grouped by hundreds series; it never blocks a step. Content gate as
-§3.
+Drafter assignee, grouped by hundreds series; it never blocks a step. It is the
+Construction Drawing phase's primary surface instead of Notes/Workspace. The
+assigned Drafter is the only writer; the assigned Designer and Studio Manager
+may inspect it read-only. A Drafter-only PIC does not get Designer phase content
+or a Notes/Workspace editing surface for Construction Drawing; workflow-record
+cards remain part of the retained project history.
 
 ## 6. Notes and requirements
 
@@ -519,6 +526,14 @@ plan's own. Someone who may edit gets "Edit dates and plan", which opens that
 project's dialog on `/studioflow/timeline?plan=<projectId>`.
 Planned dates are entered or computed from Fit Out Start, not derived from
 status history.
+
+**Owner direction recorded 2026-10-18 (runtime redesign pending).** Timeline is
+to become an on-time/overdue view calculated backward from a canonical Handover
+date. Designer sees assigned-project status; Studio Manager sees the portfolio
+read-only; only Platform Owner may set Handover or make audited manual schedule
+adjustments. R9.137 enforces the read/edit authority split but retains the
+Fit Out Start calculation until the field, dependency, overdue and migration
+contract in `KB-SF-DELIVERABLES-TIMELINE-2026-10-18.md` is settled.
 
 ## 8a. Presentation
 

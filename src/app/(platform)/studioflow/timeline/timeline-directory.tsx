@@ -74,7 +74,7 @@ export function TimelineDirectory({
       markers,
       span: project.openingDate ? { start: project.timelineStartDate, end: project.openingDate } : null,
       trailing: canEditDates ? <Button type="button" size="sm" variant="ghost" onClick={() => setEditingProject(project)}>Dates &amp; plan</Button> : null,
-      emptyText: "No planned dates — open Dates & plan",
+      emptyText: canManage ? "No planned dates — open Dates & plan" : "No planned dates",
     };
   });
 

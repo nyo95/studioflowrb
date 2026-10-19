@@ -13,11 +13,11 @@ export const dynamic = "force-dynamic";
 
 export default async function ProjectMomPage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const { grants } = await pageSession();
+  const { grants, userId } = await pageSession();
   const access = await pageProjectAccess(projectId);
   if (!canSeeProjectWorkSections(access)) redirect(STUDIOFLOW_ROUTES.projectSchedule(projectId));
   const [project, documents] = await Promise.all([
-    studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
+    studioFlow.projects.getProject({ grants, actorId: userId, projectId }).catch((error) => {
       if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
       throw error;
     }),

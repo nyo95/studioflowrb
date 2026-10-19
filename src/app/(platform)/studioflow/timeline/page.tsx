@@ -1,4 +1,5 @@
 import { hasPermission } from "@platform/core/rbac";
+import { redirect } from "next/navigation";
 import { currentDateOnly } from "@platform/utilities/date";
 import { resolveTimelineSpan } from "@/apps/studioflow/domain/timeline";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
@@ -20,6 +21,8 @@ function currentTimeMs(): number {
 
 export default async function TimelinePage({ searchParams }: { searchParams: Promise<Search> }) {
   const { grants, userId, actor } = await pageSession();
+  if (!hasPermission(grants, P.projectManage)) redirect("/studioflow/projects");
+  const canOverrideTimeline = hasPermission(grants, P.projectOverride);
   const params = await searchParams;
   const status = params.status === "ALL" || params.status === "ON_HOLD" || params.status === "COMPLETED" ? params.status : params.status === "ACTIVE" ? "ACTIVE" : "ALL";
   const archived = params.view === "archived";
@@ -61,7 +64,9 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
     <PageShell measure="wide">
       <PageHeader
         title="Timeline"
-        description="Every project's phase schedule in one Gantt — filter by client, PIC, status, or date range; click a segment to set its planned dates."
+        description={canOverrideTimeline
+          ? "Every project's phase schedule in one Gantt — filter by client, PIC, status, or date range; click a segment to set its planned dates."
+          : "Every project's phase schedule in one read-only Gantt — filter by client, PIC, status, or date range."}
         divider
       />
       <TimelineDirectory
@@ -69,7 +74,7 @@ export default async function TimelinePage({ searchParams }: { searchParams: Pro
         people={people}
         clients={clients.map((c) => ({ id: c.id, name: c.name }))}
         filters={{ status, pic: params.pic ?? "", client: params.client ?? "", from: from ?? "", to: to ?? "", archived }}
-        canManage={hasPermission(grants, P.projectManage)}
+        canManage={canOverrideTimeline}
         editable={editable}
         today={currentDateOnly({ now: new Date(now) })}
       />

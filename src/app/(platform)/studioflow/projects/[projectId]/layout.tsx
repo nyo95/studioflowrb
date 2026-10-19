@@ -1,5 +1,5 @@
 import { Suspense, type ReactNode } from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
 import { enabledModuleIds } from "@platform/core/modules";
@@ -38,6 +38,7 @@ export default async function ProjectLayout({ children, params }: { children: Re
     pageProjectAccess(projectId),
   ]);
   const showWorkSections = canSeeProjectWorkSections(access);
+  if (!showWorkSections) redirect(STUDIOFLOW_ROUTES.projects);
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
       {/* Only the Phases page (marked `data-fill-page`) fills the window with its own scrolling notes; every other
@@ -54,15 +55,15 @@ export default async function ProjectLayout({ children, params }: { children: Re
   );
 }
 
-async function projectOr404(grants: PermissionGrants, projectId: string) {
-  return studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
+async function projectOr404(grants: PermissionGrants, actorId: string, projectId: string) {
+  return studioFlow.projects.getProject({ grants, actorId, projectId }).catch((error) => {
     if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
     throw error;
   });
 }
 
 async function ProjectHeader({ grants, userId, projectId, presentationEnabled, showWorkSections }: { grants: PermissionGrants; userId: string; projectId: string; presentationEnabled: boolean; showWorkSections: boolean }) {
-  const project = await projectOr404(grants, projectId);
+  const project = await projectOr404(grants, userId, projectId);
   // DESIGN v2 §6: the pill tab bar sits below the header (sibling views of the page), not in its action
   // corner, where it crowded the capsule and the title.
   return (
@@ -86,7 +87,8 @@ async function ProjectNavigation({ grants, userId, projectId, presentationEnable
 }
 
 async function ProjectNotices({ grants, projectId }: { grants: PermissionGrants; projectId: string }) {
-  const project = await projectOr404(grants, projectId);
+  const { userId } = await pageSession();
+  const project = await projectOr404(grants, userId, projectId);
   const completed = project.archivedAt === null && project.status === "COMPLETED";
   const [settings, access] = await Promise.all([
     project.archivedAt ? studioFlow.projects.getStudioSettings({ grants }) : Promise.resolve(null),

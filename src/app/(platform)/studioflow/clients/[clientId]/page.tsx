@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
 import { hasPermission } from "@platform/core/rbac";
@@ -16,6 +16,7 @@ export const dynamic = "force-dynamic";
 export default async function ClientPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = await params;
   const { grants } = await pageSession();
+  if (!hasPermission(grants, P.projectManage)) redirect(STUDIOFLOW_ROUTES.projects);
   const client = await studioFlow.projects.getClient({ grants, clientId }).catch((error) => {
     if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
     throw error;

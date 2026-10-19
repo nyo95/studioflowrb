@@ -28,12 +28,13 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
     studioFlow.projects.listAssignablePeople({ grants }),
     studioFlow.projects.listAssignablePeople({ grants, seat: "designer" }),
     studioFlow.projects.listAssignablePeople({ grants, seat: "drafter" }),
-    studioFlow.projects.listClients({ grants }),
+    studioFlow.projects.listClientChoices({ grants }),
     studioFlow.projects.getStudioSettings({ grants }),
   ]);
 
   const access = await studioFlow.projects.listAccess({ grants, actor, projectIds: projects.map((project) => project.id) });
   const editableProjectIds = projects.filter((project) => access.get(project.id)?.canEditProject).map((project) => project.id);
+  const openableProjectIds = projects.filter((project) => access.get(project.id)?.canSeeWorkSections).map((project) => project.id);
 
   return (
     <PageShell measure="wide">
@@ -44,6 +45,7 @@ export default async function ProjectsPage({ searchParams }: { searchParams: Pro
         designers={designers}
         drafters={drafters}
         editableProjectIds={editableProjectIds}
+        openableProjectIds={openableProjectIds}
         clients={clients.map((c) => ({ id: c.id, name: c.name }))}
         filters={{ status, priority: params.priority ?? "", pic: params.pic ?? "", client: params.client ?? "", q: params.q ?? "", archived }}
         canManage={hasPermission(grants, P.projectManage)}

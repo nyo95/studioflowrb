@@ -23,7 +23,7 @@ export default async function MomPrintPage({ params }: { params: Promise<{ proje
   const load = async () => {
     try {
       return await Promise.all([
-        studioFlow.projects.getProject({ grants, projectId }),
+        studioFlow.projects.getProject({ grants, actorId: principal.userId, projectId }),
         studioFlow.mom.getDocument({ grants, projectId, documentId: momId }),
       ]);
     } catch (error) {

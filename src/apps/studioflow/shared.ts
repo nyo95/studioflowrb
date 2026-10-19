@@ -90,6 +90,7 @@ type ProjectAccessFacts = {
 
 /** The single StudioFlow PIC-assignment policy, evaluated from already-read project facts. */
 export function projectAccessFromFacts(project: ProjectAccessFacts, input: { grants: PermissionGrants; actorId: string }): ProjectAccess {
+  const manager = hasPermission(input.grants, P.projectManage);
   const override = hasProjectAssignmentOverride(input.grants);
   const isDesigner = project.pic_designer_id === input.actorId;
   const isDrafter = project.pic_drafter_id === input.actorId;
@@ -97,11 +98,11 @@ export function projectAccessFromFacts(project: ProjectAccessFacts, input: { gra
   const open = !completed;
   return {
     override,
-    canSeeWorkSections: isDesigner || isDrafter || hasPermission(input.grants, P.projectManage),
+    canSeeWorkSections: isDesigner || isDrafter || manager,
     completed,
     isDesigner,
     isDrafter,
-    canEditProject: open && (override || isDesigner),
+    canEditProject: open && manager,
     canEditDocuments: open && (override || isDesigner || isDrafter),
     phases: project.phases.map((phase) => ({
       phaseId: phase.id,
@@ -124,6 +125,12 @@ export async function requireWorkSectionAccess(tx: Db | TxClient, input: { grant
   if (!access.canSeeWorkSections) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "This project's work sections are restricted to its assigned team and managers.");
 }
 
+/** Project detail is confidential: the directory is broad, but detail belongs to the assigned team and Studio Managers. */
+export async function requireProjectDetailAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<void> {
+  requireRead(input.grants);
+  await requireWorkSectionAccess(tx, input);
+}
+
 /** Who may mark a project completed or reopen it: either PIC, or an override holder. */
 export function canChangeCompletion(access: ProjectAccess): boolean {
   return access.override || access.isDesigner || access.isDrafter;
@@ -133,7 +140,7 @@ export function canChangeCompletion(access: ProjectAccess): boolean {
 export async function requireProjectAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string; kind: "project" | "document" | "transition" | "content"; phaseId?: string | null; allowCompleted?: boolean }): Promise<ProjectAccess> {
   const access = await getProjectAccess(tx, input);
   if (access.completed && !(input.allowCompleted && input.kind === "project")) throw projectCompletedError();
-  const permitted = input.kind === "project" ? access.override || access.isDesigner
+  const permitted = input.kind === "project" ? access.canEditProject
     : input.kind === "document" ? access.canEditDocuments
       : input.kind === "transition" ? access.phases.some((phase) => phase.phaseId === input.phaseId && phase.canTransition)
         : access.phases.some((phase) => phase.phaseId === input.phaseId && phase.canEditContent);

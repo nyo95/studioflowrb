@@ -1,4 +1,5 @@
 import { Prisma, SfCdItemStatus } from "@/generated/prisma/client";
+import { AppError } from "@platform/core/errors";
 
 import { drawingGroup, drawingNumber, normalizeDrawingCode } from "../domain/cd-list";
 import {
@@ -7,13 +8,13 @@ import {
   loadWritablePhase,
   notFound,
   requireCommand,
-  requireProjectAccess,
-  requireRead,
+  getProjectAccess,
+  requireProjectDetailAccess,
   requiredText,
   writeAudit,
   type CommandContext,
   type Db,
-  type ReadContext,
+  type WorkSectionReadContext,
   type StudioFlowPorts,
   type TxClient,
 } from "../shared";
@@ -79,7 +80,7 @@ export function createCdListService(db: Db, ports: StudioFlowPorts) {
 
   async function assertAssignee(assigneeId: string | null | undefined) {
     if (!assigneeId) return;
-    const holders = await ports.people.listHolders(P.phaseWork);
+    const holders = await ports.people.listHolders(P.projectPicDrafter);
     if (!holders.some((person) => person.id === assigneeId)) {
       throw invalid("CD_ASSIGNEE_NOT_ELIGIBLE", "The selected person cannot be assigned a drawing.");
     }
@@ -96,7 +97,8 @@ export function createCdListService(db: Db, ports: StudioFlowPorts) {
     const phase = await loadWritablePhase(tx, input.projectId, input.phaseId);
     assertDrafterPhase(phase);
     const userId = requireCommand(input, P.phaseWork);
-    await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, phaseId: input.phaseId, kind: "content" });
+    const access = await getProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId });
+    if (!access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only the assigned Drafter can change the Construction Drawing list.");
     return { phase, userId };
   }
 
@@ -112,8 +114,8 @@ export function createCdListService(db: Db, ports: StudioFlowPorts) {
   }
 
   return {
-    async list(input: ReadContext & { projectId: string; phaseId: string }) {
-      requireRead(input.grants);
+    async list(input: WorkSectionReadContext & { projectId: string; phaseId: string }) {
+      await requireProjectDetailAccess(db, input);
       await loadReadPhase(input.projectId, input.phaseId);
       const rows = await db.sfCdItem.findMany({ where: { phase_id: input.phaseId }, select: ITEM_SELECT });
       return rows.map(toView).sort(compareItems);

@@ -81,6 +81,7 @@ export function ProjectDirectory({
   designers,
   drafters,
   editableProjectIds,
+  openableProjectIds,
   clients,
   filters,
   canManage,
@@ -94,6 +95,8 @@ export function ProjectDirectory({
   drafters: Person[];
   /** Projects the viewer may edit (assigned PIC or override); other rows stay read-only. */
   editableProjectIds: string[];
+  /** The assigned team and Studio Managers can open confidential project detail. */
+  openableProjectIds: string[];
   clients: Array<{ id: string; name: string }>;
   filters: { status: string; priority: string; pic: string; client: string; q: string; archived: boolean };
   canManage: boolean;
@@ -169,10 +172,12 @@ export function ProjectDirectory({
                 <EmptyState title={filters.archived ? "No archived projects" : "No projects match"} description={canManage && !filters.archived ? "Create the first project to start its phases." : undefined} action={canManage && !filters.archived ? <Button onClick={() => setCreating(true)}>New project</Button> : undefined} />
               </TableCell>
             </TableRow>
-          ) : projects.map((project) => (
-            <TableRow key={project.id} className="cursor-pointer" onClick={() => router.push(STUDIOFLOW_ROUTES.project(project.id))}>
+          ) : projects.map((project) => {
+            const canOpen = openableProjectIds.includes(project.id);
+            return (
+            <TableRow key={project.id} className={canOpen ? "cursor-pointer" : undefined} onClick={canOpen ? () => router.push(STUDIOFLOW_ROUTES.project(project.id)) : undefined}>
               <TableCell>
-                <Link href={STUDIOFLOW_ROUTES.project(project.id)} prefetch={false} onClick={(e) => e.stopPropagation()} className="block no-underline">
+                {canOpen ? <Link href={STUDIOFLOW_ROUTES.project(project.id)} prefetch={false} onClick={(e) => e.stopPropagation()} className="block no-underline">
                   <EntityPrimaryCell
                     tone={project.status === "ACTIVE" ? "success" : project.status === "ON_HOLD" ? "warning" : "neutral"}
                     statusLabel={project.status === "ON_HOLD" ? "On hold" : project.status === "ACTIVE" ? "Active" : "Completed"}
@@ -181,7 +186,12 @@ export function ProjectDirectory({
                       <>{project.client?.name ?? "No client"} · <ArchivedFilesNote variant="compact" archivedAt={project.archivedAt} assetsPurgedAt={project.assetsPurgedAt} retentionDays={archiveRetentionDays} asOf={asOf} /></>
                     ) : project.client?.name ?? "No client"}
                   />
-                </Link>
+                </Link> : <EntityPrimaryCell
+                  tone={project.status === "ACTIVE" ? "success" : project.status === "ON_HOLD" ? "warning" : "neutral"}
+                  statusLabel={project.status === "ON_HOLD" ? "On hold" : project.status === "ACTIVE" ? "Active" : "Completed"}
+                  name={<>{project.name}{project.priority === "URGENT" ? <Badge tone="danger" className="ml-2">Urgent</Badge> : null}</>}
+                  secondary={<>{project.client?.name ?? "No client"} · Project list only</>}
+                />}
               </TableCell>
               <TableCell className="w-48">
                 <PhaseDotLabel phases={project.phases} />
@@ -206,7 +216,7 @@ export function ProjectDirectory({
                 </RowActionsCell>
               ) : null}
             </TableRow>
-          ))}
+          );})}
         </TableBody>
       </DataTable>
 

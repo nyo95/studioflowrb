@@ -199,11 +199,38 @@ async function main() {
     const viewerUser = await db.user.create({ data: { email: viewerEmail, display_name: "Rani Viewer", password_hash: await hashPassword(viewerPassword) } });
     await db.userRole.create({ data: { user_id: viewerUser.id, role_id: viewerRole.id } });
 
+    const designerEmail = "e2e-studioflow-designer@example.test";
+    const designerPassword = `E2e-${randomBytes(12).toString("hex")}!`;
+    const designerRole = await db.role.create({ data: { code: "e2e-studioflow-designer", name: "E2E StudioFlow Designer" } });
+    const designerPermissions = ["studioflow.access", "studioflow.project.read", "studioflow.project.pic-designer", "studioflow.phase.work", "studioflow.phase.review", "studioflow.task.manage", "studioflow.mom.manage", "studioflow.schedule.manage", "studioflow.presentation.manage"];
+    await db.rolePermission.createMany({ data: designerPermissions.map((permission_id) => ({ role_id: designerRole.id, permission_id })) });
+    const designerUser = await db.user.create({ data: { email: designerEmail, display_name: "Dewi Designer", password_hash: await hashPassword(designerPassword) } });
+    await db.userRole.create({ data: { user_id: designerUser.id, role_id: designerRole.id } });
+
+    const managerEmail = "e2e-studioflow-manager@example.test";
+    const managerPassword = `E2e-${randomBytes(12).toString("hex")}!`;
+    const managerRole = await db.role.create({ data: { code: "e2e-studioflow-manager", name: "E2E Studio Manager" } });
+    const managerPermissions = ["studioflow.access", "studioflow.project.read", "studioflow.project.manage"];
+    await db.rolePermission.createMany({ data: managerPermissions.map((permission_id) => ({ role_id: managerRole.id, permission_id })) });
+    const managerUser = await db.user.create({ data: { email: managerEmail, display_name: "Mira Manager", password_hash: await hashPassword(managerPassword) } });
+    await db.userRole.create({ data: { user_id: managerUser.id, role_id: managerRole.id } });
+    for (const userId of [designerUser.id, managerUser.id]) await createUserTutorialService(db).record({ userId, tourKey: "studioflow", version: 99, state: "completed" });
+
+    const roleProject = await sf.projects.createProject({
+      ...sfGrants,
+      name: "ZZ-Test SF Role Matrix",
+      newClientName: "E2E Client",
+      picDesignerId: designerUser.id,
+      picDrafterId: owner.userId,
+    });
+    const roleCdPhase = await db.sfPhase.findFirstOrThrow({ where: { project_id: roleProject.projectId, definition_id: LEGACY.cd } });
+    await sf.cdList.create({ ...sfGrants, projectId: roleProject.projectId, phaseId: roleCdPhase.id, drawingCode: "101", drawingName: "Role matrix plan", assignedToId: owner.userId });
+
     const bq = createBqService(db, { auditWriter: createAuditEventWriter(), runTransaction: (work) => db.$transaction((tx) => work(tx as unknown as PrismaClient)) });
     const bqProject = await bq.createProject({ grants: registry.permissions, actor, title: "E2E Long BQ Project Title For Phone Width Checks At The Breeze BSD Phase 2", clientName: "E2E Client" });
 
     mkdirSync("e2e/.tmp", { recursive: true });
-    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, limited: { email: limitedEmail, password: limitedPassword }, viewer: { email: viewerEmail, password: viewerPassword }, projectId: project.projectId, sf: sfFixtures, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, sku3: sku3.skuId, correctionSku: correctionSku.skuId, rightBrand: rightBrand.brandId, workCategory: workCategory.categoryId, priceLess62: priceLess62.skuId, priceLess63: priceLess63.skuId, priceLess63Brand: priceLess63Brand.brandId, requestSku: requestSku.skuId } }));
+    writeFileSync("e2e/.tmp/owner.json", JSON.stringify({ email, password, limited: { email: limitedEmail, password: limitedPassword }, viewer: { email: viewerEmail, password: viewerPassword }, designer: { email: designerEmail, password: designerPassword }, manager: { email: managerEmail, password: managerPassword }, roleProject: { projectId: roleProject.projectId, cdPhaseId: roleCdPhase.id }, projectId: project.projectId, sf: sfFixtures, bqProjectId: bqProject.id, masterData: { brandId: brand.brandId, matA: matA.vendorId, matB: matB.vendorId, both: both.vendorId, labor: labor.vendorId, sku1: sku1.skuId, sku2: sku2.skuId, sku3: sku3.skuId, correctionSku: correctionSku.skuId, rightBrand: rightBrand.brandId, workCategory: workCategory.categoryId, priceLess62: priceLess62.skuId, priceLess63: priceLess63.skuId, priceLess63Brand: priceLess63Brand.brandId, requestSku: requestSku.skuId } }));
   } finally {
     await closeTestDb(testDb);
   }

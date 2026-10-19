@@ -19,7 +19,7 @@ const EMPTY: GlobalSearchResult = { projects: [], clients: [] };
  * and clicked before it will accept a query. Cmd/Ctrl-K focuses it from
  * anywhere. Shown only inside /studioflow, same gating as StudioFlowNav.
  */
-export function StudioFlowHeaderSearch() {
+export function StudioFlowHeaderSearch({ canManageProjects = false }: { canManageProjects?: boolean }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -88,8 +88,8 @@ export function StudioFlowHeaderSearch() {
             value={query}
             onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
-            placeholder="Search projects or clients"
-            aria-label="Search projects or clients"
+            placeholder={canManageProjects ? "Search projects or clients" : "Search projects"}
+            aria-label={canManageProjects ? "Search projects or clients" : "Search projects"}
             className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-ink outline-none placeholder:text-ink-tertiary [&::-webkit-search-cancel-button]:appearance-none"
           />
           {shortcutHint ? (
@@ -108,7 +108,7 @@ export function StudioFlowHeaderSearch() {
         >
           <div className="max-h-[320px] overflow-auto p-[5px]">
             {!trimmed ? (
-              <Text as="p" size="sm" tone="tertiary" className="px-2.5 py-[18px] text-center">Start typing to search projects or clients.</Text>
+              <Text as="p" size="sm" tone="tertiary" className="px-2.5 py-[18px] text-center">Start typing to search {canManageProjects ? "projects or clients" : "projects"}.</Text>
             ) : loading ? (
               <Text as="p" size="sm" tone="tertiary" className="px-2.5 py-[18px] text-center">Searching…</Text>
             ) : !hasResults ? (

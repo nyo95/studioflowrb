@@ -1,5 +1,6 @@
 import { hasPermission } from "@platform/core/rbac";
-import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
+import { redirect } from "next/navigation";
+import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { PageHeader, PageShell } from "@/platform/ui_engine";
 
@@ -10,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function ClientsPage() {
   const { grants } = await pageSession();
+  if (!hasPermission(grants, P.projectManage)) redirect(STUDIOFLOW_ROUTES.projects);
   const clients = await studioFlow.projects.listClients({ grants, includeArchived: true });
   return (
     <PageShell measure="wide">

@@ -6,22 +6,21 @@ import { currentDateOnly } from "@platform/utilities/date";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 
-import { pageProjectAccess, pageSession } from "../../../_components/session";
+import { pageSession } from "../../../_components/session";
 import { ProjectTimeline } from "./project-timeline";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProjectTimelinePage({ params }: { params: Promise<{ projectId: string }> }) {
   const { projectId } = await params;
-  const { grants } = await pageSession();
-  const [project, phases, plan, access] = await Promise.all([
-    studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
+  const { grants, userId } = await pageSession();
+  const [project, phases, plan] = await Promise.all([
+    studioFlow.projects.getProject({ grants, actorId: userId, projectId }).catch((error) => {
       if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
       throw error;
     }),
     studioFlow.phases.listProjectPhases({ grants, projectId }),
     studioFlow.projects.getProjectPlan({ grants, projectId }),
-    pageProjectAccess(projectId),
   ]);
 
   return (
@@ -44,7 +43,7 @@ export default async function ProjectTimelinePage({ params }: { params: Promise<
         manual: phase.plannedDatesManual,
       }))}
       plan={plan}
-      canEdit={hasPermission(grants, P.projectManage) && access.canEditProject && project.archivedAt === null}
+      canEdit={hasPermission(grants, P.projectManage) && hasPermission(grants, P.projectOverride) && project.archivedAt === null}
       today={currentDateOnly()}
     />
   );

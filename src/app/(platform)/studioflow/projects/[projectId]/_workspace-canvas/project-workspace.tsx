@@ -1,9 +1,6 @@
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { SectionCard } from "@/platform/ui_engine";
-
-import { CdList } from "../../../_components/cd-list";
 import { pageProjectAccess, pageSession } from "../../../_components/session";
 import { WorkspaceCanvas } from "./canvas";
 
@@ -35,20 +32,6 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
   const writable = !archived && status === "ACTIVE" && caps.work;
   const selected = phaseList.find((phase) => phase.id === selectedPhaseId) ?? null;
 
-  let drawingList = null;
-  if (selected?.seat === "drafter") {
-    const [detail, items] = await Promise.all([
-      studioFlow.phases.getPhaseDetail({ grants, projectId, phaseId: selected.id }),
-      studioFlow.cdList.list({ grants, projectId, phaseId: selected.id }),
-    ]);
-    const canContent = access.phases.find((item) => item.phaseId === selected.id)?.canEditContent ?? false;
-    drawingList = (
-      <SectionCard title="Drawing list" description="The drawings this phase needs. Tick them off as they are drawn; it never blocks a step.">
-        <CdList projectId={projectId} phaseId={selected.id} items={items} people={people} canEdit={detail.modifiable && caps.work && canContent} />
-      </SectionCard>
-    );
-  }
-
   return (
     <WorkspaceCanvas
       projectId={projectId}
@@ -61,7 +44,7 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
       writablePhaseIds={writable ? access.phases.filter((item) => item.canTransition).map((item) => item.phaseId) : []}
       canUseIdeas={hasPermission(grants, P.ideasManage)}
       canUsePresentation={hasPermission(grants, P.presentationManage)}
-      drawingList={drawingList}
+      drawingList={null}
       threads={threads.map((thread) => ({ id: thread.id, version: thread.version, x: thread.x, y: thread.y, anchorCardId: thread.anchorCardId, offsetX: thread.offsetX, offsetY: thread.offsetY, messageCount: thread.messageCount, clientFeedback: thread.clientFeedback }))}
       chatPhases={phaseList.map((phase) => ({ id: phase.id, label: phase.label, iteration: phase.iterationShortName ?? null }))}
       elements={elements.map((card) => ({

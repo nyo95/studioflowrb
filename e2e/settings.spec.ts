@@ -178,11 +178,11 @@ test("Role matrix follows the Developer module ceiling without hiding core apps"
     await expect(page.locator('input[value="studioflow.ideas.manage"]')).toHaveCount(1);
     await expect(page.locator('input[value^="platform."]')).toHaveCount(0);
     await expect(page.locator('input[value$=".access"]')).toHaveCount(0);
-    await expect(page.getByText("Manage every project", { exact: true })).toBeVisible();
-    await expect(page.getByText("Can change projects even when the user is not assigned as PIC.", { exact: true })).toBeVisible();
+    await expect(page.getByText("Override project workflow", { exact: true })).toBeVisible();
+    await expect(page.getByText("Platform Owner recovery and manual Timeline authority across every project.", { exact: true })).toBeVisible();
     await page.getByLabel("Code").fill("e2e-project-manager");
     await page.getByLabel("Name").fill("E2E Project Manager");
-    await page.getByLabel("Manage every project").check();
+    await page.getByLabel("Override project workflow").check();
     await page.getByRole("button", { name: "Create role" }).click();
     await expect(page.getByText("E2E Project Manager", { exact: true })).toBeVisible();
     const stored = await client.query<{ permission_id: string }>(`SELECT rp.permission_id

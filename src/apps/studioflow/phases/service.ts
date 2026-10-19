@@ -31,6 +31,7 @@ import {
   notFound,
   nowOf,
   requireCommand,
+  requirePermission,
   requireProjectAccess,
   requireRead,
   optionalText,
@@ -204,6 +205,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     /** Portfolio Timeline (owner, 2026-09-23): overridable planned start/end for the Gantt page. `null` clears back to the equal-width sequence fallback. Schedule metadata, not phase-work — not gated by phase lock. */
     async setPhasePlannedDates(input: PhaseCommandInput & { plannedStartDate?: string | null; plannedEndDate?: string | null }) {
       requireCommand(input, P.projectManage);
+      requirePermission(input.grants, P.projectOverride);
       const startDate = input.plannedStartDate === undefined ? undefined : input.plannedStartDate ? dateOnlyToDate(input.plannedStartDate) : null;
       const endDate = input.plannedEndDate === undefined ? undefined : input.plannedEndDate ? dateOnlyToDate(input.plannedEndDate) : null;
       if (startDate && endDate && startDate > endDate) {

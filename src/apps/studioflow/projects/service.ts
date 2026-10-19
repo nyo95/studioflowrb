@@ -29,6 +29,8 @@ import {
   optionalText,
   projectAccessFromFacts,
   requireCommand,
+  requirePermission,
+  requireProjectDetailAccess,
   requireProjectAccess,
   requireRead,
   requiredText,
@@ -36,6 +38,7 @@ import {
   type CommandContext,
   type Db,
   type ReadContext,
+  type WorkSectionReadContext,
   type StudioFlowPorts,
   type TxClient,
 } from "../shared";
@@ -98,6 +101,12 @@ function parseOpeningDate(value: string | null | undefined): Date | null {
 
 export function createProjectService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction } = ports;
+
+  const requireTimelineOverride = (input: CommandContext): string => {
+    const userId = requireCommand(input, P.projectManage);
+    requirePermission(input.grants, P.projectOverride);
+    return userId;
+  };
 
   async function readSettings(client: Db | TxClient) {
     const row = await client.sfSettings.findUnique({ where: { id: SETTINGS_ID } });
@@ -269,6 +278,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     // ── Clients ────────────────────────────────────────────────────────────
     async listClients(input: ReadContext & { includeArchived?: boolean; search?: string }) {
       requireRead(input.grants);
+      requirePermission(input.grants, P.projectManage);
       const search = input.search?.trim();
       const rows = await db.sfClient.findMany({
         where: {
@@ -294,12 +304,19 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
     async getClient(input: ReadContext & { clientId: string }) {
       requireRead(input.grants);
+      requirePermission(input.grants, P.projectManage);
       const client = await db.sfClient.findUnique({
         where: { id: input.clientId },
         include: { projects: { orderBy: { name: "asc" }, select: { id: true, name: true, status: true, priority: true, archived_at: true } } },
       });
       if (!client) throw notFound("client");
       return client;
+    },
+
+    /** Minimal client projection used by the read-only project directory filters. */
+    async listClientChoices(input: ReadContext) {
+      requireRead(input.grants);
+      return db.sfClient.findMany({ where: { archived_at: null }, orderBy: { name: "asc" }, select: { id: true, name: true } });
     },
 
     async createClient(input: CommandContext & { name: string; address?: string | null }) {
@@ -375,26 +392,31 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     },
 
     /** Bounded header search; directory readers retain their full projections. */
-    async quickSearch(input: ReadContext & { search: string; limit?: number }) {
+    async quickSearch(input: WorkSectionReadContext & { search: string; limit?: number }) {
       requireRead(input.grants);
       const search = input.search.trim();
       const limit = input.limit ?? 6;
+      const canManage = hasPermission(input.grants, P.projectManage);
       const [projects, clients] = await Promise.all([
         db.sfProject.findMany({
           where: {
             archived_at: null,
-            ...(search ? { OR: [{ name: { contains: search, mode: "insensitive" as const } }, { client: { name: { contains: search, mode: "insensitive" as const } } }] } : {}),
+            ...(!search && !canManage ? { OR: [{ pic_designer_id: input.actorId }, { pic_drafter_id: input.actorId }] } : {}),
+            ...(search ? { AND: [
+              { OR: [{ name: { contains: search, mode: "insensitive" as const } }, { client: { name: { contains: search, mode: "insensitive" as const } } }] },
+              ...(canManage ? [] : [{ OR: [{ pic_designer_id: input.actorId }, { pic_drafter_id: input.actorId }] }]),
+            ] } : {}),
           },
           orderBy: [{ priority: "asc" }, { name: "asc" }],
           take: limit,
           select: { id: true, name: true, client: { select: { name: true } } },
         }),
-        db.sfClient.findMany({
+        canManage ? db.sfClient.findMany({
           where: { archived_at: null, ...(search ? { name: { contains: search, mode: "insensitive" as const } } : {}) },
           orderBy: { name: "asc" },
           take: limit,
           select: { id: true, name: true },
-        }),
+        }) : Promise.resolve([]),
       ]);
       return {
         projects: projects.map((project) => ({ id: project.id, name: project.name, clientName: project.client?.name ?? null })),
@@ -454,8 +476,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       }));
     },
 
-    async getProject(input: ReadContext & { projectId: string }) {
-      requireRead(input.grants);
+    async getProject(input: WorkSectionReadContext & { projectId: string }) {
+      await requireProjectDetailAccess(db, input);
       const row = await db.sfProject.findUnique({ where: { id: input.projectId }, include: { client: { select: { id: true, name: true, address: true } } } });
       if (!row) throw notFound("project");
       const people = await namesFor([row.pic_designer_id, row.pic_drafter_id, row.archived_by_id]);
@@ -553,6 +575,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
     async updateProject(input: CommandContext & { projectId: string } & ProjectEditInput) {
       const userId = requireCommand(input, P.projectManage);
+      if (input.openingDate !== undefined || input.timelineStartDate !== undefined) requirePermission(input.grants, P.projectOverride);
       const area = input.area === undefined ? undefined : parseArea(input.area);
       const openingDate = input.openingDate === undefined ? undefined : parseOpeningDate(input.openingDate);
       const timelineStartDate = input.timelineStartDate === undefined ? undefined : parseOpeningDate(input.timelineStartDate);
@@ -602,11 +625,11 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     },
 
     async setFitOutStart(input: CommandContext & { projectId: string; fitOutStartDate: string | null }) {
-      const userId = requireCommand(input, P.projectManage); const value = parseOpeningDate(input.fitOutStartDate);
+      const userId = requireTimelineOverride(input); const value = parseOpeningDate(input.fitOutStartDate);
       return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); await tx.sfProject.update({ where: { id: project.id }, data: { fit_out_start_date: value } }); await writeAudit(ports, tx, { action: "studioflow.project.fit-out-start-set", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, fitOutStartDate: input.fitOutStartDate } }); return { projectId: project.id }; });
     },
     async setPlanOverrides(input: CommandContext & { projectId: string; overrides: Partial<PlanIntervals> | null }) {
-      const userId = requireCommand(input, P.projectManage); const overrides = input.overrides;
+      const userId = requireTimelineOverride(input); const overrides = input.overrides;
       if (overrides && Object.values(overrides).some((n) => n !== undefined && (!Number.isInteger(n) || n < 1 || n > 260))) throw invalid("PLAN_OVERRIDES_INVALID", "Plan overrides must be whole working days from 1 to 260.");
       return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); await tx.sfProject.update({ where: { id: project.id }, data: { plan_overrides: overrides ?? Prisma.DbNull } }); await writeAudit(ports, tx, { action: "studioflow.project.plan-overrides-set", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id } }); return { projectId: project.id }; });
     },
@@ -618,7 +641,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       return resolvePlan(db, project);
     },
     async applyProjectPlan(input: CommandContext & { projectId: string }) {
-      const userId = requireCommand(input, P.projectManage);
+      const userId = requireTimelineOverride(input);
       return runTransaction(async (tx) => {
         await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await loadWritableProject(tx, input.projectId);
@@ -627,7 +650,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     },
     /** Clears the manual flag of one computed phase and recomputes, atomically. Only the three phases the plan computes qualify. */
     async resetPhasePlannedDates(input: CommandContext & { projectId: string; phaseId: string }) {
-      const userId = requireCommand(input, P.projectManage);
+      const userId = requireTimelineOverride(input);
       return runTransaction(async (tx) => {
         await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" });
         const project = await loadWritableProject(tx, input.projectId);

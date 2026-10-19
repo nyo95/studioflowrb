@@ -221,10 +221,10 @@ export async function setPlanOverridesAction(input: z.infer<typeof PlanOverrides
 /** Read for the Timeline "Dates & plan" dialog, loaded when it opens: the plan, studio lead times, and phases with hand-set dates. */
 export async function getProjectPlanEditorAction(projectId: string) {
   return runSafeAction(async () => {
-    const { grants } = await context();
+    const { grants, actor } = await context();
     const id = parse(Id, projectId);
     // Same reads, in the same order, as the project Timeline page: the project read checks it exists and is visible.
-    await studioFlow.projects.getProject({ grants, projectId: id });
+    await studioFlow.projects.getProject({ grants, actorId: actor.userId!, projectId: id });
     const [plan, settings, phases] = await Promise.all([
       studioFlow.projects.getProjectPlan({ grants, projectId: id }),
       studioFlow.projects.getStudioSettings({ grants }),
@@ -1333,7 +1333,7 @@ export async function globalSearchAction(query: string): Promise<ActionResult<Gl
   return runSafeAction(async () => {
     const ctx = await context();
     const q = parse(SearchQuery, query);
-    return studioFlow.projects.quickSearch({ ...ctx, search: q });
+    return studioFlow.projects.quickSearch({ grants: ctx.grants, actorId: ctx.actor.userId!, search: q });
   });
 }
 

@@ -15,9 +15,9 @@ export const dynamic = "force-dynamic";
 export default async function ProjectSchedulePage({ params, searchParams }: { params: Promise<{ projectId: string }>; searchParams: Promise<{ entry?: string | string[] }> }) {
   const { projectId } = await params;
   const { entry } = await searchParams;
-  const { grants } = await pageSession();
+  const { grants, userId } = await pageSession();
   const [project, entries, brands, categoryChoices, access] = await Promise.all([
-    studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
+    studioFlow.projects.getProject({ grants, actorId: userId, projectId }).catch((error) => {
       if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
       throw error;
     }),

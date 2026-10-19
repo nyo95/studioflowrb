@@ -4,7 +4,7 @@ import { BookMarked, Building2, ChartGantt, FolderKanban, Lightbulb, ListChecks,
 import { usePathname } from "next/navigation";
 
 import { NavGroup, NavItem, UtilitySection } from "@/platform/ui_engine";
-import { STUDIOFLOW_NAV_LINKS } from "@/apps/studioflow/public/nav";
+import { STUDIOFLOW_NAV_LINKS, studioFlowWorkspaceLinks } from "@/apps/studioflow/public/nav";
 
 const ICONS: Record<string, typeof ListChecks> = {
   "/studioflow": ListChecks,
@@ -21,10 +21,10 @@ function isActive(pathname: string, href: string, exact = false): boolean {
 }
 
 /** StudioFlow entries in the shared rail; shown only inside the app. */
-export function StudioFlowNav({ waitingOnYou = 0, enabledModuleIds, canUseIdeas = false }: { waitingOnYou?: number; enabledModuleIds: readonly string[]; canUseIdeas?: boolean }) {
+export function StudioFlowNav({ waitingOnYou = 0, enabledModuleIds, canUseIdeas = false, canManageProjects = false }: { waitingOnYou?: number; enabledModuleIds: readonly string[]; canUseIdeas?: boolean; canManageProjects?: boolean }) {
   const pathname = usePathname();
   if (!pathname.startsWith("/studioflow")) return null;
-  const links = STUDIOFLOW_NAV_LINKS.workspace.filter((link) => link.href !== "/studioflow/ideas" || (enabledModuleIds.includes("ideas") && canUseIdeas));
+  const links = studioFlowWorkspaceLinks({ canManageProjects, ideasEnabled: enabledModuleIds.includes("ideas"), canUseIdeas });
   return (
     <NavGroup label="StudioFlow navigation" heading="StudioFlow">
       {links.map(({ href, label, exact }) => {

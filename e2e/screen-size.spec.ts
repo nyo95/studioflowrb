@@ -91,20 +91,16 @@ for (const { width, height } of [
   { width: 1440, height: 900 },
   { width: 1280, height: 1141 },
 ]) {
-  test(`desktop Phases page keeps Drawing list and Notes inside the window at ${width}x${height}`, async ({ page }) => {
+  test(`desktop Construction Drawing workspace stays inside the window at ${width}x${height}`, async ({ page }) => {
     await page.setViewportSize({ width, height });
     await open(page, `/studioflow/projects/${projectId}`);
     await page.getByRole("list", { name: "Phase tabs" }).getByRole("button", { name: /^Construction Drawing(?:\s|$)/ }).click();
-    const drawing = page.getByRole("heading", { name: "Drawing list" });
+    const drawing = page.getByRole("heading", { name: "Construction Drawing list" });
     await expect(drawing).toBeVisible();
     await expect(page.getByRole("button", { name: "Add", exact: true })).toBeInViewport();
-    await expect(page.getByRole("textbox", { name: "New note" })).toBeInViewport();
-    await expect(page.getByRole("button", { name: "Send", exact: true })).toBeInViewport();
-    expect(await page.getByRole("region", { name: "Project notes" }).evaluate((notes) => notes.scrollHeight - notes.clientHeight)).toBeLessThanOrEqual(2);
-    expect(await page.locator("[data-fill-page]").evaluate((fill) => {
-      let parent = fill.parentElement;
-      while (parent && getComputedStyle(parent).overflowY !== "auto") parent = parent.parentElement;
-      return parent ? parent.scrollHeight - parent.clientHeight : Infinity;
-    })).toBeLessThanOrEqual(2);
+    await expect(page.getByRole("textbox", { name: "Drawing number" })).toBeInViewport();
+    await expect(page.getByRole("textbox", { name: "Drawing name" })).toBeInViewport();
+    await expect(page.getByRole("textbox", { name: "New note" })).toHaveCount(0);
+    expect(await sidewaysOverflow(page)).toEqual([]);
   });
 }

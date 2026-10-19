@@ -11,8 +11,8 @@ type PermissionPresentation = {
 
 const PRESENTATION: Readonly<Record<string, PermissionPresentation>> = {
   "studioflow.project.read": { resourceLabel: "Projects", actionLabel: "View projects", description: "Can open projects and their documents." },
-  "studioflow.project.manage": { resourceLabel: "Projects", actionLabel: "Create and manage assigned projects", description: "Can create projects and change project details when assigned as Designer PIC." },
-  "studioflow.project.override": { resourceLabel: "Projects", actionLabel: "Manage every project", description: "Can change projects even when the user is not assigned as PIC.", caution: true },
+  "studioflow.project.manage": { resourceLabel: "Studio operations", actionLabel: "Run StudioFlow operations", description: "Studio Manager access to Clients, all Projects, PIC assignment, and the read-only portfolio Timeline." },
+  "studioflow.project.override": { resourceLabel: "Studio operations", actionLabel: "Override project workflow", description: "Platform Owner recovery and manual Timeline authority across every project.", caution: true },
   "studioflow.phase.work": { resourceLabel: "Project workflow", actionLabel: "Work on assigned phases", description: "Can edit phase work and send iterations when the project seat permits it." },
   "studioflow.phase.review": { resourceLabel: "Project workflow", actionLabel: "Review and skip phases", description: "Can perform review actions on phases the user may work on." },
   "studioflow.phase.override": { resourceLabel: "Project workflow", actionLabel: "Reset phase history", description: "Administrative recovery action; use only for StudioFlow managers.", caution: true },

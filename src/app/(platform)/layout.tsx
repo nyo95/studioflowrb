@@ -57,7 +57,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const [settings, tutorial, waitingOnYou, openSampleRequests, enabledModules, brands] = await Promise.all([
     readPlatformGeneralSettings(prisma, (key) => brandMarkStorage.createPublicReadUrl(key)),
     userTutorials.getShellState({ userId: principal.userId, language: display.language }),
-    grants.includes("studioflow.access") ? studioFlow.projects.countWaitingOnYou({ grants, actorId: principal.userId }) : Promise.resolve(0),
+    grants.includes(STUDIOFLOW_PERMISSIONS.access) && grants.includes(STUDIOFLOW_PERMISSIONS.projectRead) ? studioFlow.projects.countWaitingOnYou({ grants, actorId: principal.userId }) : Promise.resolve(0),
     canManageSampleRequests ? studioFlowSampleRequestRead.countPendingSampleRequests() : Promise.resolve(0),
     enabledModuleIds(),
     areaBrands(),
@@ -69,7 +69,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   const domainNavigation = <>
     {apps.some((app) => app.appId === "masterdata") ? <MasterDataNav canManageSampleRequests={canManageSampleRequests} canReadSamples={hasPermission(grants, MASTERDATA_PERMISSIONS.sampleRead)} openSampleRequests={openSampleRequests} canUseWorkbook={(hasPermission(grants, MASTERDATA_PERMISSIONS.skuRead) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialRead)) || (hasPermission(grants, MASTERDATA_PERMISSIONS.skuManage) && hasPermission(grants, MASTERDATA_PERMISSIONS.priceMaterialManage))} /> : null}
     {apps.some((app) => app.appId === "bq") ? <BqNav /> : null}
-    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav waitingOnYou={waitingOnYou} enabledModuleIds={enabledModules} canUseIdeas={hasPermission(grants, STUDIOFLOW_PERMISSIONS.ideasManage)} /> : null}
+    {apps.some((app) => app.appId === "studioflow") ? <StudioFlowNav waitingOnYou={waitingOnYou} enabledModuleIds={enabledModules} canUseIdeas={hasPermission(grants, STUDIOFLOW_PERMISSIONS.ideasManage)} canManageProjects={hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage)} /> : null}
   </>;
 
   // Each app's Settings sits in the rail's utility area; each component renders only inside its own app.
@@ -81,7 +81,7 @@ export default async function PlatformLayout({ children }: { children: ReactNode
   // Each app registers its own first-use tour; the shell plays the one for the app the person is in.
   const tours = apps.some((app) => app.appId === "studioflow") ? [{ appRootPath: "/studioflow", tour: validateAppTutorial(STUDIOFLOW_TOUR) }] : [];
 
-  const contextSlot = apps.some((app) => app.appId === "studioflow") ? <StudioFlowHeaderSearch /> : null;
+  const contextSlot = apps.some((app) => app.appId === "studioflow") ? <StudioFlowHeaderSearch canManageProjects={hasPermission(grants, STUDIOFLOW_PERMISSIONS.projectManage)} /> : null;
 
   return <AuthenticatedShell principal={principal} grants={grants} settings={{ ...settings, ...display }} apps={apps} logoutAction={logoutAction} domainNavigation={domainNavigation} domainUtilityNavigation={domainUtilityNavigation} contextSlot={contextSlot} areaBrands={brands} tours={tours} tutorial={tutorial} tourActions={{ record: recordTutorialAction, setLanguage: setGuideLanguageAction }}>
     {children}

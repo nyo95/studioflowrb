@@ -68,12 +68,15 @@ describe("task-based role matrix", () => {
     assert.ok(studioflow.positions.every((position) => position.description?.includes("PIC")));
   });
 
-  it("names project override by its business consequence and warns about PIC bypass", () => {
+  it("separates Studio Manager operations from Platform Owner override authority", () => {
     const studioflow = groupPermissionsByApp(registry.permissions, registry).find((group) => group.appLabel === "StudioFlow")!;
+    const manage = studioflow.resources.flatMap((resource) => resource.permissions).find((permission) => permission.id === "studioflow.project.manage")!;
     const override = studioflow.resources.flatMap((resource) => resource.permissions).find((permission) => permission.id === "studioflow.project.override")!;
-    assert.equal(override.actionLabel, "Manage every project");
+    assert.equal(manage.actionLabel, "Run StudioFlow operations");
+    assert.match(manage.description ?? "", /Studio Manager/u);
+    assert.equal(override.actionLabel, "Override project workflow");
     assert.equal(override.caution, true);
-    assert.match(override.description ?? "", /not assigned as PIC/u);
+    assert.match(override.description ?? "", /Platform Owner/u);
   });
 
   it("adds technical app and read dependencies without turning a position into access", () => {
@@ -101,6 +104,6 @@ describe("task-based role matrix", () => {
       "studioflow.access",
       "studioflow.project.pic-designer",
       "studioflow.project.override",
-    ], registry), ["Designer", "Manage every project"]);
+    ], registry), ["Designer", "Override project workflow"]);
   });
 });

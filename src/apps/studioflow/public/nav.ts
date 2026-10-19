@@ -38,3 +38,11 @@ export const STUDIOFLOW_NAV_LINKS: {
   ],
   utility: [{ href: "/studioflow/settings", label: "Settings" }],
 };
+
+export function studioFlowWorkspaceLinks(input: { canManageProjects: boolean; ideasEnabled: boolean; canUseIdeas: boolean }): readonly StudioFlowNavLink[] {
+  return STUDIOFLOW_NAV_LINKS.workspace.filter((link) => {
+    if (link.href === STUDIOFLOW_ROUTES.ideas) return input.ideasEnabled && input.canUseIdeas;
+    if (link.href === STUDIOFLOW_ROUTES.timeline || link.href === STUDIOFLOW_ROUTES.clients) return input.canManageProjects;
+    return true;
+  });
+}

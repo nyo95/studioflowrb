@@ -39,12 +39,12 @@ export default async function SchedulePrintPage({
 }) {
   const { projectId } = await params;
   const printFormat = printFormatFromSearchParams(await searchParams);
-  const { grants } = await requirePrincipalGrants();
+  const { principal, grants } = await requirePrincipalGrants();
 
   const load = async () => {
     try {
       return await Promise.all([
-        studioFlow.projects.getProject({ grants, projectId }),
+        studioFlow.projects.getProject({ grants, actorId: principal.userId, projectId }),
         studioFlow.schedule.listSchedule({ grants, projectId }),
       ]);
     } catch (error) {

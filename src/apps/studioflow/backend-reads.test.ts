@@ -44,9 +44,20 @@ it("quick-search bounds both database reads and selects only the returned fields
       } },
     } as unknown as Db;
     const service = createProjectService(db, {} as StudioFlowPorts);
-    assert.deepEqual(await service.quickSearch({ grants: [P.access, P.projectRead], search: "match", limit }), {
+    assert.deepEqual(await service.quickSearch({ grants: [P.access, P.projectRead, P.projectManage], actorId: "manager", search: "match", limit }), {
       projects: [{ id: "p", name: "Project", clientName: null }], clients: [{ id: "c", name: "Client" }],
     });
     assert.equal(statements, 2);
   }
+});
+
+it("quick-search omits client records for Designers", async () => {
+  let clientReads = 0;
+  const db = {
+    sfProject: { findMany: async () => [] },
+    sfClient: { findMany: async () => { clientReads++; return []; } },
+  } as unknown as Db;
+  const service = createProjectService(db, {} as StudioFlowPorts);
+  assert.deepEqual(await service.quickSearch({ grants: [P.access, P.projectRead], actorId: "designer", search: "match" }), { projects: [], clients: [] });
+  assert.equal(clientReads, 0);
 });

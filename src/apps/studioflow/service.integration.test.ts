@@ -455,17 +455,18 @@ describe("WO-SF-PHASE-MENU-01 skip lifecycle", () => {
 });
 
 describe("WO-SF-CDLIST-01 Construction Drawing list", () => {
-  it("lets both PICs manage sorted drawing items, records one audit event per change, and keeps the list informational", async () => {
+  it("lets only the assigned Drafter manage sorted drawing items while the Designer reads", async () => {
     const { projectId } = await newProject();
     const cd = await phaseOf(projectId, "cd");
-    const first = await sf.cdList.create({ ...as(designer), projectId, phaseId: cd.id, drawingCode: "ARS_301", drawingName: "Ceiling plan", assignedToId: drafter.id });
+    const first = await sf.cdList.create({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, drawingCode: "ARS_301", drawingName: "Ceiling plan", assignedToId: drafter.id });
     const second = await sf.cdList.create({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, drawingCode: "12", drawingName: "Key plan" });
-    const third = await sf.cdList.create({ ...as(designer), projectId, phaseId: cd.id, drawingCode: "plan-a", drawingName: "Legend" });
-    const listed = await sf.cdList.list({ grants: [P.access, P.projectRead], projectId, phaseId: cd.id });
+    const third = await sf.cdList.create({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, drawingCode: "plan-a", drawingName: "Legend" });
+    const listed = await sf.cdList.list({ grants: [P.access, P.projectRead], actorId: designer.id, projectId, phaseId: cd.id });
     assert.deepEqual(listed.map((item) => [item.drawingCode, item.group]), [["ID_12", "0"], ["ID_301", "300"], ["ID_PLAN-A", "-"]]);
 
     const updated = await sf.cdList.update({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, itemId: first.id, drawingCode: "id-12.5", drawingName: "Ceiling reflected plan", assignedToId: null });
-    await sf.cdList.setStatus({ ...as(designer), projectId, phaseId: cd.id, itemId: updated.id, status: SfCdItemStatus.COMPLETED });
+    await rejectsWith(sf.cdList.setStatus({ ...as(designer), projectId, phaseId: cd.id, itemId: updated.id, status: SfCdItemStatus.COMPLETED }), "PERMISSION_DENIED");
+    await sf.cdList.setStatus({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, itemId: updated.id, status: SfCdItemStatus.COMPLETED });
     await sf.cdList.delete({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, itemId: third.id });
 
     const events = await testDb.prisma.auditEvent.findMany({ where: { entity_id: updated.id }, orderBy: { occurred_at: "asc" } });
@@ -481,23 +482,23 @@ describe("WO-SF-CDLIST-01 Construction Drawing list", () => {
     const { projectId } = await newProject();
     const cd = await phaseOf(projectId, "cd");
     const moodboard = await phaseOf(projectId, "moodboard");
-    const unassignedGrants = ALL.filter((grant) => grant !== P.projectOverride);
+    const unassignedGrants = [P.access, P.projectRead, P.phaseWork, P.projectPicDesigner];
     const outsider = await seedUser("CD outsider", unassignedGrants);
     const viewer = await seedUser("CD viewer", [P.access, P.projectRead]);
     const ineligible = await seedUser("CD ineligible", [P.access, P.projectRead]);
 
     await rejectsWith(sf.cdList.create({ ...as(outsider, unassignedGrants), projectId, phaseId: cd.id, drawingCode: "1", drawingName: "Denied" }), "PERMISSION_DENIED");
-    assert.deepEqual(await sf.cdList.list({ grants: [P.access, P.projectRead], projectId, phaseId: cd.id }), []);
-    await rejectsWith(sf.cdList.list({ grants: [P.access, P.projectRead], projectId, phaseId: moodboard.id }), "CD_LIST_WRONG_PHASE");
+    await rejectsWith(sf.cdList.list({ grants: unassignedGrants, actorId: outsider.id, projectId, phaseId: cd.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.cdList.list({ grants: [P.access, P.projectRead], actorId: designer.id, projectId, phaseId: moodboard.id }), "CD_LIST_WRONG_PHASE");
     await rejectsWith(sf.cdList.create({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: moodboard.id, drawingCode: "1", drawingName: "Wrong phase" }), "CD_LIST_WRONG_PHASE");
-    await rejectsWith(sf.cdList.create({ ...as(designer), projectId, phaseId: cd.id, drawingCode: "1", drawingName: "Invalid assignee", assignedToId: ineligible.id }), "CD_ASSIGNEE_NOT_ELIGIBLE");
+    await rejectsWith(sf.cdList.create({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, drawingCode: "1", drawingName: "Invalid assignee", assignedToId: ineligible.id }), "CD_ASSIGNEE_NOT_ELIGIBLE");
 
-    const item = await sf.cdList.create({ ...as(designer), projectId, phaseId: cd.id, drawingCode: "1", drawingName: "Section" });
+    const item = await sf.cdList.create({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, drawingCode: "1", drawingName: "Section" });
     await testDb.prisma.sfPhase.update({ where: { id: cd.id }, data: { is_locked: true } });
-    await rejectsWith(sf.cdList.update({ ...as(designer), projectId, phaseId: cd.id, itemId: item.id, drawingName: "Locked" }), "PHASE_LOCKED");
+    await rejectsWith(sf.cdList.update({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, itemId: item.id, drawingName: "Locked" }), "PHASE_LOCKED");
     await testDb.prisma.sfPhase.update({ where: { id: cd.id }, data: { is_locked: false } });
     await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: new Date() } });
-    await rejectsWith(sf.cdList.delete({ ...as(designer), projectId, phaseId: cd.id, itemId: item.id }), "PROJECT_ARCHIVED");
+    await rejectsWith(sf.cdList.delete({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, itemId: item.id }), "PROJECT_ARCHIVED");
     await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { archived_at: null } });
     await testDb.prisma.sfProject.delete({ where: { id: projectId } });
     assert.equal(await testDb.prisma.sfCdItem.count({ where: { id: item.id } }), 0);
@@ -810,15 +811,15 @@ describe("WO-BE-02 archived asset retention", () => {
     assert.equal(await db.auditEvent.count(), eventsBefore, "preview writes no audit event");
     for (const key of Object.values(expired.keys)) assert.ok(storage.objects.has(key), "preview deletes nothing");
     assert.equal((await db.sfProject.findUniqueOrThrow({ where: { id: expired.projectId } })).assets_purged_at, null);
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId: expired.projectId })).assetsPurgedAt, null);
+    assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId: expired.projectId })).assetsPurgedAt, null);
 
     assert.equal((await retention().purgeExpiredArchivedAssets({}, noModules)).projectsPurged, 1, "the purge acts on exactly what the preview counted");
     assert.deepEqual(await retention().previewAssetCleanup(as(designer)), { eligibleProjects: 0, retentionDays: 90 });
-    assert.ok((await sf.projects.getProject({ grants: ALL, projectId: expired.projectId })).assetsPurgedAt instanceof Date);
+    assert.ok((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId: expired.projectId })).assetsPurgedAt instanceof Date);
     const archivedRows = await sf.projects.listProjects({ grants: ALL, archived: true });
     assert.ok(archivedRows.find((row) => row.id === expired.projectId)?.assetsPurgedAt instanceof Date);
     assert.equal(archivedRows.find((row) => row.id === boundary.projectId)?.assetsPurgedAt, null);
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId: live.projectId })).assetsPurgedAt, null);
+    assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId: live.projectId })).assetsPurgedAt, null);
 
     await sf.projects.setArchiveRetention({ ...as(designer), archiveRetentionDays: 7 });
     assert.deepEqual(await retention().previewAssetCleanup(as(designer)), { eligibleProjects: 1, retentionDays: 7 }, "a shorter window makes the 90-day-old project eligible");
@@ -895,15 +896,15 @@ describe("WO-BE-01 backend regressions", () => {
       const projects = await sf.projects.listProjects({ grants: ALL, search });
       const clients = await sf.projects.listClients({ grants: ALL, search });
       for (const limit of [undefined, 2]) {
-        const actual = await sf.projects.quickSearch({ grants: ALL, search, limit });
+        const actual = await sf.projects.quickSearch({ grants: ALL, actorId: designer.id, search, limit });
         assert.deepEqual(actual, {
           projects: projects.slice(0, limit ?? 6).map((p) => ({ id: p.id, name: p.name, clientName: p.client?.name ?? null })),
           clients: clients.slice(0, limit ?? 6).map((c) => ({ id: c.id, name: c.name })),
         });
       }
     }
-    await rejectsWith(sf.projects.quickSearch({ grants: [P.access], search: "needle" }), "PERMISSION_DENIED");
-    await rejectsWith(sf.projects.quickSearch({ grants: [P.projectRead], search: "needle" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.projects.quickSearch({ grants: [P.access], actorId: designer.id, search: "needle" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.projects.quickSearch({ grants: [P.projectRead], actorId: designer.id, search: "needle" }), "PERMISSION_DENIED");
   });
 
   it("projects the phase's note messages oldest first, each labelled with the iteration it was written in", async () => {
@@ -969,16 +970,22 @@ describe("SF-R1 bootstrap and naming", () => {
     const drafters = await sf.projects.listAssignablePeople({ grants: ALL, seat: "drafter" });
     assert.deepEqual(designers.map((p) => p.displayName), ["Dina Designer"]);
     assert.deepEqual(drafters.map((p) => p.displayName), ["Dina Designer", "Dodi Drafter"]);
+    await rejectsWith(sf.projects.listClients({ grants: [P.access, P.projectRead] }), "PERMISSION_DENIED");
+    assert.deepEqual(await sf.projects.listClientChoices({ grants: [P.access, P.projectRead] }), []);
   });
 
-  it("requires the assigned PIC for project mutations and exposes the shared access model", async () => {
+  it("gives Studio Managers project operations while keeping project workflow with the assigned PIC", async () => {
     const { projectId } = await newProject();
     const unassignedGrants = ALL.filter((grant) => grant !== P.projectOverride);
-    const outsider = await seedUser("Unassigned", unassignedGrants);
+    const outsider = await seedUser("Studio Manager", unassignedGrants);
+    const designerOnlyGrants = [P.access, P.projectRead, P.phaseWork, P.projectPicDesigner];
+    const unassignedDesigner = await seedUser("Unassigned Designer", designerOnlyGrants);
     const moodboard = await phaseOf(projectId, "moodboard");
     const cd = await phaseOf(projectId, "cd");
 
-    await rejectsWith(sf.projects.setProjectPriority({ ...as(outsider, unassignedGrants), projectId, priority: "URGENT" }), "PERMISSION_DENIED");
+    await sf.projects.setProjectPriority({ ...as(outsider, unassignedGrants), projectId, priority: "URGENT" });
+    assert.equal((await sf.projects.getProject({ grants: unassignedGrants, actorId: outsider.id, projectId })).priority, "URGENT");
+    await rejectsWith(sf.projects.getProject({ grants: designerOnlyGrants, actorId: unassignedDesigner.id, projectId }), "PERMISSION_DENIED");
     await rejectsWith(sf.phases.sendIteration({ ...as(outsider, unassignedGrants), projectId, phaseId: moodboard.id, iterationId: (await openIteration(moodboard.id)).id }), "PERMISSION_DENIED");
     await rejectsWith(sf.mom.createDocument({ ...as(outsider, unassignedGrants), projectId, topic: "Denied" }), "PERMISSION_DENIED");
     await rejectsWith(sf.schedule.createEntry({ ...as(outsider, unassignedGrants), projectId, section: "MATERIAL", category: "Panel" }), "PERMISSION_DENIED");
@@ -1004,9 +1011,7 @@ describe("SF-R1 bootstrap and naming", () => {
     await sf.projects.setProjectPriority({ ...as(designer), projectId, priority: "URGENT" });
     await sf.mom.createDocument({ ...as(drafter, [...DRAFTER_GRANTS, P.momManage]), projectId, topic: "Drafter can edit documents" });
     await sf.phases.addIteration({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id });
-    const cdIteration = await openIteration(cd.id);
-    await sf.phases.postPhaseNote({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, body: "Drafter-seat notes" });
-    assert.equal((await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { phase_id: cd.id } })).iteration_id, cdIteration.id);
+    await sf.phases.postPhaseNote({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: cd.id, body: "Recorded CD context" });
     const access = await sf.projects.getAccess({ grants: DRAFTER_GRANTS, actor: drafter.actor, projectId });
     assert.deepEqual({ project: access.canEditProject, documents: access.canEditDocuments }, { project: false, documents: true });
     assert.equal(access.phases.find((phase) => phase.phaseId === moodboard.id)?.canTransition, false);
@@ -1135,7 +1140,7 @@ describe("Iteration workflow (WO-SF-ITER-01)", () => {
     assert.equal(after.status, "DONE");
     assert.equal(after.is_locked, true);
     assert.deepEqual(await revisions(phase.id), ["Moodboard 1:REVISED", "Heloskin Cimanggu MB2:REVISED", "Heloskin Cimanggu MB3:DONE"]);
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE", "finishing a phase never completes the project");
+    assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId })).status, "ACTIVE", "finishing a phase never completes the project");
     assert.deepEqual((await sf.tasks.listChecklist({ grants: ALL, projectId, phaseId: phase.id })).map((item) => item.label), ["Draft board"], "Done adds nothing to the requirements");
 
     const actions = (await testDb.prisma.auditEvent.findMany({ where: { entity_id: phase.id }, orderBy: { occurred_at: "asc" } })).map((e) => e.action);
@@ -1185,7 +1190,7 @@ describe("Iteration workflow (WO-SF-ITER-01)", () => {
     const visit = await sf.phases.createSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, visitDate: "2026-09-20" });
     await sf.phases.chooseSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, iterationId: visit.iterationId, outcome: "DONE" });
     assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: supervision.id } })).status, "DONE");
-    const project = await sf.projects.getProject({ grants: ALL, projectId });
+    const project = await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId });
     assert.equal(project.status, "ACTIVE");
   });
 
@@ -2569,16 +2574,16 @@ describe("Deliverable reference revision", () => {
 describe("Project timeline start (Gantt, owner 2026-09-23)", () => {
   it("defaults to createdAt's date, accepts an override, and resets on clear", async () => {
     const { projectId } = await newProject();
-    const created = await sf.projects.getProject({ grants: ALL, projectId });
+    const created = await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId });
     assert.equal(created.timelineStartDate, dateToDateOnly(created.createdAt), "defaults to the createdAt date when never overridden");
 
     await sf.projects.updateProject({ ...as(designer), projectId, timelineStartDate: "2026-01-15" });
-    let updated = await sf.projects.getProject({ grants: ALL, projectId });
+    let updated = await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId });
     assert.equal(updated.timelineStartDate, "2026-01-15");
     assert.deepEqual((await sf.projects.listProjects({ grants: ALL, status: "ALL" })).find((p) => p.id === projectId)?.timelineStartDate, "2026-01-15", "listProjects reflects the override too");
 
     await sf.projects.updateProject({ ...as(designer), projectId, timelineStartDate: null });
-    updated = await sf.projects.getProject({ grants: ALL, projectId });
+    updated = await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId });
     assert.equal(updated.timelineStartDate, dateToDateOnly(created.createdAt), "clearing the override resets to the createdAt fallback");
   });
 
@@ -2586,7 +2591,7 @@ describe("Project timeline start (Gantt, owner 2026-09-23)", () => {
     const { projectId } = await newProject();
     await sf.projects.updateProject({ ...as(designer), projectId, openingDate: "2026-12-01" });
     await sf.projects.updateProject({ ...as(designer), projectId, address: "Somewhere" });
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).openingDate, "2026-12-01");
+    assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId })).openingDate, "2026-12-01");
   });
 });
 
@@ -2701,7 +2706,7 @@ describe("SF-V2-E phase definitions", () => {
     assert.equal(visitDetail.isSupervision, true);
     assert.deepEqual(visitDetail.currentIteration?.choices, ["next_visit", "done"]);
     await sf.phases.chooseSupervisionVisit({ ...as(designer), projectId: standard.projectId, phaseId: supervision.id, iterationId: visit.iterationId, outcome: "DONE" });
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId: standard.projectId })).status, "ACTIVE");
+    assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId: standard.projectId })).status, "ACTIVE");
   });
 
   it("does not complete the project when the last custom phase is finished", async () => {
@@ -2710,13 +2715,13 @@ describe("SF-V2-E phase definitions", () => {
     const [concept, handover] = await phasesOf(projectId);
     const run = { ...as(designer), projectId };
     await clientRound({ ...run, phaseId: concept.id }, "DONE");
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE");
+    assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId })).status, "ACTIVE");
     await clientRound({ ...run, phaseId: handover.id }, "DONE");
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE");
+    assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId })).status, "ACTIVE");
 
     // Another iteration on a finished phase stays phase-local; project completion is an explicit command.
     await sf.phases.addIteration({ ...run, phaseId: handover.id });
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE");
+    assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId })).status, "ACTIVE");
     assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, projectId, phaseId: handover.id })).status, "ACTIVE");
   });
 
@@ -3265,7 +3270,7 @@ describe("WO-SF-ITER-01 screens support (Lead)", () => {
     const second = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: supervision.id, status: "NOT_SENT" } });
     await sf.phases.chooseSupervisionVisit({ ...as(designer), projectId, phaseId: supervision.id, iterationId: second.id, outcome: "DONE" });
     assert.equal((await testDb.prisma.sfPhase.findUniqueOrThrow({ where: { id: supervision.id } })).status, "DONE");
-    assert.equal((await sf.projects.getProject({ grants: ALL, projectId })).status, "ACTIVE", "finishing the last phase never completes the project");
+    assert.equal((await sf.projects.getProject({ grants: ALL, actorId: designer.id, projectId })).status, "ACTIVE", "finishing the last phase never completes the project");
   });
 
   it("lets a requirement be ticked or dismissed after its phase is done, and a dismissed one disappears", async () => {
@@ -3359,7 +3364,7 @@ describe("R8.332 logic review fixes", () => {
     await sf.projects.setProjectPriority({ ...as(designer), projectId: urgent.projectId, priority: "URGENT" });
     const list = await sf.projects.listProjects({ grants: ALL });
     assert.deepEqual(list.map((project) => project.name), ["Zeta urgent", "Alpha house", "Beta house"]);
-    const found = await sf.projects.quickSearch({ grants: ALL, search: "house" });
+    const found = await sf.projects.quickSearch({ grants: ALL, actorId: designer.id, search: "house" });
     assert.deepEqual(found.projects.map((project) => project.name), ["Alpha house", "Beta house"]);
   });
 });
@@ -3407,10 +3412,13 @@ describe("WO-SF-PLAN-01 working-time planning from Fit Out Start", () => {
     await rejectsWith(sf.projects.resetPhasePlannedDates({ ...as(designer), projectId, phaseId: (await phaseOf(projectId, "moodboard")).id }), "PHASE_NOT_PLANNED");
   });
 
-  it("needs a Fit Out Start and the project-manage permission", async () => {
+  it("needs a Fit Out Start and Platform Owner override authority", async () => {
     const { projectId } = await newProject("Plan guards");
     await rejectsWith(sf.projects.applyProjectPlan({ ...as(designer), projectId }), "FIT_OUT_START_REQUIRED");
     await sf.projects.setFitOutStart({ ...as(designer), projectId, fitOutStartDate: "2026-11-02" });
+    const managerGrants = ALL.filter((grant) => grant !== P.projectOverride);
+    await rejectsWith(sf.projects.applyProjectPlan({ ...as(designer, managerGrants), projectId }), "PERMISSION_DENIED");
+    await rejectsWith(sf.projects.setPlanOverrides({ ...as(designer, managerGrants), projectId, overrides: { gap: 3 } }), "PERMISSION_DENIED");
     await rejectsWith(sf.projects.applyProjectPlan({ ...as(drafter, DRAFTER_GRANTS), projectId }), "PERMISSION_DENIED");
     await rejectsWith(sf.projects.setPlanOverrides({ ...as(drafter, DRAFTER_GRANTS), projectId, overrides: { gap: 3 } }), "PERMISSION_DENIED");
     await rejectsWith(sf.projects.setPlanOverrides({ ...as(designer), projectId, overrides: { gap: 0 } }), "PLAN_OVERRIDES_INVALID");

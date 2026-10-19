@@ -3,8 +3,10 @@ import { notFound, redirect } from "next/navigation";
 
 import { AppError } from "@platform/core/errors";
 import { isModuleEnabled } from "@platform/core/modules";
+import { hasPermission } from "@platform/core/rbac";
 import { LEGACY_PHASE_DEFINITION_IDS } from "@/apps/studioflow/domain/phase";
 import { phaseStepPresentation } from "@/apps/studioflow/domain/phase-display";
+import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { SectionCard, Text } from "@/platform/ui_engine";
 
@@ -15,6 +17,7 @@ import { canSeeProjectWorkSections, pageProjectAccess, pageSession } from "../..
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { ProjectNotes } from "./_notes-stream/project-notes";
 import { ProjectWorkspace } from "./_workspace-canvas/project-workspace";
+import { ConstructionDrawingWorkspace } from "./construction-drawing-workspace";
 import { PhaseTabs } from "./phase-tabs";
 import styles from "./phase-layout.module.css";
 
@@ -30,12 +33,12 @@ export default async function ProjectOverviewPage({
   searchParams: Promise<{ phase?: string }>;
 }) {
   const [{ projectId }, sp] = await Promise.all([params, searchParams]);
-  const { grants } = await pageSession();
+  const { grants, userId } = await pageSession();
   const access = await pageProjectAccess(projectId);
   if (!canSeeProjectWorkSections(access)) redirect(STUDIOFLOW_ROUTES.projectSchedule(projectId));
 
-  const [project, phases, people, boardEnabled] = await Promise.all([
-    studioFlow.projects.getProject({ grants, projectId }).catch((error) => {
+  const [project, allPhases, people, boardEnabled] = await Promise.all([
+    studioFlow.projects.getProject({ grants, actorId: userId, projectId }).catch((error) => {
       if (error instanceof AppError && error.kind === "NOT_FOUND") notFound();
       throw error;
     }),
@@ -44,9 +47,16 @@ export default async function ProjectOverviewPage({
     isModuleEnabled("workspace-board"),
   ]);
 
+  // A Drafter-only PIC works only in Drafter-seat phases; Designer phases and their Notes/Workspace stay out of view.
+  const phases = access.isDrafter && !access.isDesigner && !hasPermission(grants, P.projectManage)
+    ? allPhases.filter((phase) => phase.seat === "drafter")
+    : allPhases;
+
   const archived = project.archivedAt !== null;
   const activePhase = phases.find((p) => p.status === "ACTIVE") ?? null;
-  const selectedPhaseId = (sp.phase || null) ?? activePhase?.id ?? phases[0]?.id ?? null;
+  const requestedPhase = sp.phase ? phases.find((phase) => phase.id === sp.phase) ?? null : null;
+  const selectedPhaseId = requestedPhase?.id ?? activePhase?.id ?? phases[0]?.id ?? null;
+  const selectedPhase = phases.find((phase) => phase.id === selectedPhaseId) ?? null;
 
   const pipelineSteps = phases.map((phase, index) => {
     const display = phaseStepPresentation({
@@ -96,7 +106,9 @@ export default async function ProjectOverviewPage({
       <div className="flex flex-1 gap-4 max-xl:flex-col xl:min-h-0">
         <div className="flex min-h-[28rem] min-w-0 flex-1 flex-col gap-4 xl:min-h-0">
           <Suspense fallback={<SectionCard padded><SkeletonBlock className="h-[420px] w-full" /></SectionCard>}>
-            {boardEnabled
+            {selectedPhase?.seat === "drafter"
+              ? <ConstructionDrawingWorkspace projectId={projectId} phaseId={selectedPhase.id} archived={archived} status={project.status} />
+              : boardEnabled
               ? <ProjectWorkspace projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />
               : <ProjectNotes projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />}
           </Suspense>
