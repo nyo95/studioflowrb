@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.152 | 2026-10-19 | feat(studioflow): anchor Timeline at Design Handover
+
+- **Schedule:** Design Handover is now a distinct nullable project date. When it is set, the working-day milestones calculate backward from it; recorded Start stays unchanged and Opening conflicts or past milestones warn without shifting dates.
+- **Operations:** Timeline has Table and Gantt lenses over the same project schedule data, with active-phase status derived as On track, Due today, or Overdue. Date writes remain limited to Platform Owner.
+- **Compatibility:** existing projects without Design Handover retain their Fit Out Start plan and historical dates. The office database migration was applied only to the isolated `studioflow_rebuild` target.
+
 ## R9.151 | 2026-10-19 | plan(studioflow): authorize Design-Handover Timeline
 
 - **Work order:** `WO-SF-TIMELINE-HANDOVER-01` is READY for R9.152. It adds nullable canonical Design Handover, preserves no-Handover schedules, calculates the locked working-day chain backward, derives real phase schedule status, and exposes consistent Table/Gantt data.

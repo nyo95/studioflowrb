@@ -208,9 +208,11 @@ export async function setProjectDatesAction(input: z.infer<typeof ProjectDates>)
 }
 const FitOutStart = z.strictObject({ projectId: Id, fitOutStartDate: DateOnly });
 export async function setFitOutStartAction(input: z.infer<typeof FitOutStart>): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const ctx = await context(); const data = parse(FitOutStart, input); const result = await studioFlow.projects.setFitOutStart({ ...ctx, projectId: data.projectId, fitOutStartDate: data.fitOutStartDate || null }); refresh(data.projectId); return result; }); }
+const DesignHandover = z.strictObject({ projectId: Id, designHandoverDate: DateOnly });
+export async function setDesignHandoverAction(input: z.infer<typeof DesignHandover>): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const ctx = await context(); const data = parse(DesignHandover, input); const result = await studioFlow.projects.setDesignHandover({ ...ctx, projectId: data.projectId, designHandoverDate: data.designHandoverDate || null }); refresh(data.projectId); return result; }); }
 export async function applyProjectPlanAction(projectId: string): Promise<ActionResult<unknown>> { return runSafeAction(async () => { const ctx = await context(); const id = parse(Id, projectId); const result = await studioFlow.projects.applyProjectPlan({ ...ctx, projectId: id }); refresh(id); return result; }); }
 const PlanDays = z.number().int().min(1).max(260);
-const PlanIntervalsInput = z.strictObject({ cdMall: PlanDays, cdFinal: PlanDays, gap: PlanDays, fitOutToHandover: PlanDays, handoverToOpening: PlanDays });
+const PlanIntervalsInput = z.strictObject({ cdMall: z.number().int().min(0).max(260), cdFinal: PlanDays, gap: PlanDays, fitOutToHandover: PlanDays, handoverToOpening: PlanDays });
 export async function setPlanningDefaultsAction(input: z.infer<typeof PlanIntervalsInput>): Promise<ActionResult<unknown>> {
   return runSafeAction(async () => { const ctx = await context(); const result = await studioFlow.projects.setPlanningDefaults({ ...ctx, ...parse(PlanIntervalsInput, input) }); refresh(); return result; });
 }

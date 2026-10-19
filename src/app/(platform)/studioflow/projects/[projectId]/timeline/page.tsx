@@ -32,6 +32,7 @@ export default async function ProjectTimelinePage({ params }: { params: Promise<
         openingDate: project.openingDate ?? null,
         timelineStartDate: project.timelineStartDate,
         fitOutStartDate: project.fitOutStartDate ?? null,
+        designHandoverDate: project.designHandoverDate ?? null,
       }}
       phases={phases.map((phase) => ({
         id: phase.id,

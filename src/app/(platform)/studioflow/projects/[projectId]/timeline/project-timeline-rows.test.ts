@@ -6,8 +6,8 @@ import { LEGACY_PHASE_DEFINITION_IDS as D } from "@/apps/studioflow/domain/phase
 import { buildProjectTimelineRows, type PhaseInput, type Plan, type ProjectInput } from "./project-timeline-rows";
 
 const milestones = { designFinal: "2026-10-12", cdMallStart: "2026-10-12", cdFinalStart: "2026-10-19", end: "2026-10-26", fitOutStart: "2026-11-02", handover: "2026-12-28", openingForecast: "2027-01-11" };
-const plan = (over: Partial<Plan> = {}): Plan => ({ fitOutStartDate: "2026-11-02", intervals: { cdMall: 5, cdFinal: 5, gap: 5, fitOutToHandover: 40, handoverToOpening: 10 }, overrides: null, milestones, endPlanned: "2026-10-26", endActual: null, suggestedFitOutStart: null, warnings: [], ...over });
-const project: ProjectInput = { id: "p", name: "P", client: null, openingDate: "2027-01-11", timelineStartDate: "2026-09-14", fitOutStartDate: "2026-11-02" };
+const plan = (over: Partial<Plan> = {}): Plan => ({ fitOutStartDate: "2026-11-02", designHandoverDate: "2026-12-28", intervals: { cdMall: 0, cdFinal: 5, gap: 5, fitOutToHandover: 40, handoverToOpening: 10 }, overrides: null, milestones, endPlanned: "2026-10-26", endActual: null, suggestedFitOutStart: null, warnings: [], ...over });
+const project: ProjectInput = { id: "p", name: "P", client: null, openingDate: "2027-01-11", timelineStartDate: "2026-09-14", fitOutStartDate: "2026-11-02", designHandoverDate: "2026-12-28" };
 const phase = (id: string, def: string, label: string, start: string | null, end: string | null, manual = false): PhaseInput => ({ id, definitionId: def, label, status: "PENDING", plannedStartDate: start, plannedEndDate: end, manual });
 const phases = (manual = false): PhaseInput[] => [
   phase("m", D.moodboard, "Moodboard", null, null),

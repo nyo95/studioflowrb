@@ -32,6 +32,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.152] Design-Handover Timeline Table and Gantt
+- Surface: StudioFlow → Timeline, plus a project Timeline tab
+- Fixture: an isolated rebuild-only project with Design Handover and Opening dates, one active dated phase, and a second project without Handover; Platform Owner and Studio Manager accounts
+- Viewport: desktop (default) and 375 px
+- Steps: 1. As Platform Owner, set Design Handover and Opening, apply the plan, then compare Table and Gantt. 2. Confirm Start stays the recorded project date and the calculated milestones lead back from Handover. 3. Use an Opening that conflicts and a Handover whose generated date is before today. 4. Check active phase status before/on/after planned end. 5. Open as Manager and attempt date changes. 6. Open the no-Handover project.
+- Acceptance: Table/Gantt show the same dates and real active-phase status; warnings never move dates; only Platform Owner can write; the no-Handover project remains readable with existing dates.
+- Status: PENDING
+
 ### [R9.139] One private Deliverable file per phase
 - Surface: StudioFlow project → Deliverables
 - Fixture: disposable rebuild-only project with an active phase; authorized PIC, Studio Manager and an unauthorized viewer

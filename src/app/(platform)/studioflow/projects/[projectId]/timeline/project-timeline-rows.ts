@@ -7,6 +7,7 @@ import { phaseBarsAndMarkers } from "../../../_components/gantt-rows";
 export type Intervals = { cdMall: number; cdFinal: number; gap: number; fitOutToHandover: number; handoverToOpening: number };
 export type Plan = {
   fitOutStartDate: string | null;
+  designHandoverDate: string | null;
   intervals: Intervals;
   overrides: Partial<Intervals> | null;
   milestones: { designFinal: string; cdMallStart: string; cdFinalStart: string; end: string; fitOutStart: string; handover: string; openingForecast: string } | null;
@@ -16,7 +17,7 @@ export type Plan = {
   warnings: string[];
 };
 export type PhaseInput = { id: string; definitionId: string | null; label: string; status: PhaseStatus; plannedStartDate: string | null; plannedEndDate: string | null; manual: boolean };
-export type ProjectInput = { id: string; name: string; client: { id: string; name: string } | null; openingDate: string | null; timelineStartDate: string; fitOutStartDate: string | null };
+export type ProjectInput = { id: string; name: string; client: { id: string; name: string } | null; openingDate: string | null; timelineStartDate: string; fitOutStartDate: string | null; designHandoverDate: string | null };
 
 export const PLANNED_DEFINITIONS: ReadonlySet<string> = new Set([DEFS.design3d, DEFS.cd, DEFS.supervision]);
 

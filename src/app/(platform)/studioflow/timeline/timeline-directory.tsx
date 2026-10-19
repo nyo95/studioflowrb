@@ -5,9 +5,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import type { GanttZoom } from "@/apps/studioflow/domain/gantt";
+import { LEGACY_PHASE_DEFINITION_IDS } from "@/apps/studioflow/domain/phase";
 import type { PhaseStatus } from "@/apps/studioflow/domain/phase";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public/nav";
-import { Button, EmptyState, FilterChip, Input, SectionCard, Select, TableToolbar, Text } from "@/platform/ui_engine";
+import { Button, DataTable, EmptyState, FilterChip, Input, SectionCard, Select, TableBody, TableCell, TableHead, TableHeader, TableRow, TableToolbar, Text } from "@/platform/ui_engine";
 
 import { GanttChart, type GanttRowData } from "../_components/gantt-chart";
 import { phaseBarsAndMarkers } from "../_components/gantt-rows";
@@ -20,8 +21,11 @@ export type TimelineProject = {
   name: string;
   client: { id: string; name: string } | null;
   openingDate: string | null;
+  designHandoverDate: string | null;
   timelineStartDate: string;
   fitOutStartDate: string | null;
+  scheduleStatus: "ON_TRACK" | "DUE_TODAY" | "OVERDUE" | "PENDING" | "ON_HOLD" | "COMPLETED";
+  activePhaseLabel: string | null;
   phases: TimelinePhase[];
 };
 
@@ -57,6 +61,7 @@ export function TimelineDirectory({
     return project && canManage && editable[project.id]?.project ? project : null;
   });
   const [zoom, setZoom] = useState<GanttZoom>("month");
+  const [mode, setMode] = useState<"table" | "gantt">("table");
 
   const rows: GanttRowData[] = projects.filter((project) => project.phases.length > 0).map((project) => {
     const phaseIds = editable[project.id]?.phaseIds ?? [];
@@ -64,6 +69,7 @@ export function TimelineDirectory({
       onBarClick: canManage ? (phase) => { if (phaseIds.includes(phase.id)) setEditing({ projectId: project.id, phase }); } : undefined,
     });
     if (project.fitOutStartDate) markers.push({ id: `${project.id}:fit-out`, date: project.fitOutStartDate, label: "Fit Out Start", tone: "milestone" });
+    if (project.designHandoverDate) markers.push({ id: `${project.id}:handover`, date: project.designHandoverDate, label: "Design Handover", tone: "milestone" });
     if (project.openingDate) markers.push({ id: `${project.id}:opening`, date: project.openingDate, label: "Opening", tone: "opening" });
     const canEditDates = canManage && (editable[project.id]?.project ?? false);
     return {
@@ -110,6 +116,8 @@ export function TimelineDirectory({
             ))}
             <FilterChip selected={filters.archived} onClick={() => setParam("view", filters.archived ? "" : "archived")}>Archived</FilterChip>
             <span className="mx-1 h-4 w-px bg-line" aria-hidden="true" />
+            <FilterChip selected={mode === "table"} onClick={() => setMode("table")}>Table</FilterChip>
+            <FilterChip selected={mode === "gantt"} onClick={() => setMode("gantt")}>Gantt</FilterChip>
             <FilterChip selected={zoom === "week"} onClick={() => setZoom("week")}>Week</FilterChip>
             <FilterChip selected={zoom === "month"} onClick={() => setZoom("month")}>Month</FilterChip>
             <div className="w-40 shrink-0">
@@ -141,9 +149,7 @@ export function TimelineDirectory({
           <EmptyState title={filters.archived ? "No archived projects match" : "No projects match"} />
         </SectionCard>
       ) : (
-        <SectionCard padded={false}>
-          <GanttChart label="Project timeline" rows={rows} today={today} zoom={zoom} />
-        </SectionCard>
+        mode === "table" ? <ScheduleTable projects={projects} /> : <SectionCard padded={false}><GanttChart label="Project timeline" rows={rows} today={today} zoom={zoom} /></SectionCard>
       )}
 
       {editingProject ? <EditProjectDatesDialog project={editingProject} onClose={closeProjectDialog} /> : null}
@@ -153,4 +159,12 @@ export function TimelineDirectory({
       ) : null}
     </div>
   );
+}
+
+function ScheduleTable({ projects }: { projects: TimelineProject[] }) {
+  const phaseEnd = (project: TimelineProject, definition: string) => project.phases.find((phase) => phase.definitionId === definition)?.plannedEndDate ?? "—";
+  const phaseStart = (project: TimelineProject, definition: string) => project.phases.find((phase) => phase.definitionId === definition)?.plannedStartDate ?? "—";
+  const defs = { design: LEGACY_PHASE_DEFINITION_IDS.design3d, cd: LEGACY_PHASE_DEFINITION_IDS.cd };
+  const status = (project: TimelineProject) => project.scheduleStatus.replaceAll("_", " ").toLowerCase();
+  return <DataTable aria-label="Project timeline table" minWidth={1500} density="compact"><TableHeader><TableRow><TableHead>Project</TableHead><TableHead>Start</TableHead><TableHead>Design Final</TableHead><TableHead>CD</TableHead><TableHead>CD Final</TableHead><TableHead>END</TableHead><TableHead>Start Fit Out</TableHead><TableHead>Design Handover</TableHead><TableHead>Opening</TableHead><TableHead>Status / progress</TableHead></TableRow></TableHeader><TableBody>{projects.map((project) => <TableRow key={project.id}><TableCell><Link href={STUDIOFLOW_ROUTES.projectTimeline(project.id)} prefetch={false}>{project.name}</Link></TableCell><TableCell>{project.timelineStartDate}</TableCell><TableCell>{phaseEnd(project, defs.design)}</TableCell><TableCell>{phaseStart(project, defs.cd)}</TableCell><TableCell>{phaseEnd(project, defs.cd)}</TableCell><TableCell>{phaseEnd(project, defs.cd)}</TableCell><TableCell>{project.fitOutStartDate ?? "—"}</TableCell><TableCell>{project.designHandoverDate ?? "—"}</TableCell><TableCell>{project.openingDate ?? "—"}</TableCell><TableCell>{status(project)}{project.activePhaseLabel ? ` · ${project.activePhaseLabel}` : ""}</TableCell></TableRow>)}</TableBody></DataTable>;
 }

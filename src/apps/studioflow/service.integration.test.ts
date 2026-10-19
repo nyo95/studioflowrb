@@ -3279,9 +3279,9 @@ describe("WO-SF-PLAN-01 working-time planning from Fit Out Start", () => {
     const projectId = await withFitOut("Plan basic");
     const first = await sf.projects.applyProjectPlan({ ...as(designer), projectId });
     assert.equal(first.written.length, 3);
-    assert.deepEqual(first.milestones, { designFinal: "2026-10-12", cdMallStart: "2026-10-12", cdFinalStart: "2026-10-19", end: "2026-10-26", fitOutStart: "2026-11-02", handover: "2026-12-28", openingForecast: "2027-01-11" });
-    assert.deepEqual(await planned(projectId, "design3d"), { id: (await phaseOf(projectId, "design3d")).id, start: null, end: "2026-10-12", manual: false });
-    assert.deepEqual(await planned(projectId, "cd").then(({ start, end }) => [start, end]), ["2026-10-12", "2026-10-26"]);
+    assert.deepEqual(first.milestones, { designFinal: "2026-10-19", cdMallStart: "2026-10-19", cdFinalStart: "2026-10-19", end: "2026-10-26", fitOutStart: "2026-11-02", handover: "2026-12-28", openingForecast: "2027-01-11" });
+    assert.deepEqual(await planned(projectId, "design3d"), { id: (await phaseOf(projectId, "design3d")).id, start: null, end: "2026-10-19", manual: false });
+    assert.deepEqual(await planned(projectId, "cd").then(({ start, end }) => [start, end]), ["2026-10-19", "2026-10-26"]);
     assert.deepEqual(await planned(projectId, "supervision").then(({ start, end }) => [start, end]), ["2026-11-02", "2026-12-28"]);
     assert.equal((await planned(projectId, "moodboard")).start, null);
     const again = await sf.projects.applyProjectPlan({ ...as(designer), projectId });
@@ -3302,15 +3302,18 @@ describe("WO-SF-PLAN-01 working-time planning from Fit Out Start", () => {
     assert.deepEqual(await planned(projectId, "cd").then(({ start, end }) => [start, end]), ["2026-10-01", "2026-10-05"]);
     const reset = await sf.projects.resetPhasePlannedDates({ ...as(designer), projectId, phaseId: cd.id });
     assert.deepEqual(reset.written, [cd.id]);
-    assert.deepEqual(await planned(projectId, "cd"), { id: cd.id, start: "2026-10-12", end: "2026-10-26", manual: false });
+    assert.deepEqual(await planned(projectId, "cd"), { id: cd.id, start: "2026-10-19", end: "2026-10-26", manual: false });
     await rejectsWith(sf.projects.resetPhasePlannedDates({ ...as(designer), projectId, phaseId: (await phaseOf(projectId, "moodboard")).id }), "PHASE_NOT_PLANNED");
   });
 
   it("needs a Fit Out Start and Platform Owner override authority", async () => {
     const { projectId } = await newProject("Plan guards");
-    await rejectsWith(sf.projects.applyProjectPlan({ ...as(designer), projectId }), "FIT_OUT_START_REQUIRED");
+    await rejectsWith(sf.projects.applyProjectPlan({ ...as(designer), projectId }), "DESIGN_HANDOVER_REQUIRED");
     await sf.projects.setFitOutStart({ ...as(designer), projectId, fitOutStartDate: "2026-11-02" });
     const managerGrants = ALL.filter((grant) => grant !== P.projectOverride);
+    await rejectsWith(sf.projects.setDesignHandover({ ...as(designer, managerGrants), projectId, designHandoverDate: "2026-12-28" }), "PERMISSION_DENIED");
+    await sf.projects.setDesignHandover({ ...as(designer), projectId, designHandoverDate: "2026-12-28" });
+    assert.equal((await sf.projects.getProjectPlan({ grants: ALL, projectId })).designHandoverDate, "2026-12-28");
     await rejectsWith(sf.projects.applyProjectPlan({ ...as(designer, managerGrants), projectId }), "PERMISSION_DENIED");
     await rejectsWith(sf.projects.setPlanOverrides({ ...as(designer, managerGrants), projectId, overrides: { gap: 3 } }), "PERMISSION_DENIED");
     await rejectsWith(sf.projects.applyProjectPlan({ ...as(drafter, DRAFTER_GRANTS), projectId }), "PERMISSION_DENIED");
@@ -3324,10 +3327,10 @@ describe("WO-SF-PLAN-01 working-time planning from Fit Out Start", () => {
     await sf.projects.setPlanOverrides({ ...as(designer), projectId, overrides: { cdFinal: 10 } });
     const after = await sf.projects.getProjectPlan({ grants: ALL, projectId });
     assert.equal(after.intervals.cdFinal, 10);
-    assert.equal(after.intervals.cdMall, 5);
+    assert.equal(after.intervals.cdMall, 0);
     assert.deepEqual([after.milestones!.end, after.milestones!.handover, after.milestones!.openingForecast], [before.end, before.handover, before.openingForecast]);
     assert.equal(after.milestones!.cdFinalStart, "2026-10-12");
-    assert.equal(after.milestones!.designFinal, "2026-10-05");
+    assert.equal(after.milestones!.designFinal, "2026-10-12");
     await sf.projects.setPlanOverrides({ ...as(designer), projectId, overrides: null });
     assert.deepEqual((await sf.projects.getProjectPlan({ grants: ALL, projectId })).milestones, before);
   });
@@ -3338,7 +3341,7 @@ describe("WO-SF-PLAN-01 working-time planning from Fit Out Start", () => {
     await rejectsWith(sf.projects.addHoliday({ ...as(designer), date: "2026-10-22", label: "Again" }), "HOLIDAY_EXISTS");
     await rejectsWith(sf.projects.addHoliday({ ...as(drafter, DRAFTER_GRANTS), date: "2026-10-23", label: "No" }), "PERMISSION_DENIED");
     const held = (await sf.projects.getProjectPlan({ grants: ALL, projectId })).milestones!;
-    assert.deepEqual([held.cdFinalStart, held.cdMallStart], ["2026-10-16", "2026-10-09"]);
+    assert.deepEqual([held.cdFinalStart, held.cdMallStart], ["2026-10-16", "2026-10-16"]);
     const [holiday] = await sf.projects.listHolidays({ grants: ALL });
     await sf.projects.removeHoliday({ ...as(designer), holidayId: holiday!.id });
     assert.equal((await sf.projects.getProjectPlan({ grants: ALL, projectId })).milestones!.cdFinalStart, "2026-10-19");

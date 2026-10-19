@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 
 import { Button, DraftDialog, Field, FormActions, InlineError, Input, Notice, Text } from "@/platform/ui_engine";
 
-import { applyProjectPlanAction, getProjectPlanEditorAction, resetPhasePlannedDatesAction, setFitOutStartAction, setPlanOverridesAction, setProjectDatesAction } from "../actions";
+import { applyProjectPlanAction, getProjectPlanEditorAction, resetPhasePlannedDatesAction, setDesignHandoverAction, setPlanOverridesAction, setProjectDatesAction } from "../actions";
 import { useCommand } from "../_components/use-command";
 import { PLANNED_DEFINITIONS, type Intervals, type Plan } from "../projects/[projectId]/timeline/project-timeline-rows";
 import type { TimelineProject } from "./timeline-directory";
@@ -51,7 +51,7 @@ const leadDraftOf = (overrides: Partial<Intervals> | null) =>
  */
 export function EditProjectDatesDialog({ project, onClose }: { project: TimelineProject; onClose: () => void }) {
   const { run, pendingKey, error } = useCommand();
-  const [form, setForm] = useState({ timelineStartDate: project.timelineStartDate, openingDate: project.openingDate ?? "", fitOutStartDate: project.fitOutStartDate ?? "" });
+  const [form, setForm] = useState({ timelineStartDate: project.timelineStartDate, openingDate: project.openingDate ?? "", designHandoverDate: project.designHandoverDate ?? "" });
   const [editor, setEditor] = useState<Editor | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [lead, setLead] = useState<Record<keyof Intervals, string>>(() => leadDraftOf(null));
@@ -84,7 +84,7 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
     if (leadInvalid) return false;
     const dates = await run("save", () => setProjectDatesAction({ projectId: project.id, timelineStartDate: form.timelineStartDate || null, openingDate: form.openingDate || null }));
     if (!dates) return false;
-    if (!(await run("fit-out", () => setFitOutStartAction({ projectId: project.id, fitOutStartDate: form.fitOutStartDate })))) return false;
+    if (!(await run("handover", () => setDesignHandoverAction({ projectId: project.id, designHandoverDate: form.designHandoverDate })))) return false;
     if (leadDirty && !(await run("overrides", () => setPlanOverridesAction({ projectId: project.id, overrides: Object.keys(nextOverrides).length > 0 ? nextOverrides : null })))) return false;
     return true;
   };
@@ -95,7 +95,7 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
   };
 
   const onApply = async () => {
-    if (!form.fitOutStartDate || !(await saveAll())) return;
+    if (!form.designHandoverDate || !(await saveAll())) return;
     await run("apply", () => applyProjectPlanAction(project.id), (data) => setResult(data as PlanResult));
     await load();
   };
@@ -109,7 +109,7 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
       open
       onOpenChange={(open) => { if (!open) onClose(); }}
       title={`${project.name} — dates and plan`}
-      description="The bar runs from the start to the opening date. Design dates are counted back from Fit Out Start in working days (Monday to Friday, skipping holidays); Handover and Opening forward."
+      description="Start is the recorded project date. Design dates are counted backward from Design Handover in working days (Monday to Friday, skipping holidays); Opening is checked against that handover."
       size="md"
       pending={pending}
       watchedValue={JSON.stringify({ form, leadDirty })}
@@ -119,19 +119,18 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
           <Field label="Start">
             <Input type="date" value={form.timelineStartDate} onChange={(e) => setForm((f) => ({ ...f, timelineStartDate: e.target.value }))} />
           </Field>
-          <Field label="Fit Out Start" description="When the contractor starts work from the CD drawings.">
-            <Input type="date" value={form.fitOutStartDate} onChange={(e) => setForm((f) => ({ ...f, fitOutStartDate: e.target.value }))} />
+          <Field label="Design Handover" description="The canonical handover date used to plan backward.">
+            <Input type="date" value={form.designHandoverDate} onChange={(e) => setForm((f) => ({ ...f, designHandoverDate: e.target.value }))} />
           </Field>
           <Field label="Opening date">
             <Input type="date" value={form.openingDate} onChange={(e) => setForm((f) => ({ ...f, openingDate: e.target.value }))} />
           </Field>
         </div>
 
-        {editor?.plan.suggestedFitOutStart && editor.plan.suggestedFitOutStart !== form.fitOutStartDate ? (
+        {editor?.plan.suggestedFitOutStart ? (
           <Notice tone="neutral" title="Suggested Fit Out Start">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span>Construction Drawing finished on {editor.plan.endActual}. Starting fit-out on {editor.plan.suggestedFitOutStart} leaves the usual gap.</span>
-              <Button type="button" size="sm" onClick={() => setForm((f) => ({ ...f, fitOutStartDate: editor.plan.suggestedFitOutStart! }))}>Use {editor.plan.suggestedFitOutStart}</Button>
             </div>
           </Notice>
         ) : null}
@@ -142,7 +141,7 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
           <div className="grid grid-cols-3 gap-3 max-[560px]:grid-cols-2">
             {INTERVAL_FIELDS.map(([key, label]) => (
               <Field key={key} label={label} description={editor ? `Studio default ${editor.studioDefaults[key]}` : "Loading…"} error={Number.isNaN(parsed(key)) ? "Whole number from 1 to 260, or empty." : undefined}>
-                <Input type="number" inputMode="numeric" min={1} max={260} step={1} placeholder={editor ? String(editor.studioDefaults[key]) : ""} value={lead[key]} disabled={!editor || pending} onChange={(event) => setLead((current) => ({ ...current, [key]: event.target.value }))} />
+                <Input type="number" inputMode="numeric" min={0} max={260} step={1} placeholder={editor ? String(editor.studioDefaults[key]) : ""} value={lead[key]} disabled={!editor || pending} onChange={(event) => setLead((current) => ({ ...current, [key]: event.target.value }))} />
               </Field>
             ))}
           </div>
@@ -165,10 +164,10 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
         {error ? <InlineError>{error}</InlineError> : null}
         <FormActions>
           <Button type="button" data-dialog-cancel disabled={pending}>Cancel</Button>
-          <Button type="button" disabled={!form.fitOutStartDate || leadInvalid || pending} pending={pendingKey === "apply"} onClick={() => void onApply()}>Save and apply plan</Button>
-          <Button type="submit" variant="primary" disabled={leadInvalid} pending={pendingKey === "save" || pendingKey === "fit-out" || pendingKey === "overrides"}>Save</Button>
+          <Button type="button" disabled={!form.designHandoverDate || leadInvalid || pending} pending={pendingKey === "apply"} onClick={() => void onApply()}>Save and apply plan</Button>
+          <Button type="submit" variant="primary" disabled={leadInvalid} pending={pendingKey === "save" || pendingKey === "handover" || pendingKey === "overrides"}>Save</Button>
         </FormActions>
-        {!form.fitOutStartDate ? <Text size="sm" tone="secondary">Enter Fit Out Start to enable Save and apply plan. You can still Save these dates without applying the plan.</Text> : null}
+        {!form.designHandoverDate ? <Text size="sm" tone="secondary">Enter Design Handover to enable Save and apply plan. You can still Save Start and Opening without applying the plan.</Text> : null}
         <Text size="sm" tone="tertiary">Apply plan writes the computed dates to Design 3D, Construction Drawing and Construction. Dates you set by hand are kept.</Text>
       </form>
     </DraftDialog>

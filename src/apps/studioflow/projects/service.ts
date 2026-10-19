@@ -110,12 +110,12 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
   async function readSettings(client: Db | TxClient) {
     const row = await client.sfSettings.findUnique({ where: { id: SETTINGS_ID } });
-    return { archiveRetentionDays: row?.archive_retention_days ?? 90, cdMall: row?.cd_mall_days ?? 5, cdFinal: row?.cd_final_days ?? 5, gap: row?.fit_out_gap_days ?? 5, fitOutToHandover: row?.fit_out_to_handover_days ?? 40, handoverToOpening: row?.handover_to_opening_days ?? 10 };
+    return { archiveRetentionDays: row?.archive_retention_days ?? 90, cdMall: row?.cd_mall_days ?? 0, cdFinal: row?.cd_final_days ?? 5, gap: row?.fit_out_gap_days ?? 5, fitOutToHandover: row?.fit_out_to_handover_days ?? 40, handoverToOpening: row?.handover_to_opening_days ?? 10 };
   }
 
   const PLAN_PHASE_DEFINITIONS: ReadonlySet<string> = new Set([LEGACY_PHASE_DEFINITION_IDS.design3d, LEGACY_PHASE_DEFINITION_IDS.cd, LEGACY_PHASE_DEFINITION_IDS.supervision]);
 
-  type PlanProject = { id: string; fit_out_start_date: Date | null; plan_overrides: unknown; opening_date: Date | null; timeline_start_date: Date | null };
+  type PlanProject = { id: string; fit_out_start_date: Date | null; design_handover_date: Date | null; plan_overrides: unknown; opening_date: Date | null; timeline_start_date: Date | null };
 
   /** Studio defaults, then the project's own overrides. Only the five interval keys are ever read. */
   async function resolveIntervals(client: Db | TxClient, project: PlanProject): Promise<PlanIntervals> {
@@ -131,11 +131,11 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
     const cd = await client.sfPhase.findFirst({ where: { project_id: project.id, definition_id: LEGACY_PHASE_DEFINITION_IDS.cd }, select: { status: true, status_changed_at: true } });
     const endActual = cd?.status === "DONE" ? dateToDateOnly(cd.status_changed_at) : null;
     const fitOutStartDate = dateToDateOnly(project.fit_out_start_date);
-    const plan = fitOutStartDate
-      ? computeProjectPlan({ fitOutStart: fitOutStartDate, intervals, holidays, openingDate: dateToDateOnly(project.opening_date), timelineStart: dateToDateOnly(project.timeline_start_date), cdDoneDate: endActual, today: dateToDateOnly(nowOf(ports))! })
-      : null;
+    const designHandoverDate = dateToDateOnly(project.design_handover_date);
+    const plan = computeProjectPlan({ fitOutStart: fitOutStartDate, designHandover: designHandoverDate, intervals, holidays, openingDate: dateToDateOnly(project.opening_date), timelineStart: dateToDateOnly(project.timeline_start_date), cdDoneDate: endActual, today: dateToDateOnly(nowOf(ports))! });
     return {
       fitOutStartDate,
+      designHandoverDate,
       intervals,
       overrides: (project.plan_overrides ?? null) as Partial<PlanIntervals> | null,
       milestones: plan?.milestones ?? null,
@@ -149,7 +149,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
   /** Writes the computed dates of every phase whose dates are not manual (or only `onlyPhaseId`, whose manual flag is cleared first). */
   async function applyPlanIn(tx: TxClient, project: PlanProject, actor: CommandContext["actor"], onlyPhaseId: string | null) {
-    if (!project.fit_out_start_date) throw invalid("FIT_OUT_START_REQUIRED", "Set Fit Out Start before applying the plan.");
+    if (!project.design_handover_date && !project.fit_out_start_date) throw invalid("DESIGN_HANDOVER_REQUIRED", "Set Design Handover before applying the plan.");
     if (onlyPhaseId) await tx.sfPhase.update({ where: { id: onlyPhaseId }, data: { planned_dates_manual: false } });
     const resolved = await resolvePlan(tx, project);
     const m = resolved.milestones!;
@@ -256,7 +256,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
 
     async setPlanningDefaults(input: CommandContext & PlanIntervals) {
       const userId = requireCommand(input, P.settingsManage);
-      if (Object.values({ cdMall: input.cdMall, cdFinal: input.cdFinal, gap: input.gap, fitOutToHandover: input.fitOutToHandover, handoverToOpening: input.handoverToOpening }).some((n) => !Number.isInteger(n) || n < 1 || n > 260)) throw invalid("PLANNING_DEFAULTS_INVALID", "Planning defaults must be whole working days from 1 to 260.");
+      if (![input.cdMall, input.cdFinal, input.gap, input.fitOutToHandover, input.handoverToOpening].every((n) => Number.isInteger(n) && n <= 260) || input.cdMall < 0 || [input.cdFinal, input.gap, input.fitOutToHandover, input.handoverToOpening].some((n) => n < 1)) throw invalid("PLANNING_DEFAULTS_INVALID", "Design Final to CD may be 0; other planning defaults must be whole working days from 1 to 260.");
       return runTransaction(async (tx) => { await tx.sfSettings.upsert({ where: { id: SETTINGS_ID }, create: { id: SETTINGS_ID, updated_by_id: userId, cd_mall_days: input.cdMall, cd_final_days: input.cdFinal, fit_out_gap_days: input.gap, fit_out_to_handover_days: input.fitOutToHandover, handover_to_opening_days: input.handoverToOpening }, update: { updated_by_id: userId, cd_mall_days: input.cdMall, cd_final_days: input.cdFinal, fit_out_gap_days: input.gap, fit_out_to_handover_days: input.fitOutToHandover, handover_to_opening_days: input.handoverToOpening } }); await writeAudit(ports, tx, { action: "studioflow.settings.planning-updated", entityType: "settings", entityId: SETTINGS_ID, actor: input.actor }); return readSettings(tx); });
     },
     async listHolidays(input: ReadContext) { requireRead(input.grants); return (await db.sfHoliday.findMany({ orderBy: { date: "asc" } })).map((h) => ({ id: h.id, date: dateToDateOnly(h.date)!, label: h.label })); },
@@ -460,6 +460,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         status: row.status as ProjectStatus,
         priority: row.priority as ProjectPriority,
         openingDate: dateToDateOnly(row.opening_date),
+        designHandoverDate: dateToDateOnly(row.design_handover_date),
         fitOutStartDate: dateToDateOnly(row.fit_out_start_date),
         /** Gantt/timeline start; falls back to `createdAt`'s date when the owner hasn't overridden it. */
         timelineStartDate: dateToDateOnly(row.timeline_start_date) ?? dateToDateOnly(row.created_at)!,
@@ -471,6 +472,17 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         updatedAt: row.updated_at,
         designer: people.get(row.pic_designer_id) ?? { id: row.pic_designer_id, displayName: "Unknown", active: false },
         drafter: people.get(row.pic_drafter_id) ?? { id: row.pic_drafter_id, displayName: "Unknown", active: false },
+        scheduleStatus: (() => {
+          if (row.status === "ON_HOLD") return "ON_HOLD" as const;
+          if (row.status === "COMPLETED") return "COMPLETED" as const;
+          const active = row.phases.find((phase) => phase.status === "ACTIVE");
+          if (!active) return "PENDING" as const;
+          if (!active?.planned_end_date) return "ON_TRACK" as const;
+          const due = dateToDateOnly(active.planned_end_date)!;
+          const today = dateToDateOnly(nowOf(ports))!;
+          return due < today ? "OVERDUE" as const : due === today ? "DUE_TODAY" as const : "ON_TRACK" as const;
+        })(),
+        activePhaseLabel: row.phases.find((phase) => phase.status === "ACTIVE")?.name_snapshot ?? null,
         phases: row.phases.map((phase) => ({ id: phase.id, definitionId: phase.definition_id, status: phase.status as PhaseStatus, isLocked: phase.is_locked, statusChangedAt: phase.status_changed_at, label: phase.name_snapshot, plannedStartDate: dateToDateOnly(phase.planned_start_date), plannedEndDate: dateToDateOnly(phase.planned_end_date) })),
         openItems: row._count.checklist_items,
       }));
@@ -488,6 +500,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         status: row.status as ProjectStatus,
         priority: row.priority as ProjectPriority,
         openingDate: dateToDateOnly(row.opening_date),
+        designHandoverDate: dateToDateOnly(row.design_handover_date),
         fitOutStartDate: dateToDateOnly(row.fit_out_start_date),
         /** Gantt/timeline start; falls back to `createdAt`'s date when the owner hasn't overridden it. */
         timelineStartDate: dateToDateOnly(row.timeline_start_date) ?? dateToDateOnly(row.created_at)!,
@@ -628,15 +641,19 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       const userId = requireTimelineOverride(input); const value = parseOpeningDate(input.fitOutStartDate);
       return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); await tx.sfProject.update({ where: { id: project.id }, data: { fit_out_start_date: value } }); await writeAudit(ports, tx, { action: "studioflow.project.fit-out-start-set", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, fitOutStartDate: input.fitOutStartDate } }); return { projectId: project.id }; });
     },
+    async setDesignHandover(input: CommandContext & { projectId: string; designHandoverDate: string | null }) {
+      const userId = requireTimelineOverride(input); const value = parseOpeningDate(input.designHandoverDate);
+      return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); await tx.sfProject.update({ where: { id: project.id }, data: { design_handover_date: value } }); await writeAudit(ports, tx, { action: "studioflow.project.design-handover-set", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id, designHandoverDate: input.designHandoverDate } }); return { projectId: project.id }; });
+    },
     async setPlanOverrides(input: CommandContext & { projectId: string; overrides: Partial<PlanIntervals> | null }) {
       const userId = requireTimelineOverride(input); const overrides = input.overrides;
-      if (overrides && Object.values(overrides).some((n) => n !== undefined && (!Number.isInteger(n) || n < 1 || n > 260))) throw invalid("PLAN_OVERRIDES_INVALID", "Plan overrides must be whole working days from 1 to 260.");
+      if (overrides && Object.entries(overrides).some(([key, n]) => n !== undefined && (!Number.isInteger(n) || n > 260 || n < (key === "cdMall" ? 0 : 1)))) throw invalid("PLAN_OVERRIDES_INVALID", "Design Final to CD may be 0; other plan overrides must be whole working days from 1 to 260.");
       return runTransaction(async (tx) => { await requireProjectAccess(tx, { grants: input.grants, actorId: userId, projectId: input.projectId, kind: "project" }); const project = await loadWritableProject(tx, input.projectId); await tx.sfProject.update({ where: { id: project.id }, data: { plan_overrides: overrides ?? Prisma.DbNull } }); await writeAudit(ports, tx, { action: "studioflow.project.plan-overrides-set", entityType: "project", entityId: project.id, actor: input.actor, metadata: { projectId: project.id } }); return { projectId: project.id }; });
     },
     /** Read-only plan: resolved intervals, computed milestones, END (actual/planned), a suggested Fit Out Start, and warnings. Writes nothing. */
     async getProjectPlan(input: ReadContext & { projectId: string }) {
       requireRead(input.grants);
-      const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, fit_out_start_date: true, plan_overrides: true, opening_date: true, timeline_start_date: true } });
+      const project = await db.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, fit_out_start_date: true, design_handover_date: true, plan_overrides: true, opening_date: true, timeline_start_date: true } });
       if (!project) throw notFound("project");
       return resolvePlan(db, project);
     },
