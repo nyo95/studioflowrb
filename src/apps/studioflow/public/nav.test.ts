@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { studioFlowWorkspaceLinks } from "./nav";
+import { STUDIOFLOW_ROUTES, studioFlowWorkspaceLinks } from "./nav";
 
 const hrefs = (input: Parameters<typeof studioFlowWorkspaceLinks>[0]) => studioFlowWorkspaceLinks(input).map((link) => link.href);
 
 describe("StudioFlow role navigation", () => {
+  it("keeps the centralized Deliverables route under its project", () => {
+    assert.equal(STUDIOFLOW_ROUTES.projectDeliverables("project-123"), "/studioflow/projects/project-123/deliverables");
+  });
+
   it("keeps Designers on personal work, the read-only project list, and Library", () => {
     assert.deepEqual(hrefs({ canManageProjects: false, ideasEnabled: false, canUseIdeas: false }), [
       "/studioflow",

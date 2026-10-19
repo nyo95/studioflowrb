@@ -33,11 +33,19 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 ## Pending
 
 ### [R9.139] One private Deliverable file per phase
-- Surface: StudioFlow project → Phases → a phase's Deliverables panel
+- Surface: StudioFlow project → Deliverables
 - Fixture: disposable rebuild-only project with an active phase; authorized PIC, Studio Manager and an unauthorized viewer
 - Viewport: desktop (default) and 375 px
 - Steps: 1. As the PIC, upload a PDF and then a differently named PDF to the same phase; reload. 2. Check that only the second file is listed and can be downloaded. 3. As the Manager, open Delete, cancel, then confirm. 4. As the unauthorized viewer, attempt the upload boundary.
 - Acceptance: each phase visibly retains exactly one current private file; replacement survives reload without Version, Final or expiry controls; cancellation preserves the file, confirmation removes it, and unauthorized upload is refused.
+- Status: PENDING
+
+### [R9.141] Centralized project Deliverables
+- Surface: StudioFlow project → Deliverables, and project → Phases
+- Fixture: disposable rebuild-only project with at least two phases and one active private Deliverable
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Open a project and confirm Deliverables is directly after Phases in the project tabs. 2. Open it, then reload; its tab remains active. 3. Confirm every phase is present in the workflow order and the existing private file is shown only beneath its own phase label. 4. Open Phases and confirm the phase sidebar now shows Requirements only.
+- Acceptance: one project-wide view gives an orderly, narrow-screen-safe view of all phase Deliverables without duplicate controls in the phase sidebar; the existing file and access behavior are unchanged.
 - Status: PENDING
 
 ### [R9.128] Master Data full application canvas

@@ -41,6 +41,8 @@ export function DeliverablesPanel({
   status,
   canWork,
   canManage,
+  title = "Deliverables",
+  description = "Files produced and uploaded during this phase.",
 }: {
   projectId: string;
   phaseId: string;
@@ -48,6 +50,8 @@ export function DeliverablesPanel({
   status: DeliverableStatus;
   canWork: boolean;
   canManage: boolean;
+  title?: string;
+  description?: string;
 }) {
   const command = useCommand();
   const confirm = useConfirm();
@@ -109,9 +113,9 @@ export function DeliverablesPanel({
 
   return (
     <SectionCard
-      title="Deliverables"
+      title={title}
       count={deliverables.length}
-      description="Files produced and uploaded during this phase."
+      description={description}
     >
       {status !== "MISSING" ? <div className="mb-3 flex items-center gap-2">
         <StatusIcon className={`size-4 ${status === "CURRENT" ? "text-success" : status === "OUTDATED" ? "text-warning" : "text-danger"}`} />

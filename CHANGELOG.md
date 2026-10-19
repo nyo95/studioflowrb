@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.141 | 2026-10-19 | feat(studioflow): centralize project Deliverables
+
+- **Project workflow:** Deliverables is now a project tab directly after Phases. It lists every phase in order with its one current private file, file status, signed download, authorized upload and Studio Manager deletion in one place. The Phases sidebar now contains Requirements only.
+- **Boundaries:** this reuses the existing private-file service and phase-scoped authorization. No file was moved or copied; no schema, migration, permission, public URL or storage lifecycle changed.
+- **Verification:** targeted navigation and service-surface coverage passed. The required medium gate (boundary and legacy-runtime scans, whitespace, typecheck, lint and production build) is recorded with this revision. Browser acceptance is owner-deferred; scenarios `[R9.139]` and `[R9.141]` are pending and no independent review PASS is claimed.
+
 ## R9.140 | 2026-10-19 | plan(studioflow): centralize project Deliverables
 
 - **Owner direction:** Deliverables moves from the individual phase sidebar to a dedicated project tab directly after Phases, following the legacy centralized workflow.
