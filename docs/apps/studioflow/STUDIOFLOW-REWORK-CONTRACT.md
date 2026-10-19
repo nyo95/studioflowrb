@@ -264,6 +264,12 @@ phase's prior file regardless of its name; there are no slots, versions, Final
 state, expiry period, or extension. Status per phase: no file / current /
 outdated.
 
+Deliverables is a centralized project section: it lists the existing phase
+files in phase order, with the phase label and status. It does not create a
+project-level file or duplicate bytes. Upload remains limited to the matching
+phase's authorized PIC, and Studio Manager deletion remains scoped to that
+phase; the phase detail sidebar contains Requirements only.
+
 The replacement transaction records the change in audit and enqueues the prior
 unreferenced object for retry-safe cleanup only after the replacement metadata
 has committed. Upload follows the existing phase-work plus PIC access rule;

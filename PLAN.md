@@ -1,10 +1,10 @@
 # Active Plan
 
-Plan ID: WO-SF-DELIVERABLE-ONE-PHASE-01
-Scope: Replace StudioFlow deliverable version slots with one private file per phase
+Plan ID: WO-SF-CENTRAL-DELIVERABLES-01
+Scope: Move StudioFlow Deliverables from the phase sidebar to one project-wide tab
 Module(s): StudioFlow
-Target revision: R9.139
-Risk: high — this changes persisted file cardinality, removes historical deliverable records, and must keep private-object cleanup and audit recovery reliable. Stop for a conflict in existing migration state, ownership, or cleanup safety.
+Target revision: R9.141
+Risk: medium — this changes a project navigation path and upload management surface, but retains the existing private-file, access, action, and storage contracts. Stop if evidence requires a new permission, a change to file ownership, or a persistence change.
 Status: READY
 Priority: P1
 Owner: Product Owner
@@ -12,71 +12,51 @@ Last updated: 2026-10-19
 
 ## Outcome
 
-Every StudioFlow phase has zero or one private deliverable. Uploading a file replaces that phase's existing file, so storage and the visible phase panel never retain versions, Final state, expiry state, or same-name slots.
+Deliverables is a centralized project tab immediately after Phases. It lets a permitted user see each phase's active private file and act on that file in one place, as in the pinned legacy workflow, without duplicating or moving stored files.
 
 ## Context and Evidence
 
-- Owner confirmation, 2026-10-19: "di penyimpanan hanya menyimpan 1 file tiap phase."
-- The current `SfDeliverable` model permits many files per phase through file-name slots and version numbers; `phases/deliverables.ts` retains Finals and working versions.
-- The pinned legacy behavior replaces old phase files. The KB records that evidence and the existing private streaming, assignment, audit, and cleanup safety floor.
+- Owner direction, 2026-10-19: “pindahin kesini aja delivrables nya seperti di legacy (terpusat)” on the project section navigation.
+- R9.139 locks zero or one private Deliverable per phase, including authenticated signed reads, PIC-scoped upload and Studio Manager deletion.
+- The current phase sidebar combines Requirements with a single phase's Deliverables panel; the project pill navigation is the canonical sibling-view surface.
 
 ## Locked Decisions
 
-- REPLACE the StudioFlow-only version-slot capability with one phase-owned file. There is no project-wide dashboard, external-link type, download-public path, or new module in this work order.
-- A successful upload replaces the stored file irrespective of name; the newly uploaded file is the sole current file for the phase and is attached to the active round.
-- Existing data migration retains the newest uploaded record per phase (`created_at`, then id) and removes older deliverable rows. Every removed object key is placed in the existing cleanup retry ledger within the migration before its row disappears; object removal remains best-effort and retryable after deployment.
-- The one retained/new file has no Final flag, expiry date, version number, or manual extension. Deletion remains an explicit Studio Manager operation; upload continues to require the existing phase-work grant plus matching PIC/phase access.
-- Keep authenticated signed reads, streamed private storage, input limits/types, active-round requirement, database transaction, assignment access, and audit events. Do not add a new role or weaken project privacy.
+- ADD a `Deliverables` tab after `Phases` in the project navigation. It shows all project phases in their existing order, with each phase's current Deliverable status and its zero-or-one private file.
+- MOVE the existing functional upload, signed download and confirmed manager deletion controls into that centralized page. Do not duplicate these controls in the phase sidebar.
+- Keep the current per-phase access rule: only the authorized, modifiable phase's PIC may upload; only the existing Studio Manager authority may delete. Reading remains within the existing project-detail gate.
+- REUSE the existing StudioFlow Deliverables service, authenticated upload route, server action, private storage, signed URLs and `DeliverablesPanel`; do not add a project-wide stored record, new permission, database migration, or public URL.
 
-## Business Rules and Architecture Constraints
+## UI and Boundaries
 
-- EXTEND the existing StudioFlow private ObjectStorage and cleanup ledger; no shared-layer substitute and no cross-app relation.
-- The database enforces at most one `SfDeliverable` per phase. Migrations may remove only obsolete Deliverable-version metadata and rows made obsolete by that cardinality rule.
-- Upload writes the object before its short transaction as today; after the transaction commits the replacement's old key is removed through the existing retry-safe cleanup path. If upload or the transaction fails, the new unreferenced object is cleaned through the same path and the old deliverable remains.
-- Audit replacement must identify the new file and whether an older file was replaced, without exposing signed URLs or file contents.
-
-## Backend Contract
-
-- `listDeliverables` returns at most one item and preserves phase status calculation against its round.
-- Both upload entry points atomically replace the phase record after re-authorizing; concurrent uploads cannot leave two records.
-- Remove obsolete Final, expiry, sweep, and slot-facing service operations and their transport/UI consumers. Preserve the explicit manager delete operation and its cleanup/audit guarantees.
-
-## UI Contract
-
-- Executor may make the existing phase Deliverables panel accurately exercise the backend: it renders one file when present, offers upload to the authorized PIC, and manager deletion with confirmation.
-- Executor removes controls and explanatory copy for versions, Final, expiry, and extension. Layout, visual redesign, and a project-wide dashboard are Lead work and excluded.
-
-## Boundaries and Non-goals
-
-- No Timeline work, schedule model change, external link support, public file URLs, legacy import, new permissions, or UI redesign.
-- No direct legacy database access and no manual deletion of object-storage contents outside the existing cleanup boundary.
+- The project page uses the existing `PillTabs` project navigation and UI Engine section cards. The centralized view must preserve clear phase labels, empty states and narrow-screen stacking.
+- The phase sidebar remains focused on Requirements and no longer fetches or reports files.
+- No Timeline, external link, multi-file, version, Final, expiry, role, schema, storage or audit behavior changes.
 
 ## Acceptance Criteria
 
-- A phase accepts one supported private upload and lists exactly that file; a subsequent upload leaves exactly the new file row and schedules/removes the former object through the cleanup ledger.
-- Parallel or failed replacement cannot leave two rows, lose the former file before a successful commit, or leave a deleted key untracked.
-- Existing multi-file phases migrate to their newest file only; older rows are gone and their keys are pending safe cleanup.
-- Readers keep signed private download access; unauthorized users and inactive phases are still refused before bytes are accepted.
-- The panel no longer presents versions, Final, expiry, or extension actions; manager deletion remains confirmed and user-visible errors remain surfaced.
+- An eligible project opens `/studioflow/projects/:projectId/deliverables` from the tab immediately after Phases.
+- The page presents every project phase, its file status and its single current private file when one exists.
+- The same user who could upload/delete before can do so from the centralized page; an ineligible user sees no unauthorized action.
+- The phase sidebar no longer presents Deliverables or a file count.
+- No stored file is copied, moved or made public.
 
 ## Verification
 
-- Tier: high (schema/data migration, private storage, authorization, audit and transactions). Per-command timeout: 15 minutes; checkpoint after migration generation and focused tests before the full gate.
-- Read the installed Next.js guide before editing routes/components. Verify the selected `kantor` database target is explicitly rebuild-only before applying any migration or running database-backed tests.
-- Add/update direct service integration coverage for replacement, rollback/failure, concurrency, migration retention/cleanup-ledger behavior, permissions and signed reads; update the panel/static safety test and affected Playwright deliverable scenario.
-- Run `node scripts/verify.mjs --tier high` after migration deployment to the disposable test target, plus Prisma generation. The required high gate includes full test, typecheck, lint, boundaries, legacy-runtime, production build, and whitespace. Owner deferred browser acceptance on 2026-10-19; its scenarios remain in the Reviewer backlog.
-- Apply a new migration to every rebuild-only local database actually used this session (dev and test) only after explicit target verification, regenerate Prisma, and restart any local development server if one is running.
+- Tier: medium (bounded StudioFlow navigation and user-facing route; no schema/auth/service change). Per-command timeout: 15 minutes.
+- Read the installed Next.js route guide before creating the route. Add a direct route/navigation regression test or extend the relevant deterministic StudioFlow test, and run it with `src/apps/studioflow/public/nav.test.ts` plus the existing affected Deliverables/service-surface test as consumer coverage.
+- Run `node scripts/verify.mjs --tier medium --build --tests src/apps/studioflow/public/nav.test.ts src/apps/studioflow/phases/service-surface.test.ts`, including its boundary, legacy-runtime, typecheck, lint, production build and whitespace checks.
+- Browser acceptance is Reviewer-owned and owner-deferred. Record the exact centralized-page scenario in the browser backlog; no browser PASS is claimed.
 
 ## Reviewer Acceptance
 
-- On a disposable migrated database: authorized PIC uploads a second file and sees only the replacement; a manager confirms deletion; an unauthorized viewer cannot upload; signed download remains private.
-- Browser acceptance is Reviewer-owned after the Executor commit. Record its backlog entry rather than making it an Executor commit blocker.
+- On a disposable project with at least two phases, confirm the new tab placement, active state, phase order, file/download action, authorized upload and manager deletion at desktop and 375 px.
+- Confirm a phase detail no longer exposes Deliverables. The prior R9.139 one-file replacement browser case remains pending independently.
 
 ## Regression Risks and Recovery
 
-- The migration is irreversible for removed historical deliverable rows; it deliberately retains the newest row and logs every discarded object key for retry-safe cleanup. Revert the application commit only before migration deployment; after deployment, restore only through a specifically authorized data-recovery procedure.
-- Existing archive cleanup must continue to see the surviving deliverable and cleanup-ledger rows must remain retryable.
+- A route or active-tab mistake can strand users or present duplicate file controls. Recovery is to revert only the centralized UI revision; private files and access rules are untouched.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, the installed Next.js guide, and this READY `PLAN.md`, then implement the entire one-file-per-phase Deliverables outcome and nothing beyond it. Preserve unrelated owner work, verify each rebuild-only database target before any Prisma command, run the required high gate, update the changelog and durable StudioFlow contract, then create target local revision R9.139. Stop only for a material locked-decision conflict or unsafe boundary; otherwise report the commit, checks, limitations, and remaining unrelated dirty files.
+You are operating in the owner-authorized combined Lead/Executor session. Location: kantor. Read `AGENTS.md`, the installed Next.js route guide and this READY `PLAN.md`; implement only the centralized StudioFlow Deliverables UI, use the existing private-file boundary, run the locked medium gate, update the changelog and browser backlog, then commit local revision R9.141. Do not claim independent Claude review or browser acceptance.

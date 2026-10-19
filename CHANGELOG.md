@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.140 | 2026-10-19 | plan(studioflow): centralize project Deliverables
+
+- **Owner direction:** Deliverables moves from the individual phase sidebar to a dedicated project tab directly after Phases, following the legacy centralized workflow.
+- **Work order:** `WO-SF-CENTRAL-DELIVERABLES-01` is READY for R9.141. It reuses the one-private-file-per-phase contract and its existing upload, download, deletion and per-phase access rules; no data move, migration, new permission or public link is allowed.
+
 ## R9.139 | 2026-10-19 | fix(studioflow): retain one private Deliverable file per phase
 
 - **Deliverables:** each phase now stores zero or one private file. A successful upload replaces the existing file regardless of its name; version slots, Final state, expiry, extension and the expiry sweep are removed. Signed private reads, streaming limits, active-round validation, PIC access and confirmed Studio Manager deletion remain.
