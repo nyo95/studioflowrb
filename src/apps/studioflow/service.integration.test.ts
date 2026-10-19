@@ -354,7 +354,7 @@ describe("WO-SF-PHASE-MENU-01 skip lifecycle", () => {
     const { projectId } = await newProject("Round with attached work");
     const phase = await phaseOf(projectId, "moodboard");
     const open = await openIteration(phase.id);
-    const file = await testDb.prisma.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: open.id, name: "Moodboard v1", storage_key: "studioflow/deliverables/attached.pdf", version_number: 1 } });
+    const file = await testDb.prisma.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, revision_id: open.id, name: "Moodboard v1", storage_key: "studioflow/deliverables/attached.pdf" } });
     await rejectsWith(sf.phases.deleteNeverSentIteration({ ...as(designer), projectId, phaseId: phase.id, iterationId: open.id }), "ITERATION_HAS_ATTACHED_WORK");
     assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: open.id } })).status, "NOT_SENT");
     const kept = await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { id: file.id } });
@@ -397,7 +397,7 @@ describe("WO-SF-PHASE-MENU-01 skip lifecycle", () => {
     const filed = await newProject("Skip round with file");
     const filedPhase = await phaseOf(filed.projectId, "moodboard");
     const filedRound = await openIteration(filedPhase.id);
-    const file = await testDb.prisma.sfDeliverable.create({ data: { project_id: filed.projectId, phase_id: filedPhase.id, revision_id: filedRound.id, name: "Concept", storage_key: "studioflow/deliverables/concept.pdf", version_number: 1 } });
+    const file = await testDb.prisma.sfDeliverable.create({ data: { project_id: filed.projectId, phase_id: filedPhase.id, revision_id: filedRound.id, name: "Concept", storage_key: "studioflow/deliverables/concept.pdf" } });
     await sf.phases.bypassPhase({ ...as(designer), projectId: filed.projectId, phaseId: filedPhase.id, reason: "Client supplied the concept" });
     assert.equal((await testDb.prisma.sfRevision.findUniqueOrThrow({ where: { id: filedRound.id } })).status, "DONE");
     assert.equal((await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { id: file.id } })).revision_id, filedRound.id);
@@ -526,7 +526,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const phase = await phaseOf(projectId, "moodboard");
     const keys = { deliverable: `${projectId}/deliverable`, iteration: `${projectId}/iteration`, mom: `${projectId}/mom`, oldMom: `${projectId}/old-mom`, option: `${projectId}/option` };
     for (const key of Object.values(keys)) await storage.put({ key, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
-    await db.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, name: "Private file", storage_key: keys.deliverable, version_number: 1 } });
+    await db.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, name: "Private file", storage_key: keys.deliverable } });
     const section = await db.sfWorkspaceSection.create({ data: { project_id: projectId, title: "Notes", sort_order: 0, created_by_id: designer.id } });
     const iterationId = (await openIteration(phase.id)).id;
     await db.sfWorkspaceCard.create({ data: { project_id: projectId, section_id: section.id, sort_order: 0, phase_id: phase.id, iteration_id: iterationId, body: "Keep this note text" } });
@@ -783,7 +783,7 @@ describe("WO-BE-02 archived asset retention", () => {
     const newKey = `${cycle.projectId}/second-cycle`;
     await storage.put({ key: newKey, body: new Uint8Array([1]), bytes: 1, contentType: "image/png" });
     const phase = await phaseOf(cycle.projectId, "moodboard");
-    await db.sfDeliverable.create({ data: { project_id: cycle.projectId, phase_id: phase.id, name: "Second-cycle file", storage_key: newKey, version_number: 1 } });
+    await db.sfDeliverable.create({ data: { project_id: cycle.projectId, phase_id: phase.id, name: "Second-cycle file", storage_key: newKey } });
 
     await sf.projects.archiveProject({ ...as(designer), projectId: cycle.projectId, reason: "Second archive" });
     assert.equal((await db.sfProject.findUniqueOrThrow({ where: { id: cycle.projectId } })).assets_purged_at, null, "a new archive clears the marker");
@@ -2322,111 +2322,27 @@ describe("Deliverable reference revision", () => {
     assert.equal(after.status, "OUTDATED", "files belong to old revision after reject");
   });
 
-  it("keeps two non-final versions per normalized slot, separately from a final", async () => {
+  it("replaces the phase file regardless of name and queues the old object for cleanup", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
     const base = { ...as(designer), projectId, phaseId: phase.id };
-    for (const name of [" Design.PDF ", "design.pdf", "design.pdf"]) await sf.phases.uploadDeliverable({ ...base, name, file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
-    let listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
-    assert.equal(listed.items.length, 2);
-    await sf.phases.setDeliverableFinal({ ...as(designer), projectId, deliverableId: listed.items[0].id, isFinal: true });
-    await sf.phases.uploadDeliverable({ ...base, name: "design.pdf", file: { body: new Uint8Array([2]), contentType: "application/pdf" } });
-    await sf.phases.uploadDeliverable({ ...base, name: "other.pdf", file: { body: new Uint8Array([3]), contentType: "application/pdf" } });
-    listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
-    assert.equal(listed.items.filter((item) => item.isFinal).length, 1);
-    assert.equal(listed.items.filter((item) => item.name.toLowerCase().trim() === "design.pdf").length, 3);
-    const newerDesign = listed.items.find((item) => item.name.toLowerCase().trim() === "design.pdf" && !item.isFinal)!;
-    await sf.phases.setDeliverableFinal({ ...as(designer), projectId, deliverableId: newerDesign.id, isFinal: true });
-    const afterNewFinal = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
-    assert.equal(afterNewFinal.items.filter((item) => item.name.toLowerCase().trim() === "design.pdf" && item.isFinal).length, 1, "a newer final clears the old final in its slot");
+    await sf.phases.uploadDeliverable({ ...base, name: "draft.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
+    const first = await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { phase_id: phase.id } });
+    await sf.phases.uploadDeliverable({ ...base, name: "final.zip", file: { body: new Uint8Array([2]), contentType: "application/zip" } });
+    const listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
+    assert.equal(listed.items.length, 1);
+    assert.equal(listed.items[0]?.name, "final.zip");
+    assert.equal(await testDb.prisma.sfDeliverable.count({ where: { phase_id: phase.id } }), 1);
+    assert.equal(storage.objects.has(first.storage_key), false);
+    assert.ok((await testDb.prisma.sfAssetCleanupFailure.findUnique({ where: { storage_key: first.storage_key } }))?.resolved_at instanceof Date);
   });
 
-  it("keeps upload-order version numbers after pruning, deletion, and a rejected upload", async () => {
-    const { projectId } = await newProject();
-    const phase = await phaseOf(projectId, "moodboard");
-    const base = { ...as(designer), projectId, phaseId: phase.id };
-    const upload = (name = "design.pdf", bytes = new Uint8Array([1])) => sf.phases.uploadDeliverable({ ...base, name, file: { body: bytes, contentType: "application/pdf" } });
-    await upload();
-    const first = (await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id })).items[0]!;
-    assert.equal(first.versionNumber, 1);
-    await sf.phases.setDeliverableFinal({ ...as(designer), projectId, deliverableId: first.id, isFinal: true });
-    await upload(" Design.PDF ");
-    await upload();
-    await upload();
-    let listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
-    assert.deepEqual(listed.items.map((item) => item.versionNumber).sort((a, b) => a - b), [1, 3, 4]);
-    assert.deepEqual(listed.items.filter((item) => item.isNewest).map((item) => item.versionNumber), [4]);
-    assert.equal(listed.items.find((item) => item.id === first.id)?.versionNumber, 1);
-    const fourth = listed.items.find((item) => item.versionNumber === 4)!;
-    await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: fourth.id });
-    listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
-    assert.deepEqual(listed.items.filter((item) => item.isNewest).map((item) => item.versionNumber), [3]);
-    await rejectsWith(upload("design.pdf", new Uint8Array()), "DELIVERABLE_SIZE");
-    await upload();
-    listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
-    assert.deepEqual(listed.items.map((item) => item.versionNumber).sort((a, b) => a - b), [1, 3, 5]);
-    assert.deepEqual(listed.items.filter((item) => item.isNewest).map((item) => item.versionNumber), [5]);
-    await upload("other.pdf");
-    const other = (await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id })).items.find((item) => item.name === "other.pdf");
-    assert.equal(other?.versionNumber, 1, "a separate slot begins at one");
-    const nextProject = await newProject("Independent versions");
-    const nextPhase = await phaseOf(nextProject.projectId, "moodboard");
-    await sf.phases.uploadDeliverable({ ...as(designer), projectId: nextProject.projectId, phaseId: nextPhase.id, name: "design.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
-    assert.equal((await sf.phases.listDeliverables({ grants: ALL, projectId: nextProject.projectId, phaseId: nextPhase.id })).items[0]?.versionNumber, 1, "a separate phase begins at one");
-    const db = testDb.prisma;
-    const failing = createStudioFlowService(db, {
-      runTransaction: (work) => db.$transaction((tx) => work(tx)),
-      auditWriter: { write: async () => { throw new Error("audit down"); } },
-      people: createPeopleDirectory(db), storage, masterData: createMasterDataPublicRead(db), now: () => clock,
-    });
-    await assert.rejects(failing.phases.uploadDeliverable({ ...base, name: "design.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } }), /audit down/);
-    for (const item of listed.items) await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: item.id });
-    await upload();
-    const resumed = (await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id })).items.find((item) => item.name === "design.pdf");
-    assert.equal(resumed?.versionNumber, 6, "removing every file does not reset the slot counter");
-  });
-
-  it("allocates distinct versions for concurrent uploads to one slot", async () => {
+  it("serializes concurrent uploads into one stored phase file", async () => {
     const { projectId } = await newProject();
     const phase = await phaseOf(projectId, "moodboard");
     const input = { ...as(designer), projectId, phaseId: phase.id, name: "parallel.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } };
-    await Promise.all([sf.phases.uploadDeliverable(input), sf.phases.uploadDeliverable(input)]);
-    const listed = await sf.phases.listDeliverables({ grants: ALL, projectId, phaseId: phase.id });
-    assert.deepEqual(listed.items.map((item) => item.versionNumber).sort((a, b) => a - b), [1, 2]);
-    assert.deepEqual(listed.items.filter((item) => item.isNewest).map((item) => item.versionNumber), [2]);
-  });
-
-  it("prunes working files by stable version number when timestamps disagree", async () => {
-    const { projectId } = await newProject();
-    const phase = await phaseOf(projectId, "moodboard");
-    const input = { ...as(designer), projectId, phaseId: phase.id, name: "ordered.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } };
-    await sf.phases.uploadDeliverable(input);
-    await sf.phases.uploadDeliverable(input);
-    const firstTwo = await testDb.prisma.sfDeliverable.findMany({ where: { phase_id: phase.id, slot_key: "ordered.pdf" }, orderBy: { version_number: "asc" } });
-    await testDb.prisma.sfDeliverable.update({ where: { id: firstTwo[0]!.id }, data: { created_at: new Date("2099-01-01T00:00:00Z") } });
-    await testDb.prisma.sfDeliverable.update({ where: { id: firstTwo[1]!.id }, data: { created_at: new Date("2000-01-01T00:00:00Z") } });
-
-    await sf.phases.uploadDeliverable(input);
-
-    const versions = await testDb.prisma.sfDeliverable.findMany({ where: { phase_id: phase.id, slot_key: "ordered.pdf" }, orderBy: { version_number: "asc" }, select: { version_number: true } });
-    assert.deepEqual(versions.map((row) => row.version_number), [2, 3]);
-  });
-
-  it("serializes concurrent Final choices and the database rejects a duplicate Final", async () => {
-    const { projectId } = await newProject();
-    const phase = await phaseOf(projectId, "moodboard");
-    const input = { ...as(designer), projectId, phaseId: phase.id, name: "final.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } };
-    await sf.phases.uploadDeliverable(input);
-    await sf.phases.uploadDeliverable(input);
-    const files = await testDb.prisma.sfDeliverable.findMany({ where: { phase_id: phase.id, slot_key: "final.pdf" }, orderBy: { version_number: "asc" } });
-
-    await Promise.all(files.map((file) => sf.phases.setDeliverableFinal({ ...as(designer), projectId, deliverableId: file.id, isFinal: true })));
-
-    const after = await testDb.prisma.sfDeliverable.findMany({ where: { phase_id: phase.id, slot_key: "final.pdf" }, orderBy: { version_number: "asc" } });
-    assert.equal(after.filter((file) => file.is_final).length, 1);
-    const other = after.find((file) => !file.is_final)!;
-    await assert.rejects(testDb.prisma.sfDeliverable.update({ where: { id: other.id }, data: { is_final: true } }));
-    assert.equal(await testDb.prisma.sfDeliverable.count({ where: { phase_id: phase.id, slot_key: "final.pdf", is_final: true } }), 1);
+    await Promise.all([sf.phases.uploadDeliverable(input), sf.phases.uploadDeliverable({ ...input, name: "parallel-2.pdf" })]);
+    assert.equal(await testDb.prisma.sfDeliverable.count({ where: { phase_id: phase.id } }), 1);
   });
 
   it("streams a deliverable, and refuses a stream that is short of, or over, its declared size", async () => {
@@ -2445,30 +2361,13 @@ describe("Deliverable reference revision", () => {
     assert.equal(await testDb.prisma.sfDeliverable.count({ where: { phase_id: phase.id } }), 1);
   });
 
-  it("cleans expired non-finals and warns an uploader only once until extended", async () => {
-    const { projectId } = await newProject();
-    const phase = await phaseOf(projectId, "moodboard");
-    const base = { ...as(designer), projectId, phaseId: phase.id };
-    await sf.phases.uploadDeliverable({ ...base, name: "expire.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
-    const row = await testDb.prisma.sfDeliverable.findFirstOrThrow({ where: { phase_id: phase.id } });
-    await testDb.prisma.sfDeliverable.update({ where: { id: row.id }, data: { expires_at: new Date(clock.getTime() + 3 * 86_400_000) } });
-    assert.equal((await sf.phases.sweepDeliverableExpiry()).warned, 1);
-    assert.equal((await sf.phases.sweepDeliverableExpiry()).warned, 0);
-    await sf.phases.extendDeliverableExpiry({ ...as(designer), projectId, deliverableId: row.id });
-    await testDb.prisma.sfDeliverable.update({ where: { id: row.id }, data: { expires_at: new Date(clock.getTime() - 1) } });
-    assert.equal((await sf.phases.sweepDeliverableExpiry()).deleted, 1);
-    assert.equal(storage.objects.has(row.storage_key), false);
-  });
-
-  it("rejects Final, expiry extension, and manual deletion while the phase is locked", async () => {
+  it("rejects manual deletion while the phase is locked", async () => {
     const { projectId } = await newProject("Locked deliverables");
     const phase = await phaseOf(projectId, "moodboard");
     await sf.phases.uploadDeliverable({ ...as(designer), projectId, phaseId: phase.id, name: "locked.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
     const row = await testDb.prisma.sfDeliverable.findFirstOrThrow({ where: { phase_id: phase.id } });
     const beforeAudit = await testDb.prisma.auditEvent.count({ where: { entity_id: row.id } });
     await testDb.prisma.sfPhase.update({ where: { id: phase.id }, data: { is_locked: true } });
-    await rejectsWith(sf.phases.setDeliverableFinal({ ...as(designer), projectId, deliverableId: row.id, isFinal: true }), "PHASE_LOCKED");
-    await rejectsWith(sf.phases.extendDeliverableExpiry({ ...as(designer), projectId, deliverableId: row.id }), "PHASE_LOCKED");
     await rejectsWith(sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id }), "PHASE_LOCKED");
     assert.deepEqual(await testDb.prisma.sfDeliverable.findUniqueOrThrow({ where: { id: row.id } }), row);
     assert.equal(await testDb.prisma.auditEvent.count({ where: { entity_id: row.id } }), beforeAudit);
@@ -2493,7 +2392,7 @@ describe("Deliverable reference revision", () => {
     const event = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { entity_id: row.id, action: "studioflow.deliverable.deleted" } });
     assert.equal(event.actor_kind, "USER");
     assert.equal(event.actor_user_id, designer.id);
-    assert.deepEqual(event.metadata, { projectId, phaseId: phase.id, name: row.name, versionNumber: row.version_number, wasFinal: row.is_final });
+    assert.deepEqual(event.metadata, { projectId, phaseId: phase.id, name: row.name });
     assert.equal(await testDb.prisma.sfDeliverable.count({ where: { id: row.id } }), 0);
   });
 
@@ -2532,27 +2431,6 @@ describe("Deliverable reference revision", () => {
       assert.equal(result.resolved >= 1, true);
       assert.equal(storage.objects.has(row.storage_key), false);
       assert.ok((await ledger(row.storage_key))?.resolved_at instanceof Date);
-    });
-
-    it("expiry sweep follows the same rule", async () => {
-      const { row } = await uploaded("Expiry fails");
-      await testDb.prisma.sfDeliverable.update({ where: { id: row.id }, data: { expires_at: new Date(clock.getTime() - 1) } });
-      const failing = failingRemoves();
-      let swept;
-      try { swept = await sf.phases.sweepDeliverableExpiry(); } finally { failing.mock.restore(); }
-      assert.equal(swept.deleted, 1);
-      assert.equal((await ledger(row.storage_key))?.resolved_at, null);
-      await retry();
-      assert.equal(storage.objects.has(row.storage_key), false);
-    });
-
-    it("never removes a key another row still points at", async () => {
-      const { projectId, phase, row } = await uploaded("Shared key");
-      const twin = await testDb.prisma.sfDeliverable.create({ data: { project_id: projectId, phase_id: phase.id, name: "Twin", storage_key: row.storage_key, version_number: 1 } });
-      await sf.phases.deleteDeliverable({ ...as(designer), projectId, deliverableId: row.id });
-      assert.equal(storage.objects.has(row.storage_key), true);
-      assert.equal(await ledger(row.storage_key), null, "a still-referenced key is never enqueued");
-      await testDb.prisma.sfDeliverable.delete({ where: { id: twin.id } });
     });
 
     it("MOM image delete records a storage failure for retry", async () => {

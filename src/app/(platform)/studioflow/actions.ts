@@ -1298,27 +1298,6 @@ export async function deleteDeliverableAction(input: z.infer<typeof DeliverableR
   });
 }
 
-const DeliverableFinal = z.strictObject({ projectId: Id, deliverableId: Id, isFinal: z.boolean() });
-export async function setDeliverableFinalAction(input: z.infer<typeof DeliverableFinal>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(DeliverableFinal, input);
-    const result = await studioFlow.phases.setDeliverableFinal({ ...ctx, ...data });
-    refresh(data.projectId);
-    return result;
-  });
-}
-
-export async function extendDeliverableExpiryAction(input: z.infer<typeof DeliverableRef>): Promise<ActionResult<unknown>> {
-  return runSafeAction(async () => {
-    const ctx = await context();
-    const data = parse(DeliverableRef, input);
-    const result = await studioFlow.phases.extendDeliverableExpiry({ ...ctx, ...data });
-    refresh(data.projectId);
-    return result;
-  });
-}
-
 // ── Global search ─────────────────────────────────────────────────────────
 
 const SearchQuery = z.string().trim().min(1).max(200);

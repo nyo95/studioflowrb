@@ -200,7 +200,6 @@ model SfPhase {
   activities      SfActivity[]
   checklist_items SfChecklistItem[]
   deliverables    SfDeliverable[]
-  deliverable_slots SfDeliverableSlot[]
   cd_items        SfCdItem[]
   events          SfPhaseEvent[]
   workspace_cards SfWorkspaceCard[]
@@ -608,9 +607,8 @@ model SfPhaseEvent {
   @@schema("studioflow")
 }
 
-/// Phase deliverable uploaded file; status computed from revision (V2-D8).
+/// One private uploaded file per phase; status is computed from its revision (V2-D8).
 /// status: MISSING (no row), CURRENT (revision_id = active revision), OUTDATED (revision closed).
-/// A partial unique index in the migration chain permits only one Final per phase/name slot.
 model SfDeliverable {
   id              String   @id @default(uuid())
   project_id      String
@@ -621,13 +619,6 @@ model SfDeliverable {
   storage_key     String
   file_size_bytes Int?
   content_type    String?
-  slot_key        String    @default("")
-  version_number  Int
-  is_final        Boolean   @default(false)
-  finalized_at    DateTime?
-  finalized_by_id String?
-  expires_at      DateTime?
-  expiry_warned_at DateTime?
   created_by_id   String?
   created_at      DateTime @default(now())
   updated_at      DateTime @updatedAt
@@ -636,24 +627,9 @@ model SfDeliverable {
   phase    SfPhase     @relation(fields: [phase_id], references: [id], onDelete: Cascade)
   revision SfRevision? @relation(fields: [revision_id], references: [id], onDelete: SetNull)
 
+  @@unique([phase_id])
   @@index([project_id, phase_id])
-  @@index([phase_id, slot_key, created_at, id])
-  @@unique([phase_id, slot_key, version_number])
-  @@index([expires_at])
   @@map("sf_deliverable")
-  @@schema("studioflow")
-}
-
-/// Durable per-phase/file-name version allocator; it outlives individual deliverables.
-model SfDeliverableSlot {
-  phase_id     String
-  slot_key     String
-  last_version Int
-
-  phase SfPhase @relation(fields: [phase_id], references: [id], onDelete: Cascade)
-
-  @@id([phase_id, slot_key])
-  @@map("sf_deliverable_slot")
   @@schema("studioflow")
 }
 

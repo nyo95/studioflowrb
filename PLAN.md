@@ -64,7 +64,7 @@ Every StudioFlow phase has zero or one private deliverable. Uploading a file rep
 - Tier: high (schema/data migration, private storage, authorization, audit and transactions). Per-command timeout: 15 minutes; checkpoint after migration generation and focused tests before the full gate.
 - Read the installed Next.js guide before editing routes/components. Verify the selected `kantor` database target is explicitly rebuild-only before applying any migration or running database-backed tests.
 - Add/update direct service integration coverage for replacement, rollback/failure, concurrency, migration retention/cleanup-ledger behavior, permissions and signed reads; update the panel/static safety test and affected Playwright deliverable scenario.
-- Run `node scripts/verify.mjs --tier high --e2e` after migration deployment to the disposable test target, plus Prisma generation. The required high gate includes full test, typecheck, lint, boundaries, legacy-runtime, production build, and whitespace.
+- Run `node scripts/verify.mjs --tier high` after migration deployment to the disposable test target, plus Prisma generation. The required high gate includes full test, typecheck, lint, boundaries, legacy-runtime, production build, and whitespace. Owner deferred browser acceptance on 2026-10-19; its scenarios remain in the Reviewer backlog.
 - Apply a new migration to every rebuild-only local database actually used this session (dev and test) only after explicit target verification, regenerate Prisma, and restart any local development server if one is running.
 
 ## Reviewer Acceptance

@@ -3,9 +3,9 @@
 import { useRef, useState } from "react";
 import { FileDown, Trash2, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 
-import { Badge, Button, InlineError, SectionCard, Text, useConfirm } from "@/platform/ui_engine";
+import { Badge, InlineError, SectionCard, Text, useConfirm } from "@/platform/ui_engine";
 import { useCommand } from "../../../../_components/use-command";
-import { deleteDeliverableAction, extendDeliverableExpiryAction, setDeliverableFinalAction } from "../../../../actions";
+import { deleteDeliverableAction } from "../../../../actions";
 
 type Deliverable = {
   id: string;
@@ -14,11 +14,6 @@ type Deliverable = {
   fileSizeBytes: number | null;
   revisionId: string | null;
   createdAt: Date;
-  isFinal: boolean;
-  expiresAt: Date | null;
-  daysLeft: number | null;
-  versionNumber: number;
-  isNewest: boolean;
   url: string;
 };
 
@@ -32,8 +27,6 @@ const STATUS_CONFIG: Record<DeliverableStatus, { label: string; tone: "success" 
 
 /** Client-side courtesy check; the server enforces its own (configurable) limit. */
 const CLIENT_MAX_BYTES = 500 * 1024 * 1024;
-const EXPIRY_WARNING_DAYS = 7;
-
 function formatBytes(bytes: number | null): string {
   if (bytes === null) return "";
   if (bytes < 1024) return `${bytes} B`;
@@ -67,10 +60,8 @@ export function DeliverablesPanel({
 
   async function remove(d: Deliverable) {
     const accepted = await confirm.confirm({
-      title: d.isFinal ? `Delete final file ${d.name}?` : `Delete ${d.name}?`,
-      description: d.isFinal
-        ? `Version ${d.versionNumber} is the Final file. Deleting it is permanent and leaves this file slot without a Final.`
-        : `Version ${d.versionNumber} will be permanently deleted. This cannot be undone.`,
+      title: `Delete ${d.name}?`,
+      description: "This permanently deletes the file for this phase. This cannot be undone.",
       confirmLabel: "Delete file",
       tone: "danger",
     });
@@ -116,14 +107,6 @@ export function DeliverablesPanel({
     request.send(file);
   }
 
-  function setFinal(d: Deliverable, isFinal: boolean) {
-    void command.run(`deliverable:${d.id}`, () => setDeliverableFinalAction({ projectId, deliverableId: d.id, isFinal }));
-  }
-
-  function extend(d: Deliverable) {
-    void command.run(`deliverable:${d.id}`, () => extendDeliverableExpiryAction({ projectId, deliverableId: d.id }));
-  }
-
   return (
     <SectionCard
       title="Deliverables"
@@ -146,14 +129,7 @@ export function DeliverablesPanel({
                   <p className="text-xs text-ink-secondary">{formatBytes(d.fileSizeBytes)}</p>
                 ) : null}
                 <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-ink-secondary">
-                  {d.isFinal ? (
-                    <Badge tone="success">Final · kept</Badge>
-                  ) : (
-                    <Badge tone={(d.daysLeft ?? 0) <= EXPIRY_WARNING_DAYS ? "warning" : "neutral"}>
-                      {(d.daysLeft ?? 0) === 0 ? "Deleted soon" : `Deleted in ${d.daysLeft} day${d.daysLeft === 1 ? "" : "s"}`}
-                    </Badge>
-                  )}
-                  <span>Version {d.versionNumber}{d.isNewest ? " (newest)" : ""}</span>
+                  <span>Current phase file</span>
                 </p>
               </div>
               <a
@@ -176,14 +152,6 @@ export function DeliverablesPanel({
                 >
                   <Trash2 className="size-3.5" />
                 </button>
-              ) : null}
-              {canWork || canManage ? (
-                <div className="flex gap-1">
-                  <Button type="button" size="sm" variant="ghost" disabled={command.isPending(`deliverable:${d.id}`)} onClick={() => setFinal(d, !d.isFinal)}>
-                    {d.isFinal ? "Clear final" : "Mark final"}
-                  </Button>
-                  {!d.isFinal ? <Button type="button" size="sm" variant="ghost" disabled={command.isPending(`deliverable:${d.id}`)} onClick={() => extend(d)}>Extend</Button> : null}
-                </div>
               ) : null}
             </li>
           ))}
@@ -211,7 +179,7 @@ export function DeliverablesPanel({
           </label>
           {progress !== null ? <progress className="mt-2 block h-1.5 w-full max-w-xs" max={100} value={progress} aria-label="Upload progress" /> : null}
           {uploadError ? <p className="mt-1.5 text-xs text-danger">{uploadError}</p> : null}
-          <p className="mt-1 text-xs text-ink-tertiary" title="Files that are not marked final delete themselves after 30 days; only the 2 newest versions of a file are kept.">PDF, PNG, JPEG, WebP or ZIP · up to 500 MB. Temporary files expire.</p>
+          <p className="mt-1 text-xs text-ink-tertiary">PDF, PNG, JPEG, WebP or ZIP · up to 500 MB. A new upload replaces this phase&apos;s previous file.</p>
         </div>
       ) : null}
       {confirm.dialog}

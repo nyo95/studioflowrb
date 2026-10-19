@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.139 | 2026-10-19 | fix(studioflow): retain one private Deliverable file per phase
+
+- **Deliverables:** each phase now stores zero or one private file. A successful upload replaces the existing file regardless of its name; version slots, Final state, expiry, extension and the expiry sweep are removed. Signed private reads, streaming limits, active-round validation, PIC access and confirmed Studio Manager deletion remain.
+- **Data and cleanup:** the migration keeps the newest pre-existing upload in each phase, removes older records, and queues only unreferenced old object keys for retry-safe cleanup. Replacement metadata and manual deletion remain transaction-audited; failed storage removal remains in the cleanup ledger.
+- **Verification:** both rebuild-only local databases (`studioflow_rebuild` and `studioflow_rebuild_test`) received the migration and Prisma Client was regenerated. Focused Deliverables/service tests passed. The first high gate stopped only on a blank EOF whitespace finding, which was fixed; its rerun passed boundaries, legacy-runtime, whitespace, typecheck, lint, all program tests, Prisma generation and production build before the full browser matrix was owner-deferred. Browser scenario `[R9.139]` is recorded as pending; no browser acceptance is claimed.
+
 ## R9.138 | 2026-10-19 | plan(studioflow): lock one private Deliverable file per phase
 
 - **Owner decision:** each phase stores exactly one private Deliverable; a later upload replaces the prior file. The prior version-slot, Final and expiry lifecycle is retired. Existing multi-file phases retain their newest upload and queue older private-object keys for retry-safe cleanup.

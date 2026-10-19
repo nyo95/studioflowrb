@@ -5,7 +5,6 @@ import { createStudioFlowService } from "./service";
 import { createStudioFlowSampleRequestRead } from "./public/sample-request-read";
 import { createStudioFlowSampleRequestCommand } from "./public/sample-request-command";
 import { createSampleRequestNotifier } from "./sample-request-notifier";
-import { startDeliverableExpirySweep } from "./deliverable-sweep";
 
 export const studioFlow = createStudioFlowService(prisma, {
   auditWriter,
@@ -20,8 +19,3 @@ export const studioFlow = createStudioFlowService(prisma, {
 /** Read-only sample-request contract for other apps; the shell hands it to the sample-request coordinator. */
 export const studioFlowSampleRequestRead = createStudioFlowSampleRequestRead(prisma);
 export const studioFlowSampleRequestCommand = createStudioFlowSampleRequestCommand(prisma, { auditWriter, runTransaction, people: peopleDirectory, storage: objectStorage, notificationWriter, masterData: createMasterDataPublicRead(prisma) });
-
-export function startStudioFlowAssetSweep() {
-  const stopDeliverables = startDeliverableExpirySweep(() => studioFlow.phases.sweepDeliverableExpiry(), process.env);
-  return () => { stopDeliverables?.(); };
-}

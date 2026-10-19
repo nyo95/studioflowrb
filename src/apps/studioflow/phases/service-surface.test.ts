@@ -10,11 +10,11 @@ it("keeps the phase service surface explicit, with existing-note mutations on th
     "addIteration", "bypassPhase", "capabilities", "chooseIterationOutcome",
     "chooseSupervisionVisit", "createPhaseDefinition", "createPhaseTemplate", "createSupervisionVisit",
     "deleteDeliverable", "deleteNeverSentIteration", "deletePhaseDefinition", "deletePhaseTemplate",
-    "dismissRequirement", "extendDeliverableExpiry", "finishSupervision", "getPhaseDetail", "getProjectCompletionReadiness",
+    "dismissRequirement", "finishSupervision", "getPhaseDetail", "getProjectCompletionReadiness",
     "latestUndoableEvent", "listDeliverables", "listNavPhases", "listPhaseTemplates", "listStarredPhaseNotes",
     "listProjectPhases", "markProjectCompleted", "overrideRevision", "recordClientAnswer", "postPhaseImage", "postPhaseNote",
-    "renameIteration", "reopenProject", "reorderPhaseDefinitions", "sendIteration", "setDeliverableFinal",
-    "setPhaseNoteTags", "setPhasePlannedDates", "sweepDeliverableExpiry", "undoPhaseEvent",
+    "renameIteration", "reopenProject", "reorderPhaseDefinitions", "sendIteration",
+    "setPhaseNoteTags", "setPhasePlannedDates", "undoPhaseEvent",
     "updatePhaseDefinition", "updatePhaseTemplate", "uploadDeliverable", "uploadDeliverableStream",
   ].sort());
 });
