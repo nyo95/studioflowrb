@@ -1,6 +1,6 @@
 # StudioFlow KB — Deliverables and Timeline owner direction
 
-Status: Deliverables authority matrix applied; Timeline decision record in progress
+Status: Deliverables authority matrix applied; Timeline implementation authorized
 Owner conversation: 2026-10-18 (WIB)
 Evidence checked: 2026-10-19 (UTC)
 
@@ -135,10 +135,16 @@ changes actual phase progress.
 
 R9.137 applies only the clear authority slice: portfolio Timeline is a Studio Manager view, and mutation controls/services require `project.manage + project.override` (Platform Owner authority). It intentionally does not replace the Fit Out Start calculation or redesign the Gantt.
 
-## 5. Timeline — remaining contract required before runtime redesign
+## 5. Timeline — implementation contract
 
-The next Work Order must settle:
+Owner confirmation, 2026-10-19: the office-table `Start` date is the real
+recorded project start. It is not calculated before Design Final. The existing
+Timeline Start / created-date fallback supplies this fact for the initial
+implementation.
 
-1. Source for the office-table `Start` date: the real recorded project start (recommended), or a calculated date before Design Final. The latter requires a new default duration because the current plan has none.
-
-Until then, preserve existing dates and audits; do not destructively rewrite or silently reinterpret them.
+The READY work order is `WO-SF-TIMELINE-HANDOVER-01`: add a nullable canonical
+Design Handover date; retain no-Handover legacy schedules unchanged; calculate
+the approved working-day chain backward around recorded Start/Opening; expose
+one Table and one Gantt view over the same real progress and schedule facts;
+and keep date mutations Platform Owner-only. The work order, not this KB,
+contains the executable verification and migration contract.

@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.151 | 2026-10-19 | plan(studioflow): authorize Design-Handover Timeline
+
+- **Work order:** `WO-SF-TIMELINE-HANDOVER-01` is READY for R9.152. It adds nullable canonical Design Handover, preserves no-Handover schedules, calculates the locked working-day chain backward, derives real phase schedule status, and exposes consistent Table/Gantt data.
+- **Authority and safety:** Platform Owner remains the only date writer; Studio Manager stays read-only by default. Existing Opening, Fit Out Start and recorded Start are not reinterpreted during migration, and anchor conflict/pre-today plan warns rather than shifting dates.
+
 ## R9.150 | 2026-10-19 | plan(studioflow): lock Timeline warning behavior
 
 - **Exception workflow:** if backward planning places Start before today, Timeline warns without automatically moving dates. Clicking a phase is only the Platform Owner's one-phase date exception, never a manual phase-progress selector.
