@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.157 | 2026-10-19 | ui(studioflow): simplify project navigation
+
+- **Project tabs:** Deliverables now sits immediately after Timeline. History is hidden from the project tab bar; its recorded audit data and direct route are unchanged.
+- **Verification limit:** type checking and focused shared-UI regression checks pass. Browser acceptance is queued; no browser PASS is claimed.
+
 ## R9.156 | 2026-10-19 | ui(studioflow): centralize phase guidance in tooltips
 
 - **Phase workflow:** the selected round and its status remain visible beside the phase strip. Its longer next-step explanation is now a shared UI Engine tooltip on that summary, rather than permanently taking a second line.

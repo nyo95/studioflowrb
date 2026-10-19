@@ -21,13 +21,12 @@ function navigation(projectId: string, presentationEnabled: boolean, showWorkSec
   return [
     ...(showWorkSections ? [
       { href: STUDIOFLOW_ROUTES.project(projectId), label: "Phases", exact: true, detail: null },
-      { href: STUDIOFLOW_ROUTES.projectDeliverables(projectId), label: "Deliverables", detail: null },
       { href: STUDIOFLOW_ROUTES.projectMom(projectId), label: "MOM", detail: counts?.mom ? String(counts.mom) : null },
     ] : []),
     { href: STUDIOFLOW_ROUTES.projectSchedule(projectId), label: "Schedule", detail: counts?.schedule ? String(counts.schedule) : null },
     ...(presentationEnabled ? [{ href: PRESENTATION_ROUTES.project(projectId), label: "Presentation", detail: counts?.presentation ? String(counts.presentation) : null }] : []),
     { href: STUDIOFLOW_ROUTES.projectTimeline(projectId), label: "Timeline", detail: null },
-    { href: STUDIOFLOW_ROUTES.projectHistory(projectId), label: "History", detail: null },
+    { href: STUDIOFLOW_ROUTES.projectDeliverables(projectId), label: "Deliverables", detail: null },
   ];
 }
 

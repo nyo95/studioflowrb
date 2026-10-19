@@ -32,6 +32,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.157] StudioFlow project navigation order
+- Surface: any StudioFlow project tab bar
+- Fixture: a project with work sections; test once with Presentation enabled and once without it
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Open a project. 2. Scan the tab order and open Timeline then Deliverables. 3. Check the narrow tab bar. 4. Confirm History is not offered as a tab.
+- Acceptance: Deliverables directly follows Timeline in both module states and remains reachable; History is absent from the visible tab bar without affecting the retained audit records or direct route.
+- Status: PENDING
+
 ### [R9.156] StudioFlow phase guidance tooltip
 - Surface: StudioFlow project → Phases
 - Fixture: any active project with a selected phase and current iteration
