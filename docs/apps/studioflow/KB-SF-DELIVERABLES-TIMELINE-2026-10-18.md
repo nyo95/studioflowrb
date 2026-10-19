@@ -1,6 +1,6 @@
 # StudioFlow KB — Deliverables and Timeline owner direction
 
-Status: owner direction recorded; runtime redesign deferred
+Status: Deliverables authority matrix applied; Timeline runtime redesign deferred
 Owner conversation: 2026-10-18 (WIB)
 Evidence checked: 2026-10-19 (UTC)
 
@@ -45,6 +45,30 @@ Owner direction: “Deliverables yang sekarang strukturnya jadi satu per fase, u
 Locked implementation scope: phase-owned persistence remains; a successful upload replaces the prior file regardless of name; only one current managed private file remains per phase; no external-link type or project-wide dashboard is added. The existing phase-seat/PIC upload authorization remains in force. Existing multi-file data keeps its newest upload and queues older unreferenced object keys for retry-safe cleanup.
 
 Safety floor: authenticated private reads, project-detail assignment access, current ObjectStorage, audit events, transaction-scoped metadata writes, and cleanup only after a successful replacement stay mandatory. Never restore legacy public paths, local-file coupling, role enums, or direct page Prisma.
+
+### 3.1 Project authority matrix (owner-ratified)
+
+This matrix restates the existing StudioFlow contract in operational terms. A
+grant establishes the capability; a PIC assignment establishes who may work a
+specific project. It is not a return to legacy fixed roles.
+
+| Work | Assigned Designer | Assigned Drafter | Studio Manager | Platform Owner (`project.manage` + `project.override`) |
+|---|---|---|---|---|
+| Confidential project detail | assigned project | assigned project | every project, read-only work sections | every project |
+| Project identity, client, PIC and archive | no | no | create/edit/archive and assign PIC | same, with recovery authority |
+| Designer-seat phase rounds, notes and file upload | yes | no | read only | recovery override |
+| Drafter-seat phase rounds, notes and file upload | yes | yes | read only | recovery override |
+| MOM, Schedule and Presentation documents | yes | yes | read only unless separately assigned document authority and PIC access apply | recovery override |
+| Deliverable download | assigned project | assigned project | every project | every project |
+| Deliverable deletion | no | no | yes, for an open project | yes |
+| Portfolio Timeline | assigned-project status | assigned-project status | whole portfolio, read-only | set Handover and audited manual override |
+
+The intended split is deliberate: the PIC creates or replaces the file for the
+phase they own; the Studio Manager is the accountable operational remover when
+a delivered file must be withdrawn. A Manager does not thereby gain general
+phase editing or upload rights. R9.141 exposed a service mismatch in that last
+row—Manager Delete was visible but a non-PIC Manager was refused—so the
+correction is tracked as `WO-SF-DELIVERABLE-MANAGER-DELETE-01`.
 
 ## 4. Timeline — evidence and owner direction
 

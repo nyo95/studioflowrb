@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.142 | 2026-10-19 | plan(studioflow): lock Deliverable manager authority
+
+- **Authority matrix:** the Deliverables KB now states the owner-ratified split: a phase PIC uploads/replaces its file, a Studio Manager may remove it, and Platform Owner holds only the existing recovery override. Manager file removal does not grant phase edits or uploads.
+- **Correction:** `WO-SF-DELIVERABLE-MANAGER-DELETE-01` is READY for R9.143 after the review found that the visible Manager Delete action is refused to a non-PIC Manager by the service's general content guard. The correction is limited to that audited deletion command; all other phase permissions stay unchanged.
+
 ## R9.141 | 2026-10-19 | feat(studioflow): centralize project Deliverables
 
 - **Project workflow:** Deliverables is now a project tab directly after Phases. It lists every phase in order with its one current private file, file status, signed download, authorized upload and Studio Manager deletion in one place. The Phases sidebar now contains Requirements only.

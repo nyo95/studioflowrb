@@ -186,6 +186,7 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
 
 ## StudioFlow
 
+- [ ] [BUG][P1] **Studio Manager Deliverable deletion is visibly offered but refused for a non-PIC Manager.** The owner-ratified matrix grants Manager deletion of a phase's current private file while keeping upload PIC-scoped. R9.141 shows Delete, but the service also applies the PIC content guard. `WO-SF-DELIVERABLE-MANAGER-DELETE-01` is READY for R9.143; browser confirmation remains pending.
 - [ ] [UNVERIFIED][P1] **Deliverables: one private file per phase and centralized project view implemented in R9.139/R9.141.** A new upload replaces the prior phase file; storage retains no versions, Final state or expiry state. The project tab lists phase files centrally, while the phase sidebar contains Requirements only. Independent browser acceptance remains deferred in `BROWSER-ACCEPTANCE-BACKLOG.md`.
 - [ ] [PLANNED][P1] **Automatic handover Timeline (owner 2026-10-18).** Designer gets assigned-project overdue status; Studio Manager gets read-only portfolio; Platform Owner sets Handover and audited overrides. The schedule should calculate backward from Handover, but canonical field, dependency graph, overdue formula, override persistence, UI states, and migration of current manual dates must be settled first. Legacy has no comparable Gantt. Contract record: `apps/studioflow/KB-SF-DELIVERABLES-TIMELINE-2026-10-18.md`.
 
