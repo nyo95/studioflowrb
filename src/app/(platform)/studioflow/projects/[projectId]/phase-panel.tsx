@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
-import { Badge, Button, ButtonMenu, Dialog, Drawer, Field, FormActions, FormattedInstant, InlineError, Input, RadioGroup, RowActionMenu, SectionCard, Text, Textarea } from "@/platform/ui_engine";
+import { Badge, Button, ButtonMenu, Dialog, Drawer, Field, FormActions, FormattedInstant, InlineError, Input, RadioGroup, RowActionMenu, SectionCard, Text, Textarea, Tooltip } from "@/platform/ui_engine";
 
 import { ITERATION_STATE_LABEL as STATE_LABEL, ITERATION_STATE_TONE as STATE_TONE, type IterationRow } from "./round-labels";
 import { IterationButtons, UndoBar, usePhaseCommands, VisitDialog, type IterationView, type PhaseView } from "../../_components/phase-commands";
@@ -68,16 +68,17 @@ export function PhasePanel({ projectId, phase, current, iterations, skippedReaso
 
   return (
     <>
-      {/* The workflow at the strip's right end: round and state (what to do next on hover), the primary step, More. */}
+      {/* The workflow at the strip's right end: round and state; the next-step guidance stays available through the shared UI Engine tooltip. */}
       <div className="grid gap-2 px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="grid min-w-0 flex-1 gap-0.5" title={nextStep}>
-            <span className="flex min-w-0 items-center gap-2">
-              <Text size="sm" weight="semibold" className="truncate">{title}</Text>
-              <Badge tone={phase.status === "DONE" ? "success" : current ? STATE_TONE[current.state] : "neutral"} title={skippedReason ?? undefined}>{phase.status === "PENDING" ? "Not started" : phase.status === "DONE" ? (skippedReason ? "Skipped" : "Done") : current ? STATE_LABEL[current.state] : "In progress"}</Badge>
-            </span>
-            <Text tone="tertiary" size="sm" className="max-w-[22rem] truncate">{nextStep}</Text>
-          </div>
+          <Tooltip content={nextStep}>
+            <div tabIndex={0} className="grid min-w-0 flex-1 gap-0.5">
+              <span className="flex min-w-0 items-center gap-2">
+                <Text size="sm" weight="semibold" className="truncate">{title}</Text>
+                <Badge tone={phase.status === "DONE" ? "success" : current ? STATE_TONE[current.state] : "neutral"} title={skippedReason ?? undefined}>{phase.status === "PENDING" ? "Not started" : phase.status === "DONE" ? (skippedReason ? "Skipped" : "Done") : current ? STATE_LABEL[current.state] : "In progress"}</Badge>
+              </span>
+            </div>
+          </Tooltip>
           <div className="flex flex-wrap items-center gap-1.5">
             <IterationButtons phase={phase} current={current} commands={commands} canAct={acting} onNewVisit={() => setVisitOpen(true)} lead />
             {currentMenu.length > 0 ? <ButtonMenu label="More" variant="ghost" items={currentMenu} /> : null}

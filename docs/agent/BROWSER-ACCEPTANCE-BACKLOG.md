@@ -32,6 +32,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.156] StudioFlow phase guidance tooltip
+- Surface: StudioFlow project → Phases
+- Fixture: any active project with a selected phase and current iteration
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Open the project Phases tab. 2. Hover and keyboard-focus the selected iteration/status summary beside the phase strip. 3. Check the panel at both viewports.
+- Acceptance: the shared UI Engine tooltip shows the applicable next-step explanation; the explanation no longer occupies a permanent second line; iteration name, status, Send/start action, and More remain available without clipping or an extra native browser tooltip.
+- Status: PENDING
+
 ### [R9.154] StudioFlow full-width work canvas
 - Surface: StudioFlow Home, Projects, Timeline, Settings, and a project tab
 - Fixture: any signed-in StudioFlow user with at least one accessible project

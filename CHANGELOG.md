@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.156 | 2026-10-19 | ui(studioflow): centralize phase guidance in tooltips
+
+- **Phase workflow:** the selected round and its status remain visible beside the phase strip. Its longer next-step explanation is now a shared UI Engine tooltip on that summary, rather than permanently taking a second line.
+- **Verification limit:** focused component and type checks pass. The owner-deferred browser acceptance is queued; no browser PASS is claimed.
+
 ## R9.155 | 2026-10-19 | ui(studioflow): expand Home projects by default
 
 - **Home:** every visible project opens its phase strip by default. Each project can still be collapsed independently for a compact scan.
