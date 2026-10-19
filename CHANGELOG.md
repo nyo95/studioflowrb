@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.147 | 2026-10-19 | plan(studioflow): map legacy Timeline defaults
+
+- **Default schedule:** the existing Studio working-day defaults are now mapped to the office table: 0 days Design Final → CD, then 5, 5, 5, 40 and 10 days through Opening. Design Final and CD therefore share the default planning day.
+- **Blocker:** the remaining decision is the visual schedule state for the real active phase: recommended labels are On track, Due today and Overdue by comparison with its planned end.
+
 ## R9.146 | 2026-10-19 | plan(studioflow): lock studio Timeline gap defaults
 
 - **Planning authority:** standard Timeline working-day gaps will be Studio-wide configurable defaults. Platform Owner may retain a one-phase project exception without changing any other project.

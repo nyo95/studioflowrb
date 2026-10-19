@@ -111,13 +111,19 @@ Owner confirmation, 2026-10-19: working-day gaps are Studio-wide configurable
 defaults. A Platform Owner may retain a one-phase exception for an exceptional
 project; it does not change the studio default or other projects.
 
+Owner confirmation, 2026-10-19: use the existing planning defaults for the
+first automatic model. The complete table mapping is: Design Final → CD = 0
+working days; CD → CD Final = 5; CD Final → END = 5; END → Submission/Start
+Fit Out = 5; Start Fit Out → Design Handover = 40; and Design Handover →
+Opening = 10. This makes explicit that Design Final and the start of CD are
+the same default planning day.
+
 R9.137 applies only the clear authority slice: portfolio Timeline is a Studio Manager view, and mutation controls/services require `project.manage + project.override` (Platform Owner authority). It intentionally does not replace the Fit Out Start calculation or redesign the Gantt.
 
 ## 5. Timeline — remaining contract required before runtime redesign
 
 The next Work Order must settle:
 
-1. Default working-day gaps for each office-table handoff: Design Final → CD, CD → CD Final, CD Final → END, END → Submission/Start Fit Out, Start Fit Out → Design Handover, and Design Handover → Opening. Current values (5, 5, 5, 40, 10) do not cover every named handoff and are not approved for the new model.
-2. Presentation for on-track, due-today, and overdue states on Home, project Timeline, and portfolio Timeline.
+1. Presentation for on-track, due-today, and overdue states on Home, project Timeline, and portfolio Timeline. Recommended: evaluate only the real active phase against its planned end; show On track / Due today / Overdue. Completed, pending and paused phases retain their real workflow state.
 
 Until then, preserve existing dates and audits; do not destructively rewrite or silently reinterpret them.
