@@ -20,9 +20,14 @@ Last updated: 2026-10-19
 - Both Table and Gantt views are required. The Table follows the office operational layout; the Gantt is a calendar lens of the same data.
 - Phase/status progress is derived from the project's actual phase state and rounds, never selected manually in Timeline.
 
+## Locked Date Meaning
+
+- Office-table `Handover Radiant` and the owner-directed `Handover Desain` are the same business date: the project's canonical Handover.
+- Handover requires its own persisted StudioFlow date. It must not overwrite the existing Opening or Fit Out Start date, whose historical meaning remains intact.
+
 ## Blocking Decision
 
-The office table calls its anchor `Handover Radiant`, while the owner direction calls it `Handover Desain`. Confirm whether these are the same business date. If yes, the next plan can define one canonical Handover field and map the existing table column to it. If no, their meanings, ordering and separate edit rights must be defined first.
+Choose the source of standard working-day gaps between the Table columns and phases. Recommended: one Studio-wide configurable default set, with a Platform Owner allowed to override one phase for an exceptional project. The alternative is entering every project date manually, which conflicts with the requested automatic plan.
 
 ## Non-goals Until Unblocked
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.145 | 2026-10-19 | plan(studioflow): define canonical Design Handover
+
+- **Date meaning:** the office-table `Handover Radiant` is confirmed as the owner-directed Design Handover. Timeline will store it as its own canonical Handover date; it will not reinterpret Opening or Fit Out Start.
+- **Blocker:** the automatic plan still needs its source of working-day gaps confirmed: Studio-wide configurable defaults with per-phase Platform Owner exceptions is recommended over manual entry of every project date.
+
 ## R9.144 | 2026-10-19 | plan(studioflow): record Timeline anchor decisions
 
 - **Owner decisions:** Timeline will calculate from Design Handover toward the work and from Opening backward, provide Table and Gantt lenses over one schedule, derive status from real phase/round progress, identify overdue only on the active phase, retain per-phase Platform Owner overrides, and leave Manager editing disabled until explicitly delegated.

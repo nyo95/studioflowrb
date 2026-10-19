@@ -102,10 +102,10 @@ Follow-up owner decisions, 2026-10-19:
   calendar Gantt. Its progress/status is derived from the real project phase
   state and rounds, never selected manually.
 
-One business-name blocker remains: the office table calls its date `Handover
-Radiant`, while the owner direction calls it `Handover Desain`. Runtime work is
-blocked until the owner confirms whether they are the same date or supplies
-their separate meanings.
+Owner confirmation, 2026-10-19: office-table `Handover Radiant` and
+`Handover Desain` are the same date. This is the project's canonical
+Handover. It needs its own stored field: it must not overwrite the differently
+meaningful Opening or Fit Out Start date.
 
 R9.137 applies only the clear authority slice: portfolio Timeline is a Studio Manager view, and mutation controls/services require `project.manage + project.override` (Platform Owner authority). It intentionally does not replace the Fit Out Start calculation or redesign the Gantt.
 
@@ -113,8 +113,7 @@ R9.137 applies only the clear authority slice: portfolio Timeline is a Studio Ma
 
 The next Work Order must settle:
 
-1. Whether office-table `Handover Radiant` and the owner-directed `Handover Desain` are one canonical date; then which stored field/new field represents it.
-2. Exact dependency graph and duration source for every table column and phase, including parallel phases and two-step Construction Drawing.
-3. Presentation for on-track, due-today, and overdue states on Home, project Timeline, and portfolio Timeline.
+1. Exact dependency graph and duration source for every table column and phase, including parallel phases and two-step Construction Drawing. The owner must choose whether working-day gaps are Studio-wide configurable defaults with per-phase Platform Owner exceptions (recommended), or every project date is entered manually.
+2. Presentation for on-track, due-today, and overdue states on Home, project Timeline, and portfolio Timeline.
 
 Until then, preserve existing dates and audits; do not destructively rewrite or silently reinterpret them.
