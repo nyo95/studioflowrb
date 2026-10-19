@@ -68,12 +68,12 @@ describe("task-based role matrix", () => {
     assert.ok(studioflow.positions.every((position) => position.description?.includes("PIC")));
   });
 
-  it("separates Studio Manager operations from Platform Owner override authority", () => {
+  it("separates Manager operations from Platform Owner override authority", () => {
     const studioflow = groupPermissionsByApp(registry.permissions, registry).find((group) => group.appLabel === "StudioFlow")!;
     const manage = studioflow.resources.flatMap((resource) => resource.permissions).find((permission) => permission.id === "studioflow.project.manage")!;
     const override = studioflow.resources.flatMap((resource) => resource.permissions).find((permission) => permission.id === "studioflow.project.override")!;
     assert.equal(manage.actionLabel, "Run StudioFlow operations");
-    assert.match(manage.description ?? "", /Studio Manager/u);
+    assert.match(manage.description ?? "", /Manager/u);
     assert.equal(override.actionLabel, "Override project workflow");
     assert.equal(override.caution, true);
     assert.match(override.description ?? "", /Platform Owner/u);

@@ -32,6 +32,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.160] StudioFlow role profile matrix
+- Surface: Settings → Access → Roles, plus StudioFlow navigation/project access
+- Fixture: Platform Owner with Designer assignment; Designer, Drafter, and Manager role fixtures; a project with Designer and Drafter PICs
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Open each standard role and compare its visible permission groups. 2. Confirm Manager includes Designer position and project operations but no recovery override. 3. Sign in as each fixture and verify expected navigation and assigned-project access. 4. Confirm the Platform Owner remains separately assigned as Designer when selected as PIC.
+- Acceptance: visible labels/grants match the approved matrix; no standard custom role exposes recovery override; each job profile can perform only its intended project work; Platform Owner authority and separate PIC position remain understandable and functional.
+- Status: PENDING
+
 ### [R9.159] Balanced operational table columns
 - Surface: Master Data → Brands Catalog; StudioFlow project → Deliverables
 - Fixture: a populated Brands Catalog and a project with file and no-file phase rows

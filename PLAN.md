@@ -1,10 +1,10 @@
 # Active Plan
 
-Plan ID: WO-SF-TIMELINE-HANDOVER-01
-Scope: Rebuild StudioFlow Timeline around Design Handover, real progress, and Table/Gantt lenses
-Module(s): StudioFlow
-Target revision: R9.152
-Risk: high — persisted schedule meaning, calculations, authorization, project and portfolio timeline reads, and user-facing routes change. Stop for a migration conflict or any need to widen Manager authority.
+Plan ID: WO-SF-ROLE-PROFILES-01
+Scope: Replace StudioFlow's ad-hoc role grants with the owner-approved four-role operating matrix.
+Module(s): StudioFlow (app-owned policy) reusing Platform Core RBAC role and grant storage.
+Target revision: R9.160
+Risk: high - this changes live authorization grants and role data. Escalate if a listed grant is unregistered, a canonical role is system-owned, or a local target is not explicitly rebuild-only.
 Status: READY
 Priority: P1
 Owner: Product Owner
@@ -12,40 +12,63 @@ Last updated: 2026-10-19
 
 ## Outcome
 
-Each project has a canonical Design Handover date (office-table `Handover Radiant`). Timeline calculates plan dates backward from it, compares with Opening's independent 10-working-day backward constraint, and visibly reports conflict. Table and Gantt use one schedule source and derive progress from actual phase state.
+StudioFlow operates through Platform Owner, Designer (shared by Junior and Mid), Drafter, and Manager. Designer is narrowed to its job; Drafter and Manager are available without automatic user-assignment changes.
+
+## Context and Evidence
+
+- `STUDIOFLOW_PERMISSIONS` is the app vocabulary; StudioFlow evaluates access from grants plus PIC facts, never role names.
+- Platform Owner receives enabled non-position capabilities but never Designer/Drafter PIC positions automatically. An owner who is also a Designer retains that separate role.
+- The validated kantor rebuild database has an overly broad custom `designer` role. Master Data's role is outside this scope.
 
 ## Locked Decisions
 
-- ADD one nullable StudioFlow-owned Design Handover date; never repurpose Opening or Fit Out Start. No-Handover projects retain their current schedule.
-- REUSE recorded project Start (`timeline_start_date`, then the existing created-date fallback); never calculate or overwrite Start.
-- Working-day defaults: Design Final/CD same day; CD → CD Final 5; CD Final → END 5; END → Submission/Start Fit Out 5; Start Fit Out → Handover 40; Handover → Opening 10. Calculate this chain backward from Handover, honor holidays, and warn for anchor conflict or a generated date before today—never silently shift it.
-- Platform Owner (`project.manage + project.override`) is the only date writer. A one-phase manual date exception survives calculation; Manager stays portfolio read-only by default. Do not add delegation in this work order.
-- Derive schedule status from the real active phase: On track / Due today / Overdue by its planned end; pending, completed and paused retain actual workflow state. Clicking a phase is a date-exception action only.
-- ADD a Table and retain Gantt as two views over the same data. Table order: Start, Design Final, CD, CD Final, END, Submission/Start Fit Out, Design Handover, Opening, real Status/Progress, final-output availability.
+- Junior/Mid are staffing levels within Designer, not separate permissions.
+- Manager contains the entire Designer profile plus `project.manage`; it is Designer-PIC eligible and manages Clients, projects, and PIC assignment.
+- Designer/Drafter receive their PIC position plus work, review, requirements, MOM, schedule, and presentation. Neither gets project management, settings, Ideas, or recovery override.
+- `project.override` and `phase.override` are Platform Owner recovery authority only.
+- Migrate only canonical `designer`, `drafter`, and `studio-manager`: create/revive them, replace only their StudioFlow grants, and keep user assignments, Platform Owner, and unrelated app roles intact.
 
-## Architecture and Boundaries
+## Business Rules and Architecture Constraints
 
-- EXTEND StudioFlow project planning, phase read models and public route contract only. Add an additive nullable migration; never infer Handover from historical dates or overwrite existing planned dates during migration.
-- One planning service supplies project table rows, Gantt bars, warnings and active-phase status. Pages do not recompute policy or query Prisma directly.
-- Preserve current audit, transaction, private-file and assignment boundaries.
+- REUSE Platform Core RBAC storage and existing StudioFlow vocabulary. StudioFlow owns the profile policy; Platform Core cannot import it.
+- Use a forward-only, idempotent Prisma SQL data migration with deterministic IDs. No schema change.
+- Keep generic Platform Access administration; add no role-name authorization or platform-to-app profile registry.
+
+## Backend Contract
+
+- Expose a testable StudioFlow definition of the three custom profile codes, labels, descriptions, and exact permission sets.
+- Normalize role names/descriptions, replace old StudioFlow grants only on profile roles, and insert exactly the locked sets.
+- Correct permission-directory wording for Manager operations and Platform Owner-only recovery.
+
+## UI Contract
+
+The existing Platform Access Roles directory stays the management surface. No new settings workflow or visual redesign is in scope.
+
+## Boundaries and Non-goals
+
+- No Master Data/BQ/Developer-module/user-assignment/project-PIC/workflow changes.
+- No arbitrary custom-role migration, hierarchy engine, recovery delegation, or Ideas enablement.
 
 ## Acceptance Criteria
 
-- A set Handover generates the locked dates; Opening conflict and pre-today milestones warn without moving anything.
-- A no-Handover legacy project remains readable with unchanged dates.
-- Only Platform Owner can set/recalculate Handover or create a phase exception; Manager cannot write dates.
-- Table/Gantt agree on dates, real active-phase status and final-output availability.
+- Designer, Drafter, and Manager have exactly their approved StudioFlow grants after migration.
+- Manager has Designer's permissions plus `project.manage`, never either override.
+- Designer/Drafter remain separately PIC eligible; Platform Owner remains non-positioned unless separately assigned.
+- No unrelated role grant or user-role assignment changes.
+- Directory wording no longer says Manager has recovery override authority.
 
 ## Verification
 
-- Tier: high (schema migration, schedule meaning, authorization/audit and public reads). Per-command timeout: 15 minutes. Verify each `kantor` database target is rebuild-only before Prisma, migrate every local database used, then regenerate Prisma.
-- Add domain tests for working days, holidays, both anchors/conflict and pre-today warning; service integration for no-Handover fallback, apply/recalculate, exception, Manager refusal and Platform Owner success; transport/row-model tests for Table/Gantt parity.
-- Run `node scripts/verify.mjs --tier high` after migration plus Prisma generation. Browser acceptance is Reviewer-owned and owner-deferred; record it pending.
+High tier. Verify every development/test target used is explicitly `studioflow_rebuild` before database work. Apply only to those targets. Run `node scripts/verify.mjs --tier high --timeout-minutes 15` after edits: full tests, typecheck, lint, boundaries, legacy-runtime, build, whitespace. Add direct profile-composition coverage; full suite covers existing RBAC and StudioFlow consumers. Record target identity/migration state without credentials.
 
 ## Reviewer Acceptance
 
-- On a migrated disposable project, set Handover/Opening and verify calculated dates, warnings, real phase status, exception survival, Table/Gantt parity and Manager/Owner states at desktop and 375 px. Confirm a no-Handover project is unchanged.
+Review the Platform Access Roles list: Designer/Drafter/Manager labels and grants match this matrix; Platform Owner stays separate. Browser acceptance is owner-deferred and must enter the browser backlog, not Executor PASS.
+
+## Regression Risks and Recovery
+
+Bad grants may broaden staff access or block existing Designer work. This migration is idempotent; recovery is a later audited corrective migration, never a manual broad grant replacement. Owner + Designer assignments preserve owner PIC eligibility.
 
 ## Executor Prompt
 
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, the installed Next.js guides and this READY `PLAN.md`; implement the locked Timeline backend/data outcome only: nullable Design Handover, canonical planning source, real progress status, authorization, migration/tests and minimal functional route wiring. Preserve no-Handover schedules, do not add Manager delegation or redesign UI, run the high gate, update changelog/browser backlog, and commit R9.152. Do not claim browser acceptance.
+You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, and this `PLAN.md`, then implement the entire READY backend outcome and nothing beyond it. Inspect current repository evidence, preserve unrelated owner work, run the required checks, update `CHANGELOG.md`, and create the target local revision commit. Stop only for a material locked-decision conflict or unsafe boundary; otherwise report the commit, checks, limitations, and remaining unrelated dirty files.

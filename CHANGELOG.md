@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.160 | 2026-10-19 | feat(studioflow): simplify StudioFlow role profiles
+
+- **Role matrix:** StudioFlow now has four clear operating profiles: Platform Owner, Designer (shared by Junior and Mid), Drafter, and Manager. Manager includes the Designer profile plus project operations; it is therefore eligible as a Designer PIC.
+- **Safety:** Designer, Drafter, and Manager no longer receive Timeline/workflow recovery overrides. Those remain Platform Owner authority. The migration preserves user assignments and non-StudioFlow grants, including Master Data roles.
+- **Verification limit:** high-risk authorization checks are required. Browser acceptance of the Roles screen remains owner-deferred and is queued separately; no browser PASS is claimed.
+
 ## R9.159 | 2026-10-19 | ui(tables): balance operational column widths
 
 - **Table scan:** Master Data Brands and StudioFlow Deliverables now declare balanced fixed-table column proportions. The primary name/file column no longer expands into unused workspace while categories, status, metadata, and actions remain readable.
