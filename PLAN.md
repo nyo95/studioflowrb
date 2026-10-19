@@ -26,10 +26,11 @@ Last updated: 2026-10-19
 - Handover requires its own persisted StudioFlow date. It must not overwrite the existing Opening or Fit Out Start date, whose historical meaning remains intact.
 - Working-day gaps are Studio-wide configurable defaults. A Platform Owner may override one phase for an exceptional project; the override survives automatic recalculation and does not alter another project.
 - The initial Studio defaults retain the current planning values: Design Final → CD = 0, CD → CD Final = 5, CD Final → END = 5, END → Submission/Start Fit Out = 5, Start Fit Out → Design Handover = 40, and Design Handover → Opening = 10 working days.
+- The schedule state reads the actual active phase only: On track before its planned end, Due today on its planned end, and Overdue after it. Completed, pending and paused phases retain their workflow state.
 
 ## Blocking Decision
 
-Confirm how the Table and Gantt label a real active phase: recommended labels are **On track** when its planned end is after today, **Due today** when it ends today, and **Overdue** when its planned end has passed. Completed, pending and paused phases retain their real workflow state rather than receiving a schedule-status label.
+Choose the planning anchor for the work before Design Handover: either calculate backward from the canonical Design Handover to the project Start (recommended), or calculate forward from a manually set project Start until Design Handover. Opening independently calculates backward by its 10-day gap and any disagreement must be visible.
 
 ## Non-goals Until Unblocked
 

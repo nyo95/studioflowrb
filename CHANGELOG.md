@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.148 | 2026-10-19 | plan(studioflow): lock real phase schedule status
+
+- **Progress state:** the timeline's schedule label will derive from the actual active phase: On track before its planned end, Due today on it, and Overdue afterward. Completed, pending and paused phases retain their true workflow state.
+- **Blocker:** choose whether pre-Handover planning calculates backward from Design Handover (recommended) or forward from a manually set project Start. Opening will independently calculate backward by its approved 10-day gap and surface a conflict.
+
 ## R9.147 | 2026-10-19 | plan(studioflow): map legacy Timeline defaults
 
 - **Default schedule:** the existing Studio working-day defaults are now mapped to the office table: 0 days Design Final → CD, then 5, 5, 5, 40 and 10 days through Opening. Design Final and CD therefore share the default planning day.

@@ -118,12 +118,17 @@ Fit Out = 5; Start Fit Out → Design Handover = 40; and Design Handover →
 Opening = 10. This makes explicit that Design Final and the start of CD are
 the same default planning day.
 
+Owner confirmation, 2026-10-19: schedule state is derived from the actual
+active phase. It is **On track** before its planned end, **Due today** on that
+day, and **Overdue** afterward. Completed, pending and paused phases retain
+their real workflow state rather than receiving a schedule-status label.
+
 R9.137 applies only the clear authority slice: portfolio Timeline is a Studio Manager view, and mutation controls/services require `project.manage + project.override` (Platform Owner authority). It intentionally does not replace the Fit Out Start calculation or redesign the Gantt.
 
 ## 5. Timeline — remaining contract required before runtime redesign
 
 The next Work Order must settle:
 
-1. Presentation for on-track, due-today, and overdue states on Home, project Timeline, and portfolio Timeline. Recommended: evaluate only the real active phase against its planned end; show On track / Due today / Overdue. Completed, pending and paused phases retain their real workflow state.
+1. Planning anchor for the work before Design Handover: calculate backward from the canonical Handover to project Start (recommended), or forward from a manually set project Start until Handover. Opening independently calculates backward by its 10-day gap; disagreement must be visible.
 
 Until then, preserve existing dates and audits; do not destructively rewrite or silently reinterpret them.
