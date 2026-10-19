@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.150 | 2026-10-19 | plan(studioflow): lock Timeline warning behavior
+
+- **Exception workflow:** if backward planning places Start before today, Timeline warns without automatically moving dates. Clicking a phase is only the Platform Owner's one-phase date exception, never a manual phase-progress selector.
+- **Blocker:** choose whether the office-table Start column is the real recorded project start (recommended) or a calculated date before Design Final, which would require a new duration default.
+
 ## R9.149 | 2026-10-19 | plan(studioflow): anchor pre-handover schedule backward
 
 - **Calculation direction:** all work before canonical Design Handover will calculate backward to project Start. Opening independently calculates backward through its approved 10-day gap and any conflict remains visible.

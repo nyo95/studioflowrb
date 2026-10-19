@@ -128,12 +128,17 @@ active phase. It is **On track** before its planned end, **Due today** on that
 day, and **Overdue** afterward. Completed, pending and paused phases retain
 their real workflow state rather than receiving a schedule-status label.
 
+Owner confirmation, 2026-10-19: if backward planning places Start before today,
+Timeline warns and does not silently shift the schedule. Clicking a phase is
+only the Platform Owner's one-phase date-exception action; it never selects or
+changes actual phase progress.
+
 R9.137 applies only the clear authority slice: portfolio Timeline is a Studio Manager view, and mutation controls/services require `project.manage + project.override` (Platform Owner authority). It intentionally does not replace the Fit Out Start calculation or redesign the Gantt.
 
 ## 5. Timeline — remaining contract required before runtime redesign
 
 The next Work Order must settle:
 
-1. Studio-wide default working-day duration from project Start to Design Final. The current plan has no such interval, while the office table shows both columns. A project-specific Platform Owner exception follows the locked rule.
+1. Source for the office-table `Start` date: the real recorded project start (recommended), or a calculated date before Design Final. The latter requires a new default duration because the current plan has none.
 
 Until then, preserve existing dates and audits; do not destructively rewrite or silently reinterpret them.

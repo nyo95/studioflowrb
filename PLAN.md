@@ -28,10 +28,11 @@ Last updated: 2026-10-19
 - The initial Studio defaults retain the current planning values: Design Final → CD = 0, CD → CD Final = 5, CD Final → END = 5, END → Submission/Start Fit Out = 5, Start Fit Out → Design Handover = 40, and Design Handover → Opening = 10 working days.
 - The schedule state reads the actual active phase only: On track before its planned end, Due today on its planned end, and Overdue after it. Completed, pending and paused phases retain their workflow state.
 - Work before Handover calculates backward from canonical Design Handover to project Start. Opening independently calculates backward by its 10-day gap; disagreement is visible.
+- When backward calculation places Start before today, Timeline warns and does not silently shift dates. Clicking a phase is only a Platform Owner date-exception action; it never selects or changes workflow progress.
 
 ## Blocking Decision
 
-Set the Studio-wide default working-day duration from project Start to Design Final. The current plan has no such interval, while the office table shows both columns. A project-specific Platform Owner exception follows the already locked rule.
+Set the source for the office-table `Start` date. The current product has a manual Timeline Start / project-created fallback, but no approved duration between Start and Design Final. Choose whether Start is the real recorded project start (recommended) or a calculated date before Design Final; the latter needs a new default duration.
 
 ## Non-goals Until Unblocked
 
