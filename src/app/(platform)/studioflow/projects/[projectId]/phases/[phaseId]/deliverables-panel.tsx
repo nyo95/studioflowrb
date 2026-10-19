@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { FileDown, Trash2, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 
-import { Badge, InlineError, SectionCard, Text, useConfirm } from "@/platform/ui_engine";
+import { Badge, InlineError, SectionCard, TableCell, TableRow, Text, Tooltip, useConfirm } from "@/platform/ui_engine";
 import { useCommand } from "../../../../_components/use-command";
 import { deleteDeliverableAction } from "../../../../actions";
 
@@ -25,6 +25,12 @@ const STATUS_CONFIG: Record<DeliverableStatus, { label: string; tone: "success" 
   OUTDATED: { label: "Outdated", tone: "warning", icon: AlertTriangle },
 };
 
+const STATUS_HELP: Record<DeliverableStatus, string> = {
+  MISSING: "No file has been uploaded for this phase yet.",
+  CURRENT: "This file was uploaded for the active iteration.",
+  OUTDATED: "This file belongs to an earlier iteration. Upload a replacement for the active iteration.",
+};
+
 /** Client-side courtesy check; the server enforces its own (configurable) limit. */
 const CLIENT_MAX_BYTES = 500 * 1024 * 1024;
 function formatBytes(bytes: number | null): string {
@@ -43,6 +49,7 @@ export function DeliverablesPanel({
   canManage,
   title = "Deliverables",
   description = "Files produced and uploaded during this phase.",
+  variant = "panel",
 }: {
   projectId: string;
   phaseId: string;
@@ -52,6 +59,8 @@ export function DeliverablesPanel({
   canManage: boolean;
   title?: string;
   description?: string;
+  /** A single compact row for the project-wide Deliverables table. */
+  variant?: "panel" | "table-row";
 }) {
   const command = useCommand();
   const confirm = useConfirm();
@@ -111,6 +120,53 @@ export function DeliverablesPanel({
     request.send(file);
   }
 
+  const uploadInput = (
+    <input
+      ref={fileRef}
+      type="file"
+      id={`deliverable-upload-${phaseId}`}
+      className="sr-only"
+      accept=".pdf,.png,.jpg,.jpeg,.webp,.zip,application/pdf,image/png,image/jpeg,image/webp,application/zip"
+      onChange={handleFileChange}
+    />
+  );
+  const uploadLabel = (
+    <label
+      htmlFor={`deliverable-upload-${phaseId}`}
+      className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:border-line-emphasis hover:text-ink ${command.pending || progress !== null ? "pointer-events-none opacity-60" : ""}`}
+    >
+      <Upload className="size-3.5" />
+      {progress !== null ? `Uploading… ${progress}%` : deliverables.length ? "Replace" : "Upload"}
+    </label>
+  );
+
+  if (variant === "table-row") {
+    const file = deliverables[0] ?? null;
+    return (
+      <TableRow>
+        <TableCell><span className="font-medium text-ink">{title}</span></TableCell>
+        <TableCell>
+          {file ? <div className="min-w-0"><a href={file.url} download={file.name} target="_blank" rel="noopener noreferrer" className="inline-flex max-w-full items-center gap-1.5 text-sm text-action hover:underline"><FileDown className="size-4 shrink-0" aria-hidden="true" /><span className="truncate">{file.name}</span></a>{file.fileSizeBytes !== null ? <p className="mt-0.5 text-xs text-ink-secondary">{formatBytes(file.fileSizeBytes)}</p> : null}</div> : <Text tone="tertiary" size="sm">—</Text>}
+        </TableCell>
+        <TableCell>
+          <Tooltip content={STATUS_HELP[status]}><span tabIndex={0} className="inline-flex"><Badge tone={statusConfig.tone}><StatusIcon className="size-3.5" aria-hidden="true" />{statusConfig.label}</Badge></span></Tooltip>
+        </TableCell>
+        <TableCell align="end">
+          <div className="flex min-w-[11rem] flex-col items-end gap-1.5">
+            <div className="flex items-center gap-1.5">
+              {canWork ? <>{uploadInput}{uploadLabel}</> : null}
+              {file && canManage ? <button type="button" disabled={command.isPending(`deliverable:${file.id}`)} onClick={() => void remove(file)} className="inline-flex h-8 w-8 items-center justify-center rounded-action text-ink-tertiary hover:bg-surface-muted hover:text-danger disabled:opacity-60" aria-label={`Delete ${file.name}`}><Trash2 className="size-3.5" /></button> : null}
+            </div>
+            {progress !== null ? <progress className="block h-1.5 w-full" max={100} value={progress} aria-label="Upload progress" /> : null}
+            {uploadError ? <p className="max-w-56 text-right text-xs text-danger">{uploadError}</p> : null}
+            {command.error ? <InlineError>{command.error}</InlineError> : null}
+          </div>
+        </TableCell>
+        {confirm.dialog}
+      </TableRow>
+    );
+  }
+
   return (
     <SectionCard
       title={title}
@@ -166,21 +222,8 @@ export function DeliverablesPanel({
 
       {canWork ? (
         <div className={`mt-3 ${status === "MISSING" ? "rounded-control bg-surface-muted p-3" : ""}`}>
-          <input
-            ref={fileRef}
-            type="file"
-            id={`deliverable-upload-${phaseId}`}
-            className="sr-only"
-            accept=".pdf,.png,.jpg,.jpeg,.webp,.zip,application/pdf,image/png,image/jpeg,image/webp,application/zip"
-            onChange={handleFileChange}
-          />
-          <label
-            htmlFor={`deliverable-upload-${phaseId}`}
-            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm font-medium text-ink-secondary transition-colors hover:border-line-emphasis hover:text-ink ${command.pending || progress !== null ? "pointer-events-none opacity-60" : ""}`}
-          >
-            <Upload className="size-3.5" />
-            {progress !== null ? `Uploading… ${progress}%` : "Upload file"}
-          </label>
+          {uploadInput}
+          {uploadLabel}
           {progress !== null ? <progress className="mt-2 block h-1.5 w-full max-w-xs" max={100} value={progress} aria-label="Upload progress" /> : null}
           {uploadError ? <p className="mt-1.5 text-xs text-danger">{uploadError}</p> : null}
           <p className="mt-1 text-xs text-ink-tertiary">PDF, PNG, JPEG, WebP or ZIP · up to 500 MB. A new upload replaces this phase&apos;s previous file.</p>

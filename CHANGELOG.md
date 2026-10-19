@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.158 | 2026-10-19 | ui(studioflow): show Deliverables as a phase table
+
+- **Deliverables:** the project tab now uses one compact row per phase: phase, current private file, compliance status, and available actions. It follows the legacy scan pattern instead of stacking one card per phase.
+- **Outdated warning:** an uploaded file is marked Outdated when its upload iteration no longer matches the active iteration. The badge explains that a replacement is needed; the existing private storage, access, replacement, download, and deletion rules are unchanged.
+- **Verification limit:** type checking, Deliverables component checks, and the StudioFlow service regression suite passed. Browser acceptance is queued; no browser PASS is claimed.
+
 ## R9.157 | 2026-10-19 | ui(studioflow): simplify project navigation
 
 - **Project tabs:** Deliverables now sits immediately after Timeline. History is hidden from the project tab bar; its recorded audit data and direct route are unchanged.

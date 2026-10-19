@@ -19,4 +19,10 @@ describe("Deliverables panel safety", () => {
     assert.match(panel, /<InlineError>\{command\.error\}<\/InlineError>/);
     assert.doesNotMatch(panel, /setDeliverableFinalAction|extendDeliverableExpiryAction|Version \{d\.versionNumber\}|Mark final|Temporary files expire/);
   });
+
+  it("offers the project-wide table row and explains an outdated file", () => {
+    assert.match(panel, /variant === "table-row"/);
+    assert.match(panel, /This file belongs to an earlier iteration/);
+    assert.match(panel, /<TableRow>/);
+  });
 });

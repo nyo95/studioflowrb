@@ -32,6 +32,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.158] StudioFlow Deliverables table and outdated iteration warning
+- Surface: StudioFlow project → Deliverables
+- Fixture: an active phase with a file uploaded during iteration 1, then a client revision that opens iteration 2; a phase with no file; authorized PIC and Studio Manager
+- Viewport: desktop (default) and 375 px
+- Steps: 1. Open Deliverables and inspect the one-row-per-phase table. 2. Confirm the iteration-1 file reads Outdated after iteration 2 opens and hover/focus its badge. 3. Replace it as the PIC, reload, and confirm Current. 4. Check the no-file row and Manager delete action.
+- Acceptance: the table remains usable at both viewports; every phase has one row; Outdated clearly means the file belongs to an earlier iteration and does not hide download/replacement; replacement returns the row to Current; existing access boundaries remain intact.
+- Status: PENDING
+
 ### [R9.157] StudioFlow project navigation order
 - Surface: any StudioFlow project tab bar
 - Fixture: a project with work sections; test once with Presentation enabled and once without it

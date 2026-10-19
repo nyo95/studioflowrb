@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { SectionCard, Text } from "@/platform/ui_engine";
+import { DataTable, SectionCard, TableBody, TableHead, TableHeader, TableRow, Text } from "@/platform/ui_engine";
 
 import { canSeeProjectWorkSections, pageProjectAccess, pageSession } from "../../../_components/session";
 import { DeliverablesPanel } from "../phases/[phaseId]/deliverables-panel";
@@ -36,8 +36,10 @@ export default async function ProjectDeliverablesPage({ params }: { params: Prom
 
   const fileCount = rows.reduce((total, row) => total + row.deliverables.items.length, 0);
   return (
-    <SectionCard title="Deliverables" count={fileCount} description="Current private file for each project phase. Uploading a new file replaces that phase's prior file.">
-      <div className="grid gap-4">
+    <SectionCard title="Deliverables" count={fileCount} description="One private file per phase. The status compares its upload iteration with the active iteration.">
+      {rows.length > 0 ? <DataTable framed={false} density="compact" minWidth={720}>
+        <TableHeader><TableRow><TableHead>Phase</TableHead><TableHead>File</TableHead><TableHead>Status</TableHead><TableHead align="end">Actions</TableHead></TableRow></TableHeader>
+        <TableBody>
         {rows.map(({ phase, deliverables, canWork }) => (
           <DeliverablesPanel
             key={phase.id}
@@ -48,11 +50,11 @@ export default async function ProjectDeliverablesPage({ params }: { params: Prom
             canWork={canWork}
             canManage={canManage}
             title={phase.label}
-            description="One current private file for this phase."
+            variant="table-row"
           />
         ))}
-        {rows.length === 0 ? <Text tone="secondary" size="sm">No phases are available for this project.</Text> : null}
-      </div>
+        </TableBody>
+      </DataTable> : <Text tone="secondary" size="sm">No phases are available for this project.</Text>}
     </SectionCard>
   );
 }

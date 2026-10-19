@@ -32,11 +32,16 @@ The row accepts either an uploaded managed file or an external link. Upload auth
 
 The rebuild currently differs materially:
 
-- files are still phase-owned, but multiple same-name versions are retained;
-- each name forms a stable version slot with one Final and two newest working versions;
-- working versions expire after 30 days;
-- files remain tied to the round current at upload and show missing/current/outdated state;
+- files are phase-owned and only one current private file is retained per phase;
+- the file remains tied to the round current at upload and is compared to the active round;
+- the project Deliverables tab is one table row per phase, matching legacy's scan pattern;
+- a file from an earlier round is visibly **Outdated** and explains that a replacement is needed for the active round;
 - private storage is streamed through the current object-storage boundary.
+
+Implemented 2026-10-19 (R9.158): the centralized project Deliverables view
+uses the legacy-style table rather than separate phase cards. It keeps the
+rebuild's private streaming, signed download, PIC upload/replacement and Studio
+Manager deletion rules; only the presentation changes.
 
 ## 3. Deliverables — owner direction and unresolved contract
 
