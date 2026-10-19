@@ -153,6 +153,10 @@ async function main() {
     const requestEntry = await sf.schedule.createEntry({ ...{ grants: registry.permissions, actor }, projectId: project.projectId, section: "MATERIAL", category: "E2E Samples", snapshot: { productName: "ZZ-Test 6.5 Requested Sample", brandName: "ZZ-Test Brand" } });
     const seededEntry = (await sf.schedule.listSchedule({ grants: registry.permissions, projectId: project.projectId })).find((entry) => entry.id === requestEntry.entryId)!;
     await sf.schedule.requestSample({ ...{ grants: registry.permissions, actor }, projectId: project.projectId, optionId: seededEntry.options[0].id, requestedFrom: "ZZ-Test Mat A" });
+    // R9.100 decline acceptance owns its own request: the 6.5 shelf spec resolves the request above.
+    const declineEntry = await sf.schedule.createEntry({ ...{ grants: registry.permissions, actor }, projectId: project.projectId, section: "MATERIAL", category: "E2E Samples", snapshot: { productName: "ZZ-Test Decline Sample", brandName: "ZZ-Test Brand" } });
+    const declineOption = (await sf.schedule.listSchedule({ grants: registry.permissions, projectId: project.projectId })).find((entry) => entry.id === declineEntry.entryId)!.options[0].id;
+    await sf.schedule.requestSample({ ...{ grants: registry.permissions, actor }, projectId: project.projectId, optionId: declineOption, requestedFrom: "ZZ-Test Mat A" });
 
     // Stage 3 fixtures: one project per spec so no spec depends on another's changes.
     const sfGrants = { grants: registry.permissions, actor };

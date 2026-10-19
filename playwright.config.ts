@@ -26,6 +26,8 @@ export default defineConfig({
     ...devices["Desktop Chrome"],
     // PLAYWRIGHT_CHANNEL=chrome runs the installed Google Chrome when Playwright's own browser cannot be downloaded.
     ...(process.env.PLAYWRIGHT_CHANNEL ? { channel: process.env.PLAYWRIGHT_CHANNEL } : {}),
+    // PLAYWRIGHT_CHROMIUM_EXECUTABLE points at a preinstalled Chromium (cloud containers) instead of downloading one.
+    ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } } : {}),
     storageState: "e2e/.tmp/state.json",
   },
   webServer: {

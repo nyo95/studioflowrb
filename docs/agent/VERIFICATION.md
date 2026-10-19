@@ -31,7 +31,8 @@ checkpoint; this grants no authority to deploy, publish or push.
 
 ## Deterministic commands and artifacts
 
-Set `STUDIOFLOW_LOCATION=rumah|kantor` in the shell first. Examples:
+Set `STUDIOFLOW_LOCATION=rumah|kantor|cloud` in the shell first. In a cloud container
+without the project's Playwright browser build, set `PLAYWRIGHT_CHROMIUM_EXECUTABLE` to the preinstalled Chromium. Examples:
 
 ```
 node scripts/verify.mjs --tier low

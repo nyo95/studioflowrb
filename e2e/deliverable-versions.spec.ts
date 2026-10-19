@@ -6,7 +6,8 @@ const { sf } = JSON.parse(readFileSync("e2e/.tmp/owner.json", "utf8")) as { sf: 
 const PDF = Buffer.from("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF");
 
 async function upload(page: Page, name: string) {
-  const file = page.locator('input[type="file"][id^="deliverable-upload-"]');
+  // The project Deliverables table renders one upload input per phase the user may work in; the active phase is first.
+  const file = page.locator('input[type="file"][id^="deliverable-upload-"]').first();
   await Promise.all([
     page.waitForEvent("load"),
     file.setInputFiles({ name, mimeType: "application/pdf", buffer: PDF }),
@@ -17,7 +18,8 @@ async function upload(page: Page, name: string) {
 async function refuseNextAction(page: Page) {
   let refused = false;
   const handler = async (route: Route) => {
-    if (!refused && route.request().method() === "POST" && route.request().headers()["next-action"]) {
+    // Shell polling (unread counts) also posts Server Actions, always without arguments; refuse only the user's command.
+    if (!refused && route.request().method() === "POST" && route.request().headers()["next-action"] && route.request().postData() !== "[]") {
       refused = true;
       await route.abort("failed");
     } else await route.continue();
@@ -27,17 +29,17 @@ async function refuseNextAction(page: Page) {
 }
 
 test("a phase keeps one file and confirms its deletion", async ({ page }) => {
-  await page.goto(`/studioflow/projects/${sf.notes}`);
+  await page.goto(`/studioflow/projects/${sf.notes}/deliverables`);
   await page.waitForLoadState("networkidle");
-  await expect(page.getByText("Deliverables", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Deliverables" })).toBeVisible();
 
   await upload(page, "draft.pdf");
-  await expect(page.getByRole("listitem").filter({ hasText: "draft.pdf" })).toHaveCount(1);
+  await expect(page.getByRole("row").filter({ hasText: "draft.pdf" })).toHaveCount(1);
   await upload(page, "issued.pdf");
-  await expect(page.getByRole("listitem").filter({ hasText: "draft.pdf" })).toHaveCount(0);
-  const current = page.getByRole("listitem").filter({ hasText: "issued.pdf" });
+  await expect(page.getByRole("row").filter({ hasText: "draft.pdf" })).toHaveCount(0);
+  const current = page.getByRole("row").filter({ hasText: "issued.pdf" });
   await expect(current).toHaveCount(1);
-  await expect(current).toContainText("Current phase file");
+  await expect(current).toContainText("Current");
 
   await current.getByRole("button", { name: "Delete issued.pdf" }).click();
   const dialog = page.getByRole("alertdialog", { name: "Delete issued.pdf?" });

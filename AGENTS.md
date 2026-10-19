@@ -113,8 +113,11 @@ The current checkout identifies the rebuild repository. Do not ask for its path.
 
 - `rumah`: load `.env.rumah`;
 - `kantor`: load `.env.kantor`.
+- `cloud` (a remote, ephemeral agent container; do not ask the home/office question there): no owner env file
+  exists. Create only an ignored `.env`/`.env.test.local` that point at a PostgreSQL started inside that same
+  container for `studioflow_rebuild` and `studioflow_rebuild_test`; it is disposable and never the owner's data.
 
-Never commit or copy either file. Set `STUDIOFLOW_LOCATION` to the selected value before Prisma or other repository tooling. Both locations use isolated rebuild-only PostgreSQL; verify the explicit target belongs only to `studioflow-rebuild` before *any* database command, and stop if the target is absent or ambiguous.
+Never commit or copy any of these files. Set `STUDIOFLOW_LOCATION` to the selected value before Prisma or other repository tooling. Both locations use isolated rebuild-only PostgreSQL; verify the explicit target belongs only to `studioflow-rebuild` before *any* database command, and stop if the target is absent or ambiguous.
 
 Legacy is separate, read-only evidence. When needed, ask the owner for its exact path on this computer, then record path, commit, branch, and dirty state before reading it. Do not scan drives or assume a path. Never edit, format, generate into, install in, run, test, migrate, seed, reset, stash, clean, switch, merge, rebase, pull, push, or otherwise alter legacy. Inspect committed evidence with read-only Git commands and name any working-tree-only evidence separately. Never copy legacy code, schema, migrations, database, or configuration as an implementation base.
 

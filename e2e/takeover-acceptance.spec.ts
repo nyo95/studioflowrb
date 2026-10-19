@@ -77,10 +77,17 @@ test("R9.99: new SKU size reaches SKU details while supplier price units stay se
 });
 
 test("R9.100: declining a sample updates Schedule, waiting filter, and re-request", async ({ page }) => {
+  // Other specs resolve their own seeded requests in this project, so compare counts instead of expecting zero.
+  const scheduleWaiting = async () => Number((await page.getByRole("button", { name: /^Sample waiting( \d+)?$/ }).textContent())?.match(/\d+/)?.[0] ?? 0);
+  const homeWaiting = async () => Number(await page.getByText("Samples waiting", { exact: true }).locator("..").locator("..").getByText(/^\d+$/).textContent());
+  await page.goto(`/studioflow/projects/${projectId}/schedule`);
+  const waitingBefore = await scheduleWaiting();
+  await page.goto("/studioflow");
+  const homeBefore = await homeWaiting();
   await page.goto("/masterdata/sample-requests");
-  await page.getByRole("button", { name: "Actions for ZZ-Test 6.5 Requested Sample" }).click();
+  await page.getByRole("button", { name: "Actions for ZZ-Test Decline Sample" }).click();
   await page.getByRole("menuitem", { name: "Take" }).click();
-  await page.getByRole("button", { name: "Actions for ZZ-Test 6.5 Requested Sample" }).click();
+  await page.getByRole("button", { name: "Actions for ZZ-Test Decline Sample" }).click();
   await page.getByRole("menuitem", { name: "Decline" }).click();
   const dialog = page.getByRole("dialog", { name: "Decline this sample request" });
   await dialog.getByLabel("Reason").fill("Supplier has no stock");
@@ -97,7 +104,7 @@ test("R9.100: declining a sample updates Schedule, waiting filter, and re-reques
   const database = new Pool({ connectionString: disposableUrl });
   let notificationsBeforeRetry = 0;
   try {
-    const intake = await database.query<{ source_request_id: string }>('SELECT source_request_id FROM "master_data"."SampleRequestIntake" WHERE product_name = $1', ["ZZ-Test 6.5 Requested Sample"]);
+    const intake = await database.query<{ source_request_id: string }>('SELECT source_request_id FROM "master_data"."SampleRequestIntake" WHERE product_name = $1', ["ZZ-Test Decline Sample"]);
     expect(intake.rows).toHaveLength(1);
     notificationsBeforeRetry = Number((await database.query<{ count: string }>('SELECT count(*) FROM "platform"."Notification" WHERE kind = $1', ["masterdata.sample-request.declined"])).rows[0]?.count);
     await database.query('UPDATE "studioflow"."sf_schedule_sample_request" SET status = $1 WHERE id = $2', ["REQUESTED", intake.rows[0]!.source_request_id]);
@@ -105,8 +112,8 @@ test("R9.100: declining a sample updates Schedule, waiting filter, and re-reques
     await database.end();
   }
   await page.goto("/masterdata/sample-requests");
-  await expect(page.getByText("Schedule still waiting")).toBeVisible();
-  await page.getByRole("button", { name: "Actions for ZZ-Test 6.5 Requested Sample" }).click();
+  await expect(page.getByRole("row").filter({ hasText: "ZZ-Test Decline Sample" }).getByText("Schedule still waiting")).toBeVisible();
+  await page.getByRole("button", { name: "Actions for ZZ-Test Decline Sample" }).click();
   await page.getByRole("menuitem", { name: "Update product schedule" }).click();
   await expect(page.getByText("Product schedule now shows the sample as declined.")).toBeVisible();
   const afterRetry = new Pool({ connectionString: disposableUrl });
@@ -118,19 +125,19 @@ test("R9.100: declining a sample updates Schedule, waiting filter, and re-reques
   }
 
   await page.goto(`/studioflow/projects/${projectId}/schedule`);
-  await expect(page.getByText("Sample declined", { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: /Sample waiting/ })).toContainText("0");
+  await expect(page.getByText("Sample declined", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect.poll(scheduleWaiting).toBe(waitingBefore - 1);
   await page.goto("/studioflow");
-  await expect(page.getByText("Samples waiting", { exact: true }).locator("..").locator("..").getByText("0", { exact: true })).toBeVisible();
+  await expect.poll(homeWaiting).toBe(homeBefore - 1);
   await page.goto(`/studioflow/projects/${projectId}/schedule`);
-  await page.getByRole("button", { name: /ZZ-Test 6\.5 Requested Sample/ }).click();
+  await page.getByRole("button", { name: /ZZ-Test Decline Sample/ }).click();
   await expect(page.getByText("Sample declined: Supplier has no stock")).toBeVisible();
   await page.getByRole("button", { name: "Request sample again" }).click();
   await expect(page.getByRole("button", { name: "Request sample", exact: true })).toBeVisible();
   await page.setViewportSize({ width: 375, height: 800 });
   await expect(page.getByText("Sample declined: Supplier has no stock")).toBeVisible();
   await page.getByRole("button", { name: "Request sample", exact: true }).click();
-  await expect(page.getByText("Sample waiting", { exact: true })).toBeVisible();
+  await expect(page.getByText("Sample waiting", { exact: true }).filter({ visible: true }).first()).toBeVisible();
 });
 
 test("R9.99: sample-shelf SKU is usable without a price or purchase unit", async ({ page }) => {

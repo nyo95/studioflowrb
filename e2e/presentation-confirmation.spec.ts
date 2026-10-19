@@ -9,7 +9,8 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
 async function refuseNextAction(page: Page) {
   let refused = false;
   const handler = async (route: Route) => {
-    if (!refused && route.request().method() === "POST" && route.request().headers()["next-action"]) {
+    // Shell polling (unread counts) also posts Server Actions, always without arguments; refuse only the user's command.
+    if (!refused && route.request().method() === "POST" && route.request().headers()["next-action"] && route.request().postData() !== "[]") {
       refused = true;
       await route.abort("failed");
     } else await route.continue();

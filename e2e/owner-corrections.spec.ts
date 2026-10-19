@@ -11,7 +11,8 @@ test("Notes identifies both senders and places my messages on the left", async (
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(`/studioflow/projects/${sf.notesChat}`);
   const log = page.getByRole("log", { name: "Notes" });
-  const mine = log.getByRole("article").filter({ hasText: "ZZ-Test General note edit check" });
+  // notes-chat.spec edits this seeded note's text, so match its stable prefix rather than the original body.
+  const mine = log.getByRole("article").filter({ hasText: "ZZ-Test General note" });
   const theirs = log.getByRole("article").filter({ hasText: "ZZ-Test note from Lia" });
   await expect(mine).toContainText("Eka Tester");
   await expect(theirs).toContainText("Lia Limited");

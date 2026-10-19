@@ -134,8 +134,8 @@ proportionate to risk.
 ## Local database sync after new migrations
 
 Each location's isolated rebuild-only PostgreSQL instance holds two independent
-databases: the local dev database (`masterdata`) and the integration-test
-database (`masterdata_test`). Prisma migrations applied to one never reach the
+databases: the local dev database (`studioflow_rebuild`) and the integration-test
+database (`studioflow_rebuild_test`). Prisma migrations applied to one never reach the
 other. After a `git pull`, rebase, cherry-pick, or any local change that adds
 migration files, migrate **every local database this session actually uses**
 before treating the checkout as caught up — normally that means running
