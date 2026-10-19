@@ -48,6 +48,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 - Acceptance: one project-wide view gives an orderly, narrow-screen-safe view of all phase Deliverables without duplicate controls in the phase sidebar; the existing file and access behavior are unchanged.
 - Status: PENDING
 
+### [R9.143] Studio Manager Deliverable deletion
+- Surface: StudioFlow project → Deliverables
+- Fixture: disposable rebuild-only project with one phase file; a Studio Manager who is not either project PIC, an assigned PIC and a non-manager
+- Viewport: desktop (default)
+- Steps: 1. As the non-PIC Studio Manager, open Deliverables and delete the file after confirming. 2. Reload and confirm it is gone. 3. Confirm that same Manager has no upload action. 4. As the assigned PIC, upload a replacement. 5. As a non-manager, confirm Delete is absent or refused.
+- Acceptance: only the explicit Manager deletion operation is available across project assignments; upload stays phase-PIC-scoped and no other phase edit authority is gained.
+- Status: PENDING
+
 ### [R9.128] Master Data full application canvas
 - Surface: Master Data overview; Master Data → Brands
 - Fixture: authenticated Master Data account with at least one Brand

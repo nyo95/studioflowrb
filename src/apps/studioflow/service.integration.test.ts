@@ -2374,6 +2374,22 @@ describe("Deliverable reference revision", () => {
     assert.equal(storage.objects.has(row.storage_key), true);
   });
 
+  it("lets a non-PIC Studio Manager delete a file, but keeps upload and deletion unavailable to the wrong authority", async () => {
+    const { projectId } = await newProject("Manager deliverable authority");
+    const phase = await phaseOf(projectId, "moodboard");
+    await sf.phases.uploadDeliverable({ ...as(designer), projectId, phaseId: phase.id, name: "manager-delete.pdf", file: { body: new Uint8Array([1]), contentType: "application/pdf" } });
+    const row = await testDb.prisma.sfDeliverable.findFirstOrThrow({ where: { phase_id: phase.id } });
+    const manager = await seedUser("Maya Manager", [P.access, P.projectRead, P.projectManage]);
+    const picWithoutManager = [P.access, P.projectRead, P.phaseWork, P.projectPicDesigner];
+
+    await rejectsWith(sf.phases.uploadDeliverable({ ...as(manager, [P.access, P.projectRead, P.projectManage]), projectId, phaseId: phase.id, name: "not-allowed.pdf", file: { body: new Uint8Array([2]), contentType: "application/pdf" } }), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.deleteDeliverable({ ...as(designer, picWithoutManager), projectId, deliverableId: row.id }), "PERMISSION_DENIED");
+    await sf.phases.deleteDeliverable({ ...as(manager, [P.access, P.projectRead, P.projectManage]), projectId, deliverableId: row.id });
+
+    assert.equal(await testDb.prisma.sfDeliverable.count({ where: { id: row.id } }), 0);
+    assert.equal(storage.objects.has(row.storage_key), false);
+  });
+
   it("records manual deletion with the actor and file identity, and rolls back if audit fails", async () => {
     const { projectId } = await newProject("Audited deletion");
     const phase = await phaseOf(projectId, "moodboard");

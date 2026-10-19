@@ -153,7 +153,7 @@ export function createDeliverableService(
         const d = await tx.sfDeliverable.findUnique({ where: { id: input.deliverableId }, select: { id: true, project_id: true, phase_id: true, storage_key: true, name: true } });
         if (!d || d.project_id !== input.projectId) throw notFound("deliverable");
         await loadWritablePhase(tx, input.projectId, d.phase_id);
-        await requireProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId!, projectId: input.projectId, phaseId: d.phase_id, kind: "content" });
+        // Deliverable removal is the explicit Studio Manager operation. Unlike upload, it is not phase-PIC content work.
         await tx.sfDeliverable.delete({ where: { id: d.id } });
         await writeAudit(ports, tx, { action: "studioflow.deliverable.deleted", entityType: "deliverable", entityId: d.id, actor: input.actor, metadata: { projectId: d.project_id, phaseId: d.phase_id, name: d.name } });
         return enqueueUnreferencedCleanup(tx, [d.storage_key]);

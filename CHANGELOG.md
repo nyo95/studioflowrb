@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.143 | 2026-10-19 | fix(studioflow): allow Manager Deliverable deletion
+
+- **Authority correction:** an unassigned Studio Manager can now remove a current private Deliverable from an open project, exactly as the authority matrix states. This is intentionally deletion-only: upload, phase content, rounds, notes and documents remain PIC-scoped.
+- **Safety:** the existing writable project/phase check, project/file ownership check, audit record and retry-safe private-object cleanup remain unchanged.
+- **Verification:** direct integration coverage proves Manager deletion succeeds while the same Manager cannot upload and a PIC without Manager authority cannot delete. The required high gate is recorded with this revision. Browser scenario `[R9.143]` remains owner-deferred; no browser acceptance is claimed.
+
 ## R9.142 | 2026-10-19 | plan(studioflow): lock Deliverable manager authority
 
 - **Authority matrix:** the Deliverables KB now states the owner-ratified split: a phase PIC uploads/replaces its file, a Studio Manager may remove it, and Platform Owner holds only the existing recovery override. Manager file removal does not grant phase edits or uploads.
