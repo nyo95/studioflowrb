@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.144 | 2026-10-19 | plan(studioflow): record Timeline anchor decisions
+
+- **Owner decisions:** Timeline will calculate from Design Handover toward the work and from Opening backward, provide Table and Gantt lenses over one schedule, derive status from real phase/round progress, identify overdue only on the active phase, retain per-phase Platform Owner overrides, and leave Manager editing disabled until explicitly delegated.
+- **Blocker:** the office-table label `Handover Radiant` may or may not be the owner-directed `Handover Desain`. Runtime redesign is intentionally blocked until that single date meaning is confirmed; no existing date is migrated or reinterpreted.
+
 ## R9.143 | 2026-10-19 | fix(studioflow): allow Manager Deliverable deletion
 
 - **Authority correction:** an unassigned Studio Manager can now remove a current private Deliverable from an open project, exactly as the authority matrix states. This is intentionally deletion-only: upload, phase content, rounds, notes and documents remain PIC-scoped.

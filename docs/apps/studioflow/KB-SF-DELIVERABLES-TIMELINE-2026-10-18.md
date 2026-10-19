@@ -1,6 +1,6 @@
 # StudioFlow KB — Deliverables and Timeline owner direction
 
-Status: Deliverables authority matrix applied; Timeline runtime redesign deferred
+Status: Deliverables authority matrix applied; Timeline decision record in progress
 Owner conversation: 2026-10-18 (WIB)
 Evidence checked: 2026-10-19 (UTC)
 
@@ -85,17 +85,36 @@ Owner direction now supersedes the interaction intent for future Timeline work:
 - Only Platform Owner may set/change Handover or manually adjust calculated schedule dates; every adjustment is audited.
 - Designer and Studio Manager do not drag or manually edit phase dates.
 
+Follow-up owner decisions, 2026-10-19:
+
+- Design Handover pulls the schedule forward and Opening pulls it backward. The
+  generated plan must make a conflict visible; it must not silently prefer one
+  anchor.
+- A change to either anchor recalculates the generated plan. A Platform Owner
+  adjustment is scoped to one phase only and persists when the surrounding plan
+  is recalculated.
+- Overdue means the currently active phase has passed its planned end date.
+- Studio Manager date editing may be delegated in a later capability, but is
+  disabled by default. Current Manager access stays read-only.
+- A project with no Handover keeps its existing schedule until Handover is
+  supplied.
+- Timeline has two views over the same schedule: an office-style table and a
+  calendar Gantt. Its progress/status is derived from the real project phase
+  state and rounds, never selected manually.
+
+One business-name blocker remains: the office table calls its date `Handover
+Radiant`, while the owner direction calls it `Handover Desain`. Runtime work is
+blocked until the owner confirms whether they are the same date or supplies
+their separate meanings.
+
 R9.137 applies only the clear authority slice: portfolio Timeline is a Studio Manager view, and mutation controls/services require `project.manage + project.override` (Platform Owner authority). It intentionally does not replace the Fit Out Start calculation or redesign the Gantt.
 
-## 5. Timeline — contract required before runtime redesign
+## 5. Timeline — remaining contract required before runtime redesign
 
 The next Work Order must settle:
 
-1. Which stored field is canonical Handover, and whether existing `opening_date`, `fit_out_start_date`, or a new field migrates into it.
-2. Exact backward dependency graph and duration source for every phase, including parallel phases and two-step Construction Drawing.
-3. Overdue definition: phase planned end vs actual completion, current active phase only vs every unfinished phase, and working-day vs calendar-day count.
-4. What a manual Platform Owner adjustment overrides: Handover only, one milestone, one phase, or the whole generated plan; and how later recalculation treats it.
-5. Presentation for on-track, due-today, and overdue states on Home, project Timeline, and portfolio Timeline.
-6. Migration/fallback for existing projects that have manual planned dates but no canonical Handover.
+1. Whether office-table `Handover Radiant` and the owner-directed `Handover Desain` are one canonical date; then which stored field/new field represents it.
+2. Exact dependency graph and duration source for every table column and phase, including parallel phases and two-step Construction Drawing.
+3. Presentation for on-track, due-today, and overdue states on Home, project Timeline, and portfolio Timeline.
 
 Until then, preserve existing dates and audits; do not destructively rewrite or silently reinterpret them.

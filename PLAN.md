@@ -1,54 +1,30 @@
 # Active Plan
 
-Plan ID: WO-SF-DELIVERABLE-MANAGER-DELETE-01
-Scope: Align Studio Manager Deliverable deletion with the locked StudioFlow authority matrix
+Plan ID: WO-SF-TIMELINE-HANDOVER-01
+Scope: Redesign StudioFlow Timeline around real project progress and two anchored planning dates
 Module(s): StudioFlow
-Target revision: R9.143
-Risk: high — this corrects an authorization boundary for private file deletion. Stop if the required behavior conflicts with the owner-ratified matrix or alters any other phase/content authority.
-Status: READY
+Target revision: unassigned — blocked before implementation
+Risk: high — this changes schedule meaning, persisted dates, authorization and portfolio/project surfaces. No implementation is authorized while the canonical Handover field and dependency map remain ambiguous.
+Status: BLOCKED
 Priority: P1
 Owner: Product Owner
 Last updated: 2026-10-19
 
-## Outcome
+## Confirmed Owner Decisions
 
-A Studio Manager can delete a private Deliverable from any open project through the centralized Deliverables page, even when that Manager is not the assigned Designer or Drafter. Upload remains limited to the phase's authorized PIC.
+- Design Handover plans project work forward; Opening plans backward. The schedule exposes conflicts rather than silently choosing one anchor.
+- Changing either anchor recalculates the generated schedule. A Platform Owner's manual phase override affects that phase only and survives later recalculation.
+- Overdue means the currently active phase has passed its planned end date.
+- Studio Manager date editing is permitted as a future delegable capability, but disabled by default. Current Manager portfolio access remains read-only unless a later explicit delegation mechanism is approved.
+- Existing projects with no Handover keep their existing schedule until Handover is supplied.
+- Both Table and Gantt views are required. The Table follows the office operational layout; the Gantt is a calendar lens of the same data.
+- Phase/status progress is derived from the project's actual phase state and rounds, never selected manually in Timeline.
 
-## Context and Evidence
+## Blocking Decision
 
-- The owner-ratified authority matrix (§3 and §5.4 of the StudioFlow contract) assigns explicit Deliverable deletion to Studio Manager, while upload follows the phase-seat PIC.
-- R9.141 presents the Delete action to a Studio Manager, but the deletion service subsequently applies the PIC content-mutation guard. A Manager who is not a PIC is therefore shown an action that the service refuses.
-- The KB now records the same Manager/PIC split as the durable authority matrix; this is a correction to implementation, not a new product decision.
+The office table calls its anchor `Handover Radiant`, while the owner direction calls it `Handover Desain`. Confirm whether these are the same business date. If yes, the next plan can define one canonical Handover field and map the existing table column to it. If no, their meanings, ordering and separate edit rights must be defined first.
 
-## Locked Decisions
+## Non-goals Until Unblocked
 
-- FIX only Deliverable deletion: require the existing `studioflow.project.manage` Manager authority and validate that the file belongs to the named open project.
-- Do not use PIC content permission for this Manager-only deletion operation. Retain the existing audited delete, private object cleanup ledger and project/phase writable checks.
-- Keep private file reads under project-detail access. Keep upload exactly phase-scoped: assigned Designer for designer-seat phases; assigned Drafter for drafter-seat phases; Platform Owner override continues its existing recovery behavior.
-- Do not broaden Manager rights to phase transitions, notes, uploads, MOM, Schedule, Presentation, drawings or Timeline mutation. No schema, migration, role, public URL or storage behavior change.
-
-## Acceptance Criteria
-
-- A Studio Manager with `project.manage`, who is neither project PIC, can delete a phase Deliverable from an open project; audit and cleanup behavior remain intact.
-- The same Manager cannot upload the replacement, alter phase content or bypass a closed/locked project through this correction.
-- An assigned authorized PIC still uploads normally, and a user without `project.manage` cannot delete.
-
-## Verification
-
-- Tier: high (private-file authorization and destructive operation). Per-command timeout: 15 minutes.
-- Add direct StudioFlow service integration coverage for a non-PIC Manager delete success and refusal for no-manager and closed/locked project cases; retain/extend existing PIC upload coverage as consumer evidence.
-- Verify the centralized panel exposes the action consistently with the service boundary.
-- Run `node scripts/verify.mjs --tier high` after the targeted tests. No database/schema change is expected; do not create or apply a migration.
-- Browser acceptance remains Reviewer-owned and owner-deferred. Extend the existing Deliverables browser scenario only as a pending record; do not claim browser PASS.
-
-## Reviewer Acceptance
-
-- As a non-PIC Studio Manager, delete a phase file from the centralized Deliverables page and confirm it disappears after reload. As the same Manager, confirm upload is unavailable. Confirm an assigned PIC can upload and a non-manager cannot delete.
-
-## Regression Risks and Recovery
-
-- Over-broad authorization could let Managers mutate phase work. Limit the exception to the single deletion command and prove refusals with service integration tests. If regression appears, revert the correction commit; no data model changes are involved.
-
-## Executor Prompt
-
-You are the Backend Executor. Location: kantor. Read `AGENTS.md`, `docs/agent/EXECUTOR.md` and this READY `PLAN.md`; implement only the Studio Manager Deliverable-delete correction, preserve all other PIC/phase permissions, add the locked authorization tests, run the high gate, update the changelog and pending browser scenario, then commit local revision R9.143. Do not claim browser acceptance or independent Claude review.
+- No migration or reinterpretation of `opening_date`, `fit_out_start_date`, or existing phase planned dates.
+- No automatic schedule rewrite, new permission, table/Gantt UI, or progress calculation change.
