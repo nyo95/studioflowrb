@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.138 | 2026-10-19 | plan(studioflow): lock one private Deliverable file per phase
+
+- **Owner decision:** each phase stores exactly one private Deliverable; a later upload replaces the prior file. The prior version-slot, Final and expiry lifecycle is retired. Existing multi-file phases retain their newest upload and queue older private-object keys for retry-safe cleanup.
+- **Work order:** `WO-SF-DELIVERABLE-ONE-PHASE-01` is READY for R9.139. It preserves the current private streaming/storage, assignment access, audit and transaction safety; it adds no project-wide dashboard, external links, Timeline work or public path.
+
 ## R9.137 | 2026-10-19 | fix(studioflow): align Studio roles and Construction Drawing ownership
 
 - **Business roles and privacy:** existing grants now express a small hierarchy without role-name checks. Designers keep Home/My Projects, Library and a read-only project directory, but cannot open unassigned project detail, Clients, the portfolio Timeline or StudioFlow Settings. `project.manage` is presented as Studio Manager operations and opens Clients, all Projects, assignment/project metadata and a read-only portfolio Timeline. `project.manage + project.override` is the Platform Owner authority for cross-project recovery and manual Timeline changes.

@@ -72,7 +72,7 @@ Presentation plan, archived 2026-10-06).
 | Project identity strip (`project-identity-strip.tsx`) | KEEP | shared project header (§8) |
 | Project nav rail with phase status (`nav-inner.tsx`) | PURGE (R8.347) | phase strip + project header nav (§8) |
 | CD list (`cd-list-table.tsx`, `CDList`) | KEEP | Drawing list on the drafter phase (§5.5) |
-| Deliverables and uploads (`deliverables-table.tsx`, `upload/*`) | FIX | streamed private files with a version lifecycle (§5.4) |
+| Deliverables and uploads (`deliverables-table.tsx`, `upload/*`) | FIX | one streamed private file per phase (§5.4) |
 | Render boards (`RenderBoard`, `RenderAnnotation`) | KEEP | Presentation boards (§8a) |
 | MOM documents/items/images/print (`extensions/mom/*`) | KEEP | §10 |
 | Product schedule (`extensions/schedule/*`, `CatalogBoard.tsx`) | KEEP | §11 |
@@ -256,21 +256,20 @@ Phase status: `PENDING → ACTIVE → DONE`. The work is a chain of rounds
 
 ### 5.4 Files (deliverables)
 
-Per phase, uploaded through an authenticated streaming route (default limit
-500 MB, `STUDIOFLOW_DELIVERABLE_MAX_BYTES`; PDF, PNG, JPEG, WebP, ZIP), stored
-privately and read through signed URLs. A file is tagged to the round that was
-current at upload. Files with the same name form a slot: one **Final** version
-is kept, plus the two newest working versions; working files expire after
-30 days (the uploader is warned in the last seven, and may extend). A daily
-sweep removes expired rows before object cleanup. Status per phase: no files
-/ current / outdated.
+Each phase has zero or one file, uploaded through an authenticated streaming
+route (default limit 500 MB, `STUDIOFLOW_DELIVERABLE_MAX_BYTES`; PDF, PNG,
+JPEG, WebP, ZIP), stored privately and read through signed URLs. A file is
+tagged to the round current at upload. A successful new upload replaces the
+phase's prior file regardless of its name; there are no slots, versions, Final
+state, expiry period, or extension. Status per phase: no file / current /
+outdated.
 
-Each successful upload receives a stable, increasing version number within
-its phase and normalized file-name slot. Removing or expiring older files
-never renumbers surviving versions; the highest surviving number is marked
-newest. Existing retained files were numbered once by upload order when
-this rule was introduced; already-pruned historical versions cannot be
-reconstructed from the retained rows.
+The replacement transaction records the change in audit and enqueues the prior
+unreferenced object for retry-safe cleanup only after the replacement metadata
+has committed. Upload follows the existing phase-work plus PIC access rule;
+explicit deletion remains a Studio Manager operation. Existing data retains the
+newest uploaded file per phase when this rule is introduced; older rows are
+removed and their object keys enter the cleanup retry ledger.
 
 ### 5.5 Drawing list (CD list)
 

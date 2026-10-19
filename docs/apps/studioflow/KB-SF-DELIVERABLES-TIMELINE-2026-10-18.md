@@ -40,17 +40,11 @@ The rebuild currently differs materially:
 
 ## 3. Deliverables — owner direction and unresolved contract
 
-Owner direction: “Deliverables yang sekarang strukturnya jadi satu per fase, ubah mengikuti legacy.” The evidence shows that “one per phase” also describes legacy, so this phrase does not uniquely select a new data model.
+Owner direction: “Deliverables yang sekarang strukturnya jadi satu per fase, ubah mengikuti legacy.” Follow-up confirmed on 2026-10-19: “di penyimpanan hanya menyimpan 1 file tiap phase.”
 
-Do not change runtime behavior until these points are resolved from the owner's intended legacy experience:
+Locked implementation scope: phase-owned persistence remains; a successful upload replaces the prior file regardless of name; only one current managed private file remains per phase; no external-link type or project-wide dashboard is added. The existing phase-seat/PIC upload authorization remains in force. Existing multi-file data keeps its newest upload and queues older unreferenced object keys for retry-safe cleanup.
 
-1. Is the requested change a standalone project-wide Deliverables dashboard, while persistence remains phase-owned?
-2. Should a new upload replace every prior phase file like legacy, or preserve the rebuild's version history and expiry rules?
-3. Does one visible row mean one current file total, or one logical deliverable slot with versions?
-4. Are external links still accepted alongside managed files?
-5. Should upload authority follow legacy seat ownership: Drafter for Construction Drawing, Designer for every other phase, with Platform Owner recovery only?
-
-Safety floor regardless of the answer: authenticated private reads, project-detail assignment access, current ObjectStorage, audit events, transaction-scoped metadata writes, and cleanup only after a successful replacement stay mandatory. Never restore legacy public paths, local-file coupling, role enums, or direct page Prisma.
+Safety floor: authenticated private reads, project-detail assignment access, current ObjectStorage, audit events, transaction-scoped metadata writes, and cleanup only after a successful replacement stay mandatory. Never restore legacy public paths, local-file coupling, role enums, or direct page Prisma.
 
 ## 4. Timeline — evidence and owner direction
 
