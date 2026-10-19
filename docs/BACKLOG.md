@@ -58,7 +58,7 @@ Order matters; each item is its own Work Order.
 - [ ] [PLANNED][P2] **DEFERRED by the owner 2026-10-09.** Plan written, not READY: `docs/apps/sketchup/WO-SKETCHUP-01.md`
   (Schedule owns the code, project in the URL, Lead Step 0 = StudioFlow schedule door).
   Original notes follow.
-- [ ] [PLANNED][P2] SketchUp plugin sync as the first extension (D-SF-06 lifted
+- [ ] [PLANNED][P2] **DEFERRED by the owner 2026-10-19.** SketchUp plugin sync as the first extension (D-SF-06 lifted
   for this work by the owner's 2026-10-09 request; needs its own plan and the
   owner's answers on: project binding in the URL vs token, what the schedule gets
   from a pushed material, and the merge-queue behaviour). Legacy evidence
@@ -197,7 +197,7 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
 
 - [ ] [BUG][P2] **Shared crop preview differs from saved image (R9.64 D3) — fixed R9.70, Lead code review PASS R9.71; browser partial R9.98.** R9.98 compares actual Schedule 4:5 right-edge preview pixels with the saved JPEG in Chromium and passes; earlier browser work covered Schedule centre and MOM top-edge. The omitted-aspect public mode has deterministic geometry fixtures but no live app consumer or browser pixel comparison yet. Keep open until remaining [R9.64] D/E / [R9.70] browser acceptance, including other crop positions and gestures. Original evidence: `src/platform/ui_engine/patterns/image-workspace.tsx:199,205,279,283`; deterministic 1600×900/4:3 coordinate trace in PLAN.md.
 
-- [ ] [PLANNED][P1] Workspace board: a note thread where you double-click
+- [ ] [PLANNED][P1] **DEFERRED by the owner 2026-10-19.** Workspace board: a note thread where you double-click
   (owner, 2026-10-15: "tulis aja di KB, nanti oper ke codex"). Mockup artboard
   *Workspace — klik dua kali untuk catatan* in
   https://claude.ai/artifact/7ns7QpSUBxSY6c1FYYJvbF. With the Workspace board
@@ -221,7 +221,7 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
   via + Text); board off shows messages in Notes. Backend R9.76, board UI R9.78
   (Lead). Remove this item after the owner's browser check ([R9.78] group).
 
-- [ ] [PLANNED][P2] Ideas board (owner, 2026-10-08): a personal page where a
+- [ ] [PLANNED][P2] **DEFERRED by the owner 2026-10-19.** Ideas board (owner, 2026-10-08): a personal page where a
   user drops any image (Ctrl+V screenshot, a dropped download, picked files)
   and it becomes a card at once; title, source link and note are optional and
   may stay empty. No code, category or qty; no commitment. **Locked:**

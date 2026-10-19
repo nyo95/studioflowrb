@@ -1,5 +1,9 @@
 # Changelog
 
+## R9.153 | 2026-10-19 | docs(backlog): defer StudioFlow extension work
+
+- **Priority:** Workspace board, Ideas board, and SketchUp plugin sync are parked by the owner. Their accepted descriptions remain available for a later dedicated work order; no product behavior changed.
+
 ## R9.152 | 2026-10-19 | feat(studioflow): anchor Timeline at Design Handover
 
 - **Schedule:** Design Handover is now a distinct nullable project date. When it is set, the working-day milestones calculate backward from it; recorded Start stays unchanged and Opening conflicts or past milestones warn without shifting dates.
