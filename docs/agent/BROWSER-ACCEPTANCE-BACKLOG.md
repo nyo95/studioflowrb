@@ -32,6 +32,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.159] Balanced operational table columns
+- Surface: Master Data → Brands Catalog; StudioFlow project → Deliverables
+- Fixture: a populated Brands Catalog and a project with file and no-file phase rows
+- Viewport: desktop (default), 1280 px, and 375 px
+- Steps: 1. Open each table and scan every column. 2. Resize the browser to 1280 px and 375 px, using horizontal table scroll where needed. 3. Check the rightmost action and metadata columns.
+- Acceptance: primary columns do not absorb disproportionate empty width; detail/status/action columns remain visible and legible; no clipping, overlap, or lost table action is introduced. Per-user column resizing is intentionally not part of this revision.
+- Status: PENDING
+
 ### [R9.158] StudioFlow Deliverables table and outdated iteration warning
 - Surface: StudioFlow project → Deliverables
 - Fixture: an active phase with a file uploaded during iteration 1, then a client revision that opens iteration 2; a phase with no file; authorized PIC and Studio Manager

@@ -5,7 +5,7 @@ import { UpdatedCell } from "../updated-cell";
 import { useDisplaySettings } from "@/platform/authenticated-shell/display-settings";
 import { matchesDirectoryStatus, type DirectoryStatus } from "../directory-findability";
 import { formatInstant } from "@platform/utilities/date";
-import { TableFilters,Drawer,DirectoryShell,Pagination,RowActionMenu,RowActionsCell,RowActionsHead,Text,usePagination } from "@/platform/ui_engine";
+import { TableFilters,Drawer,DirectoryShell,Pagination,RowActionMenu,RowActionsCell,Text,usePagination } from "@/platform/ui_engine";
 ﻿
 
 import { Plus } from "lucide-react";
@@ -327,14 +327,14 @@ export function BrandDirectory({
       ) : (
         <DataTable framed={false} density="compact" stickyHeader fill minWidth={780} className="table-fixed [&_td]:!px-2 [&_th]:!px-2">
           <TableHeader>
-            <TableRow><TableHead sortable sortDirection={sortKey === "Brand" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Brand"); setSortDirection(direction); }}>Brand</TableHead>
-<TableHead style={{ width: 110 }}  >Categories</TableHead>
-<TableHead style={{ width: 100 }}  >Hashtags</TableHead>
-<TableHead style={{ width: 150 }} sortable sortDirection={sortKey === "Suppliers" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Suppliers"); setSortDirection(direction); }}>Supplied by</TableHead>
-<TableHead style={{ width: 84 }} sortable sortDirection={sortKey === "Resources" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Resources"); setSortDirection(direction); }}>Links</TableHead>
-<TableHead style={{ width: 64 }} align="end" sortable sortDirection={sortKey === "SKUs" ? sortDirection : null} onSortChange={(direction) => { setSortKey("SKUs"); setSortDirection(direction); }}>SKUs</TableHead>
-<TableHead style={{ width: 156 }}>Updated</TableHead>
-<RowActionsHead /></TableRow>
+            <TableRow><TableHead style={{ width: "26%" }} sortable sortDirection={sortKey === "Brand" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Brand"); setSortDirection(direction); }}>Brand</TableHead>
+<TableHead style={{ width: "12%" }}>Categories</TableHead>
+<TableHead style={{ width: "12%" }}>Hashtags</TableHead>
+<TableHead style={{ width: "16%" }} sortable sortDirection={sortKey === "Suppliers" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Suppliers"); setSortDirection(direction); }}>Supplied by</TableHead>
+<TableHead style={{ width: "8%" }} sortable sortDirection={sortKey === "Resources" ? sortDirection : null} onSortChange={(direction) => { setSortKey("Resources"); setSortDirection(direction); }}>Links</TableHead>
+<TableHead style={{ width: "5%" }} align="end" sortable sortDirection={sortKey === "SKUs" ? sortDirection : null} onSortChange={(direction) => { setSortKey("SKUs"); setSortDirection(direction); }}>SKUs</TableHead>
+<TableHead style={{ width: "16%" }}>Updated</TableHead>
+<TableHead style={{ width: "5%" }} align="end"><span className="sr-only">Actions</span></TableHead></TableRow>
           </TableHeader>
           <TableBody>
             {visibleRows.map((brand) => {

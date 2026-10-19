@@ -37,8 +37,8 @@ export default async function ProjectDeliverablesPage({ params }: { params: Prom
   const fileCount = rows.reduce((total, row) => total + row.deliverables.items.length, 0);
   return (
     <SectionCard title="Deliverables" count={fileCount} description="One private file per phase. The status compares its upload iteration with the active iteration.">
-      {rows.length > 0 ? <DataTable framed={false} density="compact" minWidth={720}>
-        <TableHeader><TableRow><TableHead>Phase</TableHead><TableHead>File</TableHead><TableHead>Status</TableHead><TableHead align="end">Actions</TableHead></TableRow></TableHeader>
+      {rows.length > 0 ? <DataTable framed={false} density="compact" minWidth={720} className="table-fixed">
+        <TableHeader><TableRow><TableHead style={{ width: "26%" }}>Phase</TableHead><TableHead style={{ width: "40%" }}>File</TableHead><TableHead style={{ width: "18%" }}>Status</TableHead><TableHead style={{ width: "16%" }} align="end">Actions</TableHead></TableRow></TableHeader>
         <TableBody>
         {rows.map(({ phase, deliverables, canWork }) => (
           <DeliverablesPanel

@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.159 | 2026-10-19 | ui(tables): balance operational column widths
+
+- **Table scan:** Master Data Brands and StudioFlow Deliverables now declare balanced fixed-table column proportions. The primary name/file column no longer expands into unused workspace while categories, status, metadata, and actions remain readable.
+- **Scope:** this is a shared-table usage convention, not Excel-like user-resizing or stored per-user width preferences.
+- **Verification limit:** type checking and touched-file lint pass. Browser acceptance is queued; no browser PASS is claimed.
+
 ## R9.158 | 2026-10-19 | ui(studioflow): show Deliverables as a phase table
 
 - **Deliverables:** the project tab now uses one compact row per phase: phase, current private file, compliance status, and available actions. It follows the legacy scan pattern instead of stacking one card per phase.
