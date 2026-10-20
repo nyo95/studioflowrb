@@ -38,7 +38,7 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 
 ## Platform Foundation
 
-- [ ] [PLANNED] WO-PLATFORM-FORCE-DELETE-01 (active `PLAN.md`): Platform Owner deletes a user permanently.
+- [ ] [UNVERIFIED] WO-PLATFORM-FORCE-DELETE-01 (R9.165): Platform Owner deletes a user permanently. Browser walk still owed: Users → ⋯ → Delete permanently on a test user, wrong name refused, your own row has no Delete, a project/BQ the user created still opens and names them or shows "Deleted user".
 - [ ] [PLANNED] Platform Owner force delete, later slices (one plan per module, each with its cascade spelled out for the owner before READY): roles; StudioFlow clients and projects (today archive only); Master Data units, categories, vendors, brands, SKUs, prices (today archive or the approval-based deletion request, and many `Restrict` links, e.g. a unit used by SKUs); BQ projects (today a deletion request). BQ library, StudioFlow templates/MOM/schedule items and samples already have delete.
 
 - [ ] [PLANNED] WO-DEVELOPER-02 updates from GitHub releases: the console shows "version X available", **Install** backs up the database, installs, migrates, rebuilds, restarts, and rolls back on failure (owner 2026-10-10, D10). It must refuse an older application over a newer database; rollback restores the pre-upgrade backup together with its code and never trusts the display-only `module_state.last_version`. Needs first: how the office server runs the app (manual `npm run start`, a Windows service, pm2, ...) and the release format.

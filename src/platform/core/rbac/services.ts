@@ -198,6 +198,7 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
   }
 
   const USER_PERMISSION = "platform.user.manage" as const;
+  const USER_DELETE_PERMISSION = "platform.user.delete" as const;
   const ROLE_PERMISSION = "platform.role.manage" as const;
 
   function userActorContext(actor: AuditActor): void {
@@ -559,6 +560,54 @@ export function createPlatformAccessService(ports: PlatformAccessPorts) {
           changes: { status: { from: "DISABLED", to: "ACTIVE" } },
         });
         return { changed: true };
+      });
+    },
+
+    /**
+     * Permanently deletes a user (owner decision 2026-10-20). Removes only the
+     * person's own platform data — sessions, role assignments, preferences,
+     * tutorials, integration tokens, notifications. Business records in apps
+     * hold plain user ids (no FK) and stay; readers render "Deleted user".
+     * Messenger history is shared with the other participant and is kept.
+     * Refuses self-deletion and removing the last Platform Owner; the typed
+     * display name must match.
+     */
+    async deleteUser(input: { grants: PermissionGrants; actor: AuditActor; userId: string; confirmName: string }) {
+      requirePermission(input.grants, USER_DELETE_PERMISSION);
+      userActorContext(input.actor);
+      if (input.actor.kind === "USER" && input.actor.userId === input.userId) {
+        throw new AppError("CONFLICT", "USER_DELETE_SELF", "You cannot delete your own account.");
+      }
+      return runTransaction(async (tx) => {
+        const user = await tx.user.findUnique({
+          where: { id: input.userId },
+          select: { id: true, email: true, display_name: true, status: true },
+        });
+        if (!user) throw new AppError("NOT_FOUND", "USER_NOT_FOUND", "This user no longer exists.");
+        if (input.confirmName.trim().toLowerCase() !== user.display_name.trim().toLowerCase()) {
+          throw new AppError("VALIDATION", "USER_DELETE_CONFIRM_MISMATCH", "Type the user's name exactly to confirm.");
+        }
+        await requireChangeKeepsAccessAdministrator(tx, {
+          affectedUserIds: [user.id],
+          simulate: async () => false,
+        });
+        const tokens = await tx.integrationToken.findMany({ where: { user_id: user.id }, select: { id: true } });
+        const tokenIds = tokens.map((token) => token.id);
+        if (tokenIds.length) await tx.integrationRequest.deleteMany({ where: { token_id: { in: tokenIds } } });
+        await tx.integrationToken.deleteMany({ where: { user_id: user.id } });
+        await tx.session.deleteMany({ where: { user_id: user.id } });
+        await tx.userRole.deleteMany({ where: { user_id: user.id } });
+        await tx.notification.deleteMany({ where: { recipient_user_id: user.id } });
+        await tx.user.delete({ where: { id: user.id } });
+        await writeAudit(tx, {
+          appId: "platform",
+          action: "user.delete",
+          entityType: "user",
+          entityId: user.id,
+          actor: input.actor,
+          metadata: { email: user.email, displayName: user.display_name, status: user.status },
+        });
+        return { deleted: true as const };
       });
     },
 

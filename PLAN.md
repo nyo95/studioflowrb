@@ -5,7 +5,7 @@ Scope: Platform Owner can permanently delete a user account (first slice of the 
 Module(s): Platform (core RBAC/access, Settings → Access → Users).
 Target revision: R9.165 (this plan is R9.164; R9.163 is claimed by the unmerged remote branch `claude/r9-163-timeline-fixes`; re-check `CHANGELOG.md` and use the next unused number if that changed).
 Risk: high - irreversible destructive operation on the identity table; lockout risk; touches every reader that resolves a user id to a name.
-Status: READY
+Status: DONE in R9.165 — browser acceptance pending (BACKLOG [UNVERIFIED])
 Priority: P1
 Owner: Product Owner (decisions 2026-10-20)
 Last updated: 2026-10-20

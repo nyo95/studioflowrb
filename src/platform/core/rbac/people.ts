@@ -22,9 +22,14 @@ export type PersonSummary = {
 export type PeopleDirectory = {
   /** Active users holding `permissionId` through at least one live role, ordered by name. */
   listHolders(permissionId: string): Promise<PersonSummary[]>;
-  /** Resolves stored ids (including disabled users) for historical display. */
+  /**
+   * Resolves stored ids for historical display: disabled users keep their
+   * name; a permanently deleted user resolves to `DELETED_USER_NAME`.
+   */
   resolve(userIds: readonly string[]): Promise<PersonSummary[]>;
 };
+
+export const DELETED_USER_NAME = "Deleted user";
 
 export function createPeopleDirectory(db: PrismaClient): PeopleDirectory {
   return {
@@ -50,7 +55,8 @@ export function createPeopleDirectory(db: PrismaClient): PeopleDirectory {
         where: { id: { in: ids } },
         select: { id: true, display_name: true, status: true },
       });
-      return rows.map((row) => ({ id: row.id, displayName: row.display_name, active: row.status === "ACTIVE" }));
+      const found = new Map(rows.map((row) => [row.id, { id: row.id, displayName: row.display_name, active: row.status === "ACTIVE" }]));
+      return ids.map((id) => found.get(id) ?? { id, displayName: DELETED_USER_NAME, active: false });
     },
   };
 }

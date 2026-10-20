@@ -13,6 +13,7 @@ import { Button,Checkbox,ConfirmDialog,DataTable,EmptyState,EntityPrimaryCell,Fi
 import {
 assignRoleAction,
 createUserAction,
+deleteUserAction,
 disableUserAction,
 removeRoleAction,
 restoreUserAction,
@@ -35,22 +36,28 @@ export function UsersDirectory({
   roles,
   canManage,
   canAssignRoles,
+  canDelete,
+  currentUserId,
 }: {
   users: UserRow[];
   roles: RoleOption[];
   canManage: boolean;
   canAssignRoles: boolean;
+  canDelete: boolean;
+  currentUserId: string;
 }) {
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<UserRow | null>(null);
   const [passwordTarget, setPasswordTarget] = useState<UserRow | null>(null);
   const [confirmDisable, setConfirmDisable] = useState<UserRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
   const [confirmRemoveRole, setConfirmRemoveRole] = useState<{ user: UserRow; roleId: string; roleName: string } | null>(null);
   const { pendingId, rowError, runRowAction } = useRowAction();
 
   const [createState, createAction, createPending] = useActionState(async (previous: Parameters<typeof createUserAction>[0], data: FormData) => { const result = await createUserAction(previous, data); if (result.ok) { setCreateOpen(false); } return result; }, null);
   const [editState, editAction, editPending] = useActionState(async (previous: Parameters<typeof updateUserDisplayNameAction>[0], data: FormData) => { const result = await updateUserDisplayNameAction(previous, data); if (result.ok) { setEditTarget(null); } return result; }, null);
+  const [deleteState, deleteAction, deletePending] = useActionState(async (previous: Parameters<typeof deleteUserAction>[0], data: FormData) => { const result = await deleteUserAction(previous, data); if (result.ok) { setDeleteTarget(null); } return result; }, null);
   const [passwordState, passwordAction, passwordPending] = useActionState(async (previous: Parameters<typeof setUserPasswordAction>[0], data: FormData) => { const result = await setUserPasswordAction(previous, data); if (result.ok) { setPasswordTarget(null); } return result; }, null);
 
 
@@ -109,7 +116,8 @@ return (
                 </TableCell>
                 <TableCell align="end" stickyEnd><div className="flex items-center justify-end gap-2"><RowActionMenu label={`Actions for ${user.displayName}`} pending={pendingId === user.id} items={canManage ? [
  {label:"Edit",onSelect:()=>setEditTarget(user)}, {label:"Password",onSelect:()=>setPasswordTarget(user)},
- user.status === "ACTIVE" ? {label:"Disable",danger:true,separatorBefore:true,onSelect:()=>setConfirmDisable(user)} : {label:"Restore",onSelect:()=>runRowAction(user.id,()=>restoreUserAction(user.id))}
+ user.status === "ACTIVE" ? {label:"Disable",danger:true,separatorBefore:true,onSelect:()=>setConfirmDisable(user)} : {label:"Restore",onSelect:()=>runRowAction(user.id,()=>restoreUserAction(user.id))},
+ ...(canDelete && user.id !== currentUserId ? [{label:"Delete permanently",danger:true,onSelect:()=>setDeleteTarget(user)}] : []),
  ] : []} />{canAssignRoles && roles.length > 0 ? (
                       <RoleAssignControl
                         user={user}
@@ -212,6 +220,28 @@ return (
               <Button type="submit" variant="primary" pending={passwordPending}>
                 {passwordPending ? <Spinner aria-hidden="true" /> : null}
                 <span>Set password</span>
+              </Button>
+            </FormActions>
+          </form>
+        ) : null}
+      </DraftDialog>
+
+      {/* Permanent deletion: typed-name confirmation */}
+      <DraftDialog pending={deletePending} open={deleteTarget !== null} onOpenChange={() => setDeleteTarget(null)} title={`Delete ${deleteTarget?.displayName ?? "user"} permanently?`} description="The account, its sign-ins, roles and notifications are removed and cannot be restored. Projects, notes and other work this person did stay, under their name." size="sm">
+        {deleteTarget ? (
+          <form action={deleteAction}>
+            <input type="hidden" name="userId" value={deleteTarget.id} />
+            <Field id="delete-confirm-name" label={`Type "${deleteTarget.displayName}" to confirm`}>
+              <Input id="delete-confirm-name" name="confirmName" required autoComplete="off" />
+            </Field>
+            {deleteState?.ok === false ? <InlineError>{deleteState.error.safeMessage}</InlineError> : null}
+            <FormActions>
+              <Button type="button" variant="ghost" onClick={() => setDeleteTarget(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" variant="danger" pending={deletePending}>
+                {deletePending ? <Spinner aria-hidden="true" /> : null}
+                <span>Delete permanently</span>
               </Button>
             </FormActions>
           </form>

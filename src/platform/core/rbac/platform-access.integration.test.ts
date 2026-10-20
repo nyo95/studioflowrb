@@ -13,6 +13,7 @@ import {
 } from "../db/test-support";
 import { getPermissionRegistry, initializePermissionRegistry, PLATFORM_PERMISSIONS, resetPermissionRegistryForTests } from "./registry";
 import { createPlatformAccessService, loadLiveGrants, type PlatformAccessService } from "./services";
+import { createPeopleDirectory, DELETED_USER_NAME } from "./people";
 import { hashPassword } from "../auth/password";
 
 /**
@@ -583,5 +584,103 @@ describe("transactional audit", () => {
     assert.equal(await auditCount(), before);
     assert.equal(await db.prisma.role.findUnique({ where: { code: "doomed" } }), null);
     void role;
+  });
+});
+
+describe("permanent user deletion (owner decision 2026-10-20)", () => {
+  const DELETE_GRANTS = ["platform.user.delete"];
+
+  async function seedPersonalData(userId: string) {
+    const token = await db.prisma.integrationToken.create({ data: {
+      user_id: userId, label: "Plugin", token_prefix: "sf_x", token_hash: crypto.randomUUID(), scopes: ["ping"],
+    } });
+    await db.prisma.integrationRequest.create({ data: {
+      token_id: token.id, key: "k1", method_path: "POST /ping", request_hash: "h", status: "DONE",
+    } });
+    await db.prisma.session.create({ data: { token_hash: crypto.randomUUID().replace(/-/g, "").padEnd(64, "0"), user_id: userId, last_seen_at: new Date(), idle_expires_at: new Date(Date.now() + 1000), absolute_expires_at: new Date(Date.now() + 2000) } });
+    await db.prisma.userPreference.create({ data: { user_id: userId, theme: "dark" } });
+    await db.prisma.userTutorial.create({ data: { user_id: userId, tour_key: "intro", version: 1, state: "completed" } });
+    await db.prisma.notification.create({ data: { recipient_user_id: userId, app_id: "platform", kind: "test", title: "Hi" } });
+  }
+
+  it("removes the account and its personal data, keeps shared history, and audits", async () => {
+    const owner = await seedOwner("owner-del@example.com", "Owner");
+    const { user: target } = await seedAdmin("target-del@example.com", "Target Person", ["masterdata.access"]);
+    await seedPersonalData(target.id);
+    const conversation = await db.prisma.messengerConversation.create({ data: {
+      pair_key: [owner.user.id, target.id].sort().join(":"),
+      participants: { create: [{ user_id: owner.user.id }, { user_id: target.id }] },
+      messages: { create: [{ author_user_id: target.id, body: "hello" }] },
+    } });
+    const actor = { kind: "USER" as const, userId: owner.user.id, label: "Owner" };
+
+    const result = await service.deleteUser({ grants: DELETE_GRANTS, actor, userId: target.id, confirmName: "  target person " });
+    assert.deepEqual(result, { deleted: true });
+
+    assert.equal(await db.prisma.user.findUnique({ where: { id: target.id } }), null);
+    assert.equal(await db.prisma.session.count({ where: { user_id: target.id } }), 0);
+    assert.equal(await db.prisma.userRole.count({ where: { user_id: target.id } }), 0);
+    assert.equal(await db.prisma.integrationToken.count({ where: { user_id: target.id } }), 0);
+    assert.equal(await db.prisma.integrationRequest.count(), 0);
+    assert.equal(await db.prisma.userPreference.count({ where: { user_id: target.id } }), 0);
+    assert.equal(await db.prisma.userTutorial.count({ where: { user_id: target.id } }), 0);
+    assert.equal(await db.prisma.notification.count({ where: { recipient_user_id: target.id } }), 0);
+    assert.equal(await db.prisma.messengerMessage.count({ where: { conversation_id: conversation.id } }), 1);
+
+    const audit = await db.prisma.auditEvent.findFirst({ where: { action: "user.delete", entity_id: target.id } });
+    assert.notEqual(audit, null);
+    assert.equal(audit?.actor_user_id, owner.user.id);
+
+    const people = await createPeopleDirectory(db.prisma).resolve([target.id, owner.user.id]);
+    assert.deepEqual(people.find((person) => person.id === target.id), { id: target.id, displayName: DELETED_USER_NAME, active: false });
+    assert.equal(people.find((person) => person.id === owner.user.id)?.displayName, "Owner");
+
+    await assert.rejects(
+      () => service.deleteUser({ grants: DELETE_GRANTS, actor, userId: target.id, confirmName: "Target Person" }),
+      (error: unknown) => error instanceof AppError && error.code === "USER_NOT_FOUND",
+    );
+  });
+
+  it("deletes a disabled user too", async () => {
+    const owner = await seedOwner("owner-dis@example.com", "Owner");
+    const { user } = await seedAdmin("disabled-del@example.com", "Gone", ["masterdata.access"]);
+    await db.prisma.user.update({ where: { id: user.id }, data: { status: "DISABLED", disabled_at: new Date() } });
+    await service.deleteUser({ grants: DELETE_GRANTS, actor: { kind: "USER", userId: owner.user.id, label: "Owner" }, userId: user.id, confirmName: "Gone" });
+    assert.equal(await db.prisma.user.findUnique({ where: { id: user.id } }), null);
+  });
+
+  it("refuses self-deletion, a wrong name, the last Platform Owner, and a caller without the delete permission", async () => {
+    const owner = await seedOwner("owner-guard@example.com", "Owner");
+    const { user: other } = await seedAdmin("other-guard@example.com", "Other", ["masterdata.access"]);
+    const ownerActor = { kind: "USER" as const, userId: owner.user.id, label: "Owner" };
+    const otherActor = { kind: "USER" as const, userId: other.id, label: "Other" };
+    const before = await auditCount();
+
+    await assert.rejects(
+      () => service.deleteUser({ grants: DELETE_GRANTS, actor: ownerActor, userId: owner.user.id, confirmName: "Owner" }),
+      (error: unknown) => error instanceof AppError && error.code === "USER_DELETE_SELF",
+    );
+    await assert.rejects(
+      () => service.deleteUser({ grants: DELETE_GRANTS, actor: ownerActor, userId: other.id, confirmName: "Othe" }),
+      (error: unknown) => error instanceof AppError && error.code === "USER_DELETE_CONFIRM_MISMATCH",
+    );
+    await assert.rejects(
+      () => service.deleteUser({ grants: DELETE_GRANTS, actor: otherActor, userId: owner.user.id, confirmName: "Owner" }),
+      (error: unknown) => error instanceof AppError && error.code === "LAST_ACCESS_ADMINISTRATOR",
+    );
+    await assert.rejects(
+      () => service.deleteUser({ grants: ["platform.user.manage"], actor: ownerActor, userId: other.id, confirmName: "Other" }),
+      (error: unknown) => error instanceof AppError && error.code === "PERMISSION_DENIED",
+    );
+
+    assert.equal(await db.prisma.user.count(), 2);
+    assert.equal(await auditCount(), before);
+  });
+
+  it("deletes a Platform Owner when another active owner remains", async () => {
+    const first = await seedOwner("owner-a@example.com", "Owner A");
+    const second = await seedOwner("owner-b@example.com", "Owner B", first.role.id);
+    await service.deleteUser({ grants: DELETE_GRANTS, actor: { kind: "USER", userId: first.user.id, label: "Owner A" }, userId: second.user.id, confirmName: "Owner B" });
+    assert.equal(await db.prisma.user.findUnique({ where: { id: second.user.id } }), null);
   });
 });

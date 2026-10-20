@@ -23,6 +23,7 @@ export const PLATFORM_PERMISSIONS = [
   "platform.settings.manage",
   "platform.user.read",
   "platform.user.manage",
+  "platform.user.delete",
   "platform.role.read",
   "platform.role.manage",
   "platform.audit.read",

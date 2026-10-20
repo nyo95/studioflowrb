@@ -58,6 +58,8 @@ export default async function UsersPage() {
             roles={groupAndOrderRoles(roles, getPermissionRegistry())}
             canManage={grants.includes("platform.user.manage")}
             canAssignRoles={grants.includes("platform.role.manage")}
+            canDelete={grants.includes("platform.user.delete")}
+            currentUserId={principalGrants.principal.userId}
           />
         )}
       </SettingsShell>

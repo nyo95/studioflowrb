@@ -108,6 +108,30 @@ export async function disableUserAction(userId: string): Promise<ActionResult<{ 
   });
 }
 
+export async function deleteUserAction(
+  _prev: ActionResult<{ deleted: true }> | null,
+  formData: FormData,
+): Promise<ActionResult<{ deleted: true }>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z
+      .object({ userId: z.string().uuid(), confirmName: z.string().max(200) })
+      .safeParse({
+        userId: String(formData.get("userId") ?? ""),
+        confirmName: String(formData.get("confirmName") ?? ""),
+      });
+    if (!parsed.success) throw validationError(parsed.error);
+    const result = await platformAccess.deleteUser({
+      grants,
+      actor: { kind: "USER", userId: principal.userId, label: principal.displayName },
+      userId: parsed.data.userId,
+      confirmName: parsed.data.confirmName,
+    });
+    revalidateUsers();
+    return result;
+  });
+}
+
 export async function restoreUserAction(userId: string): Promise<ActionResult<{ changed: boolean }>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();

@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.165 | 2026-10-20 | feat(platform): let the Platform Owner delete users permanently (Lead)
+
+- **Work order:** `WO-PLATFORM-FORCE-DELETE-01`, implemented by the Lead on owner instruction ("takeover aja") instead of the Executor.
+- **Behavior:** new Platform-Owner-only permission `platform.user.delete`. `platformAccess.deleteUser` removes the user plus their sessions, role assignments, integration tokens and their idempotency requests, notifications, preferences and tutorials in one transaction, and writes a `user.delete` audit event carrying the deleted email/name. It refuses self-deletion (`USER_DELETE_SELF`), a typed name that does not match (trimmed, case-insensitive; `USER_DELETE_CONFIRM_MISMATCH`), the last active Platform Owner (`LAST_ACCESS_ADMINISTRATOR`), and callers holding only `platform.user.manage`. Works for active and disabled users.
+- **Kept data:** app records store plain user ids with no FK and are untouched. `PeopleDirectory.resolve` now returns `{ displayName: "Deleted user", active: false }` for an id with no user, so every app reader (StudioFlow names, BQ creators) shows that instead of a raw id; Messenger's fallback reads "Deleted user". **Deviation from the plan:** Messenger participant rows and messages are kept, not removed, so the other person's conversation history stays intact.
+- **UI:** Users row menu gains "Delete permanently" (only with the permission, never on your own row) opening a dialog that requires typing the user's name.
+- **Migrations:** none.
+- **Checks:** RBAC integration + unit suites 49/49 including four new deletion tests (personal-data removal, kept messages, audit, "Deleted user" resolution, repeat delete → not found; disabled user; owner-to-owner; every refusal rolls back with no audit). High gate (`STUDIOFLOW_LOCATION=kantor node scripts/verify.mjs --tier high`, kantor test DB): boundaries, legacy-runtime, whitespace, typecheck, lint, `npm test` 1245/1245, Prisma generate, production build PASS. The first run failed one bootstrap test that hard-coded 10 platform permissions; it now asserts `PLATFORM_PERMISSIONS.length`. e2e not run; browser walk is the owner's ([UNVERIFIED] in BACKLOG).
+
 ## R9.164 | 2026-10-20 | plan(platform): authorize Platform Owner user deletion
 
 - **Work order:** `WO-PLATFORM-FORCE-DELETE-01` is READY for R9.165: a Platform-Owner-only `platform.user.delete` permanently deletes a user with a typed-name confirm, removes only their personal platform data, and keeps every business record they authored under their snapshotted name or "Deleted user".

@@ -1,4 +1,5 @@
 import { AppError } from "@platform/core/errors";
+import { DELETED_USER_NAME } from "@platform/core/rbac/people";
 import { createPrivateObjectKey, type ObjectStorage } from "@platform/core/storage";
 import type { PrismaClient } from "@/generated/prisma/client";
 
@@ -114,7 +115,7 @@ export function createMessengerService(db: Db, storage: ObjectStorage, options: 
     return {
       id: message.id,
       authorUserId: message.author_user_id,
-      authorName: userById.get(message.author_user_id) ?? "Unknown user",
+      authorName: userById.get(message.author_user_id) ?? DELETED_USER_NAME,
       body: message.body,
       createdAt: message.created_at,
       attachments: await Promise.all((message as typeof message & { attachments?: Array<{
@@ -194,7 +195,7 @@ export function createMessengerService(db: Db, storage: ObjectStorage, options: 
         const last = row.conversation.messages[0] ?? null;
         rows.push({
           id: row.conversation_id,
-          otherUser: { id: otherId, displayName: other?.display_name ?? "Unknown user", active: other?.status === "ACTIVE" },
+          otherUser: { id: otherId, displayName: other?.display_name ?? DELETED_USER_NAME, active: other?.status === "ACTIVE" },
           lastMessage: last?.body ?? (last?.attachments.length ? "Attachment" : ""),
           lastMessageAt: last?.created_at ?? null,
           unread: await db.messengerMessage.count({
