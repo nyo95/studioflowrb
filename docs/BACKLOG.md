@@ -30,8 +30,16 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
   and links ids but does not create the SKU or price. **Changed by the owner
   2026-10-07:** putting a requested sample on the shelf in Master Data does mark
   the StudioFlow request received (WO-MD-SAMPLE-01); "priced" still does not.
+- Platform Owner force delete (owner, 2026-10-20): the Platform Owner can
+  permanently delete everything, and the delete removes linked data (a trash bin
+  and delete-only-when-unused were declined). Lockout guards stay (no self-delete,
+  not the last Platform Owner). Deleting a user removes only their personal data;
+  the business work they authored is kept under their name.
 
 ## Platform Foundation
+
+- [ ] [PLANNED] WO-PLATFORM-FORCE-DELETE-01 (active `PLAN.md`): Platform Owner deletes a user permanently.
+- [ ] [PLANNED] Platform Owner force delete, later slices (one plan per module, each with its cascade spelled out for the owner before READY): roles; StudioFlow clients and projects (today archive only); Master Data units, categories, vendors, brands, SKUs, prices (today archive or the approval-based deletion request, and many `Restrict` links, e.g. a unit used by SKUs); BQ projects (today a deletion request). BQ library, StudioFlow templates/MOM/schedule items and samples already have delete.
 
 - [ ] [PLANNED] WO-DEVELOPER-02 updates from GitHub releases: the console shows "version X available", **Install** backs up the database, installs, migrates, rebuilds, restarts, and rolls back on failure (owner 2026-10-10, D10). It must refuse an older application over a newer database; rollback restores the pre-upgrade backup together with its code and never trusts the display-only `module_state.last_version`. Needs first: how the office server runs the app (manual `npm run start`, a Windows service, pm2, ...) and the release format.
 - [ ] [UNVERIFIED] Add item "From a past project" (R8.458): the search box, the empty result and the toggle were walked in the browser on the local database, which has one project, so no hit could be chosen. Still to walk with two projects: pick a hit (section and category switch to the hit's, the product shows as a summary, Remove returns to the normal fields), Save creates the item and copies the product with its photo and notes, and a failure after the item is created leaves the item without the copy.

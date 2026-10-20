@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.164 | 2026-10-20 | plan(platform): authorize Platform Owner user deletion
+
+- **Work order:** `WO-PLATFORM-FORCE-DELETE-01` is READY for R9.165: a Platform-Owner-only `platform.user.delete` permanently deletes a user with a typed-name confirm, removes only their personal platform data, and keeps every business record they authored under their snapshotted name or "Deleted user".
+- **Owner decisions (2026-10-20):** Platform Owner force delete for everything (trash bin and delete-only-when-unused declined); lockout guards kept (no self-delete, not the last Platform Owner). Recorded as a BACKLOG standing decision; later per-module slices queued as `[PLANNED]`.
+- **Plans:** the previous active plan `WO-REL-READINESS-01` is parked unchanged in `docs/agent/queued-plans/`.
+- **Checks:** documentation only; no code or schema changed.
+
 ## R9.162 | 2026-10-19 | fix(studioflow): close Lead takeover review findings (Lead)
 
 - **Access (security, defence in depth):** `getPhaseDetail` (it returns the phase's private notes) and `listDeliverables` (it signs private file URLs) now take the caller and reuse `requireProjectDetailAccess`, the same assigned-team-or-manager rule R9.134 applied to Notes reads. Pages already redirected outsiders; the services now refuse too, before any URL is signed. All four page callers pass the signed-in user.
