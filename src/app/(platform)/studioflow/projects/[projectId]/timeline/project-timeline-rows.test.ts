@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import { LEGACY_PHASE_DEFINITION_IDS as D } from "@/apps/studioflow/domain/phase";
 
-import { buildProjectTimelineRows, type PhaseInput, type Plan, type ProjectInput } from "./project-timeline-rows";
+import { buildProjectTimelineRows, parseLeadDays, type PhaseInput, type Plan, type ProjectInput } from "./project-timeline-rows";
 
 const milestones = { designFinal: "2026-10-12", cdMallStart: "2026-10-12", cdFinalStart: "2026-10-19", end: "2026-10-26", fitOutStart: "2026-11-02", handover: "2026-12-28", openingForecast: "2027-01-11" };
 const plan = (over: Partial<Plan> = {}): Plan => ({ fitOutStartDate: "2026-11-02", designHandoverDate: "2026-12-28", intervals: { cdMall: 0, cdFinal: 5, gap: 5, fitOutToHandover: 40, handoverToOpening: 10 }, overrides: null, milestones, endPlanned: "2026-10-26", endActual: null, suggestedFitOutStart: null, warnings: [], ...over });
@@ -27,6 +27,21 @@ describe("project timeline rows", () => {
     const cd = buildProjectTimelineRows(project, phases(), plan()).find((row) => row.id === "c")!;
     assert.deepEqual(cd.bars.map((bar) => [bar.label, bar.start, bar.end]), [["CD Mall", "2026-10-12", "2026-10-18"], ["CD Final", "2026-10-19", "2026-10-26"]]);
     assert.equal(cd.subtitle, "Dates from the plan");
+  });
+
+  it("draws one Construction Drawing bar when CD Mall is zero days, never an artificial CD Mall day", () => {
+    const zero = { ...milestones, cdMallStart: "2026-10-19", designFinal: "2026-10-19" };
+    const cd = buildProjectTimelineRows(project, [phase("c", D.cd, "Construction Drawing", "2026-10-19", "2026-10-26")], plan({ milestones: zero })).find((row) => row.id === "c")!;
+    assert.deepEqual(cd.bars.map((bar) => [bar.label, bar.start, bar.end]), [["Construction Drawing", "2026-10-19", "2026-10-26"]]);
+  });
+
+  it("accepts 0 only for CD Mall when reading a lead-time field", () => {
+    assert.equal(parseLeadDays("cdMall", "0"), 0);
+    assert.equal(parseLeadDays("cdMall", " "), null);
+    assert.ok(Number.isNaN(parseLeadDays("cdFinal", "0")));
+    assert.ok(Number.isNaN(parseLeadDays("cdMall", "261")));
+    assert.ok(Number.isNaN(parseLeadDays("gap", "-1")));
+    assert.equal(parseLeadDays("gap", "7"), 7);
   });
 
   it("keeps one bar and says so when the dates were set by hand", () => {

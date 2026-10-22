@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.191 | 2026-10-22 | fix(studioflow): zero-day CD Mall and Design Handover-only plan editing (port of branch claude/r9-163-timeline-fixes) (Lead)
+
+- **Source:** remote branch `claude/r9-163-timeline-fixes` (`819f0c3`, `836b035`), written 2026-10-19 as "R9.163/R9.164" but never merged; main later used those numbers for other work, so the code is carried over here under the next free revision. Owner asked to merge every remote branch that still needed it.
+- **Gantt:** with CD Mall = 0 the Construction Drawing bar no longer splits into an invented one-day CD Mall bar; it splits only when CD Mall has at least one day.
+- **Dates & plan:** the CD Mall lead-time field accepts 0 like the server does (`parseLeadDays`, one rule for field and message); "Back to the plan" follows whether the project has a plan (Design Handover or Fit Out Start), not only Fit Out Start.
+- **Browser backlog:** the branch's acceptance item is added as `[R9.191]`.
+- **Other remote branches:** `review/r8.502-r8.504` and `codex/harden-audit-01` are fully in main; `claude/modules-scope-reset` content (module Purpose, runbook, downgrade rule) already landed on main through other revisions, so it is not merged. Branches left on GitHub (deleting them was not asked).
+- **Also committed:** `next-env.d.ts` as `next dev` rewrites it (AGENTS.md: committing keeps the tree clean).
+- **Checks:** `project-timeline-rows.test.ts` 8/8; `tsc --noEmit` clean; eslint clean on the timeline paths; `npm test` 1295/1295 pass.
+
 ## R9.190 | 2026-10-22 | fix(sketchup): item list ranks titles by initials; Ruby syntax checked (Lead)
 
 - **Check (owner-approved Docker, official `ruby:3.2-slim`, Ruby 3.2.11 like SketchUp 2026):** `ruby -wc` on all 19 plugin files: Syntax OK, no warnings. Pure rules exercised: SO-1 / SO-001 / so-01 / " SO - 01 " are one code key; Material12 and "PL-01 copy" are not codes; item labels; list-safe text.

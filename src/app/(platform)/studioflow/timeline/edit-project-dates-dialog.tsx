@@ -6,7 +6,7 @@ import { Button, DraftDialog, Field, FormActions, InlineError, Input, Notice, Te
 
 import { applyProjectPlanAction, getProjectPlanEditorAction, resetPhasePlannedDatesAction, setDesignHandoverAction, setPlanOverridesAction, setProjectDatesAction } from "../actions";
 import { useCommand } from "../_components/use-command";
-import { PLANNED_DEFINITIONS, type Intervals, type Plan } from "../projects/[projectId]/timeline/project-timeline-rows";
+import { PLANNED_DEFINITIONS, parseLeadDays, type Intervals, type Plan } from "../projects/[projectId]/timeline/project-timeline-rows";
 import type { TimelineProject } from "./timeline-directory";
 
 type PlanResult = {
@@ -71,7 +71,7 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
     return () => { live = false; };
   }, [project.id]);
 
-  const parsed = (key: keyof Intervals) => (lead[key].trim() === "" ? null : /^\d+$/.test(lead[key].trim()) && Number(lead[key]) >= 1 && Number(lead[key]) <= 260 ? Number(lead[key]) : Number.NaN);
+  const parsed = (key: keyof Intervals) => parseLeadDays(key, lead[key]);
   const leadInvalid = INTERVAL_FIELDS.some(([key]) => Number.isNaN(parsed(key)));
   // Only a value that differs from the studio default is stored, so a later change of the default still reaches this project.
   const nextOverrides = editor
@@ -140,7 +140,7 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
           {loadError ? <InlineError>{loadError}</InlineError> : null}
           <div className="grid grid-cols-3 gap-3 max-[560px]:grid-cols-2">
             {INTERVAL_FIELDS.map(([key, label]) => (
-              <Field key={key} label={label} description={editor ? `Studio default ${editor.studioDefaults[key]}` : "Loading…"} error={Number.isNaN(parsed(key)) ? "Whole number from 1 to 260, or empty." : undefined}>
+              <Field key={key} label={label} description={editor ? `Studio default ${editor.studioDefaults[key]}` : "Loading…"} error={Number.isNaN(parsed(key)) ? `Whole number from ${key === "cdMall" ? 0 : 1} to 260, or empty.` : undefined}>
                 <Input type="number" inputMode="numeric" min={0} max={260} step={1} placeholder={editor ? String(editor.studioDefaults[key]) : ""} value={lead[key]} disabled={!editor || pending} onChange={(event) => setLead((current) => ({ ...current, [key]: event.target.value }))} />
               </Field>
             ))}
@@ -154,7 +154,7 @@ export function EditProjectDatesDialog({ project, onClose }: { project: Timeline
             {manualPlanned.map((phase) => (
               <div key={phase.id} className="flex items-center justify-between gap-3 border-t border-line-subtle py-1.5">
                 <Text size="sm">{phase.label} · {phase.plannedStartDate ?? "?"} – {phase.plannedEndDate ?? "?"}</Text>
-                <Button type="button" size="sm" variant="ghost" disabled={!editor?.plan.fitOutStartDate || pending} pending={pendingKey === `reset:${phase.id}`} onClick={() => void backToPlan(phase.id)}>Back to the plan</Button>
+                <Button type="button" size="sm" variant="ghost" disabled={!editor?.plan.milestones || pending} pending={pendingKey === `reset:${phase.id}`} onClick={() => void backToPlan(phase.id)}>Back to the plan</Button>
               </div>
             ))}
           </div>

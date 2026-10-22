@@ -32,6 +32,14 @@ Mark each item PASS or FAIL. A FAIL opens a new correction plan.
 
 ## Pending
 
+### [R9.191] Dates & plan: zero-day CD Mall and Design Handover-only plan
+- Surface: Timeline → project row → Dates & plan; project Timeline tab (Gantt)
+- Fixture: a Designer-PIC project with Design Handover set, no Fit Out Start, Construction Drawing dates still from the plan; studio CD Mall default 0
+- Viewport: desktop (default)
+- Steps: 1. Open Dates & plan and confirm no field shows an error with CD Mall empty. 2. Enter 0 in CD Mall, then 3 in CD Final; confirm Save and Save and apply plan stay enabled, and entering 0 in CD Final shows "Whole number from 1 to 260, or empty." 3. Save and apply plan, open the project Timeline tab. 4. Set a Construction Drawing date by hand, reopen Dates & plan, and use Back to the plan. 5. Set CD Mall to 3 and apply.
+- Acceptance: with CD Mall 0 the Gantt shows one Construction Drawing bar and no "CD Mall" bar; Back to the plan is enabled and restores the plan dates although Fit Out Start is empty; with CD Mall 3 the bar splits into CD Mall and CD Final; Table milestones match the Dates & plan summary.
+- Status: PENDING
+
 ### [R9.162] Lead takeover corrections: Timeline milestones, Deliverables, phase names
 - Surface: StudioFlow → Timeline (Table and Gantt); project → Deliverables; project → Phases strip; project → Timeline tab
 - Fixture: a project with Design Handover set and a cdFinal override; a project with no anchor; a project whose first phase is active and later phases not started; a non-assigned staff reader

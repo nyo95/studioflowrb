@@ -21,6 +21,14 @@ export type ProjectInput = { id: string; name: string; client: { id: string; nam
 
 export const PLANNED_DEFINITIONS: ReadonlySet<string> = new Set([DEFS.design3d, DEFS.cd, DEFS.supervision]);
 
+/** A lead-time field: empty = studio default (null), otherwise whole days 1–260 (CD Mall may be 0, as the server allows); NaN when invalid. */
+export function parseLeadDays(key: keyof Intervals, text: string): number | null {
+  const value = text.trim();
+  if (value === "") return null;
+  const n = /^\d+$/.test(value) ? Number(value) : Number.NaN;
+  return n >= (key === "cdMall" ? 0 : 1) && n <= 260 ? n : Number.NaN;
+}
+
 const dayBefore = (date: string) => dateOfDay(dayNumber(date) - 1);
 
 export function buildProjectTimelineRows(project: ProjectInput, phases: PhaseInput[], plan: Plan): GanttRowData[] {
@@ -38,8 +46,8 @@ export function buildProjectTimelineRows(project: ProjectInput, phases: PhaseInp
   for (const phase of phases) {
     const { bars, markers: own, undated } = phaseBarsAndMarkers([phase]);
     const planned = phase.definitionId !== null && PLANNED_DEFINITIONS.has(phase.definitionId);
-    // Construction Drawing shows its two steps while its dates are still the plan's own.
-    const splitCd = phase.definitionId === DEFS.cd && m && !phase.manual && phase.plannedStartDate === m.cdMallStart && phase.plannedEndDate === m.end;
+    // Construction Drawing shows its two steps while its dates are still the plan's own; a zero-day CD Mall has no step to draw.
+    const splitCd = phase.definitionId === DEFS.cd && m && !phase.manual && m.cdMallStart < m.cdFinalStart && phase.plannedStartDate === m.cdMallStart && phase.plannedEndDate === m.end;
     const finalBars: GanttBarData[] = splitCd && bars[0]
       ? [
           { ...bars[0], id: `${phase.id}:mall`, end: dayBefore(m.cdFinalStart), label: "CD Mall", title: `CD Mall (${m.cdMallStart} – ${dayBefore(m.cdFinalStart)})` },
