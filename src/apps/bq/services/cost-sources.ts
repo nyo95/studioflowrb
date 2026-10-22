@@ -61,12 +61,12 @@ export function createCostSourceService(ctx: BqServiceContext, masterData: BqMas
       const read = requireMasterData();
       if (kind !== "labor" && kind !== "material-labor" && canMaterial) {
         const option = await read.getMaterialPriceOption(id);
-        if (option) return snapshotFromMaterialPrice(option);
+        if (option) return { ...snapshotFromMaterialPrice(option), notes: `Supplier: ${option.supplierVendor.name}` };
       }
       if (kind !== "material" && canWork) {
         workPrices ??= read.listWorkPricesRead();
         const option = (await workPrices).find((candidate) => candidate.id === id && (!kind || candidate.kind === kind));
-        if (option) return snapshotFromWorkPrice(option, option.kind);
+        if (option) return { ...snapshotFromWorkPrice(option, option.kind), notes: `Vendor: ${option.vendor.name}` };
       }
       // Not found where the caller may look: when part of Master Data is hidden from them, it may sit there.
       if ((kind === "material" && !canMaterial) || ((kind === "labor" || kind === "material-labor") && !canWork) || (!kind && (!canMaterial || !canWork))) {

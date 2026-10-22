@@ -48,7 +48,7 @@ async function addAssemblySourcedLine(input: { grants: PermissionGrants; actor: 
   const koefisien = requirePositiveCoefficient(input.koefisien ?? snapshot.koefisien);
   const line = await runAutomaticSortTransaction(async (tx) => {
     const maxSortOrder = await tx.bqAssemblyLine.aggregate({ where: { assembly_template_id: input.assemblyId }, _max: { sort_order: true } });
-    return tx.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: snapshot.sourceType, source_ref_id: snapshot.sourceRefId, title_snapshot: snapshot.titleSnapshot, purchase_unit_snapshot: snapshot.purchaseUnitSnapshot, base_unit_snapshot: snapshot.baseUnitSnapshot, harga_snapshot: snapshot.hargaSnapshot, currency_snapshot: requireRupiah(snapshot.currencySnapshot), kategori: requireKategori(snapshot.kategori), qty: input.qty ?? "1", koefisien, sort_order: (maxSortOrder._max.sort_order ?? -1) + 1 } });
+    return tx.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: snapshot.sourceType, source_ref_id: snapshot.sourceRefId, title_snapshot: snapshot.titleSnapshot, purchase_unit_snapshot: snapshot.purchaseUnitSnapshot, base_unit_snapshot: snapshot.baseUnitSnapshot, harga_snapshot: snapshot.hargaSnapshot, currency_snapshot: requireRupiah(snapshot.currencySnapshot), kategori: requireKategori(snapshot.kategori), qty: input.qty ?? "1", koefisien, sort_order: (maxSortOrder._max.sort_order ?? -1) + 1, notes: snapshot.notes } });
   });
   await auditWriter({ appId: "bq", action: "bq.assembly-line.created", entityType: "BqAssemblyLine", entityId: line.id, actor: input.actor, changes: { sourceType: snapshot.sourceType } });
   return line;

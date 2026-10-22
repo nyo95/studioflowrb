@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 
-import { Button, Dialog, EmptyState, InlineError, SearchField } from "@/platform/ui_engine";
+import { Button, Dialog, EmptyState, InlineError, SearchField, Select } from "@/platform/ui_engine";
 import { createMoney, formatMoney } from "@platform/utilities/money";
 import { listLineItemSourcesAction, type LineItemSourceOption } from "./source-actions";
 
@@ -46,6 +46,8 @@ export function ImportDialog({
   const [error, setError] = useState<string | null>(null);
   const [showCustom, setShowCustom] = useState(false);
   const [showOtherCosts, setShowOtherCosts] = useState(false);
+  /** One SKU can carry a price per supplier; the estimator may narrow the list to one supplier. */
+  const [supplier, setSupplier] = useState("");
   const [loading, startTransition] = useTransition();
   const request = useRef(0);
   const typing = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,12 +90,14 @@ export function ImportDialog({
     return () => { cancelled = true; };
   }, [startTransition]);
 
-  const visibleOptions =
+  const tabOptions =
     tab === "material" ? options.filter((o) => o.sourceKind === "material")
     : tab === "labor" ? options.filter((o) => o.sourceKind === "labor")
     : tab === "material_labor" ? options.filter((o) => o.sourceKind === "material-labor")
     : tab === "bq_library" ? options.filter((o) => o.sourceType === "BQ_LIBRARY")
     : options;
+  const suppliers = [...new Set(tabOptions.map((o) => o.supplier).filter((name): name is string => Boolean(name)))].sort((a, b) => a.localeCompare(b));
+  const visibleOptions = supplier ? tabOptions.filter((o) => o.supplier === supplier) : tabOptions;
 
   const tabItems: { key: PickerTab; label: string }[] = [
     { key: "all", label: "All" },
@@ -176,7 +180,16 @@ export function ImportDialog({
           </div>
         ) : (
           <>
-            <SearchField value={query} label="Search sources" onChange={(event) => search(event.target.value)} onClear={() => search("")} />
+            <div className="flex flex-wrap items-end gap-2">
+              <div className="min-w-[220px] flex-1"><SearchField value={query} label="Search sources" onChange={(event) => search(event.target.value)} onClear={() => search("")} /></div>
+              {suppliers.length > 1 || supplier ? (
+                <Select aria-label="Supplier" value={supplier} onChange={(event) => setSupplier(event.target.value)} className="w-auto min-w-[180px]">
+                  <option value="">Semua supplier</option>
+                  {suppliers.map((name) => <option key={name} value={name}>{name}</option>)}
+                  {supplier && !suppliers.includes(supplier) ? <option value={supplier}>{supplier}</option> : null}
+                </Select>
+              ) : null}
+            </div>
             {error ? <InlineError>{error}</InlineError> : null}
             {visibleOptions.length === 0 && !loading ? (
               <EmptyState title="No matching sources" description="No Master Data price or BQ Library item matches this search." />
@@ -192,6 +205,7 @@ export function ImportDialog({
                     >
                       <span className="grid min-w-0 gap-0.5">
                         <span className="truncate font-medium text-ink">{option.title}</span>
+                        {option.supplier ? <span className="truncate text-xs text-ink-secondary">{option.supplier}</span> : null}
                         {sourceDescription(option) ? <span className="truncate text-xs text-ink-tertiary">{sourceDescription(option)}</span> : null}
                       </span>
                       <span className="shrink-0 text-right tabular-nums text-ink">

@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.171 | 2026-10-22 | feat(bq): show and filter suppliers in the Cost Component picker; BQ dev seed (Lead)
+
+- **Owner/estimator report:** a gondola uses gypsum 9 mm bought from supplier A or B at different prices, so the picker must tell the two prices apart; it could not be tried without data.
+- **Picker:** each Master Data option now shows its supplier (material) or vendor (work price), and a Supplier filter ("Semua supplier" or one name) appears when the list holds more than one. Search already matched supplier names. Used by project Cost Components and Assembly lines alike.
+- **Assembly lines:** a line taken from Master Data records "Supplier: …" / "Vendor: …" in its notes (shown under the line, copied into the project on apply), because the same SKU can carry one price per supplier and price-at-use follows that supplier's price.
+- **Seed:** `scripts/seed-dev-bq-gondola.ts` (`STUDIOFLOW_LOCATION=<rumah|kantor> npm run seed:dev-bq`) creates through the Master Data and BQ services, refuses any database but `studioflow_rebuild`, and reuses existing records (case-insensitive, because Master Data title-cases names): suppliers "Sinar Gypsum (Supplier A, contoh)" and "Mitra Plafon (Supplier B, contoh)" with different prices for Gypsum Board 9mm/12mm, Multiplek 18mm, HPL Putih Doff, Hollow Galvalum 4x4 and LED strip; two labor vendors with Upah pasang gypsum / Upah rakit gondola and one material+labor price; and the Assembly "Gondola Sociolla (contoh)". All records carry the note "Data contoh BQ (seed R9.171)". **Run on the kantor dev database** (first run stopped after part of the data on a name-case lookup; the rerun completed and a third run changed nothing; the example Assembly was deleted through the BQ service and recreated once to pick up the supplier notes).
+- **Checks:** BQ source tests 8/8 (now also asserting the supplier note). High gate (`STUDIOFLOW_LOCATION=kantor NEXT_DIST_DIR=.next-e2e node scripts/verify.mjs --tier high`): boundaries, legacy-runtime, whitespace, typecheck, lint, `npm test` 1267/1267, Prisma generate, production build PASS. Browser walk is the owner's ([UNVERIFIED] in BACKLOG).
+
 ## R9.170 | 2026-10-22 | feat(bq): Cost Components from Master Data and the BQ Library in Assemblies (Lead)
 
 - **Work order:** `WO-BQ-ASSEMBLY-SOURCE-01`, executed by the Lead. Estimator request: build an Assembly by picking Master Data prices instead of retyping them.

@@ -528,6 +528,7 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">{line.title}</div>
         <div className="text-xs text-ink-secondary">{SOURCE_LABELS[line.sourceType]} · {line.purchaseUnit} · qty {line.qty} · koef {line.koefisien} · {line.harga}</div>
+        {line.notes ? <div className="truncate text-xs text-ink-tertiary">{line.notes}</div> : null}
         {error && !editOpen ? <InlineError>{error}</InlineError> : null}
       </div>
       {line.sourceType === "CUSTOM" ? <IconButton type="button" size="sm" variant="ghost" onClick={saveToLibrary} disabled={pending || editing} label="Simpan ke BQ Library" icon={<Library size={14} aria-hidden="true" />} /> : null}

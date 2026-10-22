@@ -91,6 +91,8 @@ describe("sourced Assembly lines", () => {
       ["MASTERDATA", "md-pasang", "Pasang gypsum", "m2", "95000", "MATERIAL_UPAH", "2", "1"],
       ["BQ_LIBRARY", library.id, "Gypsum 9mm", "lbr", "80000", "MATERIAL", "1", "1.05"],
     ]);
+    // Two suppliers can price the same SKU, so the line says whose price it took.
+    assert.deepEqual(lines.map((line) => line.notes), ["Supplier: Vendor", "Vendor: Vendor", "Vendor: Vendor", null]);
   });
 
   it("refuses a sourced line without Library rights, without Master Data rights, for a missing source or a foreign currency", async () => {

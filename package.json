@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "cleanup:messenger": "tsx scripts/cleanup-messenger-attachments.ts",
+    "seed:dev-bq": "tsx scripts/seed-dev-bq-gondola.ts",
     "studioflow": "tsx scripts/studioflow.ts",
     "lint": "eslint .",
     "postinstall": "prisma generate",

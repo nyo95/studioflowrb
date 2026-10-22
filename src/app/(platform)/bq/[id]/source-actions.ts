@@ -24,6 +24,8 @@ export type LineItemSourceOption = {
   sourceType: "MASTERDATA" | "BQ_LIBRARY";
   sourceKind: "material" | "material-labor" | "labor" | "library";
   title: string;
+  /** The Master Data supplier (material) or vendor (work price); the same SKU may have one price per supplier. */
+  supplier: string | null;
   specification: string | null;
   notes: string | null;
   unit: string;
@@ -57,6 +59,7 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
         sourceType: "BQ_LIBRARY",
         sourceKind: "library",
         title: item.name,
+        supplier: null,
         specification: null,
         notes: item.notes,
         unit: item.purchaseUnit,
@@ -79,6 +82,7 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
           sourceType: "MASTERDATA",
           sourceKind: "material",
           title: option.skuName ?? option.skuCode ?? "Material",
+          supplier: option.supplierVendor.name,
           specification: formatMaterialSpecification(option.measurement),
           notes: [option.skuNotes, option.notes].filter((value): value is string => Boolean(value?.trim())).join(" · ") || null,
           unit: option.unit.code,
@@ -98,6 +102,7 @@ export async function listLineItemSourcesAction(query: string): Promise<ActionRe
           sourceType: "MASTERDATA",
           sourceKind: option.kind,
           title: option.name,
+          supplier: option.vendor.name,
           specification: option.dimDisplay ?? option.scopeNote,
           notes: option.notes,
           unit: option.unit.code,
