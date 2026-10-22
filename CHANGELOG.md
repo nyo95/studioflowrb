@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.173 | 2026-10-22 | plan(schedule-assistant): guardrails for the Schedule Assistant (Lead)
+
+- **Work order:** `WO-SCHEDULE-ASSISTANT-02` READY for R9.174 (Lead executes): mandatory interview (instructions + `susun_jadwal` prompt), apply bound to a preview issued by the same bridge session, and bridge-side approval through MCP elicitation where the client supports it (fallback: the client's tool approval).
+- **Owner decision (2026-10-22):** all three layers; cheaper clients tend to act without asking.
+- **Plans:** `WO-BQ-ASSEMBLY-SOURCE-01` done in R9.170.
+- **Checks:** documentation only.
+
 ## R9.172 | 2026-10-22 | fix(platform): let bearer-token integration routes past the app login gate (Lead)
 
 - **Defect (since the integration kit landed):** `src/proxy.ts` redirected every request without the session cookie to `/login`, including `/api/integrations/**`, so a native client with an `sfk_` bearer token got a 307 to the login page and never reached the kit (the Schedule Assistant bridge, which refuses redirects, reported "StudioFlow could not be reached"). Route-level tests call the handlers directly and could not see it. Found while connecting the Claude desktop app on the kantor dev server.
