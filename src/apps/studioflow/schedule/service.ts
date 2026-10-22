@@ -452,6 +452,40 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       return result;
     },
 
+    /**
+     * Validate and store an option photo before the transaction that records it (put first, record after). The caller
+     * removes the object with `discardStoredImages` when that transaction fails.
+     */
+    async storeOptionImage(projectId: string, file: ScheduleImageUpload): Promise<string> {
+      const extension = validateImage(file);
+      const key = createPrivateObjectKey(`studioflow/schedule/${projectId}`, extension);
+      await storage.put({ key, contentType: file.contentType, bytes: file.body.byteLength, body: file.body });
+      return key;
+    },
+
+    async discardStoredImages(keys: readonly string[]) {
+      await discardObjects(db, storage, keys);
+    },
+
+    /** Record a stored photo on an option. The replaced object is queued for cleanup in the same transaction. */
+    async attachOptionImage(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; optionId: string; key: string; bytes: number; metadata?: Record<string, unknown> }) {
+      const option = await loadOption(tx, input.projectId, input.optionId, true);
+      await tx.sfScheduleOption.update({ where: { id: option.id }, data: { image_key: input.key } });
+      await writeAudit(ports, tx, {
+        action: option.image_key ? "studioflow.schedule.option-image-replaced" : "studioflow.schedule.option-image-added",
+        entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor,
+        metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label, bytes: input.bytes, ...input.metadata },
+      });
+      return {
+        optionId: option.id,
+        entryId: option.entry_id,
+        code: scheduleCode(option.entry.prefix, option.entry.increment),
+        label: option.label,
+        replaced: option.image_key !== null,
+        cleanupKeys: await enqueueUnreferencedCleanup(tx, [option.image_key]),
+      };
+    },
+
     /** Copy an option of another project into an entry as its next, never-final option (photo and notes included). */
     async reuseOption(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; entryId: string; sourceOptionId: string; metadata?: Record<string, unknown> }) {
       const entry = await loadEntry(tx, input.projectId, input.entryId, true);
@@ -926,16 +960,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       const key = createPrivateObjectKey(`studioflow/schedule/${input.projectId}`, extension);
       await storage.put({ key, contentType: input.file.contentType, bytes: input.file.body.byteLength, body: input.file.body });
       try {
-        const result = await runTransaction(async (tx) => {
-          const option = await loadOption(tx, input.projectId, input.optionId, true);
-          await tx.sfScheduleOption.update({ where: { id: option.id }, data: { image_key: key } });
-          await writeAudit(ports, tx, {
-            action: option.image_key ? "studioflow.schedule.option-image-replaced" : "studioflow.schedule.option-image-added",
-            entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor,
-            metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label, bytes: input.file.body.byteLength },
-          });
-          return { optionId: option.id, cleanupKeys: await enqueueUnreferencedCleanup(tx, [option.image_key]) };
-        });
+        const result = await runTransaction((tx) => writer.attachOptionImage(tx, { actor: input.actor, projectId: input.projectId, optionId: input.optionId, key, bytes: input.file.body.byteLength }));
         await discardObjects(db, storage, result.cleanupKeys);
         return { optionId: result.optionId };
       } catch (error) {

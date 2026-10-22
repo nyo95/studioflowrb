@@ -1,10 +1,14 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
+
 import type { PrismaClient } from "@/generated/prisma/client";
 import type { TransactionClient } from "@platform/core/db";
 import { AppError } from "@platform/core/errors";
 
-import { normalizeExtraFields, normalizeScheduleCategory, scheduleCode, similarScheduleCategories } from "../domain/schedule";
+import { STUDIOFLOW_IMAGE_TYPES } from "../domain/images";
+import { normalizeExtraFields, normalizeScheduleCategory, SCHEDULE_IMAGE_BYTES, scheduleCode, similarScheduleCategories } from "../domain/schedule";
+import { SCHEDULE_COLOR_HEX, solidColorPng } from "../schedule/color-image";
 import { scheduleFingerprint, sha256Canonical } from "../schedule/fingerprint";
 import { createScheduleService, type OptionPatch } from "../schedule/service";
 import type { SnapshotInput } from "../schedule/sync";
@@ -49,7 +53,16 @@ export type ScheduleComposerOperation =
   | { op: "create_option"; entryId?: string; entryRef?: string; option: ScheduleComposerOption }
   | { op: "reuse_option"; entryId?: string; entryRef?: string; sourceOptionId: string }
   | { op: "update_option"; optionId: string; patch: ScheduleComposerOptionPatch }
-  | { op: "finalize_option"; optionId: string };
+  | { op: "finalize_option"; optionId: string }
+  /** A photo the caller sends as bytes at apply; the operation carries only its hash, so the digest pins the file. */
+  | { op: "set_option_image"; optionId?: string; entryRef?: string; image: ScheduleComposerImage }
+  /** A colour placeholder: StudioFlow draws a solid 4:5 picture. */
+  | { op: "set_option_color"; optionId?: string; entryRef?: string; hex: string };
+
+export type ScheduleComposerImage = { sha256: string; contentType: string; bytes: number };
+
+/** At most this many photos travel in one batch (the apply body carries their bytes). */
+export const SCHEDULE_COMPOSER_MAX_IMAGES = 4;
 
 export type ScheduleComposerIssue = {
   index: number;
@@ -71,6 +84,10 @@ export type ScheduleComposerResult = {
   /** finalize_option: the option's product, and the other options of its item that become "not used". */
   productName?: string;
   displacedOptions?: string[];
+  /** set_option_image / set_option_color: where the picture comes from and whether it replaces one. */
+  imageSource?: "file" | "color";
+  color?: string;
+  replacesImage?: boolean;
   category?: string;
   prefix?: string;
   newCategory?: boolean;
@@ -80,13 +97,19 @@ export type ScheduleComposerResult = {
 };
 
 /** Not blocking: something the user should confirm before applying, e.g. a new category that looks like a studio one. */
-export type ScheduleComposerWarning = { index: number; code: "SCHEDULE_CATEGORY_SIMILAR"; message: string; suggestions: Array<{ category: string; prefix: string | null }> };
+export type ScheduleComposerWarning =
+  | { index: number; code: "SCHEDULE_CATEGORY_SIMILAR"; message: string; suggestions: Array<{ category: string; prefix: string | null }> }
+  /** WO-SCHEDULE-ASSISTANT-04: an option this batch creates ends without a photo or colour; ask the user first. */
+  | { index: number; code: "SCHEDULE_OPTION_NO_IMAGE"; message: string; entryCode?: string; optionLabel?: string };
 
 export type ScheduleComposerPreview =
   | { valid: false; issues: ScheduleComposerIssue[] }
   | { valid: true; digest: string; baseFingerprint: string; templatesCreated: number; operations: ScheduleComposerResult[]; warnings: ScheduleComposerWarning[] };
 
 type Ctx = CommandContext & { projectId: string };
+/** The stored object for a photo (by hash) or a colour (by hex); preview never stores anything. */
+type PictureKeys = (picture: { image: string } | { color: string }) => { key: string; bytes: number };
+const PREVIEW_PICTURES: PictureKeys = () => ({ key: "preview", bytes: 0 });
 const QTY = /^\d+(\.\d{1,2})?$/;
 const DIGEST_VERSION = 1;
 const LIMITS = { projects: 200, brands: 20, reusable: 20, suggestions: 5 } as const;
@@ -160,6 +183,9 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
     const sectionOf = new Map(entries.map((entry) => [entry.id, entry.section] as const));
     const optionIds = new Set(entries.flatMap((entry) => entry.options.map((option) => option.id)));
     const refs = new Map<string, string>();
+    const refsWithOption = new Set<string>();
+    const pictured = new Set<string>();
+    let images = 0;
     const updatedEntries = new Set<string>();
     const updatedOptions = new Set<string>();
     const finalizedOptions = new Set<string>();
@@ -184,6 +210,7 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
           if (operation.ref !== undefined) {
             if (refs.has(operation.ref)) issues.push({ index, op, field: "ref", code: "SCHEDULE_ENTRY_REF_DUPLICATE", message: "Each create_entry ref must be unique in the batch." });
             else refs.set(operation.ref, operation.section);
+            if (operation.option) refsWithOption.add(operation.ref);
           }
           issues.push(...qtyIssues(index, op, operation.section, operation));
           if (operation.option) {
@@ -229,6 +256,28 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
           finalizedOptions.add(operation.optionId);
           break;
         }
+        case "set_option_image":
+        case "set_option_color": {
+          let target: string;
+          if (operation.entryRef !== undefined) {
+            if (!refsWithOption.has(operation.entryRef)) { issues.push({ index, op, field: "entryRef", code: "SCHEDULE_ENTRY_REF_INVALID", message: "entryRef must name an earlier create_entry of this batch that creates an option." }); break; }
+            target = `ref:${operation.entryRef}`;
+          } else {
+            if (!operation.optionId || !optionIds.has(operation.optionId)) { issues.push({ index, op, field: "optionId", code: "SCHEDULE_OPTION_NOT_FOUND", message: "This option is not in the project." }); break; }
+            target = operation.optionId;
+          }
+          if (pictured.has(target)) issues.push({ index, op, code: "SCHEDULE_DUPLICATE_UPDATE", message: "An option may get one photo or colour per batch." });
+          pictured.add(target);
+          if (operation.op === "set_option_color") {
+            if (!SCHEDULE_COLOR_HEX.test(operation.hex)) issues.push({ index, op, field: "hex", code: "SCHEDULE_COLOR_INVALID", message: "Colour must be #RRGGBB, for example #D8C8A8." });
+          } else {
+            images += 1;
+            if (images === SCHEDULE_COMPOSER_MAX_IMAGES + 1) issues.push({ index, op, code: "SCHEDULE_IMAGE_LIMIT", message: `At most ${SCHEDULE_COMPOSER_MAX_IMAGES} photos per batch; send the rest in another batch.` });
+            if (!STUDIOFLOW_IMAGE_TYPES[operation.image.contentType]) issues.push({ index, op, field: "image.contentType", code: "SCHEDULE_IMAGE_TYPE", message: "Use a PNG, JPEG, or WebP image." });
+            if (operation.image.bytes <= 0 || operation.image.bytes > SCHEDULE_IMAGE_BYTES) issues.push({ index, op, field: "image.bytes", code: "SCHEDULE_IMAGE_SIZE", message: "Photos must be smaller than 3 MB; shrink or crop it first." });
+          }
+          break;
+        }
       }
     }
     return issues;
@@ -245,7 +294,7 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
   }
 
   /** Run the batch through the schedule writer. Each failure carries its operation index. */
-  async function execute(tx: TransactionClient, ctx: Ctx, operations: readonly ScheduleComposerOperation[], operationId: string): Promise<ScheduleComposerResult[]> {
+  async function execute(tx: TransactionClient, ctx: Ctx, operations: readonly ScheduleComposerOperation[], operationId: string, pictures: PictureKeys = PREVIEW_PICTURES): Promise<ScheduleComposerResult[]> {
     const metadata = { via: "schedule-assistant", operationId };
     const before = await tx.sfScheduleEntry.findMany({ where: { project_id: ctx.projectId }, select: { id: true, section: true, category_key: true } });
     const known = new Set([
@@ -253,6 +302,7 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
       ...(await schedule.listCategoryChoices({ grants: ctx.grants })).map((choice) => `${choice.section}:${normalizeScheduleCategory(choice.category).key}`),
     ]);
     const refs = new Map<string, string>();
+    const refOptions = new Map<string, string>();
     const results: ScheduleComposerResult[] = [];
     const entryFacts = async (entryId: string) => tx.sfScheduleEntry.findUniqueOrThrow({ where: { id: entryId }, select: { category: true, prefix: true } });
 
@@ -274,6 +324,7 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
             const snapshot = operation.option ? await snapshotOf(operation.option) : null;
             const created = await schedule.writer.createEntry(tx, { actor: ctx.actor, projectId: ctx.projectId, section: operation.section, category: operation.category, qty: operation.qty, unit: operation.unit, location: operation.location, snapshot, metadata });
             if (operation.ref !== undefined) refs.set(operation.ref, created.entryId);
+            if (operation.ref !== undefined && created.optionId) refOptions.set(operation.ref, created.optionId);
             const facts = await entryFacts(created.entryId);
             const key = `${operation.section}:${normalizeScheduleCategory(operation.category).key}`;
             results.push({ index, op: operation.op, effect: "create", entryId: created.entryId, entryCode: created.code, optionId: created.optionId ?? undefined, optionLabel: created.label ?? undefined, category: facts.category, prefix: facts.prefix, newCategory: !known.has(key), brandName: snapshot?.brandName ?? null });
@@ -316,12 +367,61 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
             results.push({ index, op: operation.op, effect: done.changed ? "update" : "no_change", entryId: done.entryId, entryCode: done.code, optionId: done.optionId, optionLabel: done.label, productName: done.productName, category: facts.category, prefix: facts.prefix, ...(done.changed ? { changes: { isFinal: { from: false, to: true } }, displacedOptions: done.displacedLabels } : {}) });
             break;
           }
+          case "set_option_image":
+          case "set_option_color": {
+            const optionId = operation.entryRef !== undefined ? refOptions.get(operation.entryRef) : operation.optionId;
+            if (!optionId) throw new AppError("VALIDATION", "SCHEDULE_ENTRY_REF_INVALID", "entryRef must name an earlier create_entry of this batch that creates an option.");
+            const color = operation.op === "set_option_color" ? operation.hex.toLowerCase() : undefined;
+            const picture = pictures(operation.op === "set_option_image" ? { image: operation.image.sha256 } : { color: color! });
+            const done = await schedule.writer.attachOptionImage(tx, { actor: ctx.actor, projectId: ctx.projectId, optionId, key: picture.key, bytes: picture.bytes, metadata: { ...metadata, source: color ? "color" : "file", ...(color ? { color } : {}) } });
+            const facts = await entryFacts(done.entryId);
+            results.push({ index, op: operation.op, effect: "update", entryId: done.entryId, entryCode: done.code, optionId: done.optionId, optionLabel: done.label, category: facts.category, prefix: facts.prefix, imageSource: color ? "color" : "file", ...(color ? { color } : {}), replacesImage: done.replaced });
+            break;
+          }
         }
       } catch (error) {
         throw new OperationFailure(index, operation.op, error);
       }
     }
     return results;
+  }
+
+  /**
+   * Check every photo the batch names against the bytes sent with apply (same hash, size and type), then store photos
+   * and drawn colours before the writes. `stored` collects the keys so a failed batch can remove them.
+   */
+  async function storePictures(ctx: Ctx & { operations: readonly ScheduleComposerOperation[]; images?: Readonly<Record<string, string>> }, stored: string[]): Promise<PictureKeys> {
+    const sent = ctx.images ?? {};
+    const named = new Map<string, ScheduleComposerImage>();
+    const colors = new Set<string>();
+    for (const operation of ctx.operations) {
+      if (operation.op === "set_option_image") named.set(operation.image.sha256, operation.image);
+      if (operation.op === "set_option_color") colors.add(operation.hex.toLowerCase());
+    }
+    for (const hash of Object.keys(sent)) if (!named.has(hash)) throw new AppError("VALIDATION", "SCHEDULE_IMAGE_UNUSED", "A photo was sent that no operation of this batch names.");
+    const keys = new Map<string, { key: string; bytes: number }>();
+    for (const [hash, image] of named) {
+      const base64 = sent[hash];
+      if (!base64) throw new AppError("VALIDATION", "SCHEDULE_IMAGE_MISSING", "A photo named by the batch was not sent with apply.");
+      const body = new Uint8Array(Buffer.from(base64, "base64"));
+      if (body.byteLength !== image.bytes || createHash("sha256").update(body).digest("hex") !== hash) {
+        throw new AppError("VALIDATION", "SCHEDULE_IMAGE_MISMATCH", "A photo differs from the one previewed. Preview again.");
+      }
+      const key = await schedule.writer.storeOptionImage(ctx.projectId, { body, contentType: image.contentType });
+      stored.push(key);
+      keys.set(`image:${hash}`, { key, bytes: body.byteLength });
+    }
+    for (const color of colors) {
+      const png = solidColorPng(color);
+      const key = await schedule.writer.storeOptionImage(ctx.projectId, png);
+      stored.push(key);
+      keys.set(`color:${color}`, { key, bytes: png.body.byteLength });
+    }
+    return (picture) => {
+      const found = keys.get("image" in picture ? `image:${picture.image}` : `color:${picture.color}`);
+      if (!found) throw new AppError("INVARIANT", "SCHEDULE_IMAGE_NOT_STORED", "A picture of the batch was not stored.");
+      return found;
+    };
   }
 
   /** Validation-type failures become preview issues; access, conflicts and server faults stay errors. */
@@ -430,7 +530,10 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
             outcome = { valid: false, issues };
           } else {
             try {
-              const operations = (await execute(tx, ctx, ctx.operations, "preview")).map((result) => (result.effect === "create" ? { ...result, entryId: undefined, optionId: undefined } : result));
+              const executed = await execute(tx, ctx, ctx.operations, "preview");
+              const created = executed.filter((result) => (result.op === "create_entry" || result.op === "create_option") && result.optionId);
+              const bare = new Set((await tx.sfScheduleOption.findMany({ where: { id: { in: created.map((result) => result.optionId!) }, image_key: null }, select: { id: true } })).map((row) => row.id));
+              const operations = executed.map((result) => (result.effect === "create" ? { ...result, entryId: undefined, optionId: undefined } : result));
               // WO-SF-CATEGORY-SIMILAR-01: a brand-new category that looks like a studio one is worth a question.
               const studio = await schedule.listCategoryChoices({ grants: ctx.grants });
               const warnings: ScheduleComposerWarning[] = [];
@@ -445,6 +548,11 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
                   message: `"${operation.category}" is a new category and would be coded ${result.prefix}; it looks like ${suggestions.map((choice) => `${choice.category}${choice.prefix ? ` (${choice.prefix})` : ""}`).join(" or ")}. Ask the user which one is meant.`,
                   suggestions: suggestions.map(({ category, prefix }) => ({ category, prefix })),
                 });
+              }
+              // WO-SCHEDULE-ASSISTANT-04: every new option without a photo or colour is a question for the user.
+              for (const result of created) {
+                if (!bare.has(result.optionId!)) continue;
+                warnings.push({ index: result.index, code: "SCHEDULE_OPTION_NO_IMAGE", entryCode: result.entryCode, optionLabel: result.optionLabel, message: `${result.entryCode} ${result.optionLabel ?? ""} has no photo. Ask the user for one; if there is none, ask whether a colour placeholder should be used and which colour (#RRGGBB), then preview again.` });
               }
               outcome = {
                 valid: true,
@@ -474,7 +582,7 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
      * idempotency record). A schedule that changed since the preview is refused before anything is written; any failed
      * operation fails the whole batch.
      */
-    async applyBatch(tx: TransactionClient, ctx: Ctx & { operationId: string; digest: string; operations: readonly ScheduleComposerOperation[] }) {
+    async applyBatch(tx: TransactionClient, ctx: Ctx & { operationId: string; digest: string; operations: readonly ScheduleComposerOperation[]; images?: Readonly<Record<string, string>> }) {
       await requireApply(tx, ctx);
       const baseFingerprint = await scheduleFingerprint(tx, ctx.projectId);
       if (digestOf(ctx.projectId, ctx.operations, baseFingerprint) !== ctx.digest) {
@@ -485,10 +593,14 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
         const [first] = issues;
         throw new AppError("VALIDATION", first.code, `Operation ${first.index + 1} (${first.op}): ${first.message}`, { details: { issues } });
       }
+      const stored: string[] = [];
       let operations: ScheduleComposerResult[];
       try {
-        operations = await execute(tx, ctx, ctx.operations, ctx.operationId);
+        const pictures = await storePictures(ctx, stored);
+        operations = await execute(tx, ctx, ctx.operations, ctx.operationId, pictures);
       } catch (error) {
+        // Put first, record after: a batch that does not commit must not leave its objects behind.
+        await schedule.writer.discardStoredImages(stored);
         throw error instanceof OperationFailure ? namedError(error) : error;
       }
       return {

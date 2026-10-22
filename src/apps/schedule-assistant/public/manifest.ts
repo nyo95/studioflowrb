@@ -8,7 +8,7 @@ import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 export const SCHEDULE_ASSISTANT_MODULE_MANIFEST = Object.freeze({
   id: "schedule-assistant",
   name: "Schedule Assistant",
-  version: "1.1.0",
+  version: "1.2.0",
   kind: "optional",
   parent: "studioflow",
   requires: Object.freeze(["studioflow"]),

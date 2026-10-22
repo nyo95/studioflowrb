@@ -1,7 +1,11 @@
 // @ts-check
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { after, before, beforeEach, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -9,7 +13,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-import { approvalMessage, readConfig } from "../bridge.mjs";
+import { approvalMessage, readConfig, readImage, withImages } from "../bridge.mjs";
 
 const SERVER = fileURLToPath(new URL("../server.mjs", import.meta.url));
 const TOKEN = `sfk_${"a".repeat(12)}_${"B".repeat(43)}`;
@@ -350,6 +354,73 @@ describe("MCP tools over stdio", () => {
       { op: "update_entry", effect: "no_change", entryCode: "LA-01" },
     ], 3);
     assert.equal(message, 'Terapkan ke Product Schedule "Gondola": 1 item baru, 1 opsi baru, 3 item dari template studio. Kode: DO-01 A, DO-01 B. Opsi baru tidak otomatis final.');
+  });
+
+  it("sends a photo as a hash at preview and its previewed bytes at apply, never the path", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sa-photo-"));
+    const path = join(dir, "tile.png");
+    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 7)]);
+    writeFileSync(path, png);
+    const hash = createHash("sha256").update(png).digest("hex");
+    const ops = [{ op: "set_option_image", optionId: ENTRY, imagePath: path }];
+    answer = ({ path: url }) => {
+      if (url.endsWith("/schedule-assistant/projects")) return { body: { ok: true, data: [{ id: PROJECT, name: "Sociolla SBZ" }] } };
+      if (url.endsWith("/preview")) return { body: { ok: true, data: { valid: true, digest: DIGEST, baseFingerprint: "x", templatesCreated: 0, operations: [{ index: 0, op: "set_option_image", effect: "update", entryCode: "PT-08", optionLabel: "A", replacesImage: true }], warnings: [] } } };
+      if (url.endsWith("/apply")) return { body: { ok: true, data: { operationId: "x", applied: true, templatesCreated: 0, operations: [] } } };
+      return { body: { ok: true, data: { entries: [] } } };
+    };
+    const { client, dialogs } = await connect({}, () => ({ action: "accept", content: { setuju: true } }));
+    try {
+      const issued = json(await client.callTool({ name: "preview_schedule_changes", arguments: { projectId: PROJECT, operations: ops } }));
+      const previewBody = JSON.parse(requests.find((request) => request.path.endsWith("/preview"))?.body ?? "{}");
+      assert.deepEqual(previewBody.operations, [{ op: "set_option_image", optionId: ENTRY, image: { sha256: hash, contentType: "image/png", bytes: png.length } }]);
+      assert.equal(JSON.stringify(previewBody).includes(path.replaceAll("\\", "\\\\")), false);
+      // The file changes after the preview: the previewed bytes are still the ones applied.
+      writeFileSync(path, Buffer.from("changed"));
+      json(await client.callTool({ name: "apply_schedule_changes", arguments: { projectId: PROJECT, operationId: issued.operationId, digest: issued.digest, operations: ops } }));
+      const applyBody = JSON.parse(requests.find((request) => request.path.endsWith("/apply"))?.body ?? "{}");
+      assert.deepEqual(applyBody.operations, previewBody.operations);
+      assert.deepEqual(applyBody.images, { [hash]: png.toString("base64") });
+      assert.match(dialogs[0].message, /FOTO LAMA DIGANTI: PT-08 A/);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("refuses a missing path, a directory, a renamed text file, a photo over 3 MB and a fifth photo before calling StudioFlow", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sa-photo-"));
+    const fake = join(dir, "fake.jpg");
+    writeFileSync(fake, "not a picture");
+    const big = join(dir, "big.jpg");
+    writeFileSync(big, Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(3 * 1024 * 1024)]));
+    const small = join(dir, "small.jpg");
+    writeFileSync(small, Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]));
+    await assert.rejects(readImage(join(dir, "missing.png")), /IMAGE_NOT_FOUND/);
+    await assert.rejects(readImage(dir), /IMAGE_NOT_A_FILE/);
+    await assert.rejects(readImage(fake), /IMAGE_TYPE/);
+    await assert.rejects(readImage(big), /IMAGE_TOO_LARGE/);
+    assert.equal((await readImage(small)).image.contentType, "image/jpeg");
+    await assert.rejects(withImages(Array.from({ length: 5 }, () => ({ op: "set_option_image", optionId: ENTRY, imagePath: small }))), /IMAGE_LIMIT/);
+    const { client } = await connect();
+    try {
+      const response = /** @type {any} */ (await client.callTool({ name: "preview_schedule_changes", arguments: { projectId: PROJECT, operations: [{ op: "set_option_image", optionId: ENTRY, imagePath: fake }] } }));
+      assert.equal(response.isError, true);
+      assert.match(response.content[0].text, /IMAGE_TYPE/);
+      assert.equal(requests.filter((request) => request.path.endsWith("/preview")).length, 0);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("names photos, colour placeholders and options still without a photo in the confirmation", () => {
+    const message = approvalMessage("Gondola", [
+      { op: "create_entry", effect: "create", entryCode: "PT-08", optionLabel: "A" },
+      { op: "set_option_color", effect: "update", entryCode: "PT-08", optionLabel: "A", color: "#d8c8a8" },
+      { op: "create_entry", effect: "create", entryCode: "PT-09", optionLabel: "A" },
+    ], 0, [{ code: "SCHEDULE_OPTION_NO_IMAGE", entryCode: "PT-09", optionLabel: "A" }]);
+    assert.match(message, /1 warna placeholder/);
+    assert.match(message, /Warna placeholder: PT-08 A #d8c8a8\./);
+    assert.match(message, /Tanpa foto: PT-09 A\./);
   });
 
   it("rejects an operation shape the wire contract does not allow before calling StudioFlow", async () => {

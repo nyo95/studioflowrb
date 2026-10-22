@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.186 | 2026-10-22 | feat(schedule-assistant): option photos and colour placeholders (Lead)
+
+- **Work order:** `WO-SCHEDULE-ASSISTANT-04` (owner: photos through the MCP; with no picture, ask first and confirm a colour placeholder). Executed by the Lead at the owner's request.
+- **Operations:** `set_option_image` (option by `optionId`, or the first option of a `create_entry` in the batch by `entryRef`; the operation carries `{sha256, contentType, bytes}`, the bytes travel only with apply as `images`, checked against hash/size/type and the Schedule's image rule; at most 4 per batch, 3 MB each) and `set_option_color` (`#RRGGBB`; StudioFlow draws a 400×500 PNG with `node:zlib`, `schedule/color-image.ts`). One picture per option per batch; replacing a photo is reported (`replacesImage`).
+- **Safety:** objects are stored before the writes and removed when the batch fails; a replaced photo is queued in the asset-cleanup ledger inside the transaction. Preview stores nothing. A valid preview warns `SCHEDULE_OPTION_NO_IMAGE` for every created option left without a picture.
+- **Writer:** `storeOptionImage`, `discardStoredImages`, `attachOptionImage` extracted from the Schedule screen's `setOptionImage`, which now uses them (same behaviour).
+- **Bridge 1.3.0:** `imagePath` (local file only, no URLs) is read and checked by content at preview, sent as a descriptor, and the bytes are kept with the operationId so the previewed file is the one applied; the interview asks about every option without a photo and never picks a colour itself; the dialog lists photos, colour placeholders, replaced photos and options still without a photo.
+- **Module** `schedule-assistant` 1.2.0; apply body limit 17 MiB; docs: `CONTRACT.md`, bridge README.
+- **Checks:** bridge 19/19; schedule-assistant integration 21/21 (four new photo/colour tests; the look-alike test now ignores the new photo warning); boundaries OK; typecheck and lint clean. High gate (`STUDIOFLOW_LOCATION=kantor NEXT_DIST_DIR=.next-e2e node scripts/verify.mjs --tier high`): boundaries, legacy-runtime, whitespace, typecheck, lint, `npm test` 1284/1284, Prisma generate, production build PASS. Owner check owed: one photo and one colour placeholder through the MCP, seen on the Schedule screen.
+
 ## R9.185 | 2026-10-22 | docs(changelog): record R9.184 (Lead)
 
 - R9.184 (`882f5a3`) was committed without its CHANGELOG entry (CRLF mismatch in the edit script); this entry records it.

@@ -1,6 +1,6 @@
 # WO-SCHEDULE-ASSISTANT-04 — option photos and colour placeholders through the Assistant
 
-Status: READY. Plan revision R9.184; target revision: the next free one after it.
+Status: DONE in R9.186 (Lead, at the owner's request). Plan revision R9.184.
 Owner decision 2026-10-22: "2 [photo upload through MCP] / if I give no picture, ask first, and
 confirm whether a colour placeholder should be used". Lead decisions below.
 Module: Schedule Assistant (contract, composer door, bridge); StudioFlow schedule writer. No schema.

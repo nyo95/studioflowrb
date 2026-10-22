@@ -5,7 +5,7 @@ import { createIntegrationRouteHandler } from "@platform/core/integrations";
 import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 import { studioFlowScheduleComposer as scheduleComposer } from "@/apps/studioflow/public/schedule-composer-runtime";
 
-import { ApplyRequestSchema, PreviewRequestSchema, SCHEDULE_ASSISTANT_BODY_LIMIT_BYTES, SearchQuerySchema, SectionQuerySchema } from "./contract";
+import { ApplyRequestSchema, PreviewRequestSchema, SCHEDULE_ASSISTANT_APPLY_BODY_LIMIT_BYTES, SCHEDULE_ASSISTANT_BODY_LIMIT_BYTES, SearchQuerySchema, SectionQuerySchema } from "./contract";
 import { SCHEDULE_ASSISTANT_READ_SCOPE, SCHEDULE_ASSISTANT_WRITE_SCOPE } from "./scope-grants";
 
 /**
@@ -84,7 +84,7 @@ export async function applyBatch(request: Request, { params }: RouteContext) {
     scope: SCHEDULE_ASSISTANT_WRITE_SCOPE,
     grant: GRANT,
     body: ApplyRequestSchema,
-    bodyLimitBytes: SCHEDULE_ASSISTANT_BODY_LIMIT_BYTES,
+    bodyLimitBytes: SCHEDULE_ASSISTANT_APPLY_BODY_LIMIT_BYTES,
     write: true,
     handle: ({ principal, body, transaction }) => {
       if (!transaction) throw new AppError("INVARIANT", "INTEGRATION_TRANSACTION_MISSING", "The write transaction is missing.");

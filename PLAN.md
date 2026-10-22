@@ -10,9 +10,8 @@ Priority: P2
 Owner: Product Owner (decisions 2026-10-22: proposal accepted except "wall labels read the Schedule")
 Last updated: 2026-10-22
 
-Also active: `WO-SCHEDULE-ASSISTANT-04` (option photos and colour placeholders through the
-Assistant), READY, full plan in `docs/apps/schedule-assistant/WO-SCHEDULE-ASSISTANT-04.md`. It
-does not touch the SketchUp work; either can go first.
+`WO-SCHEDULE-ASSISTANT-04` (option photos and colour placeholders through the Assistant) is
+DONE in R9.186 (owner checks one photo and one colour on the Schedule screen); plan in `docs/apps/schedule-assistant/WO-SCHEDULE-ASSISTANT-04.md`.
 
 Plan reconciliation: `WO-SCHEDULE-ASSISTANT-03` is DONE in R9.178 (owner walk owed: the 42
 "(old)" materials, HT-04 excluded).

@@ -1,6 +1,7 @@
 # Schedule Assistant contract (v1)
 
-Status: ACTIVE (R9.167, WO-SCHEDULE-ASSISTANT-01; `finalize_option` added in R9.178,
+Status: ACTIVE (R9.167, WO-SCHEDULE-ASSISTANT-01; photos and colour placeholders added in
+R9.186, WO-SCHEDULE-ASSISTANT-04, module 1.2.0; `finalize_option` added in R9.178,
 WO-SCHEDULE-ASSISTANT-03, module 1.1.0). Owner decisions 2026-10-22; Lead decisions 10–22 in
 that Work Order.
 
@@ -48,7 +49,8 @@ not completed. A manager without override reads but cannot apply.
 
 Every response uses the integration kit envelope `{ ok, data | error: { kind, code,
 message } }`. Reads never contain storage keys or signed URLs; an option shows `hasImage`.
-Bodies are limited to 256 KiB and 1–100 operations.
+Bodies are limited to 256 KiB and 1–100 operations; apply allows 17 MiB because it may carry
+up to four photos as base64 (`images: { <sha256>: <base64> }`).
 
 ## Operations (`src/apps/schedule-assistant/contract.ts`, strict)
 
@@ -61,13 +63,23 @@ Bodies are limited to 256 KiB and 1–100 operations.
 | `reuse_option` | `entryId` or `entryRef`, `sourceOptionId` | copies an option of another project (photo and notes included); never final |
 | `update_option` | `optionId`, `patch` | patch: sent fields change, `null` clears, `productName` cannot be cleared; photo, label, final flag and status never change; once per option |
 | `finalize_option` | `optionId` | the client's final decision on one existing option of this project: it becomes final/approved and the item's other options become not used (same as Set as final on the Schedule screen, one audit row with `via`/`operationId`); once per option; already final = `no_change`; the result shows `productName` and `displacedOptions`; no ref, so not for an option created in the same batch |
+| `set_option_image` | `optionId` or `entryRef`, `image: { sha256, contentType, bytes }` | a photo for an existing option, or for the first option of a `create_entry` with `option` in this batch (`entryRef`); PNG/JPEG/WebP, at most 3 MB, at most 4 per batch; replaces an existing photo (`replacesImage`); the bytes travel only with apply and must match the hash, size and type, then pass the Schedule's image check |
+| `set_option_color` | `optionId` or `entryRef`, `hex` (`#RRGGBB`) | a colour placeholder: StudioFlow draws a 400×500 PNG and stores it as the option photo; otherwise like `set_option_image` |
 
 `option = { brandId?, brandName?, productName, color?, pattern?, finishing?, dimension?,
 notes?, extra? }`. `brandId` must be an active Master Data Brand; `brandName` is only a
 hint from the brief and always produces `SCHEDULE_BRAND_NOT_FOUND` with up to five
-suggestions. No Master Data write, no image, delete, un-finalize, sample, card field,
+suggestions. No Master Data write, photo removal, delete, un-finalize, sample, card field,
 reorder, category move or global template/prefix change exists. Final decisions have no
-"all", filter or pattern form: each option is named by id.
+"all", filter or pattern form: each option is named by id. One photo or colour per option per
+batch.
+
+Photos (R9.186): apply stores each photo and colour before its writes (put first, record
+after) and removes them when the batch fails; a replaced photo is queued in StudioFlow's asset
+cleanup ledger in the same transaction and removed by the retention sweep. Audit rows are the
+Schedule's `option-image-added`/`-replaced` with `via`, `operationId` and `source` (`file` or
+`color`). A valid preview warns `SCHEDULE_OPTION_NO_IMAGE` (not blocking) for every option the
+batch creates that ends without a photo or colour; `reuse_option` copies the source photo.
 
 ## Preview, digest, apply
 
@@ -95,7 +107,9 @@ reorder, category move or global template/prefix change exists. Final decisions 
 `SCHEDULE_ENTRY_REF_DUPLICATE`, `SCHEDULE_ENTRY_REF_INVALID`, `SCHEDULE_ENTRY_NOT_FOUND`,
 `SCHEDULE_OPTION_NOT_FOUND`, `SCHEDULE_DUPLICATE_UPDATE`, `SCHEDULE_QTY_NOT_FOR_MATERIAL`,
 `SCHEDULE_QTY_INVALID`, `SCHEDULE_PRODUCT_REQUIRED`, `SCHEDULE_BRAND_NOT_FOUND`,
-`SCHEDULE_REUSE_SOURCE_INVALID` (finalize reuses `SCHEDULE_OPTION_NOT_FOUND` and `SCHEDULE_DUPLICATE_UPDATE`), plus the kit's `INTEGRATION_*`/`IDEMPOTENCY_*` codes and
+`SCHEDULE_REUSE_SOURCE_INVALID`, `SCHEDULE_COLOR_INVALID`, `SCHEDULE_IMAGE_LIMIT`,
+`SCHEDULE_IMAGE_TYPE`, `SCHEDULE_IMAGE_SIZE`, `SCHEDULE_IMAGE_MISSING`, `SCHEDULE_IMAGE_MISMATCH`,
+`SCHEDULE_IMAGE_UNUSED` (finalize reuses `SCHEDULE_OPTION_NOT_FOUND` and `SCHEDULE_DUPLICATE_UPDATE`), plus the kit's `INTEGRATION_*`/`IDEMPOTENCY_*` codes and
 StudioFlow's `PERMISSION_DENIED`, `PROJECT_ARCHIVED`, `PROJECT_COMPLETED`.
 
 ## Bridge
@@ -118,3 +132,12 @@ Clients without elicitation keep their own tool approval, except for a batch tha
 call), because a client's tool approval can be switched to automatic. The final-decision
 dialog names every finalized item code and option and says the item's other options become not
 used; the interview tells the AI to list them and ask about final decisions on their own.
+
+Photos (R9.186, bridge 1.3.0): the client sends `set_option_image` with `imagePath`, a local file
+the user gave in the conversation (never a URL). At preview the bridge reads it, checks it by
+content (PNG/JPEG/WebP), size (≤ 3 MB) and count (≤ 4), sends only the descriptor, and keeps the
+bytes with that preview's operationId; apply sends those bytes, so a file changed after the
+preview cannot slip in. The interview asks about every `SCHEDULE_OPTION_NO_IMAGE` (a photo; if
+none, whether a colour placeholder is wanted and which `#RRGGBB`, confirmed by the user). The
+confirmation dialog lists photos, colour placeholders, replaced photos and options still
+without a photo.

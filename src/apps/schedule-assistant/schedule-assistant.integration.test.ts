@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { after, before, beforeEach, describe, it } from "node:test";
 
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
@@ -434,10 +434,12 @@ describe("look-alike categories (WO-SF-CATEGORY-SIMILAR-01)", () => {
     const lookAlike = (await preview(secret, projectId, [{ op: "create_entry", section: "MATERIAL", category: "HPL/Plastic Laminate", option: { productName: "Laminate CT 0270 G" } }])).body.data;
     assert.equal(lookAlike.valid, true);
     assert.equal(lookAlike.operations[0].entryCode, "HP-01");
-    assert.deepEqual(lookAlike.warnings.map((warning: { index: number; code: string; suggestions: unknown }) => [warning.index, warning.code, warning.suggestions]), [[0, "SCHEDULE_CATEGORY_SIMILAR", [{ category: "High Pressure Laminate", prefix: "PL" }]]]);
+    // Both options have no photo, so each preview also carries SCHEDULE_OPTION_NO_IMAGE (WO-SCHEDULE-ASSISTANT-04).
+    const similar = (warnings: Array<{ index: number; code: string; suggestions?: unknown }>) => warnings.filter((warning) => warning.code === "SCHEDULE_CATEGORY_SIMILAR").map((warning) => [warning.index, warning.code, warning.suggestions]);
+    assert.deepEqual(similar(lookAlike.warnings), [[0, "SCHEDULE_CATEGORY_SIMILAR", [{ category: "High Pressure Laminate", prefix: "PL" }]]]);
     const studio = (await preview(secret, projectId, [{ op: "create_entry", section: "MATERIAL", category: "High Pressure Laminate", option: { productName: "Laminate CT 0270 G" } }])).body.data;
     assert.equal(studio.operations[0].entryCode, "PL-01");
-    assert.deepEqual(studio.warnings, []);
+    assert.deepEqual(similar(studio.warnings), []);
   });
 });
 
@@ -473,6 +475,119 @@ describe("rollback", () => {
       (error: unknown) => error instanceof AppError && error.code === "SCHEDULE_BRAND_NOT_FOUND" && error.safeMessage.startsWith("Operation 2"),
     );
     assert.equal(lookups, 2);
+    assert.deepEqual(await counts(), before);
+  });
+});
+
+describe("photos and colour placeholders (WO-SCHEDULE-ASSISTANT-04)", () => {
+  function composerWith(storage: FakeObjectStorage, masterDataOverride?: (read: ReturnType<typeof createMasterDataPublicRead>) => ReturnType<typeof createMasterDataPublicRead>) {
+    const db = testDb.prisma;
+    const masterData = createMasterDataPublicRead(db);
+    return createStudioFlowScheduleComposer(db, {
+      runTransaction: <T>(work: (tx: Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0]) => Promise<T>) => db.$transaction((tx) => work(tx)),
+      auditWriter: createAuditEventWriter(),
+      people: createPeopleDirectory(db),
+      storage,
+      notificationWriter: createNotificationWriter(),
+      masterData: masterDataOverride ? masterDataOverride(masterData) : masterData,
+    });
+  }
+  const ctxFor = (projectId: string) => ({ grants: DESIGNER, actor: { kind: "USER" as const, userId: designer.id, label: designer.name }, projectId });
+  /** StudioFlow checks a PNG by its signature; the rest of these bytes only has to be stable for the hash. */
+  const pngBytes = (fill: number) => new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, ...new Array(64).fill(fill)]);
+  const photo = pngBytes(7);
+  const descriptor = { sha256: createHash("sha256").update(photo).digest("hex"), contentType: "image/png", bytes: photo.byteLength };
+  const images = { [descriptor.sha256]: Buffer.from(photo).toString("base64") };
+
+  it("attaches a photo to the option of a new item by entryRef, audited, and asks about options left without a photo", async () => {
+    const projectId = await newProject("Photo");
+    const storage = new FakeObjectStorage();
+    const composer = composerWith(storage);
+    const operations: ScheduleComposerOperation[] = [
+      { op: "create_entry", ref: "paint", section: "MATERIAL", category: "Paint", option: { productName: "Texture Paint", color: "Beige" } },
+      { op: "set_option_image", entryRef: "paint", image: descriptor },
+      { op: "create_entry", section: "MATERIAL", category: "Paint", option: { productName: "Plain" } },
+    ];
+    const previewed = await composer.previewBatch({ ...ctxFor(projectId), operations });
+    assert.equal(previewed.valid, true, JSON.stringify(previewed));
+    if (!previewed.valid) return;
+    assert.deepEqual(previewed.operations[1], { ...previewed.operations[1], imageSource: "file", replacesImage: false, entryCode: "PT-01", optionLabel: "A" });
+    assert.deepEqual(previewed.warnings.map((warning) => [warning.code, warning.index]), [["SCHEDULE_OPTION_NO_IMAGE", 2]]);
+    assert.equal(storage.objects.size, 0, "preview stores nothing");
+    const operationId = randomUUID();
+    await testDb.prisma.$transaction((tx) => composer.applyBatch(tx, { ...ctxFor(projectId), operationId, digest: previewed.digest, operations, images }));
+    const [key] = [...storage.objects.keys()];
+    assert.equal(storage.objects.size, 1);
+    const option = await testDb.prisma.sfScheduleOption.findFirstOrThrow({ where: { product_name: "Texture Paint" } });
+    assert.equal(option.image_key, key);
+    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.schedule.option-image-added" } });
+    assert.deepEqual([(audit.metadata as Record<string, unknown>).via, (audit.metadata as Record<string, unknown>).source], ["schedule-assistant", "file"]);
+  });
+
+  it("draws a 400×500 colour placeholder that replaces an existing photo and queues the old one for cleanup", async () => {
+    const projectId = await newProject("Colour");
+    const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Paint", category_key: "PAINT", prefix: "PT", increment: 8, sort_order: 1 } });
+    const option = await testDb.prisma.sfScheduleOption.create({ data: { entry_id: entry.id, label: "A", product_name: "Texture Paint", image_key: "studioflow/schedule/old.png", search_key: "texture paint" } });
+    const storage = new FakeObjectStorage();
+    const composer = composerWith(storage);
+    const operations: ScheduleComposerOperation[] = [{ op: "set_option_color", optionId: option.id, hex: "#D8C8A8" }];
+    const previewed = await composer.previewBatch({ ...ctxFor(projectId), operations });
+    assert.equal(previewed.valid, true, JSON.stringify(previewed));
+    if (!previewed.valid) return;
+    assert.deepEqual([previewed.operations[0].entryCode, previewed.operations[0].color, previewed.operations[0].replacesImage], ["PT-08", "#d8c8a8", true]);
+    await testDb.prisma.$transaction((tx) => composer.applyBatch(tx, { ...ctxFor(projectId), operationId: randomUUID(), digest: previewed.digest, operations }));
+    const [stored] = [...storage.objects.values()];
+    assert.equal(stored.contentType, "image/png");
+    assert.deepEqual([Buffer.from(stored.body).readUInt32BE(16), Buffer.from(stored.body).readUInt32BE(20)], [400, 500]);
+    assert.equal((await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: option.id } })).image_key, stored.key);
+    assert.equal(await testDb.prisma.sfAssetCleanupFailure.count({ where: { storage_key: "studioflow/schedule/old.png", resolved_at: null } }), 1);
+  });
+
+  it("refuses bad colours, a fifth photo and an entryRef without an option before anything runs", async () => {
+    const projectId = await newProject("Picture issues");
+    const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Paint", category_key: "PAINT", prefix: "PT", increment: 1, sort_order: 1 } });
+    const options = await Promise.all(["A", "B", "C", "D", "E"].map((label) => testDb.prisma.sfScheduleOption.create({ data: { entry_id: entry.id, label, product_name: label, search_key: label } })));
+    const composer = composerWith(new FakeObjectStorage());
+    const previewed = await composer.previewBatch({
+      ...ctxFor(projectId),
+      operations: [
+        ...options.map((option): ScheduleComposerOperation => ({ op: "set_option_image", optionId: option.id, image: descriptor })),
+        { op: "create_entry", ref: "bare", section: "MATERIAL", category: "Paint" },
+        { op: "set_option_color", entryRef: "bare", hex: "#D8C8A8" },
+      ],
+    });
+    assert.equal(previewed.valid, false);
+    if (previewed.valid) return;
+    assert.deepEqual(previewed.issues.map((issue) => [issue.index, issue.code]), [[4, "SCHEDULE_IMAGE_LIMIT"], [6, "SCHEDULE_ENTRY_REF_INVALID"]]);
+    const colour = await composer.previewBatch({ ...ctxFor(projectId), operations: [{ op: "set_option_color", optionId: options[0].id, hex: "beige" }] });
+    assert.equal(colour.valid ? null : colour.issues[0].code, "SCHEDULE_COLOR_INVALID");
+  });
+
+  it("refuses a missing, different or unnamed photo at apply, and removes stored objects when the batch fails", async () => {
+    const projectId = await newProject("Photo refused");
+    const roman = await brand("Roman");
+    let applying = false;
+    let lookups = 0;
+    const storage = new FakeObjectStorage();
+    const composer = composerWith(storage, (read) => ({ ...read, getBrandLibraryRead: async (id: string) => (applying && ++lookups > 1 ? null : read.getBrandLibraryRead(id)) }));
+    const operations: ScheduleComposerOperation[] = [
+      { op: "create_entry", ref: "paint", section: "MATERIAL", category: "Paint", option: { productName: "Texture Paint" } },
+      { op: "set_option_image", entryRef: "paint", image: descriptor },
+      { op: "create_entry", section: "MATERIAL", category: "Tile", option: { productName: "Granitio", brandId: roman.id } },
+    ];
+    const previewed = await composer.previewBatch({ ...ctxFor(projectId), operations });
+    assert.equal(previewed.valid, true, JSON.stringify(previewed));
+    if (!previewed.valid) return;
+    const apply = (extra: { images?: Record<string, string> }) => testDb.prisma.$transaction((tx) => composer.applyBatch(tx, { ...ctxFor(projectId), operationId: randomUUID(), digest: previewed.digest, operations, ...extra }));
+    const codeOf = (code: string) => (error: unknown) => error instanceof AppError && error.code === code;
+    await assert.rejects(apply({}), codeOf("SCHEDULE_IMAGE_MISSING"));
+    await assert.rejects(apply({ images: { [descriptor.sha256]: Buffer.from(pngBytes(9)).toString("base64") } }), codeOf("SCHEDULE_IMAGE_MISMATCH"));
+    await assert.rejects(apply({ images: { ...images, ["a".repeat(64)]: "AAAA" } }), codeOf("SCHEDULE_IMAGE_UNUSED"));
+    assert.equal(storage.objects.size, 0);
+    const before = await counts();
+    applying = true;
+    await assert.rejects(apply({ images }), codeOf("SCHEDULE_BRAND_NOT_FOUND"));
+    assert.equal(storage.objects.size, 0, "the stored photo was removed with the failed batch");
     assert.deepEqual(await counts(), before);
   });
 });

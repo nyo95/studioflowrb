@@ -126,6 +126,11 @@ Keep `"trust": false` so every tool call is confirmed.
    AI names each option, lists every code, and the bridge applies a batch with final decisions
    only after its own dialog (it refuses clients without MCP dialogs, so a cheap or free model
    with auto-approve cannot lock options). Undoing a final stays on the Schedule screen.
+5. **Photos come only from you.** Paste or drop a picture into the conversation; the AI passes
+   its file path, the bridge checks it is really a PNG/JPEG/WebP of at most 3 MB (at most four
+   per batch) and locks it to the preview. No links from the internet. When a new option has no
+   photo, the AI asks you for one and, if there is none, whether to use a colour placeholder and
+   which colour; StudioFlow draws the placeholder. Removing a photo stays on the Schedule screen.
 
 ## Using it
 

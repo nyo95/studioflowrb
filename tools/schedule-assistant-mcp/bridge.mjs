@@ -1,5 +1,6 @@
 // @ts-check
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -58,8 +59,62 @@ const operation = z.union([
   z.object({ op: z.literal("reuse_option"), entryId: id.optional(), entryRef: text(80).optional(), sourceOptionId: id.describe("From search_reusable_options.") }).strict().describe("Send exactly one of entryId or entryRef."),
   z.object({ op: z.literal("update_option"), optionId: id, patch: option.partial().strict().describe("Only sent fields change; null clears a field.") }).strict(),
   z.object({ op: z.literal("finalize_option"), optionId: id.describe("One existing option id from get_schedule_context.") }).strict().describe("Record the client's final decision: this option becomes final and the item's other options become not used. One operation per named option; never guess, never a whole list from a vague request."),
+  z.object({ op: z.literal("set_option_image"), optionId: id.optional(), entryRef: text(80).optional(), imagePath: text(1000).min(1).describe("Absolute path of a picture the user gave you (pasted or dropped into this conversation). PNG, JPEG or WebP, at most 3 MB. Never a URL and never a picture you chose yourself.") }).strict().describe("Attach a photo to an existing option (optionId) or to the first option of a create_entry in this batch (entryRef). Replaces an existing photo."),
+  z.object({ op: z.literal("set_option_color"), optionId: id.optional(), entryRef: text(80).optional(), hex: z.string().regex(/^#[0-9a-fA-F]{6}$/).describe("#RRGGBB the user confirmed.") }).strict().describe("A colour placeholder instead of a photo, only after the user agreed to a placeholder and confirmed the colour. StudioFlow draws it."),
 ]);
 const operations = z.array(operation).min(1).max(100);
+
+/** WO-SCHEDULE-ASSISTANT-04: photos the bridge accepts, the same rules StudioFlow applies on the Schedule screen. */
+export const MAX_IMAGES = 4;
+export const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+
+/**
+ * Reads one photo from a local path the user gave, checks it by content (not by name) and returns what the operation
+ * carries (hash, type, size) plus the bytes the bridge keeps for apply.
+ * @param {string} path
+ */
+export async function readImage(path) {
+  let info;
+  try {
+    info = await stat(path);
+  } catch {
+    throw new Error(`IMAGE_NOT_FOUND: no file at ${path}. Ask the user for the picture again.`);
+  }
+  if (!info.isFile()) throw new Error(`IMAGE_NOT_A_FILE: ${path} is not a file.`);
+  if (info.size === 0 || info.size > MAX_IMAGE_BYTES) throw new Error(`IMAGE_TOO_LARGE: ${path} is ${(info.size / 1024 / 1024).toFixed(1)} MB; photos must be at most 3 MB. Ask the user to shrink or crop it first.`);
+  const bytes = await readFile(path);
+  const contentType = sniff(bytes);
+  if (!contentType) throw new Error(`IMAGE_TYPE: ${path} is not a PNG, JPEG or WebP picture.`);
+  return { image: { sha256: createHash("sha256").update(bytes).digest("hex"), contentType, bytes: bytes.length }, base64: bytes.toString("base64") };
+}
+
+/** @param {Buffer} bytes */
+function sniff(bytes) {
+  if (bytes.length > 8 && bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+  if (bytes.length > 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  if (bytes.length > 12 && bytes.toString("ascii", 0, 4) === "RIFF" && bytes.toString("ascii", 8, 12) === "WEBP") return "image/webp";
+  return null;
+}
+
+/**
+ * Replaces every `imagePath` by the photo's descriptor. Returns the operations StudioFlow receives and the photo bytes
+ * by hash; refuses more than four photos before anything is sent.
+ * @param {Array<Record<string, any>>} list
+ */
+export async function withImages(list) {
+  if (list.filter((item) => item.op === "set_option_image").length > MAX_IMAGES) throw new Error(`IMAGE_LIMIT: at most ${MAX_IMAGES} photos per batch; send the rest in another batch.`);
+  /** @type {Record<string, string>} */
+  const images = {};
+  const sent = [];
+  for (const item of list) {
+    if (item.op !== "set_option_image") { sent.push(item); continue; }
+    const { imagePath, ...rest } = item;
+    const read = await readImage(imagePath);
+    images[read.image.sha256] = read.base64;
+    sent.push({ ...rest, image: read.image });
+  }
+  return { operations: sent, images };
+}
 const projectId = id.describe("A project id from list_projects.");
 
 /**
@@ -74,6 +129,7 @@ export const INTERVIEW_STEPS = [
   "4. Summarise the plan in plain words and ask whether to prepare the preview.",
   "5. Call preview_schedule_changes, show the result (codes, labels, Brands, every issue and warning), and wait for an explicit yes. A SCHEDULE_CATEGORY_SIMILAR warning means a new category looks like a studio one (for example HPL vs High Pressure Laminate, prefix PL): ask which is meant and preview again with the studio name unless the user really wants the new category.",
   "6. Only then call apply_schedule_changes with that preview's operationId, digest and operations, and show the read-back.",
+  "Photos: attach a picture only when the user gave it in this conversation (set_option_image with its file path). For every SCHEDULE_OPTION_NO_IMAGE warning, ask the user for a photo; if there is none, ask whether a colour placeholder should be used and which colour (propose a #RRGGBB and wait for confirmation, never choose it yourself), then preview again. Say when a photo replaces an existing one.",
   "Final decisions (finalize_option) are the client's choice and lock the other options of an item. Use them only when the user names exactly which options are final; list every item code and option you will finalize, say which options become not used, and ask about the final decisions on their own, even if the request already mentioned them. Never infer a final decision. They are applied only after StudioFlow's own confirmation dialog.",
 ];
 
@@ -81,7 +137,7 @@ const INSTRUCTIONS = [
   "This server composes one StudioFlow project's Product Schedule. Behave like an assistant: ask before you act, one short question at a time, in the user's language.",
   `Required interview: ${INTERVIEW_STEPS.join(" ")}`,
   "Never call apply_schedule_changes without the user's explicit approval of that preview; it refuses a preview this session did not make. If apply answers SCHEDULE_PREVIEW_STALE, preview again and ask again. If the user declines the confirmation dialog, nothing was saved; ask what to change.",
-  "StudioFlow decides codes, prefixes, category spelling, option labels and Brand snapshots; new options are never final. Deleting, un-finalizing, samples and images are not available.",
+  "StudioFlow decides codes, prefixes, category spelling, option labels and Brand snapshots; new options are never final. Deleting, un-finalizing, removing photos and samples are not available.",
 ].join(" ");
 
 /** JSON with sorted object keys, so the same operations compare equal however the client ordered their fields. */
@@ -92,10 +148,11 @@ function canonical(/** @type {unknown} */ value) {
 /**
  * The plain-language question shown in the bridge's own confirmation dialog.
  * @param {string} projectName
- * @param {Array<{ op: string, effect: string, entryCode?: string, optionLabel?: string }>} results
+ * @param {Array<{ op: string, effect: string, entryCode?: string, optionLabel?: string, replacesImage?: boolean, color?: string }>} results
  * @param {number} templatesCreated
+ * @param {Array<{ code: string, entryCode?: string, optionLabel?: string }>} [warnings]
  */
-export function approvalMessage(projectName, results, templatesCreated) {
+export function approvalMessage(projectName, results, templatesCreated, warnings = []) {
   const count = (/** @type {string} */ op, /** @type {string} */ effect) => results.filter((item) => item.op === op && item.effect === effect).length;
   const parts = [
     [count("create_entry", "create"), "item baru"],
@@ -103,14 +160,27 @@ export function approvalMessage(projectName, results, templatesCreated) {
     [count("update_entry", "update") + count("update_option", "update"), "perubahan"],
     [templatesCreated, "item dari template studio"],
     [count("finalize_option", "update"), "keputusan final"],
+    [results.filter((item) => item.op === "set_option_image").length, "foto"],
+    [results.filter((item) => item.op === "set_option_color").length, "warna placeholder"],
   ].filter(([n]) => Number(n) > 0).map(([n, label]) => `${n} ${label}`);
   const label = (/** @type {{ entryCode?: string, optionLabel?: string }} */ item) => (item.optionLabel ? `${item.entryCode} ${item.optionLabel}` : item.entryCode);
   const finals = results.filter((item) => item.op === "finalize_option" && item.effect !== "no_change" && item.entryCode);
-  const codes = [...new Set(results.filter((item) => item.op !== "finalize_option" && item.effect !== "no_change" && item.entryCode).map(label))];
+  const pictures = new Set(["finalize_option", "set_option_image", "set_option_color"]);
+  const codes = [...new Set(results.filter((item) => !pictures.has(item.op) && item.effect !== "no_change" && item.entryCode).map(label))];
   const shown = codes.slice(0, 10).join(", ") + (codes.length > 10 ? `, +${codes.length - 10} lagi` : "");
   // Every finalized option is named in full: a final decision locks the item's other options, so the user must see each one.
   const finalText = finals.length > 0 ? ` KEPUTUSAN FINAL (${finals.length}), pilihan lain pada item itu jadi tidak dipakai: ${finals.map(label).join(", ")}.` : "";
-  return `Terapkan ke Product Schedule "${projectName}": ${parts.join(", ") || "tidak ada perubahan"}.${shown ? ` Kode: ${shown}.` : ""}${finalText} Opsi baru tidak otomatis final.`;
+  const photos = results.filter((item) => item.op === "set_option_image");
+  const colors = results.filter((item) => item.op === "set_option_color");
+  const replaced = [...photos, ...colors].filter((item) => item.replacesImage);
+  const bare = warnings.filter((item) => item.code === "SCHEDULE_OPTION_NO_IMAGE");
+  const pictureText = [
+    photos.length > 0 ? ` Foto: ${photos.map(label).join(", ")}.` : "",
+    colors.length > 0 ? ` Warna placeholder: ${colors.map((item) => `${label(item)} ${item.color}`).join(", ")}.` : "",
+    replaced.length > 0 ? ` FOTO LAMA DIGANTI: ${replaced.map(label).join(", ")}.` : "",
+    bare.length > 0 ? ` Tanpa foto: ${bare.map(label).join(", ")}.` : "",
+  ].join("");
+  return `Terapkan ke Product Schedule "${projectName}": ${parts.join(", ") || "tidak ada perubahan"}.${shown ? ` Kode: ${shown}.` : ""}${finalText}${pictureText} Opsi baru tidak otomatis final.`;
 }
 
 /**
@@ -161,12 +231,12 @@ export function createBridge(options) {
   /** @param {ApiResult} response */
   const forward = (response) => (response.ok ? result(response.body.data) : failure(response));
 
-  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.2.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.3.0" }, { instructions: INSTRUCTIONS });
 
   /**
    * Layer 2: every valid preview this bridge process returned, by its operationId. Apply accepts only these, for the
    * same project, digest and operations, so an AI cannot invent or reuse a preview the user never saw here.
-   * @type {Map<string, { projectId: string, projectName: string, digest: string, operations: string, message: string }>}
+   * @type {Map<string, { projectId: string, projectName: string, digest: string, operations: string, sent: unknown[], images: Record<string, string>, message: string }>}
    */
   const previews = new Map();
   /** @type {Map<string, string>} */
@@ -225,17 +295,24 @@ export function createBridge(options) {
   }, async (args) => forward(await call(`projects/${encodeURIComponent(args.projectId)}/reusable-options?q=${encodeURIComponent(args.query)}${args.section ? `&section=${args.section}` : ""}`)));
 
   server.registerTool("preview_schedule_changes", {
-    description: "Validate a complete batch and show exactly what StudioFlow would create or change (codes, option labels, categories, Brands). Writes nothing. Call it only after the interview (project confirmed, plan summarised and agreed). Returns every problem at once, or an operationId and digest to apply this exact preview after the user approves it.",
+    description: "Validate a complete batch and show exactly what StudioFlow would create or change (codes, option labels, categories, Brands, photos). Writes nothing. Photos are read from their file paths now and locked to this preview. Call it only after the interview (project confirmed, plan summarised and agreed). Returns every problem at once, or an operationId and digest to apply this exact preview after the user approves it.",
     inputSchema: { projectId, operations },
     annotations: read,
   }, async (args) => {
-    const response = await call(`projects/${encodeURIComponent(args.projectId)}/preview`, { method: "POST", body: JSON.stringify({ operations: args.operations }) });
+    let prepared;
+    try {
+      prepared = await withImages(args.operations);
+    } catch (error) {
+      return { isError: true, content: [{ type: /** @type {const} */ ("text"), text: error instanceof Error ? error.message : "The photo could not be read." }] };
+    }
+    const response = await call(`projects/${encodeURIComponent(args.projectId)}/preview`, { method: "POST", body: JSON.stringify({ operations: prepared.operations }) });
     if (!response.ok) return failure(response);
     const preview = response.body.data;
     if (!preview.valid) return result({ ...preview, next: "Fix the issues (ask the user where a choice is needed) and preview again." });
     const operationId = randomUUID();
     const name = await projectName(args.projectId);
-    previews.set(operationId, { projectId: args.projectId, projectName: name, digest: preview.digest, operations: canonical(args.operations), message: approvalMessage(name, preview.operations ?? [], preview.templatesCreated ?? 0) });
+    // The photo bytes read now are the ones applied: a file changed after the preview cannot slip in.
+    previews.set(operationId, { projectId: args.projectId, projectName: name, digest: preview.digest, operations: canonical(args.operations), sent: prepared.operations, images: prepared.images, message: approvalMessage(name, preview.operations ?? [], preview.templatesCreated ?? 0, preview.warnings ?? []) });
     return result({ ...preview, project: name, operationId, next: "Show this preview to the user and ask for an explicit yes before apply_schedule_changes." });
   });
 
@@ -268,7 +345,8 @@ export function createBridge(options) {
       if (!approved) return result({ applied: false, reason: "Pengguna tidak menyetujui di dialog konfirmasi. Tidak ada yang disimpan. Tanyakan apa yang ingin diubah." });
     }
     const path = `projects/${encodeURIComponent(args.projectId)}`;
-    const body = JSON.stringify({ operationId: args.operationId, digest: args.digest, operations: args.operations });
+    const hasImages = Object.keys(issued.images).length > 0;
+    const body = JSON.stringify({ operationId: args.operationId, digest: args.digest, operations: issued.sent, ...(hasImages ? { images: issued.images } : {}) });
     const applied = await call(`${path}/apply`, { method: "POST", body, idempotencyKey: args.operationId });
     // A stale preview can never succeed again under this key: forget it so a new preview is required.
     if (!applied.ok && applied.body?.error?.code === "SCHEDULE_PREVIEW_STALE") previews.delete(args.operationId);
