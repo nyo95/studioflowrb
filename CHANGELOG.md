@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.175 | 2026-10-22 | plan(studioflow): suggest studio categories for look-alike names; fix HP/HO codes (Lead)
+
+- **Owner report:** HPL items in "2026-536 Sociolla SBZ The Breeze BSD Phase 2" were coded HP-xx instead of PL-xx.
+- **Cause:** a Codex import script wrote 42 entries straight to the database on 2026-10-22 07:02 WIB (no audit rows) with "HPL/PLASTIC LAMINATE" and "HOMOGENEUS TILE", which do not match the studio's "High Pressure Laminate" (PL) and "Homogeneous Tile" (HT), so fallback prefixes HP and HO were used.
+- **Data fix (kantor dev DB, audited):** the ten entries were moved with the Schedule `moveEntryToCategory` command: HP-01…07 → PL-01…07, HO-01…03 → HT-01…03; options, photos and order unchanged.
+- **Work order:** `WO-SF-CATEGORY-SIMILAR-01` READY for R9.176 (Lead): look-alike category suggestions in the Schedule Assistant preview (warning), the import (refused unless confirmed) and the Schedule screen picker. Owner decision: suggest, never auto-map.
+- **Checks:** documentation and an audited data move only.
+
 ## R9.174 | 2026-10-22 | feat(schedule-assistant): interview, session-bound apply and bridge confirmation (Lead)
 
 - **Work order:** `WO-SCHEDULE-ASSISTANT-02` (owner: all three layers). Bridge only (`tools/schedule-assistant-mcp`, now 1.1.0); no StudioFlow, route or schema change.
