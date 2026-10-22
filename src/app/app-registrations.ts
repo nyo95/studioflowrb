@@ -7,6 +7,7 @@ import { PRESENTATION_MODULE_MANIFEST } from "@/apps/presentation/public";
 import { STUDIOFLOW_PERMISSIONS, STUDIOFLOW_POSITIONS } from "@/apps/studioflow/public";
 import { WORKSPACE_BOARD_MODULE_MANIFEST } from "@/apps/studioflow/public";
 import { SCHEDULE_ASSISTANT_MODULE_MANIFEST } from "@/apps/schedule-assistant/public";
+import { SKETCHUP_MODULE_MANIFEST } from "@/apps/sketchup/public";
 
 /**
  * App registrations for the platform permission registry and app launcher
@@ -58,4 +59,5 @@ export const MODULE_MANIFESTS: readonly ModuleManifest[] = [
   PRESENTATION_MODULE_MANIFEST,
   WORKSPACE_BOARD_MODULE_MANIFEST,
   SCHEDULE_ASSISTANT_MODULE_MANIFEST,
+  SKETCHUP_MODULE_MANIFEST,
 ];

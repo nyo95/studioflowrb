@@ -106,7 +106,8 @@ export type ScheduleComposerPreview =
   | { valid: false; issues: ScheduleComposerIssue[] }
   | { valid: true; digest: string; baseFingerprint: string; templatesCreated: number; operations: ScheduleComposerResult[]; warnings: ScheduleComposerWarning[] };
 
-type Ctx = CommandContext & { projectId: string };
+/** `via` names the outside door in audit metadata (the Schedule Assistant unless a caller says otherwise). */
+type Ctx = CommandContext & { projectId: string; via?: string };
 /** The stored object for a photo (by hash) or a colour (by hex); preview never stores anything. */
 type PictureKeys = (picture: { image: string } | { color: string }) => { key: string; bytes: number };
 const PREVIEW_PICTURES: PictureKeys = () => ({ key: "preview", bytes: 0 });
@@ -295,7 +296,7 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
 
   /** Run the batch through the schedule writer. Each failure carries its operation index. */
   async function execute(tx: TransactionClient, ctx: Ctx, operations: readonly ScheduleComposerOperation[], operationId: string, pictures: PictureKeys = PREVIEW_PICTURES): Promise<ScheduleComposerResult[]> {
-    const metadata = { via: "schedule-assistant", operationId };
+    const metadata = { via: ctx.via ?? "schedule-assistant", operationId };
     const before = await tx.sfScheduleEntry.findMany({ where: { project_id: ctx.projectId }, select: { id: true, section: true, category_key: true } });
     const known = new Set([
       ...before.map((entry) => `${entry.section}:${entry.category_key}`),

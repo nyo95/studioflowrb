@@ -73,7 +73,7 @@ export const PLATFORM_ROUTE_OWNERS = [
  * `public/nav.ts` and no `(platform)` route directory. Each entry needs a Lead Work Order (WO-SCHEDULE-ASSISTANT-01
  * added the first) and must still be an optional module with its own manifest.
  */
-export const INTEGRATION_ONLY_APPS = Object.freeze(["schedule-assistant"]);
+export const INTEGRATION_ONLY_APPS = Object.freeze(["schedule-assistant", "sketchup"]);
 
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 // Skipped at any depth: dependency and build output only. Generated code is

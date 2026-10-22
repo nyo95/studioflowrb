@@ -18,11 +18,12 @@ import { AppearancePreference } from "./appearance-preference";
 import { DisplayPreferencesForm } from "./display-preferences-form";
 import { IntegrationTokens } from "./integration-tokens";
 import { SCHEDULE_ASSISTANT_SCOPE_GRANTS } from "@/apps/schedule-assistant/public";
+import { SKETCHUP_SCOPE_GRANTS } from "@/apps/sketchup/public";
 import { SessionsTable } from "./sessions-table";
 
 export const dynamic = "force-dynamic";
 
-const SCOPE_LABELS: Record<string, string> = { "integration:ping": "Run the connection test", "schedule-assistant:read": "Schedule Assistant: read project schedules", "schedule-assistant:write": "Schedule Assistant: change project schedules" };
+const SCOPE_LABELS: Record<string, string> = { "integration:ping": "Run the connection test", "schedule-assistant:read": "Schedule Assistant: read project schedules", "schedule-assistant:write": "Schedule Assistant: change project schedules", "sketchup:read": "SketchUp: read project schedules", "sketchup:write": "SketchUp: add schedule items" };
 
 async function logoutAllAction(): Promise<void> {
   "use server";
@@ -101,7 +102,7 @@ export default async function AccountPage() {
               expiresAt: token.expiresAt ? formatInstant(token.expiresAt.toISOString(), { locale: settings.locale, timeZone: settings.timezone }) : null,
               status: token.revokedAt ? "revoked" : token.expiresAt && token.expiresAt <= new Date() ? "expired" : "active",
             }))}
-            scopes={[...REFERENCE_SCOPE_GRANTS, ...SCHEDULE_ASSISTANT_SCOPE_GRANTS].filter((entry) => hasPermission(grants, entry.grant)).map((entry) => ({ scope: entry.scope, label: SCOPE_LABELS[entry.scope] ?? entry.scope }))}
+            scopes={[...REFERENCE_SCOPE_GRANTS, ...SCHEDULE_ASSISTANT_SCOPE_GRANTS, ...SKETCHUP_SCOPE_GRANTS].filter((entry) => hasPermission(grants, entry.grant)).map((entry) => ({ scope: entry.scope, label: SCOPE_LABELS[entry.scope] ?? entry.scope }))}
           />
         </PageSection>
       ) : null}

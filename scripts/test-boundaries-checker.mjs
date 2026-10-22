@@ -407,6 +407,7 @@ try {
   );
   assert.deepEqual(await collectRouteOwnershipViolations({ projectRoot: integrationOnlyRoot, integrationOnlyApps: ["comet"] }), []);
   assert.ok(INTEGRATION_ONLY_APPS.includes("schedule-assistant"));
+  assert.ok(INTEGRATION_ONLY_APPS.includes("sketchup"));
   console.log("PASS integration-only optional modules: no nav or screen route required");
 } finally {
   await rm(integrationOnlyRoot, { recursive: true, force: true });

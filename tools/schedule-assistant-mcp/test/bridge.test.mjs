@@ -303,13 +303,13 @@ describe("MCP tools over stdio", () => {
   });
 
   it("turns a StudioFlow refusal into a tool error and forgets a stale preview", async () => {
-    answer = studio({ apply: () => ({ status: 409, body: { ok: false, error: { kind: "CONFLICT", code: "SCHEDULE_PREVIEW_STALE", message: "Preview again." } } }) });
+    answer = studio({ apply: () => ({ status: 409, body: { ok: false, error: { kind: "CONFLICT", code: "SCHEDULE_PREVIEW_STALE", safeMessage: "Preview again." } } }) });
     const { client } = await connect();
     try {
       const args = await previewed(client);
       const response = /** @type {any} */ (await client.callTool({ name: "apply_schedule_changes", arguments: args }));
       assert.equal(response.isError, true);
-      assert.match(response.content[0].text, /SCHEDULE_PREVIEW_STALE/);
+      assert.equal(response.content[0].text, "SCHEDULE_PREVIEW_STALE: Preview again.");
       assert.equal(requests.filter((request) => request.path.endsWith("/context")).length, 0);
       const again = /** @type {any} */ (await client.callTool({ name: "apply_schedule_changes", arguments: args }));
       assert.match(again.content[0].text, /APPLY_NOT_PREVIEWED/);

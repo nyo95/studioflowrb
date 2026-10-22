@@ -225,7 +225,8 @@ export function createBridge(options) {
   /** @param {ApiResult} response */
   const failure = (response) => {
     const error = response.body?.error;
-    const message = error ? `${error.code}: ${error.message}` : `StudioFlow answered HTTP ${response.status}.`;
+    // The integration kit sends the human text as `safeMessage`.
+    const message = error ? `${error.code}: ${error.safeMessage ?? error.message ?? ""}` : `StudioFlow answered HTTP ${response.status}.`;
     return { isError: true, content: [{ type: /** @type {const} */ ("text"), text: message }] };
   };
   /** @param {ApiResult} response */

@@ -48,7 +48,7 @@ not completed. A manager without override reads but cannot apply.
 | `POST projects/{id}/apply` | write | `{ operationId, applied, templatesCreated, operations }`; needs `Idempotency-Key` |
 
 Every response uses the integration kit envelope `{ ok, data | error: { kind, code,
-message } }`. Reads never contain storage keys or signed URLs; an option shows `hasImage`.
+safeMessage } }`. Reads never contain storage keys or signed URLs; an option shows `hasImage`.
 Bodies are limited to 256 KiB and 1–100 operations; apply allows 17 MiB because it may carry
 up to four photos as base64 (`images: { <sha256>: <base64> }`).
 

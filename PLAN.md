@@ -5,7 +5,7 @@ Scope: SketchUp plugin takes its material codes from the Product Schedule and li
 Module(s): new optional module `sketchup` (integration-only); StudioFlow permissions (one permission id); plugin under `tools/sketchup-plugin/`. No schema in Stage 1.
 Target revision: Stage 0 R9.180 (Lead), Stage 1a next free revision after it (Executor), Stage 1b after review (Lead). This plan is R9.179.
 Risk: medium - a new outside door that writes schedule items; reuses the composer door and the integration kit, so access, audit, idempotency and look-alike checks are already proven.
-Status: Stage 0 DONE in R9.180 (owner tries 1.1.7 in SketchUp); Stage 1a READY for the Executor.
+Status: Stage 0 DONE in R9.180 (owner tries 1.1.7 in SketchUp); Stage 1a DONE in R9.188 (Lead); Stage 1b (plugin client) is next, Lead.
 Priority: P2
 Owner: Product Owner (decisions 2026-10-22: proposal accepted except "wall labels read the Schedule")
 Last updated: 2026-10-22

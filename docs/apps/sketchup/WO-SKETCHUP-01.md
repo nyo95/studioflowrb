@@ -1,6 +1,6 @@
 # WO-SKETCHUP-01 — SketchUp plugin: schedule-owned codes (rev 2)
 
-Status: Stage 0 DONE in R9.180 (plugin 1.1.7 in `tools/sketchup-plugin/`); Stage 1a READY for the Executor;
+Status: Stage 0 DONE in R9.180 (plugin 1.1.7 in `tools/sketchup-plugin/`); Stage 1a DONE in R9.188 (Lead, at the owner's request; contract `docs/apps/sketchup/CONTRACT.md`);
 Stage 1b (Lead) follows 1a; Stage 2 is an outline, not READY.
 Supersedes rev 1 (2026-10-09, legacy-style push sync with merge queue, convergence planner
 and anti-wipe staging). Owner decisions 2026-10-22.

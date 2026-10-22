@@ -37,6 +37,7 @@ function load(signedIn = true) {
     "@platform/core/db": { prisma: { session: { findUnique: async () => null } } },
     "@platform/core/integrations": { integrationTokens: {}, REFERENCE_SCOPE_GRANTS: [] },
     "@/apps/schedule-assistant/public": { SCHEDULE_ASSISTANT_SCOPE_GRANTS: [] },
+    "@/apps/sketchup/public": { SKETCHUP_SCOPE_GRANTS: [] },
     "@platform/runtime": {
       platformAccount: {}, storageUsage: {}, userPreferences: {},
       userTutorials: {

@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.188 | 2026-10-22 | feat(sketchup): SketchUp integration module, Stage 1a (Lead)
+
+- **Work order:** `WO-SKETCHUP-01` rev 2, Stage 1a, executed by the Lead at the owner's request.
+- **Module** `sketchup` 1.0.0 (optional, parent `studioflow`, off by default), permission `studioflow.sketchup.use`, scopes `sketchup:read` / `sketchup:write` (token page labels), integration-only (no screen, no stored data). Contract `docs/apps/sketchup/CONTRACT.md`.
+- **Routes** `/api/integrations/v1/sketchup/`: `GET projects`, `GET projects/{id}/schedule` (code, category, prefix, title = Brand + product of the final option else the first), `POST projects/{id}/resolve` (entry ids → current code or null), `POST projects/{id}/entries` (StudioFlow allocates the code through the composer's preview + apply in the kit transaction; look-alike category refused with `SKETCHUP_CATEGORY_SIMILAR` unless `confirmNewCategory`; idempotent).
+- **Composer door:** optional `via` so audit rows say `sketchup` (default stays `schedule-assistant`).
+- **Fix:** the Schedule Assistant bridge showed "CODE: undefined" for every StudioFlow refusal because the kit sends `safeMessage`, not `message`; it now shows the text. `CONTRACT.md` envelope corrected.
+- **Checks:** SketchUp integration 9/9 (module switch, token/scope/live grants, validation, reads, resolve, access, create with replay and audit, look-alike refusal, archived/completed), bridge 19/19, boundaries OK, typecheck clean. High gate (`STUDIOFLOW_LOCATION=kantor NEXT_DIST_DIR=.next-e2e node scripts/verify.mjs --tier high`): boundaries, legacy-runtime, whitespace, typecheck, lint, `npm test` 1293/1293, Prisma generate, production build PASS. The plugin side (Stage 1b) is not built yet, so nothing calls these routes.
+
 ## R9.187 | 2026-10-22 | plan(sketchup): ask-first material linking, same-code spellings, model-only merge (Lead)
 
 - **Owner decisions** added to `WO-SKETCHUP-01` rev 2 (11–14): clicking a material always asks before linking, renaming or creating; SO-1 / SO-001 / so-01 are one code and are offered as the matching schedule item; merging two materials of one item happens only inside the SketchUp model, on confirmation, as one undo step, never changing the Schedule; no AI in Stage 1 (later only as accepted suggestions).
