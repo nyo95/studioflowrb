@@ -1517,7 +1517,7 @@ function EntryPanelContent({
       {saveError ? <InlineError>{saveError}</InlineError> : null}
       {command.error && !reuse && !photoFor && !sampleFor ? <InlineError>{command.error}</InlineError> : null}
       {canEdit ? (
-        <FormActions className="sticky bottom-0 z-10 -mx-4 -mb-4 border-t border-line-subtle bg-surface px-4 py-3">
+        <FormActions className="sticky bottom-0 z-10 -mx-4 border-t border-line-subtle bg-surface px-4 py-3">
           <Button type="button" variant="ghost" disabled={!isDirty || savePending} onClick={discardDraft}>Discard</Button>
           <Button type="button" variant="primary" pending={savePending} disabled={!isDirty || optionNeedsType} onClick={() => void saveAll().catch((error) => setSaveError(error instanceof Error ? error.message : "Could not save."))}>
             Save
@@ -1587,7 +1587,8 @@ function DockedEntryPanel({
         </div>
         <Text size="sm" tone="secondary">{SECTION_LABEL[entry.section]} · {state}</Text>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+      {/* No bottom padding: a scroller's padding would hold the sticky Save bar above the edge with text showing under it. */}
+      <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4 ${canEdit ? "" : "pb-4"}`}>
         <EntryPanelContent
           projectId={projectId}
           entry={entry}

@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.197 | 2026-10-22 | fix(studioflow): schedule inspector Save bar sits on the bottom edge (Lead)
+
+- **Owner report:** in the docked inspector the Save / Discard bar floated above the panel's bottom edge and the "filled dot" hint showed underneath it.
+- **Cause:** the inspector's scroll area had bottom padding; a sticky bar stops at the scroller's padding, not its edge. The bar's `-mb-4` only reached the edge once scrolled to the very end.
+- **Fix:** the scroll area keeps top and side padding only (bottom padding only when there is no Save bar, for read-only viewers); the bar drops `-mb-4`.
+- **Checks:** `tsc --noEmit` clean; eslint clean on `schedule-board.tsx`. **Browser not re-checked:** the local browser pane lost its sign-in; owner check owed.
+
 ## R9.196 | 2026-10-22 | ui(studioflow): Product Schedule fixed header and docked inspector (Lead)
 
 - **Owner request:** the R9.195 pane was messy; the pane must sit fixed on the right like a toolbar and the header must not scroll. Built from the owner-approved mockup (https://claude.ai/artifact/KtSjuhqAjjDN2snQUvGuPp).
