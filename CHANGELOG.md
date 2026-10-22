@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.201 | 2026-10-23 | fix(schedule-assistant): a dialog that never showed no longer reads as "you declined" (Lead)
+
+- **Owner report:** adding CT-01 to "2026-999 Uji Retensi" through the schedule MCP failed twice with "Pengguna tidak menyetujui di dialog konfirmasi" although the owner never saw a dialog and wanted it saved.
+- **Cause:** the Claude desktop app's Code tab declares MCP `elicitation` but answers every dialog itself within milliseconds (client log: "Elicitation request received in print mode"). The bridge reported decline, cancel and dialog errors all as the user's refusal.
+- **Fix (bridge 1.4.0):** a refused apply now answers `outcome` `declined` (real no), `dialog_closed` (cancel) or `dialog_failed` (error), and only `declined` says the user refused; the server instructions tell the AI not to call the others a refusal and not to retry by itself. New optional `STUDIOFLOW_CONFIRM=client` (default `dialog`, other values stop the bridge at start) skips the dialog for such an app, leaving the client's tool approval; final decisions stay refused there.
+- **Owner instruction vs. constraint:** the owner asked to fall back to the app's tool approval "when the dialog cannot be shown". A `cancel` is the same answer whether the person closed the dialog or the app answered it, so the fallback is the explicit `STUDIOFLOW_CONFIRM=client` setting, not automatic.
+- **Checks:** `npm --prefix tools/schedule-assistant-mcp test` 21/21 (new: outcome per reply incl. a throwing dialog, the `client` mode with a dialog-capable client, config values). Not done: the owner's own MCP registration still needs `STUDIOFLOW_CONFIRM=client` and a restart of the session before a live apply can be retried.
+- **Docs:** `docs/apps/schedule-assistant/CONTRACT.md`, bridge README.
+
 ## R9.200 | 2026-10-23 | fix(platform): hide the token menu when no tool is open to the person (Lead)
 
 - **Owner decision:** someone with the "manage own tokens" permission but on no Developer access list (and without the connection test) saw "Integration tokens" with an empty "Allowed to" and got "Choose one or more valid integration scopes." on create. The whole section now stays hidden for them; no message.

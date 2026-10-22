@@ -29,8 +29,9 @@ Contract: `docs/apps/schedule-assistant/CONTRACT.md`.
    export STUDIOFLOW_TOKEN=sfk_xxxxxxxxxxxx_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
    ```
 
-The bridge reads two variables: `STUDIOFLOW_URL` (https, or http only for
-`localhost`/`127.0.0.1`/`::1`) and `STUDIOFLOW_TOKEN`. Below, replace
+The bridge reads `STUDIOFLOW_URL` (https, or http only for
+`localhost`/`127.0.0.1`/`::1`), `STUDIOFLOW_TOKEN` and, optionally, `STUDIOFLOW_CONFIRM`
+(`dialog` by default, `client` for an app that cannot show MCP dialogs; see below). Below, replace
 `/ABSOLUTE/PATH/TO` with the folder of this checkout and the URL with your server
 (the local dev server is `http://localhost:3001`).
 
@@ -120,7 +121,15 @@ Keep `"trust": false` so every tool call is confirmed.
    Claude Code ≥ 2.1.76, Codex CLI recent versions), the bridge shows its own question,
    for example *Terapkan ke Product Schedule "Sociolla SBW R1": 2 item baru … Ya,
    terapkan?* Nothing is saved unless you tick it. Other clients use their own tool
-   approval, except for final decisions (below).
+   approval, except for final decisions (below). The answer says which way it went:
+   `declined` (you said no), `dialog_closed` (closed without an answer) or `dialog_failed`
+   (it could not be shown); only `declined` means you refused.
+
+   Some apps say they support dialogs but never show them: the **Claude desktop app's Code
+   tab** answers every dialog itself, so apply always ends as `dialog_closed`. There, add
+   `--env STUDIOFLOW_CONFIRM=client` to the `claude mcp add` command: the bridge then skips
+   its dialog and the app's own tool approval (keep it on "ask") is the only confirmation.
+   Final decisions are refused in that mode; mark them on the Schedule screen.
 4. **Final decisions are stricter.** `finalize_option` marks one named option as the client's
    final choice and sets the item's other options to "not used". There is no "all" form: the
    AI names each option, lists every code, and the bridge applies a batch with final decisions

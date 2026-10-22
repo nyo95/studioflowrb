@@ -34,7 +34,10 @@ export function readConfig(env) {
   if (baseUrl.protocol !== "https:" && !(baseUrl.protocol === "http:" && local)) {
     throw new Error("STUDIOFLOW_URL must use https (plain http is allowed only for localhost, 127.0.0.1 or ::1).");
   }
-  return { baseUrl, token };
+  // `client` is for an app that declares MCP dialogs but cannot show them (it answers every dialog itself).
+  const confirm = env.STUDIOFLOW_CONFIRM?.trim() || "dialog";
+  if (confirm !== "dialog" && confirm !== "client") throw new Error("STUDIOFLOW_CONFIRM must be dialog (the default) or client.");
+  return { baseUrl, token, confirm };
 }
 
 const text = (/** @type {number} */ max) => z.string().max(max);
@@ -136,7 +139,7 @@ export const INTERVIEW_STEPS = [
 const INSTRUCTIONS = [
   "This server composes one StudioFlow project's Product Schedule. Behave like an assistant: ask before you act, one short question at a time, in the user's language.",
   `Required interview: ${INTERVIEW_STEPS.join(" ")}`,
-  "Never call apply_schedule_changes without the user's explicit approval of that preview; it refuses a preview this session did not make. If apply answers SCHEDULE_PREVIEW_STALE, preview again and ask again. If the user declines the confirmation dialog, nothing was saved; ask what to change.",
+  "Never call apply_schedule_changes without the user's explicit approval of that preview; it refuses a preview this session did not make. If apply answers SCHEDULE_PREVIEW_STALE, preview again and ask again. If apply answers outcome declined, the user said no in the confirmation dialog: nothing was saved; ask what to change. If it answers outcome dialog_closed or dialog_failed, the user did not say no: the dialog was closed without an answer or could not be shown. Nothing was saved; say exactly that, ask whether the dialog appeared, and do not retry on your own.",
   "StudioFlow decides codes, prefixes, category spelling, option labels and Brand snapshots; new options are never final. Deleting, un-finalizing, removing photos and samples are not available.",
 ].join(" ");
 
@@ -185,7 +188,7 @@ export function approvalMessage(projectName, results, templatesCreated, warnings
 
 /**
  * @typedef {{ ok: boolean, status: number, body: any, replayed: boolean }} ApiResult
- * @typedef {{ baseUrl: URL, token: string, fetch?: typeof fetch, log?: (line: string) => void }} BridgeOptions
+ * @typedef {{ baseUrl: URL, token: string, confirm?: string, fetch?: typeof fetch, log?: (line: string) => void }} BridgeOptions
  */
 
 /** @param {BridgeOptions} options */
@@ -232,7 +235,7 @@ export function createBridge(options) {
   /** @param {ApiResult} response */
   const forward = (response) => (response.ok ? result(response.body.data) : failure(response));
 
-  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.3.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.4.0" }, { instructions: INSTRUCTIONS });
 
   /**
    * Layer 2: every valid preview this bridge process returned, by its operationId. Apply accepts only these, for the
@@ -329,21 +332,29 @@ export function createBridge(options) {
     // Layer 3: the bridge itself asks the user when the client can show a dialog; otherwise the client's tool approval applies.
     // A final decision locks other options, so it is never left to a client's tool approval (which can be auto-approved).
     const finalizing = args.operations.some((item) => item.op === "finalize_option");
-    if (finalizing && !server.server.getClientCapabilities()?.elicitation) {
-      return { isError: true, content: [{ type: /** @type {const} */ ("text"), text: "FINAL_NEEDS_CONFIRMATION_DIALOG: this batch records final decisions, which are applied only after StudioFlow's own confirmation dialog, and this client does not support MCP dialogs (elicitation). Nothing was saved. Use a client that supports them, or mark the options final on the Schedule screen." }] };
+    const dialog = options.confirm !== "client" && Boolean(server.server.getClientCapabilities()?.elicitation);
+    if (finalizing && !dialog) {
+      return { isError: true, content: [{ type: /** @type {const} */ ("text"), text: "FINAL_NEEDS_CONFIRMATION_DIALOG: this batch records final decisions, which are applied only after StudioFlow's own confirmation dialog, and this client does not support MCP dialogs (elicitation) or the bridge runs with STUDIOFLOW_CONFIRM=client. Nothing was saved. Use a client that shows the dialog, or mark the options final on the Schedule screen." }] };
     }
-    if (server.server.getClientCapabilities()?.elicitation) {
-      let approved = false;
+    if (dialog) {
+      // Only a real "no" is reported as the user's refusal. A dialog closed without an answer, or one the app could not
+      // show, saves nothing either, but must never read as if the user said no. Neither falls back to the tool approval:
+      // a cancel looks the same whether the user closed the dialog or the app answered it itself.
+      /** @type {"accepted" | "declined" | "dialog_closed" | "dialog_failed"} */
+      let outcome = "dialog_failed";
       try {
         const answer = await server.server.elicitInput({
           message: issued.message,
           requestedSchema: { type: "object", properties: { setuju: { type: "boolean", title: "Ya, terapkan", description: "Centang untuk menyimpan perubahan ini ke StudioFlow." } }, required: ["setuju"] },
         });
-        approved = answer.action === "accept" && answer.content?.setuju === true;
+        if (answer.action === "accept") outcome = answer.content?.setuju === true ? "accepted" : "declined";
+        else outcome = answer.action === "decline" ? "declined" : "dialog_closed";
       } catch (error) {
         log(`schedule-assistant: confirmation dialog failed: ${error instanceof Error ? error.message : "unknown error"}`);
       }
-      if (!approved) return result({ applied: false, reason: "Pengguna tidak menyetujui di dialog konfirmasi. Tidak ada yang disimpan. Tanyakan apa yang ingin diubah." });
+      if (outcome === "declined") return result({ applied: false, outcome, reason: "Pengguna menolak di kotak konfirmasi StudioFlow. Tidak ada yang disimpan. Tanyakan apa yang ingin diubah." });
+      if (outcome === "dialog_closed") return result({ applied: false, outcome, reason: "Kotak konfirmasi ditutup tanpa jawaban, atau aplikasi ini tidak bisa menampilkannya. Pengguna tidak menolak. Tidak ada yang disimpan. Tanyakan apakah kotaknya muncul; kalau tidak pernah muncul, aplikasi ini perlu STUDIOFLOW_CONFIRM=client (lihat README bridge)." });
+      if (outcome === "dialog_failed") return result({ applied: false, outcome, reason: "Kotak konfirmasi gagal ditampilkan. Pengguna tidak menolak. Tidak ada yang disimpan. Tanyakan apakah kotaknya muncul; kalau tidak pernah muncul, aplikasi ini perlu STUDIOFLOW_CONFIRM=client (lihat README bridge)." });
     }
     const path = `projects/${encodeURIComponent(args.projectId)}`;
     const hasImages = Object.keys(issued.images).length > 0;

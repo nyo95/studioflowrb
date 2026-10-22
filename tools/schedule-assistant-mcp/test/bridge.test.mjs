@@ -103,6 +103,13 @@ describe("configuration", () => {
     assert.equal(readConfig({ STUDIOFLOW_URL: "https://studio.example", STUDIOFLOW_TOKEN: TOKEN }).token, TOKEN);
   });
 
+  it("confirms in the bridge's dialog by default, accepts STUDIOFLOW_CONFIRM=client and refuses any other value", () => {
+    const base = { STUDIOFLOW_URL: "https://studio.example", STUDIOFLOW_TOKEN: TOKEN };
+    assert.equal(readConfig(base).confirm, "dialog");
+    assert.equal(readConfig({ ...base, STUDIOFLOW_CONFIRM: "client" }).confirm, "client");
+    assert.throws(() => readConfig({ ...base, STUDIOFLOW_CONFIRM: "never" }), /STUDIOFLOW_CONFIRM/);
+  });
+
   it("exits at start with a stderr message when the URL is remote plain http", async () => {
     const child = spawn(process.execPath, [SERVER], { env: { PATH: process.env.PATH ?? "", STUDIOFLOW_URL: "http://studio.example", STUDIOFLOW_TOKEN: TOKEN } });
     let stdout = "";
@@ -219,17 +226,47 @@ describe("MCP tools over stdio", () => {
     } finally {
       await yes.client.close();
     }
-    for (const reply of [{ action: "decline" }, { action: "cancel" }, { action: "accept", content: { setuju: false } }]) {
+    /** @type {Array<[() => any, string]>} */
+    const replies = [
+      [() => ({ action: "decline" }), "declined"],
+      [() => ({ action: "accept", content: { setuju: false } }), "declined"],
+      [() => ({ action: "cancel" }), "dialog_closed"],
+      [() => { throw new Error("no dialog here"); }, "dialog_failed"],
+    ];
+    for (const [reply, outcome] of replies) {
       requests = [];
-      const no = await connect({}, () => reply);
+      const no = await connect({}, reply);
       try {
         const refused = json(await no.client.callTool({ name: "apply_schedule_changes", arguments: await previewed(no.client) }));
         assert.equal(refused.applied, false);
+        assert.equal(refused.outcome, outcome);
         assert.match(refused.reason, /Tidak ada yang disimpan/);
-        assert.equal(applyCount(), 0, JSON.stringify(reply));
+        // Only a real "no" may read as the user's refusal.
+        assert.equal(/Pengguna menolak/.test(refused.reason), outcome === "declined", outcome);
+        if (outcome !== "declined") assert.match(refused.reason, /Pengguna tidak menolak.*STUDIOFLOW_CONFIRM=client/);
+        assert.equal(applyCount(), 0, outcome);
       } finally {
         await no.client.close();
       }
+    }
+  });
+
+  it("uses the client's own tool approval with STUDIOFLOW_CONFIRM=client even when the client declares dialogs, and still refuses final decisions", async () => {
+    answer = studio();
+    const { client, dialogs } = await connect({ STUDIOFLOW_CONFIRM: "client" }, () => ({ action: "cancel" }));
+    try {
+      const applied = json(await client.callTool({ name: "apply_schedule_changes", arguments: await previewed(client) }));
+      assert.equal(applied.applied.applied, true);
+      assert.equal(dialogs.length, 0);
+      const finals = [{ op: "finalize_option", optionId: "55555555-5555-4555-8555-555555555555" }];
+      const issued = json(await client.callTool({ name: "preview_schedule_changes", arguments: { projectId: PROJECT, operations: finals } }));
+      const refused = /** @type {any} */ (await client.callTool({ name: "apply_schedule_changes", arguments: { projectId: PROJECT, operationId: issued.operationId, digest: issued.digest, operations: finals } }));
+      assert.equal(refused.isError, true);
+      assert.match(refused.content[0].text, /FINAL_NEEDS_CONFIRMATION_DIALOG/);
+      assert.equal(dialogs.length, 0);
+      assert.equal(applyCount(), 1);
+    } finally {
+      await client.close();
     }
   });
 

@@ -134,6 +134,17 @@ call), because a client's tool approval can be switched to automatic. The final-
 dialog names every finalized item code and option and says the item's other options become not
 used; the interview tells the AI to list them and ask about final decisions on their own.
 
+Dialog outcomes (R9.201, bridge 1.4.0): a refused apply answers `{ applied: false, outcome,
+reason }`. `declined` is a real no (`decline`, or `accept` with `setuju` false);
+`dialog_closed` is `cancel`; `dialog_failed` is an error from the dialog request. Only
+`declined` reads as the user's refusal. None of them saves or falls back to the tool approval,
+because a `cancel` looks the same whether the user closed the dialog or the app answered it
+itself (the Claude desktop app's Code tab does that: it declares `elicitation` and answers in
+milliseconds without showing anything). For such an app `STUDIOFLOW_CONFIRM=client` (default
+`dialog`; any other value stops the bridge at start) skips the dialog and leaves the client's
+tool approval as the only confirmation; final decisions are then refused as for a client
+without elicitation.
+
 Photos (R9.186, bridge 1.3.0): the client sends `set_option_image` with `imagePath`, a local file
 the user gave in the conversation (never a URL). At preview the bridge reads it, checks it by
 content (PNG/JPEG/WebP), size (≤ 3 MB) and count (≤ 4), sends only the descriptor, and keeps the
