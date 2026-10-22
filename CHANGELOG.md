@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.166 | 2026-10-22 | plan(schedule-assistant): Product Schedule Composer MCP Work Order (Lead)
+
+- **Work order:** `WO-SCHEDULE-ASSISTANT-01` is READY (P0) for R9.167: optional module `schedule-assistant` (starts disabled, no schema in V1), a StudioFlow schedule composer public door, token scopes `schedule-assistant:read`/`:write` behind the new module permission `studioflow.schedule-assistant.use` (in no built-in profile), six thin integration routes, and a standalone Node stdio MCP bridge `tools/schedule-assistant-mcp/` for Claude Code, Codex, OpenCode and Gemini CLI.
+- **Decisions settled from the R9.165 proposal:** update included (entry qty/unit/location; option as a patch); templates only via an explicit first `apply_templates` operation; Brand must be an active Master Data id (unknown names are a validation issue with suggestions; no Master Data writes), new categories allowed and flagged; preview is a rolled-back dry run through the real writer returning a digest over the batch and the schedule state, and apply refuses a stale digest; the kit's one serializable transaction holds writes, audit and the idempotency record; human approval is the client's tool prompt, the server enforces previewed-only and the write scope.
+- **Ledger note:** R9.165 now appears twice (local Platform Owner user deletion `ec7a5d8` and the pushed proposal `6fb5c66`, joined by merge `c4cb676`); R9.163–R9.164 also exist on the unmerged branch `claude/r9-163-timeline-fixes`. Pushed history is not rewritten.
+- **Plans:** `WO-PLATFORM-FORCE-DELETE-01` is done and only awaits the owner's browser walk; `WO-REL-READINESS-01` stays parked.
+- **Checks:** documentation only; no code or schema changed.
+
 ## R9.165 | 2026-10-22 | docs(schedule-assistant): record Product Schedule MCP proposal (Owner/Codex)
 
 - **Owner priority:** recorded the Product Schedule Composer MCP as a P0 proposal for Claude to turn into a bounded READY Work Order; this backlog record does not authorize implementation.

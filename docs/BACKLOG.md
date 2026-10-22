@@ -49,7 +49,9 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 Harness: `agent/EXTENSIONS.md`. Foundation: `apps/platform/INTEGRATIONS.md`.
 Order matters; each item is its own Work Order.
 
-- [ ] [PLANNED][P0] **Product Schedule Composer MCP (owner, 2026-10-22).** Build an
+- [ ] [PLANNED][P0] **Product Schedule Composer MCP (owner, 2026-10-22).** READY as
+  `WO-SCHEDULE-ASSISTANT-01` in `PLAN.md` (R9.166; target R9.167); the six open
+  points below are settled there (Lead decisions 10-22). Build an
   independent, provider-neutral optional module (`schedule-assistant`, parent and
   required module `studioflow`, initially disabled) so Claude, Codex, OpenCode and
   Gemini can compose one project's Product Schedule from a written brief. One MCP
