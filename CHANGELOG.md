@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.182 | 2026-10-22 | fix(studioflow): Schedule card captions take less room; toolbar stays on screen (Lead)
+
+- **Owner review of R9.181:** layout logic right, captions too tall; and the toolbar scrolled away, so adding an item or a new category meant scrolling back up.
+- **Card captions:** Brand moves to a small line above the product name; Color, Pattern, Finishing, Size and Qty join into one unlabeled line ("Pink · Texture Paint · Matte"); Location, Notes and extra spec lines keep a run-in label with the value wrapping at full card width, two lines max, full text on hover. The card's field selection and order are unchanged.
+- **Toolbar:** Material/Fixture, Board/List, Print, Set up and Add item stick to the top of the scroll area. The Product Schedule card clips with `overflow: clip` instead of `hidden` (hidden made it a scroll container, which stops sticky). A new category is still made from Add item (Category accepts a new name).
+- **Ledger note:** the R9.180 changelog entry (SketchUp, another session) was swept into the R9.181 commit because both sessions edited `CHANGELOG.md` at once; its text is unchanged and its code is still that session's to commit.
+- **Checks:** `tsc --noEmit` clean; eslint clean on the Schedule route. Browser (built-in, owner asked for a design review): 1600px shows 7 cards per row with captions 2-4 lines; 375px shows 2 per row with run-in labels; toolbar stays at the top while scrolling.
+
 ## R9.181 | 2026-10-22 | feat(ui-engine,studioflow): compact Schedule board cards; pick a colour instead of a photo (Lead)
 
 - **Owner request:** Schedule board cards were too large (4 per row at desktop width); and a paint/laminate item should be able to show a plain colour instead of an uploaded picture, as a shared tool.

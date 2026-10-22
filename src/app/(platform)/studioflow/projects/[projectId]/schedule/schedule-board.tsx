@@ -342,6 +342,9 @@ function NewCategoryInline({ command, projectId, section, categories, categoryCh
 
 // ── Board view ─────────────────────────────────────────────────────────────
 
+/** Card fields whose value names itself, so the board joins them into one line without labels. */
+const SPEC_LINE_FIELDS: ReadonlySet<string> = new Set(["color", "pattern", "finishing", "dimension", "qty"]);
+
 function BoardView({
   projectId,
   groups,
@@ -377,8 +380,13 @@ function BoardView({
               const shown = shownOptionOf(entry);
               const extras = extraChoicesOf(entry);
               const fieldValue = cardFieldValuesOf(entry);
-              const details: Array<[string, string | null | undefined]> = effectiveCardFields(entry)
-                .map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as [string, string | null | undefined]);
+              const fields = effectiveCardFields(entry);
+              const brand = fields.includes("brand") ? fieldValue.brand : null;
+              // Self-describing specs read as one line ("Pink · Texture Paint · Matte"); only fields that need a name keep one.
+              const spec = fields.filter((key) => SPEC_LINE_FIELDS.has(key)).map((key) => fieldValue[key]).filter(Boolean).join(" · ");
+              const details = fields.filter((key) => key !== "brand" && !SPEC_LINE_FIELDS.has(key))
+                .map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as [string, string | null | undefined])
+                .filter(([, value]) => !!value);
               const badges = entryBadges(entry);
               return (
                 <ContextActionMenu
@@ -413,19 +421,23 @@ function BoardView({
                   </button>
                   <button type="button" onClick={() => onOpen(entry.id)} className="grid min-w-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
                   <span className="mb-1 flex flex-wrap gap-1">{badges.map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span>
+                  {brand ? <span className="truncate text-micro uppercase tracking-[0.08em] text-ink-tertiary">{brand}</span> : null}
                   {shown ? (
                     <span className="line-clamp-2 font-ui-sans text-xs font-semibold uppercase leading-snug text-ink" title={shown.productName}>{shown.productName}</span>
                   ) : (
                     <span className="text-xs italic text-ink-tertiary">Reserved, no product yet</span>
                   )}
-                  <span className="mt-1.5 grid">
-                    {details.map(([label, value]) => value ? (
-                      <span key={label} className="grid gap-px border-t border-line py-1" title={value}>
-                        <span className="text-micro uppercase tracking-[0.06em] text-ink-tertiary">{label}</span>
-                        <span className="line-clamp-2 text-xs text-ink [overflow-wrap:anywhere]">{value}</span>
-                      </span>
-                    ) : null)}
-                  </span>
+                  {spec ? <span className="mt-0.5 line-clamp-2 text-xs leading-snug text-ink-secondary" title={spec}>{spec}</span> : null}
+                  {details.length ? (
+                    <span className="mt-1.5 grid gap-1 border-t border-line pt-1.5">
+                      {/* Run-in label: the value wraps under it at full card width instead of losing a label column. */}
+                      {details.map(([label, value]) => (
+                        <span key={label} className="line-clamp-2 text-xs leading-snug text-ink [overflow-wrap:anywhere]" title={`${label}: ${value}`}>
+                          <span className="mr-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary">{label}</span>{value}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                   </button>
                 </article>
                 </ContextActionMenu>
@@ -588,7 +600,7 @@ export function ScheduleBoard({
 
   return (
     <div className="grid">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle px-(--ui-section-px) py-2.5">
+      <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle bg-surface px-(--ui-section-px) py-2.5">
         {/* changeSection reads the draft ref only when this browser event fires; passing it through the shared tab contract keeps the existing discard guard intact. */}
         {/* eslint-disable-next-line react-hooks/refs */}
         <div className="flex min-w-0 flex-wrap items-center gap-2"><PillTabs label="Schedule section" items={(["MATERIAL", "FIXTURE"] as const).map((key) => ({ key, label: SECTION_LABEL[key], active: section === key, count: counts[key], onSelect: changeSection.bind(null, key) }))} /><PillTabs label="Schedule view" items={[{ key: "board", label: "Board", active: viewMode === "board", onSelect: () => setViewMode("board") }, { key: "list", label: "List", active: viewMode === "list", onSelect: () => setViewMode("list") }]} /></div>

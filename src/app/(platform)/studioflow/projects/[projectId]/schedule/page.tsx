@@ -31,7 +31,7 @@ export default async function ProjectSchedulePage({ params, searchParams }: { pa
   return (
     <>
     {project.archivedAt === null && !access.completed && !access.canEditDocuments ? <ReadOnlyNotice scope="project" className="mb-3" /> : null}
-    <SectionCard title="Product Schedule" description="Materials and fixtures specified for this project, each with its options and the chosen final one." count={entries.length} padded={false}>
+    <SectionCard title="Product Schedule" description="Materials and fixtures specified for this project, each with its options and the chosen final one." count={entries.length} padded={false} className="!overflow-clip">
       <ScheduleBoard
         initialOpenId={typeof entry === "string" && entries.some((item) => item.id === entry) ? entry : null}
         projectId={projectId}
