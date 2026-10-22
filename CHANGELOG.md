@@ -1,5 +1,18 @@
 # Changelog
 
+## R9.199 | 2026-10-23 | ui(studioflow): schedule inspector v2, one layout for every item (Lead)
+
+- **Owner request:** the inspector looked different per item (the option row wrapped differently, the action bar changed shape) and "Change photo" jumped straight to the file dialog although a colour can also be used. Built from the owner-approved mockup (artboard "Inspector v2", https://claude.ai/artifact/KtSjuhqAjjDN2snQUvGuPp).
+- **Fixed frame:** header (code · category, previous/next, item menu, close; status badge Final / Needs a decision / No product yet), then a fixed option strip, a scrolling body and a fixed Save bar ("Unsaved changes" / "No changes"). The content owns its scroll, so the sticky-bar trick of R9.197 is gone.
+- **Option strip:** same-size tabs (thumb, letter, green tick for final, dimmed when not used); one "+ Option" menu holds "Blank option" and "Copy from a past project…"; the selected option's ⋯ holds Delete option and Cancel sample request.
+- **Hero:** photo, Type, Brand (with its dot), then one decision: "Set option X as final" or a green "Chosen as final" with Undo. The photo opens a menu: Upload a photo…, Paste from clipboard, Use a colour, Remove photo; drop and Ctrl+V on the photo still work. A new option's photo opens the workspace without the file dialog.
+- **Sample:** one line in a fixed place ("No sample requested · Request", "Sample asked from … · Mark received", "Sample received · Ask again", "Sample declined: … · Ask again").
+- **Specs:** one column of rows (label, value, dot): Color, Pattern, Finishing, Size, Location, Qty (Fixture only) and the extra spec lines, whose label is edited in the row; "Add a spec line"; "Use default" sits by the dot legend. Notes below.
+- **Reserved code:** no empty form; "Add option A" / "Copy from a past project" and the Location row.
+- **Shared UI (EXTEND):** `RowActionMenu` takes `trigger` and `align`; `ButtonMenu` takes `leadingIcon`; `ImageWorkspace` takes `startInColor`. UI_ENGINE.md notes them.
+- **Not built from the mockup:** "Crop or adjust this photo" for an existing photo (it would need to load the stored image back into the editor).
+- **Checks:** `tsc --noEmit` clean; eslint clean on the schedule page and `ui_engine/patterns`; `schedule.regression.test.ts` 28/28 (the declined-reason pin now reads `sample.declineReason`); `ui-engine.test.ts` + `image-workspace.test.ts` 67/67. **Browser not checked:** the local browser pane is signed out; owner check owed.
+
 ## R9.198 | 2026-10-23 | feat(platform): AI and plugin access is a Developer list, outside RBAC (Lead)
 
 - **Owner decision 2026-10-23:** everyone may use the app by hand under RBAC, but the AI assistant, MCP and plugins are for the owner only, and the owner's normal account must not become a super account (above the Platform Owner). So the "expensive" integrations are granted by the Developer, per user, at `/system`.

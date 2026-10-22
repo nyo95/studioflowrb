@@ -47,6 +47,8 @@ export type ImageWorkspaceProps = {
   pasteFromPage?: boolean;
   /** Offer a plain colour as the picture instead of a file (a paint or laminate swatch); it arrives through `onPrepared` like any image. */
   allowColor?: boolean;
+  /** With `allowColor`: open on the colour picker instead of the file choice, for a "Use a colour" command. */
+  startInColor?: boolean;
   disabled?: boolean;
 };
 
@@ -70,7 +72,7 @@ function clamp(value: number, min: number, max: number): number {
 
 /** Draws every stroke onto a 2D context at the given pixel size, shared by the live preview and the final bake so the two never drift apart. */
 /** Browser image preparation only; storage and consumer policy stay outside. */
-export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false, openOnMount = false, initialFile = null, pasteFromPage = false, allowColor = false }: ImageWorkspaceProps) {
+export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false, openOnMount = false, initialFile = null, pasteFromPage = false, allowColor = false, startInColor = false }: ImageWorkspaceProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
   const opened = useRef(false);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -94,7 +96,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
   const [error, setError] = useState<string | null>(() => initialFile ? imageProblem(initialFile, accept, maxBytes) : null);
   const [adjust, setAdjust] = useState<ColorAdjust>(NEUTRAL_ADJUST);
   const [sizeNote, setSizeNote] = useState<string | null>(null);
-  const [colorMode, setColorMode] = useState(false);
+  const [colorMode, setColorMode] = useState(allowColor && startInColor && !initialFile);
   // Read once on the client; the controls only render after an image is chosen, so there is no server markup to disagree with.
   const [colorSupported] = useState(canBakeColorFilter);
   const busy = disabled || pending;

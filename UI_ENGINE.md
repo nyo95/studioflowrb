@@ -115,6 +115,7 @@ DirectoryShell
 **RowActionMenu convention:**
 - All ordinary CRUD (Edit, Archive, Restore, Request Deletion) go behind ⋯.
 - Icon actions (not ⋯) reserved only for: reorder handles, inline manipulation, highly contextual editor controls.
+- `trigger` (R9.199) opens the same menu from another element that names itself, e.g. a photo whose choices are upload, paste, colour or remove; `align` places it. `ButtonMenu` takes a `leadingIcon`.
 
 **Layout viewport-awareness:**
 - DirectoryShell fills remaining viewport height (`flex: 1; min-height: 0`).
@@ -997,7 +998,7 @@ Deferred patterns may remain in design prose as routing memory. They are not req
   Without these props the editor behaves exactly as before. `FormattedText`
   takes `tokens = { pattern, render }` to draw the same tokens in shown text
   (matched after escapes are removed, inside emphasis and lists).
-- `ImageWorkspace` owns browser selection (picker, drop, paste, or an
+- `ImageWorkspace` (`startInColor` with `allowColor`, R9.199: open on the colour picker for a "Use a colour" command) owns browser selection (picker, drop, paste, or an
   `initialFile` handed over by the consumer), preview, crop through zoom/focus
   (optionally locked to an `aspect`), freehand annotation, PNG or JPEG output
   (`outputType`, `outputQuality`), preparation progress, and safe preparation

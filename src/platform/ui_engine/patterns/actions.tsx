@@ -2,7 +2,7 @@
 
 import { ChevronDown,Filter,MoreHorizontal,X } from "lucide-react";
 import { ContextMenu,DropdownMenu } from "radix-ui";
-import { Fragment,type HTMLAttributes,type ReactNode,useState,useTransition } from "react";
+import { Fragment,type HTMLAttributes,type ReactElement,type ReactNode,useState,useTransition } from "react";
 
 import { cx } from "../internal/cx";
 import { Button,IconButton,type ButtonVariant } from "../primitives";
@@ -55,30 +55,37 @@ export function RowActionMenu({
   label = "Row actions",
   pending = false,
   disabled = false,
+  trigger,
+  align = "end",
 }: {
   items: readonly RowActionItem[];
   label?: string;
   pending?: boolean;
   disabled?: boolean;
+  /** Open the same menu from another element (a photo, a chip) instead of the ⋯ button; it must accept a ref and click props, and carry its own accessible name. */
+  trigger?: ReactElement;
+  align?: "start" | "center" | "end";
 }) {
   if (items.length === 0) return null;
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
-        <IconButton
-          size="sm"
-          variant="ghost"
-          label={label}
-          pending={pending}
-          disabled={disabled}
-          icon={<MoreHorizontal aria-hidden="true" />}
-        />
+      <DropdownMenu.Trigger asChild disabled={disabled}>
+        {trigger ?? (
+          <IconButton
+            size="sm"
+            variant="ghost"
+            label={label}
+            pending={pending}
+            disabled={disabled}
+            icon={<MoreHorizontal aria-hidden="true" />}
+          />
+        )}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           className="z-[65] min-w-[190px] overflow-hidden rounded-control bg-surface-raised shadow-elevated p-[5px]"
           sideOffset={5}
-          align="end"
+          align={align}
         >
           {items.map((item) => (
             <Fragment key={item.label}>
@@ -158,16 +165,18 @@ export function ButtonMenu({
   variant = "primary",
   align = "end",
   items,
+  leadingIcon,
 }: {
   label: string;
   variant?: ButtonVariant;
   align?: "start" | "center" | "end";
   items: readonly ButtonMenuItem[];
+  leadingIcon?: ReactNode;
 }) {
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <Button variant={variant} trailingIcon={<ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}>
+        <Button variant={variant} leadingIcon={leadingIcon} trailingIcon={<ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />}>
           {label}
         </Button>
       </DropdownMenu.Trigger>
