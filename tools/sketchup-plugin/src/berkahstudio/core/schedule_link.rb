@@ -143,7 +143,7 @@ module BerkahStudio
 
         category = categories[listed.index(input[0])]
         items = entries.select { |row| row['category'].to_s.casecmp?(category) }
-        items = items.sort_by { |row| [-similarity(material.name, "#{row['title']} #{row['code']}"), row['code'].to_s] }
+        items = items.sort_by { |row| [-similarity(material.name, row['title']), row['code'].to_s] }
         new_item = list_safe("(Item baru di #{category})")
         labels = items.map { |row| list_safe(entry_label(row)) }
         input = UI.inputbox(['Item jadwal'], [CHOOSE], [([CHOOSE] + labels + [new_item]).join('|')], "#{category}: #{material.name}")
@@ -169,12 +169,13 @@ module BerkahStudio
         end
       end
 
-      # Names that share words, initials or most letters come first in the item list.
-      def self.similarity(a, b)
-        words_a = a.to_s.downcase.scan(/[a-z0-9]+/)
-        words_b = b.to_s.downcase.scan(/[a-z0-9]+/)
+      # Item titles that share words with the material name, or whose initials it uses (hpl = High Pressure
+      # Laminate), come first in the item list.
+      def self.similarity(name, title)
+        words_a = name.to_s.downcase.scan(/[a-z0-9]+/)
+        words_b = title.to_s.downcase.scan(/[a-z0-9]+/)
         shared = (words_a & words_b).sum { |word| word.length >= 3 ? 2 : 1 }
-        initials = words_b.map { |word| word[0] }.join
+        initials = words_b.select { |word| word.match?(/\A[a-z]/) }.map { |word| word[0] }.join
         shared + (words_a.include?(initials) && initials.length > 1 ? 3 : 0)
       end
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.190 | 2026-10-22 | fix(sketchup): item list ranks titles by initials; Ruby syntax checked (Lead)
+
+- **Check (owner-approved Docker, official `ruby:3.2-slim`, Ruby 3.2.11 like SketchUp 2026):** `ruby -wc` on all 19 plugin files: Syntax OK, no warnings. Pure rules exercised: SO-1 / SO-001 / so-01 / " SO - 01 " are one code key; Material12 and "PL-01 copy" are not codes; item labels; list-safe text.
+- **Fix:** the picker's similarity compared the material name with "title + code", so initials never matched (hpl ↔ High Pressure Laminate). It now compares with the title only and takes initials from words that start with a letter. Plugin version unchanged (1.2.0, not yet released).
+- **Still owed:** the owner's test in SketchUp against the dev server.
+
 ## R9.189 | 2026-10-22 | feat(sketchup): plugin 1.2.0 takes codes from the Product Schedule (Lead)
 
 - **Work order:** `WO-SKETCHUP-01` rev 2, Stage 1b (decisions 11–14), executed by the Lead at the owner's request.
