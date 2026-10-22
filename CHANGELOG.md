@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.187 | 2026-10-22 | plan(sketchup): ask-first material linking, same-code spellings, model-only merge (Lead)
+
+- **Owner decisions** added to `WO-SKETCHUP-01` rev 2 (11–14): clicking a material always asks before linking, renaming or creating; SO-1 / SO-001 / so-01 are one code and are offered as the matching schedule item; merging two materials of one item happens only inside the SketchUp model, on confirmation, as one undo step, never changing the Schedule; no AI in Stage 1 (later only as accepted suggestions).
+- **Stage 1b** now spells out the four click states (linked, code-like name, picker with similar names first, merge offer) and two acceptance cases. Stage 1a (Codex) is unchanged.
+- **Checks:** documentation only.
+
 ## R9.186 | 2026-10-22 | feat(schedule-assistant): option photos and colour placeholders (Lead)
 
 - **Work order:** `WO-SCHEDULE-ASSISTANT-04` (owner: photos through the MCP; with no picture, ask first and confirm a colour placeholder). Executed by the Lead at the owner's request.

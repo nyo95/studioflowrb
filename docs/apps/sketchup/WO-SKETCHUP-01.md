@@ -45,6 +45,19 @@ that complexity and of collisions such as PL-1 in the model vs PL-01…07 in the
    zeros ignored (PL-1 = PL-01) so existing models are recognized.
 10. (Lead) Legacy per-project key, project-by-name binding, `/api/sketchup/*`, `/api/health`,
     merge queue and staging tables are not built.
+11. (Owner, 2026-10-22) **Clicking a material always asks before linking.** The plugin never
+    links, renames or creates a schedule item without the user's answer (flow in Stage 1b).
+12. (Owner) **Same code, any spelling.** SO-1, SO-001, so-01 and SO-01 are one code (prefix
+    case-insensitive, leading zeros ignored); the plugin offers the matching schedule item and
+    asks "Ini SO-01 · <brand product>?" instead of treating the spelling as a new code.
+13. (Owner) **Merge only inside the model, only on confirmation.** When two SketchUp materials
+    are linked to the same schedule item (or carry the same code in two spellings), the plugin
+    offers to merge them into one material named with the schedule code, showing face counts
+    and warning when textures or colours differ; one undo step. The Schedule is never changed
+    by a merge.
+14. (Owner) **No AI in Stage 1.** The flow is rule-based (deterministic matching). A later
+    stage may add AI suggestions (e.g. from a texture picture, or tidying many messy names) that
+    are always proposals the user accepts, like the Schedule Assistant rules.
 
 ## Stage 0 — Lead (plugin hygiene, no StudioFlow change)
 
@@ -83,9 +96,18 @@ create, another project's entry id resolves to `null`.
 
 - "Connect to StudioFlow": server URL + token (stored in SketchUp preferences, never in the
   package), project picked from `GET projects`, project id saved on the model.
-- Auto-Rename becomes "Kode dari jadwal": click a surface → list of the project's items
-  (code · category · brand product) filtered by category, or "Item baru di kategori…" →
-  StudioFlow returns the code → material renamed, entry id stored.
+- Auto-Rename becomes "Kode dari jadwal". Click a surface, then by the material's state:
+  1. **Linked** to an item of this project → show "SO-01 · <brand product>", offer "Ganti item".
+  2. **Name reads as a code** (decision 12) and the project has that item → ask
+     "Ini SO-01 · <brand product>?". Yes → rename to the schedule code and link. No → the
+     picker below.
+  3. **Otherwise** → picker: choose a category, see its items (code · brand product), names
+     most similar to the material name first (same rule family as the Schedule's look-alike
+     check: initials, edit distance, shared long word), plus "Item baru di kategori…" →
+     StudioFlow returns the code → material renamed, entry id stored.
+  4. After linking, if another material in the model is linked to the same item or carries
+     the same code in another spelling → offer the merge of decision 13.
+  Nothing is renamed, linked, created or merged without the user's answer (decision 11).
 - "Refresh codes": resolve all linked entry ids; rename changed ones in one undo step
   (temporary names for swaps); a removed item leaves the material "not linked" with a notice.
 - Status in the dialog: linked / not linked / linked to another project.
@@ -106,3 +128,8 @@ way with instance counts offered as quantity suggestions. Needs a stored snapsho
 3. Without a token or with the module off, the plugin still renames offline and says the
    material is not linked; nothing is sent.
 4. Wall Finish Labels and Component Tracker behave as in 1.1.6.
+5. A material named SO-1 in a project whose Schedule has SO-01 is offered as SO-01; "Ya"
+   renames it to SO-01 and links it; "Bukan" opens the picker; nothing changes on cancel.
+6. Two materials SO-1 and SO-001 linked to SO-01: the plugin offers one merge, shows both face
+   counts and a texture-difference warning when they differ; after merge every face uses SO-01;
+   one undo restores both materials; the Schedule is unchanged.
