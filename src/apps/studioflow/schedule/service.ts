@@ -60,6 +60,9 @@ const SIGNED_URL_SECONDS = 15 * 60;
 
 export type ScheduleImageUpload = { body: Uint8Array; contentType: string };
 
+/** Fields a patch may send; `null` clears an optional field, an omitted field keeps its value. */
+export type OptionPatch = Partial<Pick<SnapshotInput, "brandId" | "productName" | "color" | "pattern" | "finishing" | "dimension" | "notes" | "extra">>;
+
 /** Template item fields an operator may edit; the photo is managed by its own command. */
 export type TemplateItemInput = {
   snapshot: SnapshotInput;
@@ -320,6 +323,113 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       const label = await nextLabel(tx, entry.id);
       const option = await tx.sfScheduleOption.create({ data: { entry_id: entry.id, label, ...optionData(snapshot) } });
       await writeAudit(ports, tx, { action: "studioflow.schedule.option-created", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: entry.id, label, ...input.metadata } });
+      return { entryId: entry.id, code: scheduleCode(entry.prefix, entry.increment), optionId: option.id, label };
+    },
+
+    /** Materialize the active studio templates not yet in the project (legacy "Apply template"). */
+    async applyTemplates(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; metadata?: Record<string, unknown> }) {
+      await loadWritableProject(tx, input.projectId);
+      const created = await seedScheduleFromTemplates(tx, input.projectId);
+      if (created > 0) await writeAudit(ports, tx, { action: "studioflow.schedule.templates-applied", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { projectId: input.projectId, created, ...input.metadata } });
+      return { created };
+    },
+
+    /** Only the fields that were sent change; omitted fields keep their value. Qty and unit exist for Fixture only. */
+    async updateEntry(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; entryId: string; qty?: string | null; unit?: string | null; location?: string | null; metadata?: Record<string, unknown> }) {
+      const entry = await loadEntry(tx, input.projectId, input.entryId, true);
+      const code = scheduleCode(entry.prefix, entry.increment);
+      const data: { qty?: string | null; unit?: string | null; location?: string | null } = {};
+      if (entry.section !== "MATERIAL" && input.qty !== undefined) data.qty = decimalText(input.qty);
+      if (entry.section !== "MATERIAL" && input.unit !== undefined) data.unit = optionalText(input.unit, 40);
+      if (input.location !== undefined) data.location = optionalText(input.location, 160);
+      const changes: Record<string, { from: unknown; to: unknown }> = {};
+      const before = { qty: entry.qty?.toString() ?? null, unit: entry.unit, location: entry.location };
+      const same = (key: keyof typeof data, a: string | null, b: string | null) =>
+        key === "qty" && a !== null && b !== null ? Number(a) === Number(b) : a === b;
+      for (const key of Object.keys(data) as (keyof typeof data)[]) {
+        const to = data[key] ?? null;
+        if (!same(key, before[key], to)) changes[key] = { from: before[key], to };
+      }
+      if (Object.keys(changes).length === 0) return { entryId: entry.id, code, changes };
+      await tx.sfScheduleEntry.update({ where: { id: entry.id }, data });
+      await writeAudit(ports, tx, { action: "studioflow.schedule.entry-updated", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, changes, metadata: { projectId: input.projectId, code, ...input.metadata } });
+      return { entryId: entry.id, code, changes };
+    },
+
+    /**
+     * Replace an option's snapshot (legacy inspector `updateScheduleOptionSnapshot`). The photo, label, final flag and
+     * status never change here. The stored Brand is kept when the same Master Data Brand is sent again (it may have been
+     * archived since); a different Brand id is snapshotted from Master Data.
+     */
+    async updateOption(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; optionId: string; snapshot: SnapshotInput; metadata?: Record<string, unknown> }) {
+      const option = await loadOption(tx, input.projectId, input.optionId, true);
+      const brand = input.snapshot.brandId && input.snapshot.brandId === option.brand_id
+        ? { brandId: option.brand_id, brandName: option.brand_name }
+        : input.snapshot.brandId
+          ? await brandSnapshot(ports, input.snapshot.brandId)
+          : { brandId: null, brandName: input.snapshot.brandName ?? null };
+      const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: option.image_key });
+      const next = optionData(snapshot);
+      const changes: Record<string, { from: unknown; to: unknown }> = {};
+      for (const key of Object.keys(next) as (keyof typeof next)[]) {
+        if (key === "search_key") continue;
+        const from = option[key] ?? null;
+        const to = next[key] ?? null;
+        if (key === "extra" ? JSON.stringify(normalizeExtraFields(from)) !== JSON.stringify(to) : from !== to) changes[key] = { from, to };
+      }
+      const result = { optionId: option.id, entryId: option.entry_id, code: scheduleCode(option.entry.prefix, option.entry.increment), label: option.label, changes };
+      if (Object.keys(changes).length === 0) return result;
+      await tx.sfScheduleOption.update({ where: { id: option.id }, data: next });
+      await writeAudit(ports, tx, { action: "studioflow.schedule.option-updated", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, changes, metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label, ...input.metadata } });
+      return result;
+    },
+
+    /**
+     * Patch an option: only the sent fields change, `null` clears an optional field. Omitting `brandId` keeps the stored
+     * Brand; `brandId: null` removes it.
+     */
+    async patchOption(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; optionId: string; patch: OptionPatch; metadata?: Record<string, unknown> }) {
+      const option = await loadOption(tx, input.projectId, input.optionId, false);
+      const sent = (key: keyof OptionPatch) => input.patch[key] !== undefined;
+      const text = (key: Exclude<keyof OptionPatch, "brandId" | "extra">, stored: string | null) => (sent(key) ? (input.patch[key] as string | null) : stored);
+      const snapshot: SnapshotInput = {
+        brandId: sent("brandId") ? input.patch.brandId ?? null : option.brand_id,
+        brandName: sent("brandId") ? null : option.brand_name,
+        productName: text("productName", option.product_name) ?? "",
+        color: text("color", option.color),
+        pattern: text("pattern", option.pattern),
+        finishing: text("finishing", option.finishing),
+        dimension: text("dimension", option.dimension),
+        notes: text("notes", option.notes),
+        extra: sent("extra") ? input.patch.extra ?? [] : normalizeExtraFields(option.extra),
+      };
+      return writer.updateOption(tx, { actor: input.actor, projectId: input.projectId, optionId: option.id, snapshot, metadata: input.metadata });
+    },
+
+    /** Copy an option of another project into an entry as its next, never-final option (photo and notes included). */
+    async reuseOption(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; entryId: string; sourceOptionId: string; metadata?: Record<string, unknown> }) {
+      const entry = await loadEntry(tx, input.projectId, input.entryId, true);
+      const source = await tx.sfScheduleOption.findUnique({ where: { id: input.sourceOptionId }, include: { entry: true } });
+      if (!source || source.entry.project_id === input.projectId) throw notFound("reusable option");
+      const label = await nextLabel(tx, entry.id);
+      const option = await tx.sfScheduleOption.create({
+        data: {
+          entry_id: entry.id,
+          label,
+          brand_id: source.brand_id,
+          brand_name: source.brand_name,
+          product_name: source.product_name,
+          color: source.color,
+          pattern: source.pattern,
+          finishing: source.finishing,
+          dimension: source.dimension,
+          notes: source.notes,
+          extra: normalizeExtraFields(source.extra),
+          image_key: source.image_key,
+          search_key: source.search_key,
+        },
+      });
+      await writeAudit(ports, tx, { action: "studioflow.schedule.option-reused", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, sourceOptionId: source.id, ...input.metadata } });
       return { entryId: entry.id, code: scheduleCode(entry.prefix, entry.increment), optionId: option.id, label };
     },
   };
@@ -598,12 +708,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     async applyTemplates(input: CommandContext & { projectId: string }) {
       await requireScheduleCommand(input);
-      return runTransaction(async (tx) => {
-        await loadWritableProject(tx, input.projectId);
-        const created = await seedScheduleFromTemplates(tx, input.projectId);
-        if (created > 0) await writeAudit(ports, tx, { action: "studioflow.schedule.templates-applied", entityType: "project", entityId: input.projectId, actor: input.actor, metadata: { projectId: input.projectId, created } });
-        return { created };
-      });
+      return runTransaction((tx) => writer.applyTemplates(tx, { actor: input.actor, projectId: input.projectId }));
     },
 
     async createEntry(input: CommandContext & { projectId: string; section: string; category: string; qty?: string | null; unit?: string | null; location?: string | null; snapshot?: SnapshotInput | null }) {
@@ -620,25 +725,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     async updateEntry(input: CommandContext & { projectId: string; entryId: string; qty?: string | null; unit?: string | null; location?: string | null }) {
       await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
-        const entry = await loadEntry(tx, input.projectId, input.entryId, true);
-        // Only the fields that were sent change; omitted fields keep their value.
-        const data: { qty?: string | null; unit?: string | null; location?: string | null } = {};
-        // Qty and unit exist for Fixture only; a Material line ignores them.
-        if (entry.section !== "MATERIAL" && input.qty !== undefined) data.qty = decimalText(input.qty);
-        if (entry.section !== "MATERIAL" && input.unit !== undefined) data.unit = optionalText(input.unit, 40);
-        if (input.location !== undefined) data.location = optionalText(input.location, 160);
-        const changes: Record<string, { from: unknown; to: unknown }> = {};
-        const before = { qty: entry.qty?.toString() ?? null, unit: entry.unit, location: entry.location };
-        const same = (key: keyof typeof data, a: string | null, b: string | null) =>
-          key === "qty" && a !== null && b !== null ? Number(a) === Number(b) : a === b;
-        for (const key of Object.keys(data) as (keyof typeof data)[]) {
-          const to = data[key] ?? null;
-          if (!same(key, before[key], to)) changes[key] = { from: before[key], to };
-        }
-        if (Object.keys(changes).length === 0) return { entryId: entry.id };
-        await tx.sfScheduleEntry.update({ where: { id: entry.id }, data });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.entry-updated", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor, changes, metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) } });
-        return { entryId: entry.id };
+        const updated = await writer.updateEntry(tx, input);
+        return { entryId: updated.entryId };
       });
     },
 
@@ -742,24 +830,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     async updateOption(input: CommandContext & { projectId: string; optionId: string; snapshot: SnapshotInput }) {
       await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
-        const option = await loadOption(tx, input.projectId, input.optionId, true);
-        // Keep the stored brand when the same Master Data brand is sent again (it may have been archived since).
-        const brand = input.snapshot.brandId && input.snapshot.brandId === option.brand_id
-          ? { brandId: option.brand_id, brandName: option.brand_name }
-          : input.snapshot.brandId
-            ? await brandSnapshot(ports, input.snapshot.brandId)
-            : { brandId: null, brandName: input.snapshot.brandName ?? null };
-        const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: option.image_key });
-        const next = optionData(snapshot);
-        const changes: Record<string, { from: unknown; to: unknown }> = {};
-        for (const key of Object.keys(next) as (keyof typeof next)[]) {
-          if (key === "search_key") continue;
-          if ((option[key] ?? null) !== (next[key] ?? null)) changes[key] = { from: option[key] ?? null, to: next[key] ?? null };
-        }
-        if (Object.keys(changes).length === 0) return { optionId: option.id };
-        await tx.sfScheduleOption.update({ where: { id: option.id }, data: next });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.option-updated", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, changes, metadata: { projectId: input.projectId, entryId: option.entry_id, label: option.label } });
-        return { optionId: option.id };
+        const updated = await writer.updateOption(tx, input);
+        return { optionId: updated.optionId };
       });
     },
 
@@ -948,29 +1020,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     async copyReusableOption(input: CommandContext & { projectId: string; entryId: string; sourceOptionId: string }) {
       await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
-        const entry = await loadEntry(tx, input.projectId, input.entryId, true);
-        const source = await tx.sfScheduleOption.findUnique({ where: { id: input.sourceOptionId }, include: { entry: true } });
-        if (!source || source.entry.project_id === input.projectId) throw notFound("reusable option");
-        const label = await nextLabel(tx, entry.id);
-        const option = await tx.sfScheduleOption.create({
-          data: {
-            entry_id: entry.id,
-            label,
-            brand_id: source.brand_id,
-            brand_name: source.brand_name,
-            product_name: source.product_name,
-            color: source.color,
-            pattern: source.pattern,
-            finishing: source.finishing,
-            dimension: source.dimension,
-            notes: source.notes,
-            extra: normalizeExtraFields(source.extra),
-            image_key: source.image_key,
-            search_key: source.search_key,
-          },
-        });
-        await writeAudit(ports, tx, { action: "studioflow.schedule.option-reused", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, sourceOptionId: source.id } });
-        return { optionId: option.id };
+        const reused = await writer.reuseOption(tx, input);
+        return { optionId: reused.optionId };
       });
     },
 

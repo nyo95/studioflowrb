@@ -23,3 +23,11 @@ another app's internals.
 Request bodies are limited to 1 MiB before JSON parsing. A route with a known
 larger contract, such as a future SketchUp snapshot, must explicitly set its
 own `bodyLimitBytes` when it is introduced.
+
+Schedule Assistant is the v1 Product Schedule composer. Its six routes sit at
+`/api/integrations/v1/schedule-assistant`; read/preview need
+`schedule-assistant:read`, apply needs `schedule-assistant:write`, and both
+require the enabled module's `studioflow.schedule-assistant.use` grant. An app's
+scope/grant pairs are composed outside `src/platform/` (the Account page and
+token action pass `[...REFERENCE_SCOPE_GRANTS, ...SCHEDULE_ASSISTANT_SCOPE_GRANTS]`
+to `createOwn`). Contract: `docs/apps/schedule-assistant/CONTRACT.md`.

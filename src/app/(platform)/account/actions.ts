@@ -6,7 +6,8 @@ import { z } from "zod";
 import { AppError } from "@platform/core/errors";
 import { displayNameSchema, passwordSchema, requirePrincipal, requirePrincipalGrants, revokeSessionById, setSessionCookie } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
-import { integrationTokens, type IntegrationTokenPublic } from "@platform/core/integrations";
+import { integrationTokens, REFERENCE_SCOPE_GRANTS, type IntegrationTokenPublic } from "@platform/core/integrations";
+import { SCHEDULE_ASSISTANT_SCOPE_GRANTS } from "@/apps/schedule-assistant/public";
 import { platformAccount, userPreferences, userTutorials } from "@platform/runtime";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { validationError } from "@platform/core/validation";
@@ -157,6 +158,7 @@ export async function createIntegrationTokenAction(
       label: parsed.data.label,
       scopes: parsed.data.scopes,
       expiresAt: days === null ? null : new Date(Date.now() + days * 24 * 60 * 60 * 1000),
+      scopeGrants: [...REFERENCE_SCOPE_GRANTS, ...SCHEDULE_ASSISTANT_SCOPE_GRANTS],
     });
     revalidatePath("/account");
     return created;

@@ -49,9 +49,10 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 Harness: `agent/EXTENSIONS.md`. Foundation: `apps/platform/INTEGRATIONS.md`.
 Order matters; each item is its own Work Order.
 
-- [ ] [PLANNED][P0] **Product Schedule Composer MCP (owner, 2026-10-22).** READY as
-  `WO-SCHEDULE-ASSISTANT-01` in `PLAN.md` (R9.166; target R9.167); the six open
-  points below are settled there (Lead decisions 10-22). Build an
+- [ ] [UNVERIFIED][P0] WO-SCHEDULE-ASSISTANT-01 (R9.167): Product Schedule Composer MCP built and server/bridge tests pass; owed: switch the module on, create a token with both Schedule Assistant scopes, connect Claude Code, Codex, OpenCode and Gemini CLI with `tools/schedule-assistant-mcp/README.md`, compose from a short brief in one client (preview shown, client asks before apply, Schedule screen shows the same codes, nothing final), and retry apply (replay, no duplicates).
+- [ ] [PLANNED][P0] **Product Schedule Composer MCP (owner, 2026-10-22).** Built in
+  R9.167 (`WO-SCHEDULE-ASSISTANT-01`, contract `docs/apps/schedule-assistant/CONTRACT.md`);
+  remove this entry after the four-client walk above. Original proposal: build an
   independent, provider-neutral optional module (`schedule-assistant`, parent and
   required module `studioflow`, initially disabled) so Claude, Codex, OpenCode and
   Gemini can compose one project's Product Schedule from a written brief. One MCP

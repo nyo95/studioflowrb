@@ -5,7 +5,7 @@ Scope: Product Schedule Composer MCP, V1: an AI client composes one project's Pr
 Module(s): new optional module `schedule-assistant` (parent/requires `studioflow`, starts DISABLED); StudioFlow (new protected `public/` composer door + one permission id); Platform integrations (scope registration wiring only); composition root; new standalone bridge package `tools/schedule-assistant-mcp/`.
 Target revision: R9.167 (this plan is R9.166). R9.165 exists twice in the ledger (Platform Owner user deletion, local; Schedule MCP proposal `6fb5c66`, pushed) and R9.163–R9.164 are also used on the unmerged remote branch `claude/r9-163-timeline-fixes`; re-check `CHANGELOG.md` and every local/remote branch, and use the next unused number if R9.167 is taken.
 Risk: high - a new external write door into live project data authenticated by a bearer token; crosses the StudioFlow protected core, RBAC/module gating and the integration transaction kit. Escalate (BLOCKED / CONFLICT) if the composer cannot run inside the kit's transaction, if code allocation needs a change to `schedule/sync.ts` semantics, if any locked decision below needs a schema migration, or if the MCP SDK cannot be used as a pinned dependency of the standalone package.
-Status: READY
+Status: DONE in R9.167 — Reviewer acceptance pending (four-client walk; BACKLOG [UNVERIFIED]). Executed by the Lead (takeover, owner 2026-10-22) after two partial Executor passes.
 Priority: P0 (owner, 2026-10-22)
 Owner: Product Owner (decisions 2026-10-22; BACKLOG "Product Schedule Composer MCP")
 Last updated: 2026-10-22
@@ -414,11 +414,76 @@ shows the same codes/labels with nothing final; repeat apply → replay, no dupl
 - Recovery: disable the module (Developer console) to cut every route at once;
   revoke tokens on the Account page. Writes are ordinary audited schedule rows.
 
+## Lead Review of the partial slice (2026-10-22) — CONTINUE, do not roll back
+
+Codex returned an uncommitted partial slice on `e6eeed8`. Verdict: **CORRECTION
+REQUIRED, continue in place.** Keep: module manifest, permission id, scope grants and
+Account wiring, route files (shape), `contract.ts` (shape), bridge package skeleton
+and pinned dependencies, the doc/MODULES/INTEGRATIONS notes. Everything below must be
+fixed before the R9.167 commit; the plan above is unchanged and still governs.
+
+Defects found (each needs a regression test):
+
+1. **Preview swallows every error (security).** `previewBatch` catches all errors and
+   returns `valid: true` with a digest, so an outsider, a manager without override, an
+   archived/completed project or an invalid batch all get a "valid" preview. Only the
+   deliberate rollback sentinel may be caught; access/writability failures must
+   propagate as the kit error (decision 13); validation failures must come back as the
+   `{ valid: false, issues }` shape with operation indexes (decision 18, criterion 5),
+   collected by a pure validation pass before the dry run.
+2. **`update_option` erases the option's photo.** It rebuilds the snapshot with
+   `imageKey: null`, so `optionData` writes `image_key: null`. It also re-validates an
+   unchanged Brand (an archived but unchanged Brand would now fail). Follow decision
+   14: keep `image_key`, label, final and status; re-snapshot the Brand only when the
+   Brand id changes; record `changes` in the audit like `updateOption`.
+3. **`update_entry` bypasses the schedule rules.** It writes raw `qty`/`unit`/
+   `location` with no two-decimal check, trimming or length limits, no change
+   detection and no `changes` audit. Reuse the existing `updateEntry` rules
+   (`decimalText`, `optionalText`, unchanged → `no_change` with no audit).
+4. **`reuse_option` diverges from `copyReusableOption`** (no photo key, no
+   normalized extra). Reuse the same rule; extract a tx-aware helper in
+   `src/apps/studioflow/schedule/` and call it from both.
+5. **Schedule rules live in the public door.** Option patch merge, entry update, reuse
+   and the fingerprint belong in `src/apps/studioflow/schedule/` as tx-aware
+   functions next to `writer`; the door only checks access, orchestrates and maps
+   DTOs (decision 21).
+6. **`listProjects` is wrong.** It hides completed projects (they are readable with
+   `canApply: false`), ignores `studioflow.schedule.manage` in `canApply`, and
+   re-implements the access rule with string checks. Use `projectAccessFromFacts` /
+   `requireRead` and the decision-13 rule; cap at 200.
+7. **`readContext` is incomplete.** Add `project { id, name, status, archived,
+   canApply }`, category choices with prefixes, the active template items not yet in
+   the project, normalized `extra`, and keep it free of storage keys/URLs.
+8. **`searchBrands` is a stub with a swallowed fake access check.** Require read
+   (`requireRead`) and the module grant only; return `{ id, name }` capped at 20. The
+   unknown-Brand suggestions (decision 16) come from the validation pass.
+9. **`reusable-options` route returns `[]`.** Implement it on
+   `searchReusableOptions` with project-detail access, capped at 20, no image fields.
+10. **Missing batch rules:** `apply_templates` only first and at most once; an
+    entry/option updated at most once; ids must belong to the project; `qty`/`unit`
+    on Material rejected at validation (create and update).
+11. **Bridge:** tool input schemas must mirror the wire schema (no `z.unknown()`);
+    return a new `operationId` only for a valid preview; HTTP/network failures become
+    MCP tool errors with the safe message (never the token); logs only to stderr;
+    the read-back returns the entries touched by the batch, and says so if the
+    read-back failed after a successful apply; README needs copy-ready config blocks
+    for Claude Code, Codex, OpenCode and Gemini CLI checked against each client's
+    current docs.
+12. **No tests exist.** Every acceptance criterion 1–13 needs its test; the bridge test
+    command must run real tests (currently 0).
+13. **Changelog** entry is premature; rewrite it at commit time with the real checks
+    and limitations.
+
+This review section is a Lead edit to `PLAN.md` left uncommitted on purpose so the
+revision numbers stay in order: include `PLAN.md` unchanged in the R9.167 commit and
+set its Status line to `DONE in R9.167 — Reviewer acceptance pending`.
+
 ## Executor Prompt
 
 You are the Backend Executor. Location: ask the owner (rumah or kantor) and load that
 env file. Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `docs/agent/EXTENSIONS.md`, and
-this `PLAN.md` (WO-SCHEDULE-ASSISTANT-01), then implement the entire READY outcome and
+this `PLAN.md` (WO-SCHEDULE-ASSISTANT-01, including "Lead Review of the partial
+slice"), then implement the entire READY outcome and
 nothing beyond it: the `schedule-assistant` optional module, the StudioFlow schedule
 composer public door, the two token scopes and module permission, the six integration
 routes, the standalone `tools/schedule-assistant-mcp` stdio bridge, the contract and

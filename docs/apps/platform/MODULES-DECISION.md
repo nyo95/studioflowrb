@@ -123,6 +123,11 @@ first commit, and reaches other modules only through their `public/`. It may
 not add database relations into another module's schema; it stores plain ids
 plus the snapshot it needs, and handles "the thing I point to is gone" itself.
 
+Current optional module list also includes `schedule-assistant` 1.0.0 (R9.167:
+parent and requirement `studioflow`, initially disabled,
+integration-only with no screen). It has no v1 persistence; future owned data
+must start in its own `schedule-assistant` Prisma schema.
+
 **D9. Ideas Board is the pilot extraction** (M3), then Presentation. The
 StudioFlow → module edges become calls through StudioFlow's `public/`
 (e.g. "add this card to a Schedule option" goes through the existing Schedule

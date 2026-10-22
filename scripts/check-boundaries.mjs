@@ -68,6 +68,13 @@ export const PLATFORM_ROUTE_OWNERS = [
   { path: "settings/general/masterdata", app: "masterdata" },
 ];
 
+/**
+ * Optional extension modules whose only door is `/api/integrations/v1/<app>`: they have no screen, so they have no
+ * `public/nav.ts` and no `(platform)` route directory. Each entry needs a Lead Work Order (WO-SCHEDULE-ASSISTANT-01
+ * added the first) and must still be an optional module with its own manifest.
+ */
+export const INTEGRATION_ONLY_APPS = Object.freeze(["schedule-assistant"]);
+
 const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 // Skipped at any depth: dependency and build output only. Generated code is
 // skipped solely as the top-level `generated` folder of the walked root
@@ -816,7 +823,7 @@ export async function collectPermissionVocabularyViolations({ projectRoot = proc
   return violations;
 }
 
-export async function collectRouteOwnershipViolations({ projectRoot = process.cwd(), srcDir, routeOwners = PLATFORM_ROUTE_OWNERS } = {}) {
+export async function collectRouteOwnershipViolations({ projectRoot = process.cwd(), srcDir, routeOwners = PLATFORM_ROUTE_OWNERS, integrationOnlyApps = INTEGRATION_ONLY_APPS } = {}) {
   projectRoot = resolve(projectRoot);
   srcDir = srcDir ? resolve(srcDir) : join(projectRoot, "src");
   const violations = [];
@@ -833,6 +840,8 @@ export async function collectRouteOwnershipViolations({ projectRoot = process.cw
   }
 
   const registered = new Set();
+  /** Optional modules listed in `integrationOnlyApps`: no nav constants or screen route are required. */
+  const integrationOnly = new Set();
   if (registrationsSource) {
     for (const app of apps) {
       const block = findRegistrationBlock(registrationsSource, app);
@@ -845,6 +854,7 @@ export async function collectRouteOwnershipViolations({ projectRoot = process.cw
           continue;
         }
         registered.add(app);
+        if (integrationOnlyApps.includes(app)) integrationOnly.add(app);
         continue;
       }
       registered.add(app);
@@ -866,6 +876,7 @@ export async function collectRouteOwnershipViolations({ projectRoot = process.cw
   }
 
   for (const app of apps) {
+    if (integrationOnly.has(app)) continue;
     const navPath = join(srcDir, "apps", app, "public", "nav.ts");
     let navSource = null;
     try {
@@ -900,6 +911,7 @@ export async function collectRouteOwnershipViolations({ projectRoot = process.cw
   }
 
   for (const app of registered) {
+    if (integrationOnly.has(app)) continue;
     const explicitOwners = routeOwners.filter((owner) => owner.app === app);
     if (explicitOwners.length > 0) {
       for (const owner of explicitOwners) {

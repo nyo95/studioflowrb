@@ -106,6 +106,7 @@ owns grant mechanics.
 | `studioflow.mom.manage` | Create/edit/delete MOM documents and content |
 | `studioflow.schedule.manage` | Schedule entries, options, photos, card fields, sample requests |
 | `studioflow.presentation.manage` | Presentation boards, slides and pins |
+| `studioflow.schedule-assistant.use` | Use the Schedule Assistant integration (optional module `schedule-assistant`, off by default; in no built-in profile). Schedule writes still need `schedule.manage` and the document assignment rule |
 
 Rules:
 

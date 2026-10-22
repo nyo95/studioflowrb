@@ -34,6 +34,7 @@ import {
   RULE_PLATFORM_TO_APP,
   RULE_RAW_LEGACY_UI_CLASS,
   RULE_ROUTE_OWNERSHIP,
+  INTEGRATION_ONLY_APPS,
   RULE_SHELL_TO_APP_INTERNAL,
 } from "./check-boundaries.mjs";
 
@@ -384,6 +385,33 @@ try {
 } finally {
   await rm(foundationRoot, { recursive: true, force: true });
 }
+const INTEGRATION_ONLY_FILES = {
+  "tsconfig.json": JSON.stringify(TSCONFIG, null, 2),
+  "src/app/app-registrations.ts": `export const APP_REGISTRATIONS = [];
+`,
+  "src/apps/comet/public/manifest.ts": `export const COMET_MODULE_MANIFEST = { id: "comet", name: "Comet", version: "1.0.0", kind: "optional", parent: "sun", requires: ["sun"] };
+`,
+  "src/apps/comet/public/index.ts": `export { COMET_MODULE_MANIFEST } from "./manifest";
+`,
+};
+const integrationOnlyRoot = await mkdtemp(join(tmpdir(), "wo3-boundaries-integration-only-"));
+try {
+  await writeTree(integrationOnlyRoot, INTEGRATION_ONLY_FILES);
+  const strict = await collectRouteOwnershipViolations({ projectRoot: integrationOnlyRoot, integrationOnlyApps: [] });
+  assert.deepEqual(
+    strict.map((v) => violationKey(integrationOnlyRoot, v)).sort(),
+    [
+      `src/app/(platform)/sun/comet | ${RULE_ROUTE_OWNERSHIP} | `,
+      `src/apps/comet/public/nav.ts | ${RULE_ROUTE_OWNERSHIP} | `,
+    ].sort(),
+  );
+  assert.deepEqual(await collectRouteOwnershipViolations({ projectRoot: integrationOnlyRoot, integrationOnlyApps: ["comet"] }), []);
+  assert.ok(INTEGRATION_ONLY_APPS.includes("schedule-assistant"));
+  console.log("PASS integration-only optional modules: no nav or screen route required");
+} finally {
+  await rm(integrationOnlyRoot, { recursive: true, force: true });
+}
+
 const DATABASE_FILES = {
   "tsconfig.json": JSON.stringify(TSCONFIG, null, 2),
   "prisma/schema.prisma": "datasource db {\n  provider = \"postgresql\"\n  schemas  = [\"platform\", \"alpha\", \"beta\"]\n}\nmodel User {\n  id String @id\n  @@schema(\"platform\")\n}\nmodel AlphaThing {\n  id String @id\n  @@schema(\"alpha\")\n}\nmodel BetaWidget {\n  id String @id\n  @@schema(\"beta\")\n}\nmodel AlphaLink {\n  id String @id\n  thingId String\n  thing AlphaThing @relation(fields: [thingId], references: [id])\n  widgetId String\n  widget BetaWidget @relation(fields: [widgetId], references: [id])\n  ownerId String\n  owner User @relation(fields: [ownerId], references: [id])\n  @@schema(\"alpha\")\n}\n",
