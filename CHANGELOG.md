@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.183 | 2026-10-22 | fix(studioflow): Schedule board shows only the badges that need someone; smaller quick add (Lead)
+
+- **Owner review:** most cards carried the same "Final" badge (42 of 43), and the quick-add box took a full card row.
+- **Badges:** `entryBadges` marks settled states as quiet (Final, Not final with one option, Sample received). The list still shows every badge; a board card shows only the rest (N options, Sample waiting, Sample declined), and Final becomes a green check beside the code ("Final" for screen readers). The badge row is not drawn when empty.
+- **Quick add:** a short dashed box (name field plus "+ Add PT-09") instead of a 9rem-tall tile; same action and code.
+- **Checks:** `tsc --noEmit` clean; eslint clean on the Schedule route; `schedule.regression.test.ts` 28/28. Browser at 1600px: checks on final cards, no repeated Final badges, quick add about a third of the old height.
+
 ## R9.182 | 2026-10-22 | fix(studioflow): Schedule card captions take less room; toolbar stays on screen (Lead)
 
 - **Owner review of R9.181:** layout logic right, captions too tall; and the toolbar scrolled away, so adding an item or a new category meant scrolling back up.

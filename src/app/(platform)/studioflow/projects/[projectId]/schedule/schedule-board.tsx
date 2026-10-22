@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crown, Eye, EyeOff, History, ImageIcon, Plus, Printer, Search } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Crown, Eye, EyeOff, History, ImageIcon, Plus, Printer, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -252,15 +252,21 @@ function entryMatchesFilter(entry: ScheduleEntryView, filter: ScheduleFilter) {
   return true;
 }
 
-function entryBadges(entry: ScheduleEntryView): Array<{ label: string; tone: "success" | "neutral" | "warning" }> {
+/**
+ * `quiet` marks a settled state. The list shows every badge; a board card leaves the quiet ones out (Final becomes a
+ * check beside the code) so the badges left on the board are only the ones that still need someone (owner 2026-10-22).
+ */
+type EntryBadge = { label: string; tone: "success" | "neutral" | "warning"; quiet?: boolean };
+
+function entryBadges(entry: ScheduleEntryView): EntryBadge[] {
   const final = finalOf(entry);
   const shown = shownOptionOf(entry);
-  const badges: Array<{ label: string; tone: "success" | "neutral" | "warning" }> = [];
-  if (final) badges.push({ label: "Final", tone: "success" });
+  const badges: EntryBadge[] = [];
+  if (final) badges.push({ label: "Final", tone: "success", quiet: true });
   else if (entry.options.length > 1) badges.push({ label: `${entry.options.length} options`, tone: "neutral" });
-  else if (entry.options.length === 1) badges.push({ label: "Not final", tone: "neutral" });
+  else if (entry.options.length === 1) badges.push({ label: "Not final", tone: "neutral", quiet: true });
   if (shown?.sampleRequest?.status === "REQUESTED") badges.push({ label: "Sample waiting", tone: "warning" });
-  else if (shown?.sampleRequest?.status === "RECEIVED") badges.push({ label: "Sample received", tone: "success" });
+  else if (shown?.sampleRequest?.status === "RECEIVED") badges.push({ label: "Sample received", tone: "success", quiet: true });
   else if (shown?.sampleRequest?.status === "DECLINED") badges.push({ label: "Sample declined", tone: "warning" });
   return badges.slice(0, 2);
 }
@@ -277,9 +283,9 @@ function QuickAddTile({ group, command, projectId, section }: { group: { categor
     if (ok) setProductName("");
   };
   return (
-    <form className="grid min-h-36 content-center gap-2 border border-dashed border-line px-3 py-4" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
-      <Input aria-label={`Quick add to ${group.category}`} value={productName} onChange={(event) => setProductName(event.target.value)} maxLength={200} placeholder="Type, or leave empty to reserve" density="compact" />
-      <Button type="submit" size="sm" variant="secondary" pending={command.isPending(key)}>{`Add ${nextCode}`}</Button>
+    <form className="grid gap-1.5 rounded-control border border-dashed border-line p-2" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+      <Input aria-label={`Quick add to ${group.category}`} value={productName} onChange={(event) => setProductName(event.target.value)} maxLength={200} placeholder="Name, or leave empty" density="compact" />
+      <Button type="submit" size="sm" variant="ghost" leadingIcon={<Plus className="h-3.5 w-3.5" />} pending={command.isPending(key)}>{`Add ${nextCode}`}</Button>
     </form>
   );
 }
@@ -387,7 +393,9 @@ function BoardView({
               const details = fields.filter((key) => key !== "brand" && !SPEC_LINE_FIELDS.has(key))
                 .map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as [string, string | null | undefined])
                 .filter(([, value]) => !!value);
-              const badges = entryBadges(entry);
+              const allBadges = entryBadges(entry);
+              const isFinal = allBadges.some((badge) => badge.label === "Final");
+              const badges = allBadges.filter((badge) => !badge.quiet);
               return (
                 <ContextActionMenu
                   key={entry.id}
@@ -417,10 +425,13 @@ function BoardView({
                     ) : (
                       <span className="absolute inset-0 grid place-items-center text-micro tracking-[0.18em] text-ink-tertiary">NO IMAGE</span>
                     )}
-                    <span className="absolute right-2 top-2 rounded-action bg-surface/90 px-1.5 py-0.5 font-ui-mono text-micro font-bold tabular-nums text-ink">{entry.code}</span>
+                    <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-action bg-surface/90 px-1.5 py-0.5 font-ui-mono text-micro font-bold tabular-nums text-ink">
+                      {isFinal ? <><Check aria-hidden="true" className="h-3 w-3 text-success" strokeWidth={3} /><span className="sr-only">Final, </span></> : null}
+                      {entry.code}
+                    </span>
                   </button>
                   <button type="button" onClick={() => onOpen(entry.id)} className="grid min-w-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
-                  <span className="mb-1 flex flex-wrap gap-1">{badges.map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span>
+                  {badges.length ? <span className="mb-1 flex flex-wrap gap-1">{badges.map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span> : null}
                   {brand ? <span className="truncate text-micro uppercase tracking-[0.08em] text-ink-tertiary">{brand}</span> : null}
                   {shown ? (
                     <span className="line-clamp-2 font-ui-sans text-xs font-semibold uppercase leading-snug text-ink" title={shown.productName}>{shown.productName}</span>
