@@ -7,8 +7,9 @@ import { fileURLToPath } from "node:url";
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-import { readConfig } from "../bridge.mjs";
+import { approvalMessage, readConfig } from "../bridge.mjs";
 
 const SERVER = fileURLToPath(new URL("../server.mjs", import.meta.url));
 const TOKEN = `sfk_${"a".repeat(12)}_${"B".repeat(43)}`;
@@ -43,15 +44,46 @@ before(async () => {
 after(() => new Promise((resolve) => http.close(() => resolve(undefined))));
 beforeEach(() => { requests = []; answer = () => ({ body: { ok: true, data: [] } }); });
 
-/** @param {Record<string, string>} [env] */
-async function connect(env = {}) {
+/**
+ * @param {Record<string, string>} [env]
+ * @param {(request: any) => any} [elicit] when given, the client declares the elicitation capability and answers with it
+ */
+async function connect(env = {}, elicit) {
   let stderr = "";
   const transport = new StdioClientTransport({ command: process.execPath, args: [SERVER], env: { PATH: process.env.PATH ?? "", STUDIOFLOW_URL: baseUrl, STUDIOFLOW_TOKEN: TOKEN, ...env }, stderr: "pipe" });
   transport.stderr?.on("data", (chunk) => { stderr += chunk; });
-  const client = new Client({ name: "bridge-test", version: "1.0.0" });
+  const client = new Client({ name: "bridge-test", version: "1.0.0" }, elicit ? { capabilities: { elicitation: {} } } : undefined);
+  /** @type {any[]} */
+  const dialogs = [];
+  if (elicit) client.setRequestHandler(ElicitRequestSchema, async (request) => { dialogs.push(request.params); return elicit(request.params); });
   await client.connect(transport);
-  return { client, stderr: () => stderr };
+  return { client, stderr: () => stderr, dialogs };
 }
+
+const OPERATIONS = [{ op: "update_entry", entryId: ENTRY, location: "Lobby" }];
+
+/** A fake StudioFlow that answers every route the bridge uses; `apply` may override the apply answer. */
+function studio(/** @type {{ apply?: (count: number) => { status?: number, body: unknown, headers?: Record<string, string> }, context?: () => { status?: number, body: unknown } }} */ overrides = {}) {
+  let applies = 0;
+  return (/** @type {{ path: string }} */ { path }) => {
+    if (path.endsWith("/schedule-assistant/projects")) return { body: { ok: true, data: [{ id: PROJECT, name: "Sociolla SBW R1", status: "ACTIVE", canApply: true }] } };
+    if (path.endsWith("/preview")) return { body: { ok: true, data: { valid: true, digest: DIGEST, baseFingerprint: "x", templatesCreated: 0, operations: [{ index: 0, op: "update_entry", effect: "update", entryCode: "LA-01" }] } } };
+    if (path.endsWith("/apply")) {
+      applies += 1;
+      return overrides.apply?.(applies) ?? { body: { ok: true, data: { operationId: "x", applied: true, templatesCreated: 0, operations: [{ index: 0, op: "update_entry", effect: "update", entryId: ENTRY, entryCode: "LA-01" }] } }, headers: applies > 1 ? { "idempotency-replayed": "true" } : {} };
+    }
+    if (path.endsWith("/context")) return overrides.context?.() ?? { body: { ok: true, data: { entries: [{ id: ENTRY, code: "LA-01" }, { id: "other", code: "LA-02" }] } } };
+    return { body: { ok: true, data: [] } };
+  };
+}
+
+/** Preview in this session, then return the apply arguments it issued. */
+async function previewed(/** @type {Client} */ client) {
+  const preview = json(await client.callTool({ name: "preview_schedule_changes", arguments: { projectId: PROJECT, operations: OPERATIONS } }));
+  return { projectId: PROJECT, operationId: preview.operationId, digest: preview.digest, operations: OPERATIONS };
+}
+
+const applyCount = () => requests.filter((request) => request.path.endsWith("/apply")).length;
 
 /** @param {any} response */
 function json(response) {
@@ -129,22 +161,17 @@ describe("MCP tools over stdio", () => {
     }
   });
 
-  it("applies with the Idempotency-Key and a byte-identical body on retry, then reads back the touched entries", async () => {
-    const operations = [{ op: "update_entry", entryId: ENTRY, location: "Lobby" }];
-    const operationId = "33333333-3333-4333-8333-333333333333";
-    answer = ({ path }) => path.endsWith("/apply")
-      ? { body: { ok: true, data: { operationId, applied: true, templatesCreated: 0, operations: [{ index: 0, op: "update_entry", effect: "update", entryId: ENTRY, entryCode: "LA-01" }] } }, headers: requests.filter((r) => r.path.endsWith("/apply")).length > 1 ? { "idempotency-replayed": "true" } : {} }
-      : { body: { ok: true, data: { entries: [{ id: ENTRY, code: "LA-01" }, { id: "other", code: "LA-02" }] } } };
+  it("applies a preview from this session with the Idempotency-Key and a byte-identical body on retry, then reads back the touched entries", async () => {
+    answer = studio();
     const { client } = await connect();
     try {
-      const args = { projectId: PROJECT, operationId, digest: DIGEST, operations };
+      const args = await previewed(client);
       const first = json(await client.callTool({ name: "apply_schedule_changes", arguments: args }));
       const second = json(await client.callTool({ name: "apply_schedule_changes", arguments: args }));
       const applies = requests.filter((request) => request.path.endsWith("/apply"));
       assert.equal(applies.length, 2);
-      assert.equal(applies[0].headers["idempotency-key"], operationId);
+      assert.equal(applies[0].headers["idempotency-key"], args.operationId);
       assert.equal(applies[0].body, applies[1].body);
-      assert.equal(requests.filter((request) => request.path.endsWith("/context")).length, 2);
       assert.deepEqual(first.readBack.entries, [{ id: ENTRY, code: "LA-01" }]);
       assert.equal(first.replayed, false);
       assert.equal(second.replayed, true);
@@ -153,31 +180,119 @@ describe("MCP tools over stdio", () => {
     }
   });
 
-  it("turns a StudioFlow refusal into a tool error with the safe message", async () => {
-    answer = () => ({ status: 409, body: { ok: false, error: { kind: "CONFLICT", code: "SCHEDULE_PREVIEW_STALE", message: "Preview again." } } });
+  it("refuses an apply this session did not preview, or one whose operations or project differ", async () => {
+    answer = studio();
     const { client } = await connect();
     try {
-      const response = /** @type {any} */ (await client.callTool({ name: "apply_schedule_changes", arguments: { projectId: PROJECT, operationId: "33333333-3333-4333-8333-333333333333", digest: DIGEST, operations: [{ op: "apply_templates" }] } }));
+      const invented = /** @type {any} */ (await client.callTool({ name: "apply_schedule_changes", arguments: { projectId: PROJECT, operationId: "33333333-3333-4333-8333-333333333333", digest: DIGEST, operations: OPERATIONS } }));
+      assert.equal(invented.isError, true);
+      assert.match(invented.content[0].text, /APPLY_NOT_PREVIEWED/);
+      const args = await previewed(client);
+      const changed = /** @type {any} */ (await client.callTool({ name: "apply_schedule_changes", arguments: { ...args, operations: [{ op: "update_entry", entryId: ENTRY, location: "Kasir" }] } }));
+      assert.match(changed.content[0].text, /APPLY_NOT_PREVIEWED/);
+      const otherProject = /** @type {any} */ (await client.callTool({ name: "apply_schedule_changes", arguments: { ...args, projectId: "44444444-4444-4444-8444-444444444444" } }));
+      assert.match(otherProject.content[0].text, /APPLY_NOT_PREVIEWED/);
+      assert.equal(applyCount(), 0);
+      // The same operations with fields in another order are the same preview.
+      const reordered = json(await client.callTool({ name: "apply_schedule_changes", arguments: { ...args, operations: [{ location: "Lobby", entryId: ENTRY, op: "update_entry" }] } }));
+      assert.equal(reordered.applied.applied, true);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("asks the user in the bridge's own dialog when the client supports it, and saves only on yes", async () => {
+    answer = studio();
+    const yes = await connect({}, () => ({ action: "accept", content: { setuju: true } }));
+    try {
+      const applied = json(await yes.client.callTool({ name: "apply_schedule_changes", arguments: await previewed(yes.client) }));
+      assert.equal(applied.applied.applied, true);
+      assert.equal(yes.dialogs.length, 1);
+      assert.match(yes.dialogs[0].message, /Sociolla SBW R1/);
+      assert.match(yes.dialogs[0].message, /LA-01/);
+      assert.deepEqual(yes.dialogs[0].requestedSchema.required, ["setuju"]);
+      assert.equal(applyCount(), 1);
+    } finally {
+      await yes.client.close();
+    }
+    for (const reply of [{ action: "decline" }, { action: "cancel" }, { action: "accept", content: { setuju: false } }]) {
+      requests = [];
+      const no = await connect({}, () => reply);
+      try {
+        const refused = json(await no.client.callTool({ name: "apply_schedule_changes", arguments: await previewed(no.client) }));
+        assert.equal(refused.applied, false);
+        assert.match(refused.reason, /Tidak ada yang disimpan/);
+        assert.equal(applyCount(), 0, JSON.stringify(reply));
+      } finally {
+        await no.client.close();
+      }
+    }
+  });
+
+  it("falls back to the client's own tool approval when the client has no dialog support", async () => {
+    answer = studio();
+    const { client, dialogs } = await connect();
+    try {
+      const applied = json(await client.callTool({ name: "apply_schedule_changes", arguments: await previewed(client) }));
+      assert.equal(applied.applied.applied, true);
+      assert.equal(dialogs.length, 0);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("turns a StudioFlow refusal into a tool error and forgets a stale preview", async () => {
+    answer = studio({ apply: () => ({ status: 409, body: { ok: false, error: { kind: "CONFLICT", code: "SCHEDULE_PREVIEW_STALE", message: "Preview again." } } }) });
+    const { client } = await connect();
+    try {
+      const args = await previewed(client);
+      const response = /** @type {any} */ (await client.callTool({ name: "apply_schedule_changes", arguments: args }));
       assert.equal(response.isError, true);
       assert.match(response.content[0].text, /SCHEDULE_PREVIEW_STALE/);
       assert.equal(requests.filter((request) => request.path.endsWith("/context")).length, 0);
+      const again = /** @type {any} */ (await client.callTool({ name: "apply_schedule_changes", arguments: args }));
+      assert.match(again.content[0].text, /APPLY_NOT_PREVIEWED/);
+      assert.equal(applyCount(), 1);
     } finally {
       await client.close();
     }
   });
 
   it("says the apply succeeded when only the read-back fails", async () => {
-    answer = ({ path }) => path.endsWith("/apply")
-      ? { body: { ok: true, data: { operationId: "x", applied: true, templatesCreated: 0, operations: [] } } }
-      : { status: 500, body: { ok: false, error: { kind: "INTERNAL", code: "INTERNAL", message: "boom" } } };
+    answer = studio({ context: () => ({ status: 500, body: { ok: false, error: { kind: "INTERNAL", code: "INTERNAL", message: "boom" } } }) });
     const { client } = await connect();
     try {
-      const response = json(await client.callTool({ name: "apply_schedule_changes", arguments: { projectId: PROJECT, operationId: "33333333-3333-4333-8333-333333333333", digest: DIGEST, operations: [{ op: "apply_templates" }] } }));
+      const response = json(await client.callTool({ name: "apply_schedule_changes", arguments: await previewed(client) }));
       assert.equal(response.applied.applied, true);
       assert.match(response.readBack.error, /saved/);
     } finally {
       await client.close();
     }
+  });
+
+  it("offers the guided interview as the susun_jadwal prompt and in the server instructions", async () => {
+    const { client } = await connect();
+    try {
+      const { prompts } = await client.listPrompts();
+      assert.ok(prompts.some((prompt) => prompt.name === "susun_jadwal"));
+      const prompt = await client.getPrompt({ name: "susun_jadwal", arguments: { proyek: "Sociolla", permintaan: "tambah downlight 12 pcs" } });
+      const text = /** @type {any} */ (prompt.messages[0].content).text;
+      assert.match(text, /Sociolla/);
+      assert.match(text, /tambah downlight 12 pcs/);
+      assert.match(text, /list_projects/);
+      assert.match(client.getInstructions() ?? "", /Confirm the project/);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("summarises a preview in plain words for the confirmation dialog", () => {
+    const message = approvalMessage("Gondola", [
+      { op: "create_entry", effect: "create", entryCode: "DO-01", optionLabel: "A" },
+      { op: "create_option", effect: "create", entryCode: "DO-01", optionLabel: "B" },
+      { op: "update_entry", effect: "no_change", entryCode: "LA-01" },
+    ], 3);
+    assert.equal(message, 'Terapkan ke Product Schedule "Gondola": 1 item baru, 1 opsi baru, 3 item dari template studio. Kode: DO-01 A, DO-01 B. Opsi baru tidak otomatis final.');
   });
 
   it("rejects an operation shape the wire contract does not allow before calling StudioFlow", async () => {

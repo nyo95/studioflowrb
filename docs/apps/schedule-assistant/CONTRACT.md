@@ -102,3 +102,12 @@ StudioFlow's `PERMISSION_DENIED`, `PROJECT_ARCHIVED`, `PROJECT_COMPLETED`.
 `list_projects`, `get_schedule_context`, `search_brands`, `search_reusable_options`,
 `preview_schedule_changes` (all read-only) and `apply_schedule_changes`. Setup for Claude
 Code, Codex, OpenCode and Gemini CLI is in its README.
+
+Guardrails (R9.174, WO-SCHEDULE-ASSISTANT-02): server instructions and the `susun_jadwal`
+prompt carry a mandatory interview (confirm project, intent, missing facts, summary, then
+preview and an explicit yes); the bridge applies only an operationId it issued from a valid
+preview in the same process for the same project, digest and canonical operations
+(`APPLY_NOT_PREVIEWED` otherwise, no HTTP call; a stale-preview 409 forgets it); and when
+the client declares MCP `elicitation` it asks the user in a form dialog (boolean
+`setuju`) before calling apply, saving nothing on decline, cancel, false or dialog failure.
+Clients without elicitation keep their own tool approval.

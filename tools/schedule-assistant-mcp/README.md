@@ -107,6 +107,21 @@ written literally):
 
 Keep `"trust": false` so every tool call is confirmed.
 
+## How it guards your data
+
+1. **Interview first.** The assistant must confirm the project (and ask when more than
+   one matches), ask what you want, ask for missing facts (Fixture quantities, a Brand
+   that is not in Master Data), summarise the plan, and only then prepare a preview. In
+   clients that list MCP prompts, start it with the `susun_jadwal` prompt (for example
+   `/mcp__studioflow-schedule__susun_jadwal` in Claude Code).
+2. **Only a preview made here can be applied.** The bridge refuses an apply whose preview
+   was not made in the same session for exactly the same changes (`APPLY_NOT_PREVIEWED`).
+3. **StudioFlow asks you itself.** In clients that support MCP dialogs (elicitation —
+   Claude Code ≥ 2.1.76, Codex CLI recent versions), the bridge shows its own question,
+   for example *Terapkan ke Product Schedule "Sociolla SBW R1": 2 item baru … Ya,
+   terapkan?* Nothing is saved unless you tick it. Other clients use their own tool
+   approval.
+
 ## Using it
 
 Ask in plain words, for example: *"In project Heloskin Cimanggu, apply the studio

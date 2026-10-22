@@ -49,6 +49,7 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 Harness: `agent/EXTENSIONS.md`. Foundation: `apps/platform/INTEGRATIONS.md`.
 Order matters; each item is its own Work Order.
 
+- [ ] [UNVERIFIED][P0] WO-SCHEDULE-ASSISTANT-02 (R9.174) guardrails: in a new Claude or Codex session say "susun jadwal untuk Sociolla"; the assistant asks which project and what to add before any preview; after the preview, applying shows the bridge dialog "Ya, terapkan" (Claude/Codex); untick or decline saves nothing; asking it to apply without a preview is refused.
 - [ ] [UNVERIFIED][P0] WO-SCHEDULE-ASSISTANT-01 (R9.167): Product Schedule Composer MCP built and server/bridge tests pass. Kantor dev (R9.172): module on, token created, Claude desktop configured, bridge smoke read + preview OK over HTTP. Still owed: switch the module on, create a token with both Schedule Assistant scopes, connect Claude Code, Codex, OpenCode and Gemini CLI with `tools/schedule-assistant-mcp/README.md`, compose from a short brief in one client (preview shown, client asks before apply, Schedule screen shows the same codes, nothing final), and retry apply (replay, no duplicates).
 - [ ] [PLANNED][P0] **Product Schedule Composer MCP (owner, 2026-10-22).** Built in
   R9.167 (`WO-SCHEDULE-ASSISTANT-01`, contract `docs/apps/schedule-assistant/CONTRACT.md`);

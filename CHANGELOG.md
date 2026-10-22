@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.174 | 2026-10-22 | feat(schedule-assistant): interview, session-bound apply and bridge confirmation (Lead)
+
+- **Work order:** `WO-SCHEDULE-ASSISTANT-02` (owner: all three layers). Bridge only (`tools/schedule-assistant-mcp`, now 1.1.0); no StudioFlow, route or schema change.
+- **Layer 1 — interview:** server instructions, the preview/apply descriptions and a new MCP prompt `susun_jadwal` (optional `proyek`, `permintaan`) carry one protocol: confirm the project (ask when several or none match), ask intent, ask missing facts (Fixture qty/unit, Brands not in Master Data), summarise, then preview and wait for an explicit yes, asking one short question at a time in the user's language.
+- **Layer 2 — session-bound apply:** the bridge remembers each valid preview it returned (project, digest, canonical operations) and refuses any other apply with `APPLY_NOT_PREVIEWED` before any HTTP call; field order does not matter; a stale-preview 409 forgets the preview; an exact retry stays a replay.
+- **Layer 3 — bridge confirmation:** when the client declares MCP elicitation the bridge shows its own dialog ("Terapkan ke Product Schedule "<proyek>": … Ya, terapkan") and calls apply only on accept with the box ticked; decline, cancel, unticked or a dialog error saves nothing. Clients without elicitation keep their own tool approval. Support found: Claude Code ≥ 2.1.76, Codex CLI recent versions, OpenCode per third-party listings, Gemini CLI unconfirmed; decided at run time from the declared capability.
+- **Checks:** bridge `npm --prefix tools/schedule-assistant-mcp test` 14/14 over real stdio (apply refused without/with a different preview, dialog yes/decline/cancel/unticked, fallback without dialog support, stale forgets, prompt and instructions, dialog wording, plus the earlier tool/idempotency/read-back tests); live smoke on the kantor dev server with the Claude token: prompt listed, apply without preview refused, preview valid (nothing written). Low gate (`STUDIOFLOW_LOCATION=kantor node scripts/verify.mjs --tier low`: boundaries, legacy-runtime, whitespace) PASS and eslint clean on the bridge; no app code changed, so the full suite and build were not rerun.
+
 ## R9.173 | 2026-10-22 | plan(schedule-assistant): guardrails for the Schedule Assistant (Lead)
 
 - **Work order:** `WO-SCHEDULE-ASSISTANT-02` READY for R9.174 (Lead executes): mandatory interview (instructions + `susun_jadwal` prompt), apply bound to a preview issued by the same bridge session, and bridge-side approval through MCP elicitation where the client supports it (fallback: the client's tool approval).

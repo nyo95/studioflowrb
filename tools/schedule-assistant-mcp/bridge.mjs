@@ -61,12 +61,50 @@ const operation = z.union([
 const operations = z.array(operation).min(1).max(100);
 const projectId = id.describe("A project id from list_projects.");
 
+/**
+ * The interview every client must follow before it proposes anything (WO-SCHEDULE-ASSISTANT-02, layer 1). It is the
+ * server instructions, the `susun_jadwal` prompt and part of the preview/apply descriptions, so a client that reads
+ * only one of them still sees it.
+ */
+export const INTERVIEW_STEPS = [
+  "1. Confirm the project: call list_projects; if the user's words match more than one project, or none, ask which one. Never guess.",
+  "2. Ask what the user wants: apply the studio templates or not, which categories and items, any Brand or product the client already chose.",
+  "3. Ask for missing facts before previewing: quantity and unit for Fixture items (Material items have none); a Brand that search_brands cannot find (offer its suggestions or leaving it empty); which existing item an extra option belongs to.",
+  "4. Summarise the plan in plain words and ask whether to prepare the preview.",
+  "5. Call preview_schedule_changes, show the result (codes, labels, Brands, every issue), and wait for an explicit yes.",
+  "6. Only then call apply_schedule_changes with that preview's operationId, digest and operations, and show the read-back.",
+];
+
 const INSTRUCTIONS = [
-  "This server composes one StudioFlow project's Product Schedule.",
-  "Required flow: list_projects -> get_schedule_context -> (search_brands / search_reusable_options as needed) -> preview_schedule_changes -> show the user the preview in plain words -> wait for the user's explicit yes -> apply_schedule_changes with the exact operationId, digest and operations from that preview -> show the read-back.",
-  "Never call apply_schedule_changes without the user's explicit approval of that preview. If apply answers SCHEDULE_PREVIEW_STALE, preview again and ask again.",
+  "This server composes one StudioFlow project's Product Schedule. Behave like an assistant: ask before you act, one short question at a time, in the user's language.",
+  `Required interview: ${INTERVIEW_STEPS.join(" ")}`,
+  "Never call apply_schedule_changes without the user's explicit approval of that preview; it refuses a preview this session did not make. If apply answers SCHEDULE_PREVIEW_STALE, preview again and ask again. If the user declines the confirmation dialog, nothing was saved; ask what to change.",
   "StudioFlow decides codes, prefixes, category spelling, option labels and Brand snapshots; new options are never final. Deleting, final decisions, samples and images are not available.",
 ].join(" ");
+
+/** JSON with sorted object keys, so the same operations compare equal however the client ordered their fields. */
+function canonical(/** @type {unknown} */ value) {
+  return JSON.stringify(value, (_key, item) => (item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : item));
+}
+
+/**
+ * The plain-language question shown in the bridge's own confirmation dialog.
+ * @param {string} projectName
+ * @param {Array<{ op: string, effect: string, entryCode?: string, optionLabel?: string }>} results
+ * @param {number} templatesCreated
+ */
+export function approvalMessage(projectName, results, templatesCreated) {
+  const count = (/** @type {string} */ op, /** @type {string} */ effect) => results.filter((item) => item.op === op && item.effect === effect).length;
+  const parts = [
+    [count("create_entry", "create"), "item baru"],
+    [count("create_option", "create") + count("reuse_option", "create"), "opsi baru"],
+    [count("update_entry", "update") + count("update_option", "update"), "perubahan"],
+    [templatesCreated, "item dari template studio"],
+  ].filter(([n]) => Number(n) > 0).map(([n, label]) => `${n} ${label}`);
+  const codes = [...new Set(results.filter((item) => item.effect !== "no_change" && item.entryCode).map((item) => (item.optionLabel ? `${item.entryCode} ${item.optionLabel}` : item.entryCode)))];
+  const shown = codes.slice(0, 10).join(", ") + (codes.length > 10 ? `, +${codes.length - 10} lagi` : "");
+  return `Terapkan ke Product Schedule "${projectName}": ${parts.join(", ") || "tidak ada perubahan"}.${shown ? ` Kode: ${shown}.` : ""} Opsi baru tidak otomatis final.`;
+}
 
 /**
  * @typedef {{ ok: boolean, status: number, body: any, replayed: boolean }} ApiResult
@@ -116,7 +154,44 @@ export function createBridge(options) {
   /** @param {ApiResult} response */
   const forward = (response) => (response.ok ? result(response.body.data) : failure(response));
 
-  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.0.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.1.0" }, { instructions: INSTRUCTIONS });
+
+  /**
+   * Layer 2: every valid preview this bridge process returned, by its operationId. Apply accepts only these, for the
+   * same project, digest and operations, so an AI cannot invent or reuse a preview the user never saw here.
+   * @type {Map<string, { projectId: string, projectName: string, digest: string, operations: string, message: string }>}
+   */
+  const previews = new Map();
+  /** @type {Map<string, string>} */
+  const projectNames = new Map();
+  async function projectName(/** @type {string} */ id) {
+    if (!projectNames.has(id)) {
+      const listed = await call("projects");
+      // A name only makes the dialog friendlier; an odd answer must never block the preview.
+      if (listed.ok && Array.isArray(listed.body.data)) for (const project of listed.body.data) if (project?.id) projectNames.set(project.id, String(project.name ?? ""));
+    }
+    return projectNames.get(id) || "proyek ini";
+  }
+
+  server.registerPrompt("susun_jadwal", {
+    title: "Susun Product Schedule",
+    description: "Start the guided interview that composes one project's Product Schedule with StudioFlow.",
+    argsSchema: { proyek: z.string().max(200).optional().describe("Nama atau kode proyek, kalau sudah tahu."), permintaan: z.string().max(4000).optional().describe("Apa yang ingin disusun atau diubah.") },
+  }, (args) => ({
+    messages: [{
+      role: "user",
+      content: {
+        type: "text",
+        text: [
+          "Bantu saya menyusun Product Schedule di StudioFlow dengan alat studioflow-schedule. Bertindaklah seperti asisten: tanya dulu, satu pertanyaan singkat setiap kali, sebelum menyiapkan preview.",
+          args.proyek ? `Proyek yang saya maksud: ${args.proyek}. Pastikan dulu proyeknya benar lewat list_projects.` : "Tanyakan dulu proyek yang mana (pakai list_projects).",
+          args.permintaan ? `Permintaan saya: ${args.permintaan}` : "Tanyakan apa yang ingin saya susun atau ubah.",
+          "Ikuti langkah ini:",
+          ...INTERVIEW_STEPS,
+        ].join("\n"),
+      },
+    }],
+  }));
   const read = { readOnlyHint: true, destructiveHint: false, openWorldHint: false };
 
   server.registerTool("list_projects", {
@@ -143,7 +218,7 @@ export function createBridge(options) {
   }, async (args) => forward(await call(`projects/${encodeURIComponent(args.projectId)}/reusable-options?q=${encodeURIComponent(args.query)}${args.section ? `&section=${args.section}` : ""}`)));
 
   server.registerTool("preview_schedule_changes", {
-    description: "Validate a complete batch and show exactly what StudioFlow would create or change (codes, option labels, categories, Brands). Writes nothing. Returns every problem at once, or an operationId and digest to apply this exact preview after the user approves it.",
+    description: "Validate a complete batch and show exactly what StudioFlow would create or change (codes, option labels, categories, Brands). Writes nothing. Call it only after the interview (project confirmed, plan summarised and agreed). Returns every problem at once, or an operationId and digest to apply this exact preview after the user approves it.",
     inputSchema: { projectId, operations },
     annotations: read,
   }, async (args) => {
@@ -151,17 +226,40 @@ export function createBridge(options) {
     if (!response.ok) return failure(response);
     const preview = response.body.data;
     if (!preview.valid) return result({ ...preview, next: "Fix the issues (ask the user where a choice is needed) and preview again." });
-    return result({ ...preview, operationId: randomUUID(), next: "Show this preview to the user and ask for an explicit yes before apply_schedule_changes." });
+    const operationId = randomUUID();
+    const name = await projectName(args.projectId);
+    previews.set(operationId, { projectId: args.projectId, projectName: name, digest: preview.digest, operations: canonical(args.operations), message: approvalMessage(name, preview.operations ?? [], preview.templatesCreated ?? 0) });
+    return result({ ...preview, project: name, operationId, next: "Show this preview to the user and ask for an explicit yes before apply_schedule_changes." });
   });
 
   server.registerTool("apply_schedule_changes", {
-    description: "Apply a preview the user explicitly approved: send its operationId, digest and the same operations. Changes StudioFlow data in one all-or-nothing step, safe to retry with the same arguments, then reads the saved schedule back.",
+    description: "Apply a preview the user explicitly approved in this conversation: send its operationId, digest and the same operations. Refused for a preview this session did not make. Where the client supports it, StudioFlow asks the user to confirm in its own dialog first. Changes StudioFlow data in one all-or-nothing step, safe to retry with the same arguments, then reads the saved schedule back.",
     inputSchema: { projectId, operationId: id, digest: z.string().regex(/^[a-f0-9]{64}$/), operations },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   }, async (args) => {
+    const issued = previews.get(args.operationId);
+    if (!issued || issued.projectId !== args.projectId || issued.digest !== args.digest || issued.operations !== canonical(args.operations)) {
+      return { isError: true, content: [{ type: /** @type {const} */ ("text"), text: "APPLY_NOT_PREVIEWED: this operationId was not issued by a preview in this session for exactly these operations. Prepare the preview with preview_schedule_changes, show it to the user and ask for an explicit yes first." }] };
+    }
+    // Layer 3: the bridge itself asks the user when the client can show a dialog; otherwise the client's tool approval applies.
+    if (server.server.getClientCapabilities()?.elicitation) {
+      let approved = false;
+      try {
+        const answer = await server.server.elicitInput({
+          message: issued.message,
+          requestedSchema: { type: "object", properties: { setuju: { type: "boolean", title: "Ya, terapkan", description: "Centang untuk menyimpan perubahan ini ke StudioFlow." } }, required: ["setuju"] },
+        });
+        approved = answer.action === "accept" && answer.content?.setuju === true;
+      } catch (error) {
+        log(`schedule-assistant: confirmation dialog failed: ${error instanceof Error ? error.message : "unknown error"}`);
+      }
+      if (!approved) return result({ applied: false, reason: "Pengguna tidak menyetujui di dialog konfirmasi. Tidak ada yang disimpan. Tanyakan apa yang ingin diubah." });
+    }
     const path = `projects/${encodeURIComponent(args.projectId)}`;
     const body = JSON.stringify({ operationId: args.operationId, digest: args.digest, operations: args.operations });
     const applied = await call(`${path}/apply`, { method: "POST", body, idempotencyKey: args.operationId });
+    // A stale preview can never succeed again under this key: forget it so a new preview is required.
+    if (!applied.ok && applied.body?.error?.code === "SCHEDULE_PREVIEW_STALE") previews.delete(args.operationId);
     if (!applied.ok) return failure(applied);
     const summary = applied.body.data;
     const touched = new Set((summary.operations ?? []).map((/** @type {{ entryId?: string }} */ item) => item.entryId).filter(Boolean));

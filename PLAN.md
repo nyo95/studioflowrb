@@ -5,7 +5,7 @@ Scope: Schedule Assistant guardrails: a mandatory interview before any preview, 
 Module(s): `schedule-assistant` bridge only (`tools/schedule-assistant-mcp/`); docs. No StudioFlow, platform, schema or route change.
 Target revision: R9.174 (this plan is R9.173). Re-check `CHANGELOG.md` and all branches.
 Risk: medium - changes the only write path of an external client; a wrong guard either blocks legitimate applies or lets an unreviewed batch through. Escalate if a guard needs a server-side change.
-Status: READY — executed by the Lead (owner, 2026-10-22)
+Status: DONE in R9.174 — owner walk pending (BACKLOG [UNVERIFIED]). Executed by the Lead (owner, 2026-10-22).
 Priority: P0 follow-up of WO-SCHEDULE-ASSISTANT-01
 Owner: Product Owner (decision 2026-10-22: all three layers)
 Last updated: 2026-10-22
