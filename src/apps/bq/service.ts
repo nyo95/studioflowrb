@@ -5,6 +5,7 @@ import { requirePermission } from "@platform/core/rbac";
 
 import { BQ_PERMISSIONS, createBqServiceContext, type BqServiceDeps } from "./services/context";
 import { createAssemblyService } from "./services/assemblies";
+import { createCostSourceService } from "./services/cost-sources";
 import { createLibraryItemService } from "./services/library-items";
 import { createProjectLifecycleService } from "./services/projects";
 import { createProjectTreeService } from "./services/project-tree";
@@ -24,7 +25,8 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
   const projectTree = createProjectTreeService(ctx);
   const lineItemMoves = createLineItemMoveService(ctx);
   const promotions = createPromotionService(ctx);
-  const assemblies = createAssemblyService(ctx);
+  const costSources = createCostSourceService(ctx, deps.masterData, libraryItems);
+  const assemblies = createAssemblyService(ctx, costSources);
   const quotationSettings = createQuotationSettingsService(ctx);
 
   /** Creates an L1 named after the selected template, then snapshots that template into it. */
@@ -54,14 +56,14 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     });
     // The assembly's lines go straight under the new Work Item: a Component Group named like the Work Item would
     // only repeat it, and its quantity per Work Item is always 1 here.
-    await assemblies.applyAssemblyTemplate({
+    const applied = await assemblies.applyAssemblyTemplate({
       grants: input.grants,
       actor: input.actor,
       itemId: item.id,
       assemblyId: input.assemblyId,
       placement: "direct",
     });
-    return item;
+    return { ...item, priceRefresh: applied.priceRefresh };
   }
 
   const operations = {
@@ -73,6 +75,8 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     ...promotions,
     ...assemblies,
     ...quotationSettings,
+    saveAssemblyLineToLibrary: costSources.saveAssemblyLineToLibrary,
+    saveLineItemToLibrary: costSources.saveLineItemToLibrary,
     addItemAndApplyAssembly,
   };
 
@@ -83,6 +87,7 @@ export function createBqService(rootDb: PrismaClient, deps: BqServiceDeps) {
     "addTemplateSection",
     "addTemplateRecommendation",
     "addAssemblyCustomLine",
+    "addAssemblySourcedLine",
     "addSection",
     "addSubsection",
     "addItem",

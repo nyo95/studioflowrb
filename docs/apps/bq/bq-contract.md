@@ -659,6 +659,9 @@ yang eksplisit direkam.
 | K-21 | Source picker tabs: [Semua] [Material] [Labor] [Material+Labor] [BQ Library]. Custom picker wajib tanya Type (tidak default Material). |
 | K-22 | Template recommendations ada di Section DAN Subsection. Live pointer di Template, snapshot saat insert ke Project. |
 | K-23 | Component Group (L2) = container saja. Tidak punya business meaning mandiri. |
+| K-24 | (R9.170, owner 2026-10-22) Baris Assembly boleh berasal dari harga Master Data (material, labor, material+labor), BQ Library item, atau Custom, lewat source picker yang sama dengan Cost Component proyek (K-21). Sumber disimpan sebagai `source_type` + `source_ref_id`; field lain snapshot dan tetap bisa diedit. |
+| K-25 | (R9.170, owner 2026-10-22) **Harga saat dipakai.** Saat Assembly diterapkan ke proyek, baris MASTERDATA / BQ_LIBRARY mengambil harga sumber terbaru (`harga_snapshot` dan `source_price_snapshot` baris proyek = harga itu, jadi Revert kembali ke harga itu). Nama, satuan, kategori, qty, koefisien dan catatan tetap dari Assembly. Harga tersimpan di Assembly dipakai (dan dilaporkan ke pengguna) bila sumber hilang, pengguna tidak punya akses harga Master Data jenis itu, satuan sumber berubah, atau harga bukan Rupiah. Assembly sendiri tidak pernah ditulis ulang saat diterapkan. |
+| K-26 | (R9.170, owner 2026-10-22) **Simpan ke BQ Library** adalah pilihan eksplisit, tidak otomatis: baris Custom Assembly (saat ditambah atau sesudahnya) dan Cost Component Custom proyek (dari panel baris) dapat dijadikan Library item sesuai kategori (K-19), status DRAFT; baris itu lalu menjadi BQ_LIBRARY yang menunjuk item tersebut. Hanya dengan `bq.library.manage`. Belum ada cek nama dobel. |
 
 ---
 

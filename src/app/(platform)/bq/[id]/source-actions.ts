@@ -12,7 +12,8 @@ import { MASTERDATA_PERMISSIONS } from "@/apps/masterdata/public";
 async function authorize() {
   const { grants } = await requirePrincipalGrants();
   requirePermission(grants, BQ_PERMISSIONS.access);
-  if (!hasPermission(grants, BQ_PERMISSIONS.projectRead) && !hasPermission(grants, BQ_PERMISSIONS.projectManage)) {
+  // The Library's Assembly editor uses the same picker (WO-BQ-ASSEMBLY-SOURCE-01), so a Library manager may list sources.
+  if (!hasPermission(grants, BQ_PERMISSIONS.projectRead) && !hasPermission(grants, BQ_PERMISSIONS.projectManage) && !hasPermission(grants, BQ_PERMISSIONS.libraryManage)) {
     throw new AppError("FORBIDDEN", "BQ_PROJECT_ACCESS_REQUIRED", "BQ project read or manage access is required.");
   }
   return { grants };

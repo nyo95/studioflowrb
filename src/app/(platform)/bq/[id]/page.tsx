@@ -25,6 +25,7 @@ export default async function BqProjectDetailPage({
 
   const canRead = hasAnyPermission(grants, [BQ_PERMISSIONS.projectRead, BQ_PERMISSIONS.projectManage]);
   const canManage = hasPermission(grants, BQ_PERMISSIONS.projectManage);
+  const canManageLibrary = hasPermission(grants, BQ_PERMISSIONS.libraryManage);
 
   if (!canRead) redirect("/bq");
 
@@ -54,7 +55,7 @@ export default async function BqProjectDetailPage({
           <EmptyState title="Belum ada Section" description="Project ini belum memiliki Section." />
         </SectionCard>
       ) : (
-      <ProjectEditor key={`${project.updatedAt}:${project.sections.length}`} project={project} canManage={canManage} assemblies={assemblies} units={units} />
+      <ProjectEditor key={`${project.updatedAt}:${project.sections.length}`} project={project} canManage={canManage} canManageLibrary={canManageLibrary} assemblies={assemblies} units={units} />
       )}
     </div>
   );

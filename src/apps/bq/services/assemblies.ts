@@ -4,9 +4,10 @@ import { AppError } from "@platform/core/errors";
 import { toDecimalString } from "@platform/utilities/decimal";
 
 import { BQ_PERMISSIONS, requireKategori, requirePositiveCoefficient, type BqServiceContext } from "./context";
+import type { CostSourceKind, CostSourceService } from "./cost-sources";
 import { requireRupiah } from "../lib/currency";
 
-export function createAssemblyService(ctx: BqServiceContext) {
+export function createAssemblyService(ctx: BqServiceContext, sources: CostSourceService) {
   const { db, runTransaction, runAutomaticSortTransaction, auditWriter, requireEditableProjectForItem } = ctx;
 
 async function createAssemblyTemplate(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; name: string; description?: string }) {
@@ -16,7 +17,7 @@ async function createAssemblyTemplate(input: { grants: PermissionGrants; actor: 
   return assembly;
 }
 
-async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string; title: string; purchaseUnit?: string; harga?: string; currency?: string; kategori?: string; qty?: string; koefisien?: string }) {
+async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string; title: string; purchaseUnit?: string; harga?: string; currency?: string; kategori?: string; qty?: string; koefisien?: string; notes?: string; saveToLibrary?: boolean }) {
   requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
   const currency = requireRupiah(input.currency ?? "IDR");
   const koefisien = requirePositiveCoefficient(input.koefisien ?? "1");
@@ -30,9 +31,26 @@ async function addAssemblyCustomLine(input: { grants: PermissionGrants; actor: {
   const line = await runAutomaticSortTransaction(async (tx) => {
     const maxSortOrder = await tx.bqAssemblyLine.aggregate({ where: { assembly_template_id: input.assemblyId }, _max: { sort_order: true } });
     const nextSortOrder = (maxSortOrder._max.sort_order ?? -1) + 1;
-    return tx.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: currency, kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien, sort_order: nextSortOrder } });
+    return tx.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: "CUSTOM", title_snapshot: input.title, purchase_unit_snapshot: input.purchaseUnit ?? "ls", harga_snapshot: input.harga ?? "0", currency_snapshot: currency, kategori: requireKategori(input.kategori ?? "MATERIAL"), qty: input.qty ?? "1", koefisien, sort_order: nextSortOrder, notes: input.notes?.trim() || null } });
   });
   await auditWriter({ appId: "bq", action: "bq.assembly-line.created", entityType: "BqAssemblyLine", entityId: line.id, actor: input.actor });
+  // "Save to BQ Library" (owner 2026-10-22): an explicit choice, in the same transaction as the line.
+  if (input.saveToLibrary) return sources.saveAssemblyLineToLibrary({ grants: input.grants, actor: input.actor, lineId: line.id });
+  return line;
+}
+
+/** An Assembly line picked from a Master Data price or a BQ Library item: its facts are snapshotted from the source. */
+async function addAssemblySourcedLine(input: { grants: PermissionGrants; actor: { kind: string; userId?: string; label: string }; assemblyId: string; sourceType: "MASTERDATA" | "BQ_LIBRARY"; sourceRefId: string; sourceKind?: CostSourceKind; qty?: string; koefisien?: string }) {
+  requirePermission(input.grants, BQ_PERMISSIONS.libraryManage);
+  const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId } });
+  if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
+  const snapshot = await sources.resolveSource(input.grants, { sourceType: input.sourceType, sourceRefId: input.sourceRefId, sourceKind: input.sourceKind });
+  const koefisien = requirePositiveCoefficient(input.koefisien ?? snapshot.koefisien);
+  const line = await runAutomaticSortTransaction(async (tx) => {
+    const maxSortOrder = await tx.bqAssemblyLine.aggregate({ where: { assembly_template_id: input.assemblyId }, _max: { sort_order: true } });
+    return tx.bqAssemblyLine.create({ data: { assembly_template_id: assembly.id, source_type: snapshot.sourceType, source_ref_id: snapshot.sourceRefId, title_snapshot: snapshot.titleSnapshot, purchase_unit_snapshot: snapshot.purchaseUnitSnapshot, base_unit_snapshot: snapshot.baseUnitSnapshot, harga_snapshot: snapshot.hargaSnapshot, currency_snapshot: requireRupiah(snapshot.currencySnapshot), kategori: requireKategori(snapshot.kategori), qty: input.qty ?? "1", koefisien, sort_order: (maxSortOrder._max.sort_order ?? -1) + 1 } });
+  });
+  await auditWriter({ appId: "bq", action: "bq.assembly-line.created", entityType: "BqAssemblyLine", entityId: line.id, actor: input.actor, changes: { sourceType: snapshot.sourceType } });
   return line;
 }
 
@@ -134,16 +152,19 @@ async function applyAssemblyTemplate(input: { grants: PermissionGrants; actor: {
   const assembly = await db.bqAssemblyTemplate.findUnique({ where: { id: input.assemblyId }, include: { lines: { orderBy: { sort_order: "asc" } } } });
   if (!assembly) throw new AppError("NOT_FOUND", "bq.assembly.not-found", "Assembly template not found");
   if (!assembly.lines.length) throw new AppError("VALIDATION", "bq.assembly.empty", "An assembly must contain at least one Cost Component");
+  // Priced at use (owner 2026-10-22): sourced lines take today's source price; the Assembly itself is never rewritten.
+  const { prices, refresh: priceRefresh } = await sources.currentPrices(input.grants, assembly.lines);
+  const hargaOf = (line: (typeof assembly.lines)[number]) => prices.get(line.id) ?? line.harga_snapshot;
   if (input.placement === "direct") {
-    const lineData = (line: (typeof assembly.lines)[number], sortOrder: number) => ({ item_id: input.itemId, source_type: line.source_type, source_ref_id: line.source_ref_id, source_imported_at: new Date(), title_snapshot: line.title_snapshot, purchase_unit_snapshot: line.purchase_unit_snapshot, base_unit_snapshot: line.base_unit_snapshot, purchase_to_base_factor_snapshot: line.purchase_to_base_factor_snapshot, source_price_snapshot: line.source_type === "CUSTOM" ? null : line.harga_snapshot, harga_snapshot: line.harga_snapshot, currency_snapshot: line.currency_snapshot, kategori: line.kategori, qty: line.qty, koefisien: line.koefisien, sort_order: sortOrder, notes: line.notes });
+    const lineData = (line: (typeof assembly.lines)[number], sortOrder: number) => ({ item_id: input.itemId, source_type: line.source_type, source_ref_id: line.source_ref_id, source_imported_at: new Date(), title_snapshot: line.title_snapshot, purchase_unit_snapshot: line.purchase_unit_snapshot, base_unit_snapshot: line.base_unit_snapshot, purchase_to_base_factor_snapshot: line.purchase_to_base_factor_snapshot, source_price_snapshot: line.source_type === "CUSTOM" ? null : hargaOf(line), harga_snapshot: hargaOf(line), currency_snapshot: line.currency_snapshot, kategori: line.kategori, qty: line.qty, koefisien: line.koefisien, sort_order: sortOrder, notes: line.notes });
     const created = await runTransaction(async (tx) => {
       const last = await tx.bqLineItem.aggregate({ where: { item_id: input.itemId }, _max: { sort_order: true } });
       const first = (last._max.sort_order ?? -1) + 1;
       await tx.bqLineItem.createMany({ data: assembly.lines.map((line, index) => lineData(line, first + index)) });
       return assembly.lines.length;
     });
-    await auditWriter({ appId: "bq", action: "bq.assembly.applied", entityType: "BqItem", entityId: input.itemId, actor: input.actor, changes: { assemblyId: assembly.id, placement: "direct", lines: created } });
-    return { id: input.itemId };
+    await auditWriter({ appId: "bq", action: "bq.assembly.applied", entityType: "BqItem", entityId: input.itemId, actor: input.actor, changes: { assemblyId: assembly.id, placement: "direct", lines: created, pricesRefreshed: priceRefresh.refreshed, pricesKept: priceRefresh.kept.length } });
+    return { id: input.itemId, priceRefresh };
   }
   // Read+reserve the sub-object's sort_order and copy its lines atomically: two
   // near-simultaneous applies could otherwise both read the same MAX and collide,
@@ -151,11 +172,11 @@ async function applyAssemblyTemplate(input: { grants: PermissionGrants; actor: {
   const subObject = await runTransaction(async (tx) => {
     const maxSubObjectSortOrder = await tx.bqSubObject.aggregate({ where: { item_id: input.itemId }, _max: { sort_order: true } });
     const created = await tx.bqSubObject.create({ data: { item_id: input.itemId, name: assembly.name, qty_per_l1: input.qtyPerL1 ?? "1", sort_order: (maxSubObjectSortOrder._max.sort_order ?? -1) + 1 } });
-    await tx.bqLineItem.createMany({ data: assembly.lines.map((line) => ({ sub_object_id: created.id, source_type: line.source_type, source_ref_id: line.source_ref_id, source_imported_at: new Date(), title_snapshot: line.title_snapshot, purchase_unit_snapshot: line.purchase_unit_snapshot, base_unit_snapshot: line.base_unit_snapshot, purchase_to_base_factor_snapshot: line.purchase_to_base_factor_snapshot, source_price_snapshot: line.source_type === "CUSTOM" ? null : line.harga_snapshot, harga_snapshot: line.harga_snapshot, currency_snapshot: line.currency_snapshot, kategori: line.kategori, qty: line.qty, koefisien: line.koefisien, sort_order: line.sort_order, notes: line.notes })) });
+    await tx.bqLineItem.createMany({ data: assembly.lines.map((line) => ({ sub_object_id: created.id, source_type: line.source_type, source_ref_id: line.source_ref_id, source_imported_at: new Date(), title_snapshot: line.title_snapshot, purchase_unit_snapshot: line.purchase_unit_snapshot, base_unit_snapshot: line.base_unit_snapshot, purchase_to_base_factor_snapshot: line.purchase_to_base_factor_snapshot, source_price_snapshot: line.source_type === "CUSTOM" ? null : hargaOf(line), harga_snapshot: hargaOf(line), currency_snapshot: line.currency_snapshot, kategori: line.kategori, qty: line.qty, koefisien: line.koefisien, sort_order: line.sort_order, notes: line.notes })) });
     return created;
   });
-  await auditWriter({ appId: "bq", action: "bq.assembly.applied", entityType: "BqSubObject", entityId: subObject.id, actor: input.actor, changes: { assemblyId: assembly.id } });
-  return subObject;
+  await auditWriter({ appId: "bq", action: "bq.assembly.applied", entityType: "BqSubObject", entityId: subObject.id, actor: input.actor, changes: { assemblyId: assembly.id, pricesRefreshed: priceRefresh.refreshed, pricesKept: priceRefresh.kept.length } });
+  return { ...subObject, priceRefresh };
 }
 
 
@@ -165,6 +186,7 @@ async function applyAssemblyTemplate(input: { grants: PermissionGrants; actor: {
     updateAssemblyTemplate,
     deleteAssemblyTemplate,
     addAssemblyCustomLine,
+    addAssemblySourcedLine,
     updateAssemblyLine,
     deleteAssemblyLine,
     applyAssemblyTemplate,

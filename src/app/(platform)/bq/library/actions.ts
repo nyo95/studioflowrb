@@ -319,14 +319,44 @@ const AssemblyLineSchema = z.object({
   kategori: z.enum(["MATERIAL", "UPAH", "MATERIAL_UPAH", "BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"]).optional(),
   qty: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).optional(),
   koefisien: z.string().trim().regex(/^\d+(\.\d+)?$/).max(32).refine((value) => /[1-9]/.test(value), "Coefficient must be greater than zero").optional(),
+  notes: z.string().trim().max(2000).optional(),
+  saveToLibrary: z.enum(["on", "true"]).optional(),
 });
 export async function addAssemblyLineAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
   return runSafeAction(async () => {
     const { principal, grants } = await requirePrincipalGrants();
     const parsed = AssemblyLineSchema.safeParse(Object.fromEntries(formData.entries()));
     if (!parsed.success) throw validationError(parsed.error);
-    const { assemblyId, ...rest } = parsed.data;
-    await bqService.addAssemblyCustomLine({ grants, actor: actor(principal), assemblyId, ...rest });
+    const { assemblyId, saveToLibrary, notes, ...rest } = parsed.data;
+    await bqService.addAssemblyCustomLine({ grants, actor: actor(principal), assemblyId, ...rest, notes: notes || undefined, saveToLibrary: saveToLibrary !== undefined });
+    revalidatePath("/bq/library");
+  });
+}
+
+const AssemblySourcedLineSchema = z.object({
+  assemblyId: z.string().cuid(),
+  sourceType: z.enum(["MASTERDATA", "BQ_LIBRARY"]),
+  sourceRefId: z.string().trim().min(1).max(64),
+  sourceKind: z.enum(["material", "material-labor", "labor", "library"]).optional(),
+});
+/** An Assembly line picked from a Master Data price or a BQ Library item; the server snapshots the source. */
+export async function addAssemblySourcedLineAction(_prev: ActionResult<void> | null, formData: FormData): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = AssemblySourcedLineSchema.safeParse(Object.fromEntries(formData.entries()));
+    if (!parsed.success) throw validationError(parsed.error);
+    await bqService.addAssemblySourcedLine({ grants, actor: actor(principal), ...parsed.data });
+    revalidatePath("/bq/library");
+  });
+}
+
+/** "Save to BQ Library" on an existing Custom Assembly line. */
+export async function saveAssemblyLineToLibraryAction(lineId: string): Promise<ActionResult<void>> {
+  return runSafeAction(async () => {
+    const { principal, grants } = await requirePrincipalGrants();
+    const parsed = z.string().cuid().safeParse(lineId);
+    if (!parsed.success) throw validationError(parsed.error);
+    await bqService.saveAssemblyLineToLibrary({ grants, actor: actor(principal), lineId: parsed.data });
     revalidatePath("/bq/library");
   });
 }

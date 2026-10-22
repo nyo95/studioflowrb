@@ -32,10 +32,13 @@ export function ImportDialog({
   target,
   onClose,
   onPick,
+  description = "The selected price is copied as a snapshot. Later source changes do not rewrite this Cost Component. BQ works in Rupiah only, so Master Data prices in another currency are not listed.",
 }: {
   target: { itemId?: string; subObjectId?: string };
   onClose: () => void;
   onPick: (option: SourcePickOption) => Promise<void>;
+  /** The Assembly editor explains its own price rule (priced again when applied). */
+  description?: string;
 }) {
   const [tab, setTab] = useState<PickerTab>("all");
   const [query, setQuery] = useState("");
@@ -105,7 +108,7 @@ export function ImportDialog({
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       title="Add Cost Component"
-      description="The selected price is copied as a snapshot. Later source changes do not rewrite this Cost Component. BQ works in Rupiah only, so Master Data prices in another currency are not listed."
+      description={description}
       size="lg"
     >
       <div className="grid gap-3">

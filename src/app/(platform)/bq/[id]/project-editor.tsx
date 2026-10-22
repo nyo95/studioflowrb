@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, ChevronUp, FileText, FolderPlus, GripVertical, ListPlus, Plus, RotateCcw, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, FileText, FolderPlus, GripVertical, Library, ListPlus, Plus, RotateCcw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
@@ -43,6 +43,8 @@ import type {
   BqProjectDetail,
   BqSectionDetail,
   BqSubObjectDetail,
+  PriceKeptReason,
+  PriceRefresh,
 } from "@/apps/bq/public";
 import { BQ_PRICE_MODES, isMarkerPriceMode } from "@/apps/bq/lib/quotation";
 import type { UnitRead } from "@/apps/masterdata/public";
@@ -73,6 +75,7 @@ import {
   moveLineItemsAction,
   groupLineItemsAction,
   revertLineItemPriceAction,
+  saveLineItemToLibraryAction,
   saveItemAsAssemblyAction,
   updateQuotationAction,
 } from "./actions";
@@ -132,6 +135,13 @@ function findInspected(project: BqProjectDetail, target: Inspected): InspectedFo
 type NewItemTarget = { sectionId?: string; subsectionId?: string; where: string };
 
 type Mutation = (prev: null, formData: FormData) => Promise<ActionResult<BqProjectDetail>>;
+
+const PRICE_KEPT_LABEL: Record<PriceKeptReason, string> = {
+  "source-missing": "sumber sudah tidak ada",
+  "no-permission": "tanpa akses harga Master Data",
+  "unit-changed": "satuan di sumber berubah",
+  currency: "harga sumber bukan Rupiah",
+};
 type MovePreview = {
   changes: boolean;
   beforeRate: string;
@@ -676,11 +686,14 @@ function DeleteSectionDialog({
 export function ProjectEditor({
   project: initialProject,
   canManage,
+  canManageLibrary = false,
   assemblies = [],
   units,
 }: {
   project: BqProjectDetail;
   canManage: boolean;
+  /** `bq.library.manage`: a Custom Cost Component may be saved to the BQ Library. */
+  canManageLibrary?: boolean;
   assemblies?: BqAssemblyTemplateRead[];
   units: UnitRead[];
 }) {
@@ -723,10 +736,18 @@ export function ProjectEditor({
     if (highlightTimer.current) clearTimeout(highlightTimer.current);
   }, []);
 
-  const showMoveNotice = (message: string, tone: "neutral" | "success" = "neutral") => {
+  const showMoveNotice = (message: string, tone: "neutral" | "success" = "neutral", durationMs = 3200) => {
     if (noticeTimer.current) clearTimeout(noticeTimer.current);
     setMoveNotice({ message, tone });
-    noticeTimer.current = setTimeout(() => setMoveNotice(null), 3200);
+    noticeTimer.current = setTimeout(() => setMoveNotice(null), durationMs);
+  };
+
+  /** After an Assembly is applied: say which lines kept the Assembly's stored price instead of today's source price. */
+  const reportPriceRefresh = (detail: { priceRefresh?: PriceRefresh }) => {
+    const kept = detail.priceRefresh?.kept ?? [];
+    if (kept.length === 0) return;
+    const list = kept.map((line) => `${line.title} (${PRICE_KEPT_LABEL[line.reason]})`).join(", ");
+    showMoveNotice(`${kept.length} Cost Component memakai harga yang tersimpan di assembly, bukan harga sumber terbaru: ${list}.`, "neutral", 12000);
   };
 
   const highlightMovedLines = (ids: readonly string[]) => {
@@ -744,7 +765,8 @@ export function ProjectEditor({
     });
 
   /** Every mutation returns the recomputed project, so totals move without a reload. */
-  const run = (action: Mutation, fields: Record<string, string | undefined>) =>
+  /** `onData` sees the action's answer, e.g. an applied Assembly's price report. */
+  const run = <D extends BqProjectDetail>(action: (prev: null, formData: FormData) => Promise<ActionResult<D>>, fields: Record<string, string | undefined>, onData?: (data: D) => void) =>
     new Promise<void>((resolve, reject) => {
       const data = new FormData();
       data.set("projectId", project.id);
@@ -762,6 +784,7 @@ export function ProjectEditor({
         setError(null);
         setProject(result.data);
         setSelection(null);
+        onData?.(result.data);
         resolve();
       });
     });
@@ -1136,6 +1159,7 @@ export function ProjectEditor({
               found={found}
               units={units}
               editable={editable}
+              canSaveToLibrary={editable && canManageLibrary}
               pending={pending}
               run={run}
               commit={commit}
@@ -1202,7 +1226,7 @@ export function ProjectEditor({
           pending={pending}
           onClose={() => setAssemblyItemId(null)}
           onApply={(assemblyId, qtyPerL1) => {
-            void run(applyAssemblyAction, { itemId: assemblyItemId, assemblyId, qtyPerL1 }).catch(() => undefined).finally(() => setAssemblyItemId(null));
+            void run(applyAssemblyAction, { itemId: assemblyItemId, assemblyId, qtyPerL1 }, reportPriceRefresh).catch(() => undefined).finally(() => setAssemblyItemId(null));
           }}
         />
       ) : null}
@@ -1238,7 +1262,7 @@ export function ProjectEditor({
           onSubmit={({ name, qty, unit, assemblyId }) => {
             const where = newItemTarget.sectionId ? { sectionId: newItemTarget.sectionId } : { subsectionId: newItemTarget.subsectionId };
             const request = assemblyId
-              ? run(addItemAndApplyAssemblyAction, { ...where, assemblyId, name, qty, unit })
+              ? run(addItemAndApplyAssemblyAction, { ...where, assemblyId, name, qty, unit }, reportPriceRefresh)
               : run(addItemAction, { ...where, name, qty, unit });
             void request.then(() => setNewItemTarget(null)).catch(() => undefined);
           }}
@@ -1668,10 +1692,11 @@ function PanelValue({ label, children }: { label: string; children: ReactNode })
  * Component Group or Cost Component changes here; Enter or leaving a field saves it, a refused value springs back.
  * A locked or archived project shows the same values read-only.
  */
-function RowInspector({ found, units, editable, pending, run, commit, commitNum, onStep, onClose }: {
+function RowInspector({ found, units, editable, canSaveToLibrary = false, pending, run, commit, commitNum, onStep, onClose }: {
   found: InspectedFound;
   units: UnitRead[];
   editable: boolean;
+  canSaveToLibrary?: boolean;
   pending: boolean;
   run: (action: Mutation, fields: Record<string, string | undefined>) => Promise<void>;
   commit: (action: Mutation, id: string, field: string) => (value: string) => Promise<void>;
@@ -1767,6 +1792,12 @@ function RowInspector({ found, units, editable, pending, run, commit, commitNum,
         <Badge tone="neutral">{KATEGORI_LABEL[line.kategori] ?? line.kategori}</Badge>
         {line.sourceType !== "CUSTOM" ? <Text tone="tertiary" size="sm">{line.sourceType === "MASTERDATA" ? "Salinan harga Master Data" : "Salinan harga BQ Library"}</Text> : null}
       </div>
+      {line.sourceType === "CUSTOM" && canSaveToLibrary ? (
+        // Owner 2026-10-22: saving a Custom row to the Library is an explicit choice, never automatic.
+        <Button type="button" variant="secondary" size="sm" leadingIcon={<Library aria-hidden="true" />} disabled={pending} onClick={() => void run(saveLineItemToLibraryAction, { id: line.id }).catch(() => undefined)}>
+          Simpan ke BQ Library
+        </Button>
+      ) : null}
       {number("Jumlah", line.qty, updateLineItemAction, line.id, "qty")}
       <PanelField label="Satuan">
         <InlineEdit label="Satuan" value={line.purchaseUnitSnapshot} disabled={!editable} commitOnBlur onCommit={commit(updateLineItemAction, line.id, "purchaseUnitSnapshot")} />

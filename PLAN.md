@@ -5,7 +5,7 @@ Scope: one Cost Component form for Library items, Assembly lines and project Cos
 Module(s): BQ (`src/apps/bq/**`, BQ Library screen). Reads Master Data only through `@/apps/masterdata/public`.
 Target revision: R9.170 (this plan is R9.169). Re-check `CHANGELOG.md` and all branches; use the next unused number if taken.
 Risk: medium - changes how an existing feature prices projects (apply now re-reads source prices) and adds a cross-module read port to the BQ service; no schema change. Escalate (BLOCKED / CONFLICT) if a migration turns out to be required, if Master Data's public read cannot resolve a price by id for both material and work prices, or if the BQ Library read cannot resolve an item by id across its four item types.
-Status: READY — executed by the Lead (owner, 2026-10-22: "kerjakan langsung")
+Status: DONE in R9.170 — browser acceptance pending (BACKLOG [UNVERIFIED]). Executed by the Lead (owner, 2026-10-22: "kerjakan langsung").
 Priority: P1, after the P0 Schedule Assistant
 Owner: Product Owner (decisions 2026-10-22)
 Last updated: 2026-10-22

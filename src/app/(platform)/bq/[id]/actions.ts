@@ -9,7 +9,7 @@ import { validationError } from "@platform/core/validation";
 import { AppError } from "@platform/core/errors";
 import { addDecimals, isDecimalString, toDecimalString } from "@platform/utilities/decimal";
 import { bqPublicRead, bqService, masterDataRead } from "@/apps/bq/runtime";
-import { BQ_PRICE_MODES, QUOTATION_TERMS_MAX, type BqProjectDetail } from "@/apps/bq/public";
+import { BQ_PRICE_MODES, QUOTATION_TERMS_MAX, type BqProjectDetail, type PriceRefresh } from "@/apps/bq/public";
 import {
   snapshotCustom,
   snapshotFromLibrary,
@@ -571,12 +571,12 @@ const ApplyAssemblySchema = z.object({ projectId: Id, itemId: Id, assemblyId: Id
 export async function applyAssemblyAction(
   _prev: ActionResult<BqProjectDetail> | null,
   formData: FormData,
-): Promise<ActionResult<BqProjectDetail>> {
+): Promise<ActionResult<BqProjectDetail & { priceRefresh?: PriceRefresh }>> {
   return runSafeAction(async () => {
     const { grants, actor } = await authorize();
     const value = parse(ApplyAssemblySchema, formData);
-    await bqService.applyAssemblyTemplate({ grants, actor, itemId: value.itemId, assemblyId: value.assemblyId, qtyPerL1: value.qtyPerL1 ? positiveDecimal(value.qtyPerL1, "Assembly quantity") : undefined });
-    return reload(value.projectId);
+    const applied = await bqService.applyAssemblyTemplate({ grants, actor, itemId: value.itemId, assemblyId: value.assemblyId, qtyPerL1: value.qtyPerL1 ? positiveDecimal(value.qtyPerL1, "Assembly quantity") : undefined });
+    return { ...(await reload(value.projectId)), priceRefresh: applied.priceRefresh };
   });
 }
 
@@ -594,7 +594,7 @@ const AddItemAndApplyAssemblySchema = z.object({
 export async function addItemAndApplyAssemblyAction(
   _prev: ActionResult<BqProjectDetail> | null,
   formData: FormData,
-): Promise<ActionResult<BqProjectDetail>> {
+): Promise<ActionResult<BqProjectDetail & { priceRefresh?: PriceRefresh }>> {
   return runSafeAction(async () => {
     const { grants, actor } = await authorize();
     const raw = Object.fromEntries(formData.entries());
@@ -606,7 +606,7 @@ export async function addItemAndApplyAssemblyAction(
     if ((value.sectionId === undefined) === (value.subsectionId === undefined)) {
       throw new AppError("VALIDATION", "bq.assembly.invalid-parent", "Assembly must be added to one section or subsection");
     }
-    await bqService.addItemAndApplyAssembly({
+    const applied = await bqService.addItemAndApplyAssembly({
       grants,
       actor,
       sectionId: value.sectionId,
@@ -616,11 +616,27 @@ export async function addItemAndApplyAssemblyAction(
       qty: value.qty ? positiveDecimal(value.qty, "Quantity") : undefined,
       unit: value.unit || undefined,
     });
-    return reload(value.projectId);
+    return { ...(await reload(value.projectId)), priceRefresh: applied.priceRefresh };
   });
 }
 
 // ─── L3 ───────────────────────────────────────────────────────
+
+const SaveLineToLibrarySchema = z.object({ projectId: Id, id: Id });
+
+/** "Save to BQ Library" on a Custom Cost Component (owner 2026-10-22): an explicit choice, never automatic. */
+export async function saveLineItemToLibraryAction(
+  _prev: ActionResult<BqProjectDetail> | null,
+  formData: FormData,
+): Promise<ActionResult<BqProjectDetail>> {
+  return runSafeAction(async () => {
+    const { grants, actor } = await authorize();
+    const value = parse(SaveLineToLibrarySchema, formData);
+    await bqService.saveLineItemToLibrary({ grants, actor, id: value.id });
+    revalidatePath("/bq/library");
+    return reload(value.projectId);
+  });
+}
 
 const KATEGORI = ["MATERIAL", "UPAH", "MATERIAL_UPAH", "BIAYA_UMUM", "TRANSPORTASI_AKOMODASI", "ALAT"] as const;
 

@@ -6,6 +6,8 @@ import { prepareAuditEvent } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { compareDecimals, toDecimalString } from "@platform/utilities/decimal";
 
+import type { BqMasterDataRead } from "./cost-sources";
+
 export type BqKategori =
   | "MATERIAL"
   | "UPAH"
@@ -76,6 +78,8 @@ type AuditInput = {
 export type BqServiceDeps = {
   auditWriter: AuditWriter;
   runTransaction: <T>(fn: (tx: PrismaClient) => Promise<T>) => Promise<T>;
+  /** Master Data's public price read, for sourced Cost Components and Assembly price-at-use. */
+  masterData?: BqMasterDataRead;
 };
 
 export type BqServiceContext = {

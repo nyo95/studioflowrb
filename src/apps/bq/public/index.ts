@@ -9,6 +9,7 @@ export * from "./nav";
 export { BQ_DEFAULT_QUOTATION_TERMS, BQ_PRICE_MODE_LABEL, BQ_PRICE_MODES, QUOTATION_TERMS_MAX, isMarkerPriceMode, type BqPriceMode } from "../lib/quotation";
 
 export { BQ_PERMISSIONS };
+export type { PriceKeptReason, PriceRefresh } from "../services/cost-sources";
 export type { BqQuotationSettingsRead } from "../services/quotation-settings";
 export { readBqIssuerIdentity } from "./issuer-identity";
 
@@ -74,6 +75,8 @@ export type BqAssemblyTemplateRead = {
 
 export type BqAssemblyLineRead = {
   id: string;
+  /** Where the line came from: a Master Data price, a BQ Library item, or typed by hand. */
+  sourceType: "MASTERDATA" | "BQ_LIBRARY" | "CUSTOM";
   title: string;
   purchaseUnit: string;
   harga: string;
@@ -237,6 +240,7 @@ export function createBqPublicRead(db: PrismaClient) {
         lineCount: assembly.lines.length,
         lines: assembly.lines.map((l) => ({
           id: l.id,
+          sourceType: l.source_type,
           title: l.title_snapshot,
           purchaseUnit: l.purchase_unit_snapshot,
           harga: String(l.harga_snapshot),

@@ -10,9 +10,17 @@ function wrapRunTransaction<T>(fn: (tx: PrismaClient) => Promise<T>): Promise<T>
   return platformRunTransaction(async (tx) => fn(tx as unknown as PrismaClient));
 }
 
+/**
+ * Master Data is read one way only, through its published contract. BQ never
+ * touches Master Data tables, services, or internals — a snapshot taken here is
+ * a copy of a fact, not a link to it.
+ */
+export const masterDataRead = createMasterDataPublicRead(prisma);
+
 export const bqService = createBqService(prisma, {
   auditWriter,
   runTransaction: wrapRunTransaction,
+  masterData: masterDataRead,
 });
 export const bqPublicRead = createBqPublicRead(prisma);
 export const bqPublicCommands = {
@@ -21,10 +29,3 @@ export const bqPublicCommands = {
   revokeStalePromotionApproval: bqService.revokeStalePromotionApproval,
   rejectPromotion: bqService.rejectPromotion,
 };
-
-/**
- * Master Data is read one way only, through its published contract. BQ never
- * touches Master Data tables, services, or internals — a snapshot taken here is
- * a copy of a fact, not a link to it.
- */
-export const masterDataRead = createMasterDataPublicRead(prisma);

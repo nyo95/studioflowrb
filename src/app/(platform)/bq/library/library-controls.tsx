@@ -11,7 +11,8 @@ import type { UnitRead } from "@/apps/masterdata/public";
 import { Badge,Button,ConfirmDialog,DataTable,DirectoryShell,EmptyState,Field,FormActions,InlineError,Input,RowActionMenu,SearchField,Select,TableBody,TableCell,TableHead,TableHeader,TableRow,TableToolbar,Textarea } from "@/platform/ui_engine";
 import { createMoney,formatMoney } from "@platform/utilities/money";
 import { formatInstant } from "@platform/utilities/date";
-import { addAssemblyLineAction,createAssemblyAction,deleteAssemblyAction,deleteAssemblyLineAction,getAssemblyDetailAction,libraryItemAction,templateAction,updateAssemblyAction,updateAssemblyLineAction } from "./actions";
+import { addAssemblyLineAction,addAssemblySourcedLineAction,createAssemblyAction,deleteAssemblyAction,deleteAssemblyLineAction,getAssemblyDetailAction,libraryItemAction,saveAssemblyLineToLibraryAction,templateAction,updateAssemblyAction,updateAssemblyLineAction } from "./actions";
+import { ImportDialog, type SourcePickOption } from "../[id]/source-picker-dialog";
 import { PromotionRequestButton } from "./promotion-controls";
 
 type ItemType = BqLibItemRead["type"];
@@ -392,10 +393,36 @@ export function AssemblyActions({ assembly, openOnMount = false }: { assembly: B
   );
 }
 
+const SOURCE_LABELS: Record<BqAssemblyLineRead["sourceType"], string> = { MASTERDATA: "Master Data", BQ_LIBRARY: "BQ Library", CUSTOM: "Custom" };
+
 function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDetail; onRefresh: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [addOpen, setAddOpen] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [customKategori, setCustomKategori] = useState("MATERIAL");
+
+  // The same source picker as a project's "Add Cost Component" (WO-BQ-ASSEMBLY-SOURCE-01): a picked price or Library
+  // item is snapshotted by the server; Custom opens the typed form with the chosen category.
+  const pickSource = async (option: SourcePickOption) => {
+    setPickerOpen(false);
+    if (option.sourceType === "CUSTOM") {
+      setCustomKategori(option.kategori);
+      setAddOpen(true);
+      return;
+    }
+    const data = new FormData();
+    data.set("assemblyId", detail.id);
+    data.set("sourceType", option.sourceType);
+    data.set("sourceRefId", option.id);
+    data.set("sourceKind", option.sourceKind);
+    startTransition(async () => {
+      const result = await addAssemblySourcedLineAction(null, data);
+      if (result.ok === false) setError(result.error.safeMessage);
+      else { setError(null); onRefresh(); }
+    });
+  };
+
   const addLine = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
@@ -431,8 +458,8 @@ function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDet
       )}
 
       {addOpen ? (
-        <form className="grid gap-3 rounded-control border border-line p-3" onSubmit={addLine}>
-          <div className="font-medium text-sm">New Cost Component</div>
+        <form key={customKategori} className="grid gap-3 rounded-control border border-line p-3" onSubmit={addLine}>
+          <div className="font-medium text-sm">New Custom Cost Component</div>
           <div className="grid grid-cols-2 gap-2 max-[480px]:grid-cols-1">
             <Field label="Nama item" required><Input name="title" required maxLength={200} autoFocus /></Field>
             <Field label="Unit"><Input name="purchaseUnit" placeholder="m2, lot" defaultValue="ls" /></Field>
@@ -440,7 +467,7 @@ function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDet
             <Field label="Qty"><Input name="qty" inputMode="decimal" defaultValue="1" /></Field>
             <Field label="Koefisien"><Input name="koefisien" inputMode="decimal" defaultValue="1" /></Field>
             <Field label="Kategori">
-              <Select name="kategori" defaultValue="MATERIAL">
+              <Select name="kategori" defaultValue={customKategori}>
                 <option value="MATERIAL">Material</option>
                 <option value="UPAH">Labor</option>
                 <option value="MATERIAL_UPAH">Material + Labor</option>
@@ -450,16 +477,22 @@ function AssemblyLineList({ detail, onRefresh }: { detail: BqAssemblyTemplateDet
               </Select>
             </Field>
           </div>
+          <Field label="Catatan"><Input name="notes" maxLength={2000} /></Field>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" name="saveToLibrary" className="mt-0.5" />
+            <span>Simpan juga ke BQ Library<span className="block text-xs text-ink-tertiary">Jadi Library item yang bisa dipilih lagi di assembly dan proyek lain.</span></span>
+          </label>
           <FormActions>
             <Button type="button" variant="ghost" size="sm" onClick={() => setAddOpen(false)}>Batal</Button>
             <Button type="submit" variant="primary" size="sm" pending={pending}>Tambah baris</Button>
           </FormActions>
         </form>
       ) : (
-        <Button type="button" variant="secondary" size="sm" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setAddOpen(true)}>
+        <Button type="button" variant="secondary" size="sm" leadingIcon={<Plus aria-hidden="true" />} disabled={pending} onClick={() => setPickerOpen(true)}>
           Tambah baris
         </Button>
       )}
+      {pickerOpen ? <ImportDialog target={{}} onClose={() => setPickerOpen(false)} onPick={pickSource} description="The source is copied into this Assembly. Each time the Assembly is applied to a project, Master Data and BQ Library lines take the source's current price. BQ works in Rupiah only." /> : null}
     </div>
   );
 }
@@ -472,6 +505,13 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
 
   const formRef = useRef<HTMLFormElement>(null);
   const draft = useFormDraftGuard({ formRef, resetKey: line.id, active: editOpen });
+  const saveToLibrary = () => {
+    startTransition(async () => {
+      const result = await saveAssemblyLineToLibraryAction(line.id);
+      if (result.ok === false) setError(result.error.safeMessage);
+      else { setError(null); onSaved(); }
+    });
+  };
   const save = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
@@ -487,8 +527,10 @@ function AssemblyLineRow({ line, assemblyId: _assemblyId, pending, onDelete, onS
     <div className="flex flex-wrap items-center gap-2 py-2">
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate">{line.title}</div>
-        <div className="text-xs text-ink-secondary">{line.purchaseUnit} · qty {line.qty} · koef {line.koefisien} · {line.harga}</div>
+        <div className="text-xs text-ink-secondary">{SOURCE_LABELS[line.sourceType]} · {line.purchaseUnit} · qty {line.qty} · koef {line.koefisien} · {line.harga}</div>
+        {error && !editOpen ? <InlineError>{error}</InlineError> : null}
       </div>
+      {line.sourceType === "CUSTOM" ? <IconButton type="button" size="sm" variant="ghost" onClick={saveToLibrary} disabled={pending || editing} label="Simpan ke BQ Library" icon={<Library size={14} aria-hidden="true" />} /> : null}
       <IconButton type="button" size="sm" variant="ghost"  onClick={() => { setError(null); setEditOpen(true); }} label="Edit baris" icon={<Pencil size={14} aria-hidden="true" />} />
       <IconButton type="button" size="sm" variant="ghost"  onClick={() => setDeleteOpen(true)} disabled={pending} label="Hapus baris" icon={<Trash2 size={14} aria-hidden="true" />} />
 
