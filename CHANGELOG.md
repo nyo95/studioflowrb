@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.169 | 2026-10-22 | plan(bq): Cost Components from Master Data and the BQ Library in Assemblies (Lead)
+
+- **Work order:** `WO-BQ-ASSEMBLY-SOURCE-01` is READY for R9.170 and executed by the Lead (owner: "kerjakan langsung"): Assembly lines can be picked from Master Data prices and BQ Library items; applying an Assembly takes the current source price, keeping the Assembly price (and saying so) when the source is gone, not readable, re-united or non-IDR; one shared Cost Component form for Library items, Assembly lines and project Cost Components; an unticked "Save to BQ Library" choice on Custom rows.
+- **Owner decisions (2026-10-22):** price at use (not at save); one form, separate data; Save-to-Library is an explicit choice, never automatic.
+- **Plans:** `WO-SCHEDULE-ASSISTANT-01` done in R9.167; `WO-REL-READINESS-01` stays parked.
+- **Checks:** documentation only; no code or schema changed.
+
 ## R9.168 | 2026-10-22 | ui(bq): show a newly added Assembly at once (Lead)
 
 - **Owner report:** "Add assembly" looked like it failed: the dialog closed but the page stayed on the Items tab, and the new assembly sat somewhere in the A–Z Assemblies list, so the estimator re-created it ("Gondola", "Gondola Sociolla", "Gondola Sociolla 2 Bay" all existed in the dev database).
