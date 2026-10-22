@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.177 | 2026-10-22 | plan(schedule-assistant): finalize an option through the Assistant (Lead)
+
+- **Owner request:** the Assistant must be able to "Set as final" so work such as finalizing the 42 "(old)" materials of Sociolla SBZ (except HT-04) can be done from an AI app. Owner chose to add it, not to keep it screen-only.
+- **Work order:** `WO-SCHEDULE-ASSISTANT-03` READY for R9.178 (Codex): one new operation `finalize_option` on a named existing option, same preview/digest/confirmation, no un-finalize, no bulk selector, no schema change; the confirmation shows a separate final-decision count.
+- **Checks:** documentation only.
+
 ## R9.176 | 2026-10-22 | feat(studioflow): suggest studio categories for look-alike names (Lead)
 
 - **Work order:** `WO-SF-CATEGORY-SIMILAR-01` (owner: suggest, never auto-map).
