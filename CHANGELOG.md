@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.195 | 2026-10-22 | feat(studioflow): Product Schedule bulk delete and docked item editor (Lead)
+
+- **Owner request:** delete several schedule items at once; show the item editor as a pane fixed beside the board instead of a pop-up.
+- **Bulk delete:** a "Select" button (editors only) turns the board and list into selection mode with a checkbox per item, "Select all N", "Delete N" and "Done". Confirmation names the count ("Delete 2 items?", "Keep items"). Only items still in view are deleted (a filter or section switch never deletes hidden ones). Drag-reorder and the right-click menu are off while selecting; opening Select with an editor open asks the usual discard question first.
+- **Action:** `deleteScheduleEntriesAction` (max 200 ids, de-duplicated) runs the same `schedule.deleteEntry` as a single delete per item, with the same asset/link cleanup; a failure stops the run and the message says how many were deleted before it.
+- **Docked editor:** `EntryDrawer` became `DockedEntryPanel`: a sticky 30rem column on large screens (full-screen on small), header with previous/next, item menu, close button and Esc; the board stays visible and clickable, the open card is outlined. Editor content unchanged.
+- **Checks:** `tsc --noEmit` clean; eslint clean on the schedule page and `actions.ts`; browser check on the local dev server (open item docked, Select mode, Select all, confirmation shown and cancelled; no nested-button DOM). `schedule.regression.test.ts` 28/28 (the old "uses Drawer" pin now expects the docked panel). Not run: full `npm test`, a real bulk delete (owner data), phone width.
+- **Renumbered:** committed locally as R9.194 (`d5c5226`) while GitHub received its own R9.194 (SketchUp plugin 1.3.0); rebased onto it unpushed and renumbered R9.195.
+
 ## R9.194 | 2026-10-22 | feat(sketchup): plugin 1.3.0 links materials to schedule options (Lead)
 
 - **Work order:** `WO-SKETCHUP-03` (P1), built at the owner's request before the 1.2.1 test; one SketchUp test with 1.3.0 covers WO-SKETCHUP-01 Stage 1b, -02 and -03.

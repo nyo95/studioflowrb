@@ -933,6 +933,32 @@ export async function deleteScheduleEntryAction(input: z.infer<typeof ScheduleEn
 }
 
 const ScheduleOptionInput = z.strictObject({ projectId: Id, entryId: Id, snapshot: ScheduleSnapshot });
+const ScheduleEntriesRef = z.strictObject({ projectId: Id, entryIds: z.array(Id).min(1).max(200) });
+/** Bulk delete: each entry goes through the same service call as a single delete; a failure stops the run and reports how many went before it. */
+export async function deleteScheduleEntriesAction(input: z.infer<typeof ScheduleEntriesRef>): Promise<ActionResult<{ deleted: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntriesRef, input);
+    let deleted = 0;
+    try {
+      for (const entryId of new Set(data.entryIds)) {
+        const result = await studioFlow.schedule.deleteEntry({ ...ctx, projectId: data.projectId, entryId });
+        await Promise.allSettled([
+          clearScheduleEntryLink(result.entryId),
+          ...result.optionIds.map((optionId) => removeScheduleOptionUsage(optionId)),
+        ]);
+        deleted += 1;
+      }
+    } catch (error) {
+      refreshSchedule(data.projectId);
+      if (deleted > 0 && error instanceof Error) throw new Error(`${deleted} deleted, then it stopped: ${error.message}`);
+      throw error;
+    }
+    refreshSchedule(data.projectId);
+    return { deleted };
+  });
+}
+
 export async function createScheduleOptionAction(input: z.infer<typeof ScheduleOptionInput>): Promise<ActionResult<{ optionId: string }>> {
   return runSafeAction(async () => {
     const ctx = await context();

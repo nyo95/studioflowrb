@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Crown, Eye, EyeOff, History, ImageIcon, Plus, Printer, Search } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Crown, Eye, EyeOff, History, ImageIcon, Plus, Printer, Search, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -30,6 +30,7 @@ import {
   Badge,
   Button,
   ButtonMenu,
+  Checkbox,
   CreatableSearch,
   Dialog,
   Drawer,
@@ -62,6 +63,7 @@ import {
   copyReusableScheduleOptionAction,
   createScheduleEntryAction,
   createScheduleOptionAction,
+  deleteScheduleEntriesAction,
   deleteScheduleEntryAction,
   deleteScheduleOptionAction,
   importScheduleCsvAction,
@@ -362,6 +364,10 @@ function BoardView({
   onReorder,
   onDelete,
   categoryChoices,
+  openId,
+  selecting,
+  selectedIds,
+  onToggle,
 }: {
   projectId: string;
   groups: Array<{ category: string; rows: ScheduleEntryView[] }>;
@@ -373,15 +379,20 @@ function BoardView({
   onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
   onDelete: (entry: ScheduleEntryView) => void;
   categoryChoices: readonly CategoryChoice[];
+  openId: string | null;
+  selecting: boolean;
+  selectedIds: ReadonlySet<string>;
+  onToggle: (id: string) => void;
 }) {
   const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
-  const reorderEnabled = canEdit && filter === "all";
+  const reorderEnabled = canEdit && filter === "all" && !selecting;
+  const pick = (id: string) => (selecting ? onToggle(id) : onOpen(id));
   return (
     <div className="@container grid gap-8 p-(--ui-section-px)">
       {groups.map((group) => (
         <section key={group.category} className="grid gap-3" aria-label={group.category}>
           <GroupHeader title={<span className="inline-flex items-baseline gap-2"><span>{group.category}</span><span className="font-ui-mono font-normal text-ink-tertiary">{group.rows[0]?.code.split("-")[0]}</span></span>} count={group.rows.length} />
-          <div className="grid min-w-0 grid-cols-2 items-start gap-x-3 gap-y-5 @xl:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))]">
+          <div className="grid min-w-0 grid-cols-2 items-start gap-x-3 gap-y-5 @xl:grid-cols-[repeat(auto-fill,minmax(9.5rem,1fr))]">
             {group.rows.map((entry) => {
               const shown = shownOptionOf(entry);
               const extras = extraChoicesOf(entry);
@@ -399,7 +410,7 @@ function BoardView({
               return (
                 <ContextActionMenu
                   key={entry.id}
-                  items={canEdit ? [
+                  items={canEdit && !selecting ? [
                     { label: "Open", onSelect: () => onOpen(entry.id) },
                     { label: "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(entry) },
                   ] : []}
@@ -416,9 +427,9 @@ function BoardView({
                     if (draggingId) onReorder(group.rows, draggingId, entry.id);
                     end();
                   }}
-                  className={`group grid min-w-0 content-start text-left ${reorderEnabled ? "cursor-grab active:cursor-grabbing" : ""} ${draggingId === entry.id ? "opacity-40" : ""} ${dragOverId === entry.id && draggingId && draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}
+                  className={`group relative grid min-w-0 content-start text-left ${reorderEnabled ? "cursor-grab active:cursor-grabbing" : ""} ${draggingId === entry.id ? "opacity-40" : ""} ${openId === entry.id || selectedIds.has(entry.id) ? "outline-2 outline-offset-2 outline-line-focus" : ""} ${dragOverId === entry.id && draggingId && draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}
                 >
-                  <button type="button" onClick={() => onOpen(entry.id)} className="relative mb-2 block aspect-[4/5] w-full overflow-hidden bg-surface-muted text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+                  <button type="button" aria-pressed={selecting ? selectedIds.has(entry.id) : undefined} onClick={() => pick(entry.id)} className="relative mb-2 block aspect-[4/5] w-full overflow-hidden bg-surface-muted text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
                     {shown?.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={shown.imageUrl} alt={shown.productName} className="h-full w-full object-cover transition-opacity group-hover:opacity-90" draggable={false} />
@@ -430,7 +441,12 @@ function BoardView({
                       {entry.code}
                     </span>
                   </button>
-                  <button type="button" onClick={() => onOpen(entry.id)} className="grid min-w-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+                  {selecting ? (
+                    <span className="absolute left-2 top-2 rounded-[4px] bg-surface p-0.5">
+                      <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => onToggle(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} />
+                    </span>
+                  ) : null}
+                  <button type="button" onClick={() => pick(entry.id)} className="grid min-w-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
                   {badges.length ? <span className="mb-1 flex flex-wrap gap-1">{badges.map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span> : null}
                   {brand ? <span className="truncate text-micro uppercase tracking-[0.08em] text-ink-tertiary">{brand}</span> : null}
                   {shown ? (
@@ -500,6 +516,8 @@ export function ScheduleBoard({
   const [autoPhotoOptionId, setAutoPhotoOptionId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const editorDirtyRef = useRef(false);
   const listDrag = useRowDrag();
 
@@ -534,6 +552,11 @@ export function ScheduleBoard({
   }), [entries]);
   const categories = categoriesBySection[section];
   const open = entries.find((entry) => entry.id === openId) ?? null;
+  const visibleIds = useMemo(() => new Set(visibleEntries.map((entry) => entry.id)), [visibleEntries]);
+  // Only rows still in view count: switching filter or section never deletes something the user cannot see.
+  const pickedIds = useMemo(() => [...selectedIds].filter((id) => visibleIds.has(id)), [selectedIds, visibleIds]);
+  const toggleSelected = (id: string) => setSelectedIds((current) => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; });
+  const stopSelecting = () => { setSelecting(false); setSelectedIds(new Set()); };
   const visibleOpenIndex = open ? visibleEntries.findIndex((entry) => entry.id === open.id) : -1;
 
   const askDiscard = async () => {
@@ -564,6 +587,31 @@ export function ScheduleBoard({
     if (id === openId || !(await askDiscard())) return;
     editorDirtyRef.current = false;
     openEntry(id);
+  };
+
+  const startSelecting = async () => {
+    if (open && !(await askDiscard())) return;
+    editorDirtyRef.current = false;
+    setOpenId(null);
+    setAutoPhotoOptionId(null);
+    setSelecting(true);
+  };
+
+  const removeSelected = async () => {
+    const count = pickedIds.length;
+    if (!count) return;
+    const ok = await confirm.confirm({
+      title: `Delete ${count} item${count === 1 ? "" : "s"}?`,
+      description: `The ${count === 1 ? "item" : "items"} and all ${count === 1 ? "its" : "their"} options are removed. This can't be undone. Other codes stay as they are.`,
+      confirmLabel: `Delete ${count} item${count === 1 ? "" : "s"}`,
+      cancelLabel: "Keep items",
+      tone: "danger",
+    });
+    if (!ok) return;
+    if (await run("bulk-delete", () => deleteScheduleEntriesAction({ projectId, entryIds: pickedIds }))) {
+      setNotice(`${count} item${count === 1 ? "" : "s"} deleted.`);
+      stopSelecting();
+    }
   };
 
   const removeEntry = async (entry: ScheduleEntryView) => {
@@ -631,6 +679,7 @@ export function ScheduleBoard({
             ] : []),
             ...(canManageTemplates ? [{ label: "Schedule templates", onSelect: () => router.push(templatesHref) }] : []),
           ]} /> : null}
+          {canEdit && !selecting && visibleEntries.length > 0 ? <Button size="sm" variant="secondary" onClick={() => void startSelecting()}>Select</Button> : null}
           {canEdit ? (
           <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setDialog("add")}>
             Add item
@@ -650,6 +699,19 @@ export function ScheduleBoard({
         </div>
       </div>
 
+      {selecting ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle bg-surface-muted px-(--ui-section-px) py-2" role="region" aria-label="Bulk actions">
+          <div className="flex items-center gap-3 text-sm">
+            <span className="font-medium text-ink" role="status">{pickedIds.length} selected</span>
+            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(pickedIds.length === visibleEntries.length ? new Set() : new Set(visibleEntries.map((entry) => entry.id)))}>{pickedIds.length === visibleEntries.length ? "Clear selection" : `Select all ${visibleEntries.length}`}</Button>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="danger" leadingIcon={<Trash2 className="h-3.5 w-3.5" />} disabled={pickedIds.length === 0} pending={command.pendingKeys.includes("bulk-delete")} onClick={() => void removeSelected()}>Delete{pickedIds.length ? ` ${pickedIds.length}` : ""}</Button>
+            <Button size="sm" variant="secondary" onClick={stopSelecting}>Done</Button>
+          </div>
+        </div>
+      ) : null}
+
       {error && !open && !dialog ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
       {notice ? <Text size="sm" tone="secondary" role="status" className="px-(--ui-section-px) pt-2">{notice}</Text> : null}
 
@@ -663,7 +725,7 @@ export function ScheduleBoard({
           {progress.all === 0 && canEdit ? <NewCategoryInline command={command} projectId={projectId} section={section} categories={[]} categoryChoices={categoryChoices} className="mb-8 justify-self-center" /> : null}
         </div>
       ) : (
-        <div className="grid">
+        <div className={open ? "grid lg:grid-cols-[minmax(0,1fr)_30rem]" : "grid"}>
           <div className="min-w-0">
             {viewMode === "board" ? (
               <BoardView
@@ -677,10 +739,15 @@ export function ScheduleBoard({
                 onReorder={reorderGroup}
                 onDelete={(entry) => void removeEntry(entry)}
                 categoryChoices={categoryChoices}
+                openId={openId}
+                selecting={selecting}
+                selectedIds={selectedIds}
+                onToggle={toggleSelected}
               />
             ) : (
               <div className="grid">
                 <div className="hidden items-center gap-3 border-b border-line px-(--ui-section-px) py-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary sm:flex" aria-hidden="true">
+                  {selecting ? <span className="w-5 shrink-0" /> : null}
                   <span className="w-11 shrink-0" />
                   <span className="w-14 shrink-0">Code</span>
                   <span className="min-w-0 flex-1">Type</span>
@@ -702,7 +769,7 @@ export function ScheduleBoard({
                           <li
                             key={entry.id}
                             id={`schedule-entry-${entry.id}`}
-                            draggable={canEdit && filter === "all"}
+                            draggable={canEdit && filter === "all" && !selecting}
                             onDragStart={listDrag.start(entry.id)}
                             onDragEnd={listDrag.end}
                             onDragOver={listDrag.over(entry.id, canEdit && filter === "all")}
@@ -714,7 +781,8 @@ export function ScheduleBoard({
                             }}
                             className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit && filter === "all" ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
                           >
-                            <button type="button" onClick={() => openEntry(entry.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                            {selecting ? <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => toggleSelected(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} /> : null}
+                            <button type="button" onClick={() => (selecting ? toggleSelected(entry.id) : openEntry(entry.id))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                               <Thumb url={shown?.imageUrl ?? null} alt={shown ? shown.productName : `${entry.code} has no photo`} />
                               <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
                               <span className="grid min-w-0 flex-1 gap-0.5">
@@ -734,7 +802,7 @@ export function ScheduleBoard({
                               <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
                               {entryBadges(entry).map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}
                             </button>
-                            {canEdit || canManageTemplates ? (
+                            {(canEdit || canManageTemplates) && !selecting ? (
                               <RowActionMenu
                                 label={`Actions for ${entry.code}`}
                                 pending={busy}
@@ -761,30 +829,30 @@ export function ScheduleBoard({
               </div>
             )}
           </div>
+        {open ? (
+          <DockedEntryPanel
+            key={open.id}
+            projectId={projectId}
+            entry={open}
+            brands={brands}
+            canEdit={canEdit}
+            command={command}
+            confirm={confirm.confirm}
+            canManageTemplates={canManageTemplates}
+            categories={categories}
+            previousId={visibleOpenIndex > 0 ? visibleEntries[visibleOpenIndex - 1]?.id ?? null : null}
+            nextId={visibleOpenIndex >= 0 ? visibleEntries[visibleOpenIndex + 1]?.id ?? null : null}
+            onNavigate={(id) => void navigateEntry(id)}
+            onMove={() => setDialog({ move: open })}
+            onDelete={() => void removeEntry(open)}
+            onClose={() => void closeEditor()}
+            onDirtyChange={(dirty) => { editorDirtyRef.current = dirty; }}
+            initialPhotoOptionId={autoPhotoOptionId}
+          />
+        ) : null}
         </div>
       )}
 
-      {open ? (
-        <EntryDrawer
-          key={open.id}
-          projectId={projectId}
-          entry={open}
-          brands={brands}
-          canEdit={canEdit}
-          command={command}
-          confirm={confirm.confirm}
-          canManageTemplates={canManageTemplates}
-          categories={categories}
-          previousId={visibleOpenIndex > 0 ? visibleEntries[visibleOpenIndex - 1]?.id ?? null : null}
-          nextId={visibleOpenIndex >= 0 ? visibleEntries[visibleOpenIndex + 1]?.id ?? null : null}
-          onNavigate={(id) => void navigateEntry(id)}
-          onMove={() => setDialog({ move: open })}
-          onDelete={() => void removeEntry(open)}
-          onClose={() => void closeEditor()}
-          onDirtyChange={(dirty) => { editorDirtyRef.current = dirty; }}
-          initialPhotoOptionId={autoPhotoOptionId}
-        />
-      ) : null}
 
       {dialog === "add" ? (
         <AddItemDrawer projectId={projectId} section={section} categoriesBySection={categoriesBySection} categoryChoices={categoryChoices} brands={brands} command={command} confirm={confirm.confirm} onClose={() => setDialog(null)} />
@@ -1408,10 +1476,10 @@ function EntryPanelContent({
 // ── Entry drawer ───────────────────────────────────────────────────────────────
 
 /**
- * The one item editor (WO-SF-SCHED-RELAYOUT-01): a right-side drawer so the board stays in view, with
+ * The one item editor (WO-SF-SCHED-RELAYOUT-01; docked, owner 2026-10-22): a pane fixed beside the board instead of a pop-up, so the board stays in view and clickable, with
  * previous/next across the current section and filter, and the item menu (move, save as template, delete).
  */
-function EntryDrawer({
+function DockedEntryPanel({
   projectId,
   entry,
   brands,
@@ -1449,29 +1517,41 @@ function EntryDrawer({
   const state = finalOf(entry) ? "Final chosen" : entry.options.length ? "Needs a decision" : "No product yet";
   const source = templateSourceOf(entry);
   return (
-    <Drawer
-      open
-      onOpenChange={(value) => { if (!value) onClose(); }}
-      title={<div className="flex min-w-0 items-center gap-2"><span className="truncate">{entry.code} · {entry.category}</span><IconButton size="sm" variant="ghost" label="Previous item" icon={<ArrowLeft aria-hidden="true" />} disabled={!previousId} onClick={() => { if (previousId) onNavigate(previousId); }} /><IconButton size="sm" variant="ghost" label="Next item" icon={<ArrowRight aria-hidden="true" />} disabled={!nextId} onClick={() => { if (nextId) onNavigate(nextId); }} /><RowActionMenu label={`Actions for ${entry.code}`} items={[
-        { label: "Move to category…", disabled: categories.length < 2, onSelect: onMove },
-        ...(canManageTemplates && source ? [{ label: "Save as template item", onSelect: () => { void command.run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })); } }] : []),
-        { label: "Delete", danger: true, separatorBefore: true, onSelect: onDelete },
-      ]} /></div>}
-      description={`${SECTION_LABEL[entry.section]} · ${state}`}
-      size="lg"
+    <aside
+      aria-label={`Edit ${entry.code}`}
+      onKeyDown={(event) => { if (event.key === "Escape" && !event.defaultPrevented) onClose(); }}
+      className="fixed inset-0 z-40 flex min-h-0 flex-col bg-surface lg:sticky lg:inset-auto lg:top-[3.25rem] lg:z-auto lg:max-h-[calc(100vh-3.25rem)] lg:border-l lg:border-line-subtle"
     >
-      <EntryPanelContent
-        projectId={projectId}
-        entry={entry}
-        brands={brands}
-        canEdit={canEdit}
-        command={command}
-        confirm={confirm}
-        onClose={onClose}
-        onDirtyChange={onDirtyChange}
-        initialPhotoOptionId={initialPhotoOptionId}
-      />
-    </Drawer>
+      <header className="flex items-start justify-between gap-2 border-b border-line-subtle px-4 py-3">
+        <div className="grid min-w-0 gap-0.5">
+          <div className="flex min-w-0 items-center gap-1">
+            <h2 className="m-0 truncate text-base font-semibold text-ink">{entry.code} · {entry.category}</h2>
+            <IconButton size="sm" variant="ghost" label="Previous item" icon={<ArrowLeft aria-hidden="true" />} disabled={!previousId} onClick={() => { if (previousId) onNavigate(previousId); }} />
+            <IconButton size="sm" variant="ghost" label="Next item" icon={<ArrowRight aria-hidden="true" />} disabled={!nextId} onClick={() => { if (nextId) onNavigate(nextId); }} />
+            <RowActionMenu label={`Actions for ${entry.code}`} items={[
+              { label: "Move to category…", disabled: categories.length < 2, onSelect: onMove },
+              ...(canManageTemplates && source ? [{ label: "Save as template item", onSelect: () => { void command.run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })); } }] : []),
+              { label: "Delete", danger: true, separatorBefore: true, onSelect: onDelete },
+            ]} />
+          </div>
+          <Text size="sm" tone="secondary">{SECTION_LABEL[entry.section]} · {state}</Text>
+        </div>
+        <IconButton size="sm" variant="ghost" label="Close editor" icon={<X aria-hidden="true" />} onClick={onClose} />
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <EntryPanelContent
+          projectId={projectId}
+          entry={entry}
+          brands={brands}
+          canEdit={canEdit}
+          command={command}
+          confirm={confirm}
+          onClose={onClose}
+          onDirtyChange={onDirtyChange}
+          initialPhotoOptionId={initialPhotoOptionId}
+        />
+      </div>
+    </aside>
   );
 }
 

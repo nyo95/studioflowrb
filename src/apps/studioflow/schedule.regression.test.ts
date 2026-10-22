@@ -75,10 +75,12 @@ describe("WO-SF-SCHED-RELAYOUT-01 board structure", () => {
 });
 
 describe("WO-SF-SCHED-RELAYOUT-01 one drawer editor", () => {
-  it("uses Drawer for existing and new items", () => {
-    assert.match(scheduleBoard, /function EntryDrawer/);
+  it("docks the editor beside the board and keeps a Drawer for new items", () => {
+    // Owner 2026-10-22: the existing-item editor is a pane fixed beside the board, not a pop-up.
+    assert.match(scheduleBoard, /function DockedEntryPanel/);
+    assert.doesNotMatch(scheduleBoard, /function EntryDrawer/);
     assert.match(scheduleBoard, /function AddItemDrawer/);
-    assert.ok((scheduleBoard.match(/<Drawer/g) ?? []).length >= 2);
+    assert.ok((scheduleBoard.match(/<Drawer/g) ?? []).length >= 1);
   });
   it("removes the three old editor dialogs", () => {
     assert.doesNotMatch(scheduleBoard, /OptionDialog|AddItemDialog|EntryDialog/);
