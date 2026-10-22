@@ -20,7 +20,12 @@ import { TemplateSectionsButton } from "./template-editor";
 
 export const dynamic = "force-dynamic";
 
-export default async function BqLibraryPage() {
+const LIBRARY_VIEWS = ["items", "assemblies", "templates"] as const;
+
+export default async function BqLibraryPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const query = await searchParams;
+  const view = LIBRARY_VIEWS.find((value) => value === query.view) ?? "items";
+  const createdAssemblyId = typeof query.assembly === "string" ? query.assembly : null;
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { grants } = principalGrants;
@@ -60,7 +65,8 @@ export default async function BqLibraryPage() {
 
       <PillTabPanels
         fill
-        defaultValue="items"
+        key={view}
+        defaultValue={view}
         label="BQ Library views"
         items={[
           {
@@ -80,7 +86,7 @@ export default async function BqLibraryPage() {
           {
             value: "assemblies",
             label: "Assemblies",
-            content: <SectionCard>{assemblies.length === 0 ? <EmptyState title="No assemblies" description="An assembly is a Component Group template whose Cost Components are copied into a project." /> : <div className="grid gap-4">{assemblies.map((assembly) => <div key={assembly.id} className="rounded-control border border-line p-4"><div className="flex items-start justify-between gap-2"><div><div className="font-medium">{assembly.name}</div><Text tone="tertiary" size="sm">{assembly.lineCount} Cost Components · {assembly.description ?? "No description"}</Text></div></div>{canManage ? <AssemblyActions assembly={assembly} /> : null}</div>)}</div>}</SectionCard>,
+            content: <SectionCard>{assemblies.length === 0 ? <EmptyState title="No assemblies" description="An assembly is a Component Group template whose Cost Components are copied into a project." /> : <div className="grid gap-4">{assemblies.map((assembly) => <div key={assembly.id} className="rounded-control border border-line p-4"><div className="flex items-start justify-between gap-2"><div><div className="font-medium">{assembly.name}</div><Text tone="tertiary" size="sm">{assembly.lineCount} Cost Component{assembly.lineCount === 1 ? "" : "s"} · {assembly.description ?? "No description"}</Text></div></div>{canManage ? <AssemblyActions assembly={assembly} openOnMount={assembly.id === createdAssemblyId} /> : null}</div>)}</div>}</SectionCard>,
           },
           {
             value: "templates",

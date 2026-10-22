@@ -4,7 +4,7 @@ import { DraftDialog,useFormDraftGuard } from "@/platform/ui_engine";
 
 import { Copy,Library,Pencil,Plus,Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo,useRef,useState,useTransition,type FormEvent } from "react";
+import { useEffect,useMemo,useRef,useState,useTransition,type FormEvent } from "react";
 
 import type { BqAssemblyLineRead,BqAssemblyTemplateDetail,BqAssemblyTemplateRead,BqLibItemRead,BqTemplateRead } from "@/apps/bq/public";
 import type { UnitRead } from "@/apps/masterdata/public";
@@ -177,7 +177,7 @@ export function LibraryItemCreateButton({ units }: { units: UnitRead[] }) {
 
 export function AssemblyCreateButton() {
   const [open, setOpen] = useState(false); const [error, setError] = useState<string | null>(null); const [pending, startTransition] = useTransition(); const router = useRouter();
-  return <><Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>Add assembly</Button><DraftDialog pending={pending} open={open} onOpenChange={setOpen} title="Add Assembly Template" description="Reusable Component Group breakdown. Its Cost Components are copied into each project." size="sm"><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await createAssemblyAction(null, data); if (result.ok === false) setError(result.error.safeMessage); else { setOpen(false); router.refresh(); } }); }}>{error ? <InlineError>{error}</InlineError> : null}<Field label="Name" required><Input name="name" required maxLength={160} autoFocus /></Field><Field label="Description"><Textarea name="description" maxLength={2000} /></Field><FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>Add assembly</Button></FormActions></form></DraftDialog></>;
+  return <><Button type="button" variant="primary" leadingIcon={<Plus aria-hidden="true" />} onClick={() => setOpen(true)}>Add assembly</Button><DraftDialog pending={pending} open={open} onOpenChange={setOpen} title="Add Assembly Template" description="Reusable Component Group breakdown. Its Cost Components are copied into each project." size="sm"><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); startTransition(async () => { const result = await createAssemblyAction(null, data); if (result.ok === false) setError(result.error.safeMessage); else { setOpen(false); router.push(`/bq/library?view=assemblies&assembly=${result.data.id}`, { scroll: false }); } }); }}>{error ? <InlineError>{error}</InlineError> : null}<Field label="Name" required><Input name="name" required maxLength={160} autoFocus /></Field><Field label="Description"><Textarea name="description" maxLength={2000} /></Field><FormActions><Button data-dialog-cancel type="button" variant="ghost" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit" variant="primary" pending={pending}>Add assembly</Button></FormActions></form></DraftDialog></>;
 }
 
 export function LibraryItemActions({ item, units }: { item: BqLibItemRead; units: UnitRead[] }) {
@@ -301,7 +301,8 @@ function TemplateDialog({ template, open: controlledOpen, onOpenChange }: { temp
 
 // ─── ASSEMBLY CRUD ───────────────────────────────────────────────────────────
 
-export function AssemblyActions({ assembly }: { assembly: BqAssemblyTemplateRead }) {
+/** `openOnMount`: the assembly was just created, so its Cost Components open at once (the next step is adding lines). */
+export function AssemblyActions({ assembly, openOnMount = false }: { assembly: BqAssemblyTemplateRead; openOnMount?: boolean }) {
   const [editOpen, setEditOpen] = useState(false);
   const [linesOpen, setLinesOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -317,6 +318,16 @@ export function AssemblyActions({ assembly }: { assembly: BqAssemblyTemplateRead
       else setDetail(d);
     }).catch(() => setLoadError("Gagal memuat assembly"));
   };
+
+  const openedOnMount = useRef(false);
+  useEffect(() => {
+    if (!openOnMount || openedOnMount.current) return;
+    openedOnMount.current = true;
+    openLines();
+    // Drop the one-shot marker so a reload or Back does not reopen the dialog.
+    command.router.replace("/bq/library?view=assemblies", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once for the freshly created assembly
+  }, [openOnMount]);
 
   const runDelete = () => {
     const data = new FormData();

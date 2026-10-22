@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.168 | 2026-10-22 | ui(bq): show a newly added Assembly at once (Lead)
+
+- **Owner report:** "Add assembly" looked like it failed: the dialog closed but the page stayed on the Items tab, and the new assembly sat somewhere in the A–Z Assemblies list, so the estimator re-created it ("Gondola", "Gondola Sociolla", "Gondola Sociolla 2 Bay" all existed in the dev database).
+- **Behaviour:** after creating an assembly the Library switches to the Assemblies tab (`/bq/library?view=assemblies`) and opens the new assembly's Cost Components dialog, the next step; the one-shot `assembly` marker is then removed from the URL so a reload does not reopen it. The `view` query also selects the tab on direct links. The list keeps its A–Z order (the project assembly picker reads the same list). "1 Cost Components" now reads "1 Cost Component".
+- **Checks:** typecheck, lint of the Library route, low gate (`STUDIOFLOW_LOCATION=kantor node scripts/verify.mjs --tier low`) PASS. No server or schema change. Browser walk is the owner's (BACKLOG [UNVERIFIED]).
+
 ## R9.167 | 2026-10-22 | feat(schedule-assistant): Product Schedule Composer MCP (Lead)
 
 - **Work order:** `WO-SCHEDULE-ASSISTANT-01` (P0). Codex delivered two partial, uncommitted passes (module/permission/scope/route scaffolding and the preview error fix); the Lead reviewed them (13 corrections in `PLAN.md`) and, on owner instruction, finished the slice. One commit for the whole outcome.
