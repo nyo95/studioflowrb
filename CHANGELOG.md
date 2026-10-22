@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.165 | 2026-10-22 | docs(schedule-assistant): record Product Schedule MCP proposal (Owner/Codex)
+
+- **Owner priority:** recorded the Product Schedule Composer MCP as a P0 proposal for Claude to turn into a bounded READY Work Order; this backlog record does not authorize implementation.
+- **Scope:** one independent provider-neutral optional module and one MCP bridge for Claude, Codex, OpenCode and Gemini, starting with local stdio and the existing versioned integration-token door. The workflow is context read, draft validation, user-reviewed preview, atomic idempotent apply, and read-back of the actual saved schedule.
+- **Safety boundary:** V1 is limited to template application and entry/option create/update; it excludes deletion, final decisions, samples, images and global template/prefix changes. The proposal locks token-derived identity, live grants, project assignment, least-privilege scopes, bounded DTOs without signed image URLs, audit, and one transaction for the schedule batch plus idempotency result.
+- **Lead handoff:** the backlog names the remaining product/contract decisions, the protected StudioFlow public-door prerequisite, standalone bridge packaging, and the required authorization, validation, rollback, concurrency, replay and four-client acceptance evidence.
+- **Migrations/dependencies/checks:** none; documentation only. `git diff --check` passed.
+
 ## R9.165 | 2026-10-20 | feat(platform): let the Platform Owner delete users permanently (Lead)
 
 - **Work order:** `WO-PLATFORM-FORCE-DELETE-01`, implemented by the Lead on owner instruction ("takeover aja") instead of the Executor.
