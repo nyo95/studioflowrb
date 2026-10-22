@@ -1,5 +1,16 @@
 # Changelog
 
+## R9.185 | 2026-10-22 | docs(changelog): record R9.184 (Lead)
+
+- R9.184 (`882f5a3`) was committed without its CHANGELOG entry (CRLF mismatch in the edit script); this entry records it.
+
+## R9.184 | 2026-10-22 | plan(schedule-assistant): option photos and colour placeholders (Lead)
+
+- **Owner decision:** photos can be attached through the Assistant; when the user gives no picture the AI asks first and confirms whether a colour placeholder should be used.
+- **Work order:** `WO-SCHEDULE-ASSISTANT-04` READY: `set_option_image` (local file path read by the bridge, PNG/JPEG/WebP by content, at most 3 MB, sent as a hash at preview and as bytes at apply, at most 4 per batch) and `set_option_color` (StudioFlow draws a 400×500 PNG); non-blocking `SCHEDULE_OPTION_NO_IMAGE` warning for created options without photo or colour; photo lines in the confirmation dialog. No URLs, no resizing, no schema.
+- **Revision note:** R9.180 (SketchUp Stage 0) is committed as `d95418d`, after R9.181–R9.183 of a parallel session; its CHANGELOG entry landed in `025bee5`.
+- **Checks:** documentation only.
+
 ## R9.183 | 2026-10-22 | fix(studioflow): Schedule board shows only the badges that need someone; smaller quick add (Lead)
 
 - **Owner review:** most cards carried the same "Final" badge (42 of 43), and the quick-add box took a full card row.
