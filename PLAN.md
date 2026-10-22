@@ -5,7 +5,7 @@ Scope: let the Schedule Assistant (MCP) mark an existing option as the client's 
 Module(s): Schedule Assistant (contract, route validation, bridge); StudioFlow schedule composer door and schedule writer. No schema change.
 Target revision: R9.178 (this plan is R9.177).
 Risk: medium-high - first Assistant operation that records a client decision; a loose version could let an AI lock many rows from one sentence. Guarded by explicit option ids, preview and a visible count in the confirmation.
-Status: READY
+Status: DONE in R9.178 (executed by the Lead at the owner's request). Acceptance 8 (the 42 "(old)" materials, HT-04 excluded) is run with the owner on the dev database.
 Priority: P1
 Owner: Product Owner (decision 2026-10-22: "2, saya bisa kerja via AI app")
 Last updated: 2026-10-22

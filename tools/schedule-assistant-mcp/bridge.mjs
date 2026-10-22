@@ -57,6 +57,7 @@ const operation = z.union([
   z.object({ op: z.literal("create_option"), entryId: id.optional(), entryRef: text(80).optional(), option }).strict().describe("Send exactly one of entryId or entryRef."),
   z.object({ op: z.literal("reuse_option"), entryId: id.optional(), entryRef: text(80).optional(), sourceOptionId: id.describe("From search_reusable_options.") }).strict().describe("Send exactly one of entryId or entryRef."),
   z.object({ op: z.literal("update_option"), optionId: id, patch: option.partial().strict().describe("Only sent fields change; null clears a field.") }).strict(),
+  z.object({ op: z.literal("finalize_option"), optionId: id.describe("One existing option id from get_schedule_context.") }).strict().describe("Record the client's final decision: this option becomes final and the item's other options become not used. One operation per named option; never guess, never a whole list from a vague request."),
 ]);
 const operations = z.array(operation).min(1).max(100);
 const projectId = id.describe("A project id from list_projects.");
@@ -73,13 +74,14 @@ export const INTERVIEW_STEPS = [
   "4. Summarise the plan in plain words and ask whether to prepare the preview.",
   "5. Call preview_schedule_changes, show the result (codes, labels, Brands, every issue and warning), and wait for an explicit yes. A SCHEDULE_CATEGORY_SIMILAR warning means a new category looks like a studio one (for example HPL vs High Pressure Laminate, prefix PL): ask which is meant and preview again with the studio name unless the user really wants the new category.",
   "6. Only then call apply_schedule_changes with that preview's operationId, digest and operations, and show the read-back.",
+  "Final decisions (finalize_option) are the client's choice and lock the other options of an item. Use them only when the user names exactly which options are final; list every item code and option you will finalize, say which options become not used, and ask about the final decisions on their own, even if the request already mentioned them. Never infer a final decision. They are applied only after StudioFlow's own confirmation dialog.",
 ];
 
 const INSTRUCTIONS = [
   "This server composes one StudioFlow project's Product Schedule. Behave like an assistant: ask before you act, one short question at a time, in the user's language.",
   `Required interview: ${INTERVIEW_STEPS.join(" ")}`,
   "Never call apply_schedule_changes without the user's explicit approval of that preview; it refuses a preview this session did not make. If apply answers SCHEDULE_PREVIEW_STALE, preview again and ask again. If the user declines the confirmation dialog, nothing was saved; ask what to change.",
-  "StudioFlow decides codes, prefixes, category spelling, option labels and Brand snapshots; new options are never final. Deleting, final decisions, samples and images are not available.",
+  "StudioFlow decides codes, prefixes, category spelling, option labels and Brand snapshots; new options are never final. Deleting, un-finalizing, samples and images are not available.",
 ].join(" ");
 
 /** JSON with sorted object keys, so the same operations compare equal however the client ordered their fields. */
@@ -100,10 +102,15 @@ export function approvalMessage(projectName, results, templatesCreated) {
     [count("create_option", "create") + count("reuse_option", "create"), "opsi baru"],
     [count("update_entry", "update") + count("update_option", "update"), "perubahan"],
     [templatesCreated, "item dari template studio"],
+    [count("finalize_option", "update"), "keputusan final"],
   ].filter(([n]) => Number(n) > 0).map(([n, label]) => `${n} ${label}`);
-  const codes = [...new Set(results.filter((item) => item.effect !== "no_change" && item.entryCode).map((item) => (item.optionLabel ? `${item.entryCode} ${item.optionLabel}` : item.entryCode)))];
+  const label = (/** @type {{ entryCode?: string, optionLabel?: string }} */ item) => (item.optionLabel ? `${item.entryCode} ${item.optionLabel}` : item.entryCode);
+  const finals = results.filter((item) => item.op === "finalize_option" && item.effect !== "no_change" && item.entryCode);
+  const codes = [...new Set(results.filter((item) => item.op !== "finalize_option" && item.effect !== "no_change" && item.entryCode).map(label))];
   const shown = codes.slice(0, 10).join(", ") + (codes.length > 10 ? `, +${codes.length - 10} lagi` : "");
-  return `Terapkan ke Product Schedule "${projectName}": ${parts.join(", ") || "tidak ada perubahan"}.${shown ? ` Kode: ${shown}.` : ""} Opsi baru tidak otomatis final.`;
+  // Every finalized option is named in full: a final decision locks the item's other options, so the user must see each one.
+  const finalText = finals.length > 0 ? ` KEPUTUSAN FINAL (${finals.length}), pilihan lain pada item itu jadi tidak dipakai: ${finals.map(label).join(", ")}.` : "";
+  return `Terapkan ke Product Schedule "${projectName}": ${parts.join(", ") || "tidak ada perubahan"}.${shown ? ` Kode: ${shown}.` : ""}${finalText} Opsi baru tidak otomatis final.`;
 }
 
 /**
@@ -154,7 +161,7 @@ export function createBridge(options) {
   /** @param {ApiResult} response */
   const forward = (response) => (response.ok ? result(response.body.data) : failure(response));
 
-  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.1.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.2.0" }, { instructions: INSTRUCTIONS });
 
   /**
    * Layer 2: every valid preview this bridge process returned, by its operationId. Apply accepts only these, for the
@@ -242,6 +249,11 @@ export function createBridge(options) {
       return { isError: true, content: [{ type: /** @type {const} */ ("text"), text: "APPLY_NOT_PREVIEWED: this operationId was not issued by a preview in this session for exactly these operations. Prepare the preview with preview_schedule_changes, show it to the user and ask for an explicit yes first." }] };
     }
     // Layer 3: the bridge itself asks the user when the client can show a dialog; otherwise the client's tool approval applies.
+    // A final decision locks other options, so it is never left to a client's tool approval (which can be auto-approved).
+    const finalizing = args.operations.some((item) => item.op === "finalize_option");
+    if (finalizing && !server.server.getClientCapabilities()?.elicitation) {
+      return { isError: true, content: [{ type: /** @type {const} */ ("text"), text: "FINAL_NEEDS_CONFIRMATION_DIALOG: this batch records final decisions, which are applied only after StudioFlow's own confirmation dialog, and this client does not support MCP dialogs (elicitation). Nothing was saved. Use a client that supports them, or mark the options final on the Schedule screen." }] };
+    }
     if (server.server.getClientCapabilities()?.elicitation) {
       let approved = false;
       try {

@@ -366,6 +366,52 @@ describe("apply", () => {
     assert.equal(await testDb.prisma.auditEvent.count({ where: { app_id: "studioflow" } }), auditsBefore);
   });
 
+  it("finalizes a named option (WO-SCHEDULE-ASSISTANT-03): siblings become not used, audited, and an already-final option writes nothing", async () => {
+    const projectId = await newProject("Finalize");
+    const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: projectId, section: "MATERIAL", category: "Tile", category_key: "TILE", prefix: "TI", increment: 1, sort_order: 1 } });
+    const [, second] = await Promise.all(["A", "B"].map((label) => testDb.prisma.sfScheduleOption.create({ data: { entry_id: entry.id, label, product_name: `Tile ${label} (old)`, search_key: label } })));
+    const secret = await tokenFor(designer);
+    const operations = [{ op: "finalize_option", optionId: second.id }];
+    const previewed = (await preview(secret, projectId, operations)).body.data;
+    assert.equal(previewed.valid, true, JSON.stringify(previewed));
+    assert.deepEqual([previewed.operations[0].effect, previewed.operations[0].entryCode, previewed.operations[0].optionLabel, previewed.operations[0].productName, previewed.operations[0].displacedOptions], ["update", "TI-01", "B", "Tile B (old)", ["A"]]);
+    assert.equal((await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: second.id } })).is_final, false, "preview writes nothing");
+    const operationId = randomUUID();
+    assert.equal((await apply(secret, projectId, { operationId, digest: previewed.digest, operations }, operationId)).status, 200);
+    const saved = await testDb.prisma.sfScheduleOption.findMany({ where: { entry_id: entry.id }, orderBy: { label: "asc" } });
+    assert.deepEqual(saved.map((option) => [option.label, option.is_final, option.status]), [["A", false, "NOT_USED"], ["B", true, "APPROVED"]]);
+    assert.equal((await testDb.prisma.sfScheduleEntry.findUniqueOrThrow({ where: { id: entry.id } })).active_index, 1);
+    const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.schedule.option-finalized" } });
+    assert.deepEqual([(audit.metadata as Record<string, unknown>).via, (audit.metadata as Record<string, unknown>).operationId], ["schedule-assistant", operationId]);
+    const auditsBefore = await testDb.prisma.auditEvent.count({ where: { app_id: "studioflow" } });
+    const again = (await preview(secret, projectId, operations)).body.data;
+    assert.equal(again.operations[0].effect, "no_change");
+    const key = randomUUID();
+    assert.equal((await apply(secret, projectId, { operationId: key, digest: again.digest, operations }, key)).status, 200);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { app_id: "studioflow" } }), auditsBefore);
+  });
+
+  it("refuses to finalize an unknown option, an option of another project or the same option twice, and keeps the all-or-nothing rule", async () => {
+    const projectId = await newProject("Finalize refused");
+    const otherId = await newProject("Other");
+    const make = async (project: string, code: string) => {
+      const entry = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: project, section: "MATERIAL", category: code, category_key: code.toUpperCase(), prefix: code.slice(0, 2).toUpperCase(), increment: 1, sort_order: 1 } });
+      return testDb.prisma.sfScheduleOption.create({ data: { entry_id: entry.id, label: "A", product_name: code, search_key: code } });
+    };
+    const mine = await make(projectId, "Tile");
+    const foreign = await make(otherId, "Paint");
+    const secret = await tokenFor(designer);
+    const issues = (await preview(secret, projectId, [{ op: "finalize_option", optionId: randomUUID() }, { op: "finalize_option", optionId: foreign.id }, { op: "finalize_option", optionId: mine.id }, { op: "finalize_option", optionId: mine.id }])).body.data;
+    assert.equal(issues.valid, false);
+    assert.deepEqual(issues.issues.map((issue: { index: number; code: string }) => [issue.index, issue.code]), [[0, "SCHEDULE_OPTION_NOT_FOUND"], [1, "SCHEDULE_OPTION_NOT_FOUND"], [3, "SCHEDULE_DUPLICATE_UPDATE"]]);
+    const readOnly = await tokenFor(designer, [SCHEDULE_ASSISTANT_READ_SCOPE]);
+    const valid = (await preview(readOnly, projectId, [{ op: "finalize_option", optionId: mine.id }])).body.data;
+    const key = randomUUID();
+    const refused = await apply(readOnly, projectId, { operationId: key, digest: valid.digest, operations: [{ op: "finalize_option", optionId: mine.id }] }, key);
+    assert.notEqual(refused.status, 200);
+    assert.equal((await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: mine.id } })).is_final, false);
+  });
+
   it("applies a 100-operation batch in one transaction well under the 30 s ceiling", async () => {
     const projectId = await newProject("Large");
     const secret = await tokenFor(designer);

@@ -1,7 +1,8 @@
 # Schedule Assistant contract (v1)
 
-Status: ACTIVE (R9.167, WO-SCHEDULE-ASSISTANT-01). Owner decisions 2026-10-22; Lead
-decisions 10–22 in that Work Order.
+Status: ACTIVE (R9.167, WO-SCHEDULE-ASSISTANT-01; `finalize_option` added in R9.178,
+WO-SCHEDULE-ASSISTANT-03, module 1.1.0). Owner decisions 2026-10-22; Lead decisions 10–22 in
+that Work Order.
 
 ## Module
 
@@ -59,12 +60,14 @@ Bodies are limited to 256 KiB and 1–100 operations.
 | `create_option` | `entryId` or `entryRef`, `option` | next label; never final |
 | `reuse_option` | `entryId` or `entryRef`, `sourceOptionId` | copies an option of another project (photo and notes included); never final |
 | `update_option` | `optionId`, `patch` | patch: sent fields change, `null` clears, `productName` cannot be cleared; photo, label, final flag and status never change; once per option |
+| `finalize_option` | `optionId` | the client's final decision on one existing option of this project: it becomes final/approved and the item's other options become not used (same as Set as final on the Schedule screen, one audit row with `via`/`operationId`); once per option; already final = `no_change`; the result shows `productName` and `displacedOptions`; no ref, so not for an option created in the same batch |
 
 `option = { brandId?, brandName?, productName, color?, pattern?, finishing?, dimension?,
 notes?, extra? }`. `brandId` must be an active Master Data Brand; `brandName` is only a
 hint from the brief and always produces `SCHEDULE_BRAND_NOT_FOUND` with up to five
-suggestions. No Master Data write, no image, delete, final/unfinal, sample, card field,
-reorder, category move or global template/prefix change exists in v1.
+suggestions. No Master Data write, no image, delete, un-finalize, sample, card field,
+reorder, category move or global template/prefix change exists. Final decisions have no
+"all", filter or pattern form: each option is named by id.
 
 ## Preview, digest, apply
 
@@ -92,7 +95,7 @@ reorder, category move or global template/prefix change exists in v1.
 `SCHEDULE_ENTRY_REF_DUPLICATE`, `SCHEDULE_ENTRY_REF_INVALID`, `SCHEDULE_ENTRY_NOT_FOUND`,
 `SCHEDULE_OPTION_NOT_FOUND`, `SCHEDULE_DUPLICATE_UPDATE`, `SCHEDULE_QTY_NOT_FOR_MATERIAL`,
 `SCHEDULE_QTY_INVALID`, `SCHEDULE_PRODUCT_REQUIRED`, `SCHEDULE_BRAND_NOT_FOUND`,
-`SCHEDULE_REUSE_SOURCE_INVALID`, plus the kit's `INTEGRATION_*`/`IDEMPOTENCY_*` codes and
+`SCHEDULE_REUSE_SOURCE_INVALID` (finalize reuses `SCHEDULE_OPTION_NOT_FOUND` and `SCHEDULE_DUPLICATE_UPDATE`), plus the kit's `INTEGRATION_*`/`IDEMPOTENCY_*` codes and
 StudioFlow's `PERMISSION_DENIED`, `PROJECT_ARCHIVED`, `PROJECT_COMPLETED`.
 
 ## Bridge
@@ -110,4 +113,8 @@ preview in the same process for the same project, digest and canonical operation
 (`APPLY_NOT_PREVIEWED` otherwise, no HTTP call; a stale-preview 409 forgets it); and when
 the client declares MCP `elicitation` it asks the user in a form dialog (boolean
 `setuju`) before calling apply, saving nothing on decline, cancel, false or dialog failure.
-Clients without elicitation keep their own tool approval.
+Clients without elicitation keep their own tool approval, except for a batch that contains
+`finalize_option` (R9.178): the bridge refuses it (`FINAL_NEEDS_CONFIRMATION_DIALOG`, no HTTP
+call), because a client's tool approval can be switched to automatic. The final-decision
+dialog names every finalized item code and option and says the item's other options become not
+used; the interview tells the AI to list them and ask about final decisions on their own.

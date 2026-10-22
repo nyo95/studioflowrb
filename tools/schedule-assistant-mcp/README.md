@@ -120,7 +120,12 @@ Keep `"trust": false` so every tool call is confirmed.
    Claude Code ≥ 2.1.76, Codex CLI recent versions), the bridge shows its own question,
    for example *Terapkan ke Product Schedule "Sociolla SBW R1": 2 item baru … Ya,
    terapkan?* Nothing is saved unless you tick it. Other clients use their own tool
-   approval.
+   approval, except for final decisions (below).
+4. **Final decisions are stricter.** `finalize_option` marks one named option as the client's
+   final choice and sets the item's other options to "not used". There is no "all" form: the
+   AI names each option, lists every code, and the bridge applies a batch with final decisions
+   only after its own dialog (it refuses clients without MCP dialogs, so a cheap or free model
+   with auto-approve cannot lock options). Undoing a final stays on the Schedule screen.
 
 ## Using it
 

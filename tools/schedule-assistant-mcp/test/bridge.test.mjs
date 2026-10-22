@@ -241,6 +241,63 @@ describe("MCP tools over stdio", () => {
     }
   });
 
+  it("applies final decisions only through the bridge's own dialog, naming every finalized option, never through a client's tool approval", async () => {
+    const OPTION = "55555555-5555-4555-8555-555555555555";
+    const OPTION_2 = "66666666-6666-4666-8666-666666666666";
+    const finals = [{ op: "finalize_option", optionId: OPTION }, { op: "finalize_option", optionId: OPTION_2 }];
+    answer = ({ path }) => {
+      if (path.endsWith("/schedule-assistant/projects")) return { body: { ok: true, data: [{ id: PROJECT, name: "Sociolla SBZ", status: "ACTIVE", canApply: true }] } };
+      if (path.endsWith("/preview")) return { body: { ok: true, data: { valid: true, digest: DIGEST, baseFingerprint: "x", templatesCreated: 0, operations: [{ index: 0, op: "finalize_option", effect: "update", entryCode: "TI-01", optionLabel: "B" }, { index: 1, op: "finalize_option", effect: "update", entryCode: "TI-02", optionLabel: "A" }] } } };
+      if (path.endsWith("/apply")) return { body: { ok: true, data: { operationId: "x", applied: true, templatesCreated: 0, operations: [] } } };
+      return { body: { ok: true, data: { entries: [] } } };
+    };
+    const args = async (/** @type {Client} */ client) => {
+      const issued = json(await client.callTool({ name: "preview_schedule_changes", arguments: { projectId: PROJECT, operations: finals } }));
+      return { projectId: PROJECT, operationId: issued.operationId, digest: issued.digest, operations: finals };
+    };
+    const plain = await connect();
+    try {
+      const refused = /** @type {any} */ (await plain.client.callTool({ name: "apply_schedule_changes", arguments: await args(plain.client) }));
+      assert.equal(refused.isError, true);
+      assert.match(refused.content[0].text, /FINAL_NEEDS_CONFIRMATION_DIALOG/);
+      assert.equal(applyCount(), 0);
+    } finally {
+      await plain.client.close();
+    }
+    const asked = await connect({}, () => ({ action: "accept", content: { setuju: true } }));
+    try {
+      assert.equal(json(await asked.client.callTool({ name: "apply_schedule_changes", arguments: await args(asked.client) })).applied.applied, true);
+      assert.match(asked.dialogs[0].message, /KEPUTUSAN FINAL \(2\)/);
+      assert.match(asked.dialogs[0].message, /TI-01 B, TI-02 A/);
+      assert.match(asked.dialogs[0].message, /2 keputusan final/);
+      assert.equal(applyCount(), 1);
+    } finally {
+      await asked.client.close();
+    }
+    requests = [];
+    const declined = await connect({}, () => ({ action: "decline" }));
+    try {
+      assert.equal(json(await declined.client.callTool({ name: "apply_schedule_changes", arguments: await args(declined.client) })).applied, false);
+      assert.equal(applyCount(), 0);
+    } finally {
+      await declined.client.close();
+    }
+  });
+
+  it("states the final-decision rules in the server instructions and rejects a loose finalize shape", async () => {
+    const { client } = await connect();
+    try {
+      assert.match(client.getInstructions() ?? "", /finalize_option/);
+      for (const operations of [[{ op: "finalize_option" }], [{ op: "finalize_option", optionId: "not-a-uuid" }], [{ op: "finalize_option", optionId: ENTRY, all: true }]]) {
+        const response = /** @type {any} */ (await client.callTool({ name: "preview_schedule_changes", arguments: { projectId: PROJECT, operations } }));
+        assert.equal(response.isError, true);
+      }
+      assert.equal(requests.filter((request) => request.path.endsWith("/preview")).length, 0);
+    } finally {
+      await client.close();
+    }
+  });
+
   it("turns a StudioFlow refusal into a tool error and forgets a stale preview", async () => {
     answer = studio({ apply: () => ({ status: 409, body: { ok: false, error: { kind: "CONFLICT", code: "SCHEDULE_PREVIEW_STALE", message: "Preview again." } } }) });
     const { client } = await connect();

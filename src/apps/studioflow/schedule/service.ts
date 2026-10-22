@@ -428,6 +428,30 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       return writer.updateOption(tx, { actor: input.actor, projectId: input.projectId, optionId: option.id, snapshot, metadata: input.metadata });
     },
 
+    /**
+     * The client's final decision: this option becomes final and approved, every other option of its entry becomes
+     * "not used". With `skipIfFinal` an option that is already final is left untouched and not audited again.
+     */
+    async markFinal(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; optionId: string; skipIfFinal?: boolean; metadata?: Record<string, unknown> }) {
+      const option = await loadOption(tx, input.projectId, input.optionId, true);
+      const siblings = await tx.sfScheduleOption.findMany({ where: { entry_id: option.entry_id, id: { not: option.id } }, select: { label: true } });
+      const result = {
+        optionId: option.id,
+        entryId: option.entry_id,
+        code: scheduleCode(option.entry.prefix, option.entry.increment),
+        label: option.label,
+        productName: option.product_name,
+        displacedLabels: siblings.map((sibling) => sibling.label),
+        changed: true,
+      };
+      if (input.skipIfFinal && option.is_final) return { ...result, displacedLabels: [], changed: false };
+      await tx.sfScheduleOption.updateMany({ where: { entry_id: option.entry_id }, data: { is_final: false, status: "NOT_USED" } });
+      await tx.sfScheduleOption.update({ where: { id: option.id }, data: { is_final: true, status: "APPROVED" } });
+      await syncActiveIndex(tx, option.entry_id);
+      await writeAudit(ports, tx, { action: "studioflow.schedule.option-finalized", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id, ...input.metadata } });
+      return result;
+    },
+
     /** Copy an option of another project into an entry as its next, never-final option (photo and notes included). */
     async reuseOption(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; entryId: string; sourceOptionId: string; metadata?: Record<string, unknown> }) {
       const entry = await loadEntry(tx, input.projectId, input.entryId, true);
@@ -858,12 +882,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     async markFinal(input: CommandContext & { projectId: string; optionId: string }) {
       await requireScheduleCommand(input);
       return runTransaction(async (tx) => {
-        const option = await loadOption(tx, input.projectId, input.optionId, true);
-        await tx.sfScheduleOption.updateMany({ where: { entry_id: option.entry_id }, data: { is_final: false, status: "NOT_USED" } });
-        await tx.sfScheduleOption.update({ where: { id: option.id }, data: { is_final: true, status: "APPROVED" } });
-        await syncActiveIndex(tx, option.entry_id);
-        await writeAudit(ports, tx, { action: "studioflow.schedule.option-finalized", entityType: OPTION_ENTITY, entityId: option.id, actor: input.actor, metadata: { projectId: input.projectId, entryId: option.entry_id } });
-        return { optionId: option.id };
+        const done = await writer.markFinal(tx, { actor: input.actor, projectId: input.projectId, optionId: input.optionId });
+        return { optionId: done.optionId };
       });
     },
 

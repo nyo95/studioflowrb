@@ -48,7 +48,8 @@ export type ScheduleComposerOperation =
   | { op: "update_entry"; entryId: string; qty?: string | null; unit?: string | null; location?: string | null }
   | { op: "create_option"; entryId?: string; entryRef?: string; option: ScheduleComposerOption }
   | { op: "reuse_option"; entryId?: string; entryRef?: string; sourceOptionId: string }
-  | { op: "update_option"; optionId: string; patch: ScheduleComposerOptionPatch };
+  | { op: "update_option"; optionId: string; patch: ScheduleComposerOptionPatch }
+  | { op: "finalize_option"; optionId: string };
 
 export type ScheduleComposerIssue = {
   index: number;
@@ -67,6 +68,9 @@ export type ScheduleComposerResult = {
   entryCode?: string;
   optionId?: string;
   optionLabel?: string;
+  /** finalize_option: the option's product, and the other options of its item that become "not used". */
+  productName?: string;
+  displacedOptions?: string[];
   category?: string;
   prefix?: string;
   newCategory?: boolean;
@@ -158,6 +162,7 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
     const refs = new Map<string, string>();
     const updatedEntries = new Set<string>();
     const updatedOptions = new Set<string>();
+    const finalizedOptions = new Set<string>();
     const issues: ScheduleComposerIssue[] = [];
 
     const target = (index: number, op: ScheduleComposerOperation["op"], input: { entryId?: string; entryRef?: string }) => {
@@ -216,6 +221,12 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
           if (operation.patch.productName !== undefined && !filled(operation.patch.productName)) issues.push({ index, op, field: "patch.productName", code: "SCHEDULE_PRODUCT_REQUIRED", message: "Type cannot be cleared." });
           const brand = await brandIssue(index, op, "patch", operation.patch);
           if (brand) issues.push(brand);
+          break;
+        }
+        case "finalize_option": {
+          if (!optionIds.has(operation.optionId)) { issues.push({ index, op, field: "optionId", code: "SCHEDULE_OPTION_NOT_FOUND", message: "This option is not in the project." }); break; }
+          if (finalizedOptions.has(operation.optionId)) issues.push({ index, op, field: "optionId", code: "SCHEDULE_DUPLICATE_UPDATE", message: "An option may be finalized only once per batch." });
+          finalizedOptions.add(operation.optionId);
           break;
         }
       }
@@ -297,6 +308,12 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
             const facts = await entryFacts(updated.entryId);
             const brandName = (await tx.sfScheduleOption.findUniqueOrThrow({ where: { id: updated.optionId }, select: { brand_name: true } })).brand_name;
             results.push({ index, op: operation.op, effect: changed ? "update" : "no_change", entryId: updated.entryId, entryCode: updated.code, optionId: updated.optionId, optionLabel: updated.label, category: facts.category, prefix: facts.prefix, brandName, ...(changed ? { changes: updated.changes } : {}) });
+            break;
+          }
+          case "finalize_option": {
+            const done = await schedule.writer.markFinal(tx, { actor: ctx.actor, projectId: ctx.projectId, optionId: operation.optionId, skipIfFinal: true, metadata });
+            const facts = await entryFacts(done.entryId);
+            results.push({ index, op: operation.op, effect: done.changed ? "update" : "no_change", entryId: done.entryId, entryCode: done.code, optionId: done.optionId, optionLabel: done.label, productName: done.productName, category: facts.category, prefix: facts.prefix, ...(done.changed ? { changes: { isFinal: { from: false, to: true } }, displacedOptions: done.displacedLabels } : {}) });
             break;
           }
         }

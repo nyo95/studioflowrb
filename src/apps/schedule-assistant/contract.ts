@@ -35,6 +35,7 @@ export const ScheduleAssistantOperationSchema = z.union([
   z.object({ op: z.literal("create_option"), ...targetShape, option: ScheduleAssistantOptionSchema }).strict().refine(oneTarget, TARGET_MESSAGE),
   z.object({ op: z.literal("reuse_option"), ...targetShape, sourceOptionId: id }).strict().refine(oneTarget, TARGET_MESSAGE),
   z.object({ op: z.literal("update_option"), optionId: id, patch: ScheduleAssistantOptionPatchSchema }).strict(),
+  z.object({ op: z.literal("finalize_option"), optionId: id }).strict(),
 ]);
 
 export const SCHEDULE_ASSISTANT_MAX_OPERATIONS = 100;

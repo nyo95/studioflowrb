@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.178 | 2026-10-22 | feat(schedule-assistant): finalize an option through the Assistant (Lead)
+
+- **Work order:** `WO-SCHEDULE-ASSISTANT-03` (owner: add it, and keep the MCP strict so a cheap or free model stays safe). Executed by the Lead at the owner's request instead of an Executor handoff.
+- **New operation `finalize_option { optionId }`:** records the client's final decision on one existing option of the project (same effect as Set as final on the Schedule screen: final/approved, the item's other options "not used"). Once per option per batch, unknown or other-project option refused, already final = no change and no audit. The preview shows entry code, option label, product name and which options become not used. No "all" or filter form, no un-finalize (stays on the screen).
+- **Writer:** the Set as final body moved into `schedule.writer.markFinal` (audit gains `via`/`operationId` for the Assistant); the Schedule screen command calls it and behaves as before.
+- **Bridge 1.2.0 (stricter for weak models):** a batch with `finalize_option` is applied only after the bridge's own dialog, which names every finalized code and option; a client without MCP dialogs is refused (`FINAL_NEEDS_CONFIRMATION_DIALOG`, no HTTP call), because a client's tool approval can be automatic. Instructions and the interview text tell the AI to list each code and ask about final decisions separately; the loose shapes (no id, bad id, extra keys) are rejected by the schema before any call.
+- **Module** `schedule-assistant` 1.1.0; docs: `CONTRACT.md`, bridge README.
+- **Checks:** bridge 16/16; schedule-assistant + StudioFlow service integration 239/239 (two new Assistant tests); typecheck clean. High gate (`STUDIOFLOW_LOCATION=kantor NEXT_DIST_DIR=.next-e2e node scripts/verify.mjs --tier high`): boundaries, legacy-runtime, whitespace, typecheck, lint, `npm test` 1276/1276, Prisma generate, production build PASS. Owner walk owed: finalize the 42 "(old)" materials (HT-04 excluded) through the Assistant.
+
 ## R9.177 | 2026-10-22 | plan(schedule-assistant): finalize an option through the Assistant (Lead)
 
 - **Owner request:** the Assistant must be able to "Set as final" so work such as finalizing the 42 "(old)" materials of Sociolla SBZ (except HT-04) can be done from an AI app. Owner chose to add it, not to keep it screen-only.
