@@ -380,6 +380,21 @@ describe("apply", () => {
   });
 });
 
+describe("look-alike categories (WO-SF-CATEGORY-SIMILAR-01)", () => {
+  it("warns in a valid preview when a new category looks like a studio one, and stays quiet for the studio name", async () => {
+    const projectId = await newProject("Similar");
+    await testDb.prisma.sfSchedulePrefix.create({ data: { section: "MATERIAL", category: "High Pressure Laminate", category_key: "HIGH PRESSURE LAMINATE", prefix: "PL" } });
+    const secret = await tokenFor(designer);
+    const lookAlike = (await preview(secret, projectId, [{ op: "create_entry", section: "MATERIAL", category: "HPL/Plastic Laminate", option: { productName: "Laminate CT 0270 G" } }])).body.data;
+    assert.equal(lookAlike.valid, true);
+    assert.equal(lookAlike.operations[0].entryCode, "HP-01");
+    assert.deepEqual(lookAlike.warnings.map((warning: { index: number; code: string; suggestions: unknown }) => [warning.index, warning.code, warning.suggestions]), [[0, "SCHEDULE_CATEGORY_SIMILAR", [{ category: "High Pressure Laminate", prefix: "PL" }]]]);
+    const studio = (await preview(secret, projectId, [{ op: "create_entry", section: "MATERIAL", category: "High Pressure Laminate", option: { productName: "Laminate CT 0270 G" } }])).body.data;
+    assert.equal(studio.operations[0].entryCode, "PL-01");
+    assert.deepEqual(studio.warnings, []);
+  });
+});
+
 describe("rollback", () => {
   it("rolls back earlier operations when a later one fails after validation", async () => {
     const projectId = await newProject("Rollback");

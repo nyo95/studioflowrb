@@ -42,7 +42,7 @@ not completed. A manager without override reads but cannot apply.
 | `GET projects/{id}/context` | read | `{ project, baseFingerprint, entries, categoryChoices, templatesNotApplied }` |
 | `GET brands?q=` | read | `[{ id, name }]` active Master Data Brands (q 2–80 chars, max 20) |
 | `GET projects/{id}/reusable-options?q=&section=` | read | options of other projects (max 20, no image) |
-| `POST projects/{id}/preview` | read | dry run: `{ valid: false, issues }` or `{ valid: true, digest, baseFingerprint, templatesCreated, operations }` |
+| `POST projects/{id}/preview` | read | dry run: `{ valid: false, issues }` or `{ valid: true, digest, baseFingerprint, templatesCreated, operations, warnings }` (R9.176: `SCHEDULE_CATEGORY_SIMILAR` when a new category looks like a studio one; not blocking) |
 | `POST projects/{id}/apply` | write | `{ operationId, applied, templatesCreated, operations }`; needs `Idempotency-Key` |
 
 Every response uses the integration kit envelope `{ ok, data | error: { kind, code,

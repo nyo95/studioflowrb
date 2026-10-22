@@ -71,7 +71,7 @@ export const INTERVIEW_STEPS = [
   "2. Ask what the user wants: apply the studio templates or not, which categories and items, any Brand or product the client already chose.",
   "3. Ask for missing facts before previewing: quantity and unit for Fixture items (Material items have none); a Brand that search_brands cannot find (offer its suggestions or leaving it empty); which existing item an extra option belongs to.",
   "4. Summarise the plan in plain words and ask whether to prepare the preview.",
-  "5. Call preview_schedule_changes, show the result (codes, labels, Brands, every issue), and wait for an explicit yes.",
+  "5. Call preview_schedule_changes, show the result (codes, labels, Brands, every issue and warning), and wait for an explicit yes. A SCHEDULE_CATEGORY_SIMILAR warning means a new category looks like a studio one (for example HPL vs High Pressure Laminate, prefix PL): ask which is meant and preview again with the studio name unless the user really wants the new category.",
   "6. Only then call apply_schedule_changes with that preview's operationId, digest and operations, and show the read-back.",
 ];
 

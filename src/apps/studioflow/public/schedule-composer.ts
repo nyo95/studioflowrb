@@ -4,7 +4,7 @@ import type { PrismaClient } from "@/generated/prisma/client";
 import type { TransactionClient } from "@platform/core/db";
 import { AppError } from "@platform/core/errors";
 
-import { normalizeExtraFields, normalizeScheduleCategory, scheduleCode } from "../domain/schedule";
+import { normalizeExtraFields, normalizeScheduleCategory, scheduleCode, similarScheduleCategories } from "../domain/schedule";
 import { scheduleFingerprint, sha256Canonical } from "../schedule/fingerprint";
 import { createScheduleService, type OptionPatch } from "../schedule/service";
 import type { SnapshotInput } from "../schedule/sync";
@@ -75,9 +75,12 @@ export type ScheduleComposerResult = {
   templatesCreated?: Array<{ code: string; category: string; productName: string | null }>;
 };
 
+/** Not blocking: something the user should confirm before applying, e.g. a new category that looks like a studio one. */
+export type ScheduleComposerWarning = { index: number; code: "SCHEDULE_CATEGORY_SIMILAR"; message: string; suggestions: Array<{ category: string; prefix: string | null }> };
+
 export type ScheduleComposerPreview =
   | { valid: false; issues: ScheduleComposerIssue[] }
-  | { valid: true; digest: string; baseFingerprint: string; templatesCreated: number; operations: ScheduleComposerResult[] };
+  | { valid: true; digest: string; baseFingerprint: string; templatesCreated: number; operations: ScheduleComposerResult[]; warnings: ScheduleComposerWarning[] };
 
 type Ctx = CommandContext & { projectId: string };
 const QTY = /^\d+(\.\d{1,2})?$/;
@@ -411,12 +414,28 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
           } else {
             try {
               const operations = (await execute(tx, ctx, ctx.operations, "preview")).map((result) => (result.effect === "create" ? { ...result, entryId: undefined, optionId: undefined } : result));
+              // WO-SF-CATEGORY-SIMILAR-01: a brand-new category that looks like a studio one is worth a question.
+              const studio = await schedule.listCategoryChoices({ grants: ctx.grants });
+              const warnings: ScheduleComposerWarning[] = [];
+              for (const result of operations) {
+                const operation = ctx.operations[result.index];
+                if (!result.newCategory || operation?.op !== "create_entry") continue;
+                const suggestions = similarScheduleCategories(operation.category, studio.filter((choice) => choice.section === operation.section));
+                if (suggestions.length === 0) continue;
+                warnings.push({
+                  index: result.index,
+                  code: "SCHEDULE_CATEGORY_SIMILAR",
+                  message: `"${operation.category}" is a new category and would be coded ${result.prefix}; it looks like ${suggestions.map((choice) => `${choice.category}${choice.prefix ? ` (${choice.prefix})` : ""}`).join(" or ")}. Ask the user which one is meant.`,
+                  suggestions: suggestions.map(({ category, prefix }) => ({ category, prefix })),
+                });
+              }
               outcome = {
                 valid: true,
                 digest: digestOf(ctx.projectId, ctx.operations, baseFingerprint),
                 baseFingerprint,
                 templatesCreated: operations.reduce((sum, result) => sum + (result.templatesCreated?.length ?? 0), 0),
                 operations,
+                warnings,
               };
             } catch (error) {
               const issue = error instanceof OperationFailure ? issueFromFailure(error) : null;

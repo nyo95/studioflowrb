@@ -244,6 +244,55 @@ export function normalizeScheduleCategory(value: string): { label: string; key: 
   return { label, key };
 }
 
+export type SimilarScheduleCategory = { category: string; prefix: string | null };
+
+function editDistance(a: string, b: string): number {
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    let diagonal = previous[0]!;
+    previous[0] = i;
+    for (let j = 1; j <= b.length; j += 1) {
+      const above = previous[j]!;
+      previous[j] = Math.min(above + 1, previous[j - 1]! + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diagonal = above;
+    }
+  }
+  return previous[b.length]!;
+}
+
+/**
+ * Studio categories a typed category name probably means (WO-SF-CATEGORY-SIMILAR-01; owner 2026-10-22: suggest,
+ * never auto-map). A studio category resembles the typed name when its initials are one of the typed words
+ * (HPL ↔ High Pressure Laminate), when the names are at least 80% alike (Homogeneus ↔ Homogeneous), or when they
+ * share a word of five letters or more (Plastic Laminate ↔ High Pressure Laminate). An exact match is not new, so it
+ * returns nothing. Strongest first, at most `limit`.
+ */
+export function similarScheduleCategories(typed: string, known: readonly SimilarScheduleCategory[], limit = 3): SimilarScheduleCategory[] {
+  const key = normalizeScheduleCategory(typed).key;
+  if (!key) return [];
+  const words = (value: string) => value.split(/[^A-Z0-9]+/).filter(Boolean);
+  const typedWords = words(key);
+  const seen = new Set<string>();
+  const scored: Array<{ choice: SimilarScheduleCategory; score: number }> = [];
+  for (const choice of known) {
+    const candidate = normalizeScheduleCategory(choice.category).key;
+    if (!candidate || seen.has(candidate)) continue;
+    seen.add(candidate);
+    if (candidate === key) return [];
+    const candidateWords = words(candidate);
+    const initials = candidateWords.length > 1 ? candidateWords.map((word) => word[0]).join("") : "";
+    const compact = (value: string) => value.replace(/[^A-Z0-9]/g, "");
+    const longest = Math.max(compact(key).length, compact(candidate).length);
+    const alike = longest === 0 ? 0 : 1 - editDistance(compact(key), compact(candidate)) / longest;
+    let score = 0;
+    if (initials && typedWords.includes(initials)) score = Math.max(score, 1);
+    if (alike >= 0.8) score = Math.max(score, alike);
+    if (typedWords.some((word) => word.length >= 5 && candidateWords.includes(word))) score = Math.max(score, 0.6);
+    if (score > 0) scored.push({ choice, score });
+  }
+  return scored.sort((a, b) => b.score - a.score).slice(0, limit).map(({ choice }) => choice);
+}
+
 export function normalizeSchedulePrefix(value: string): string {
   return value.trim().replace(/[^A-Za-z0-9]/g, "").toLocaleUpperCase("id-ID").slice(0, 8);
 }

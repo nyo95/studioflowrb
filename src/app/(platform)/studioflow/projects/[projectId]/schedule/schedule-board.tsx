@@ -19,6 +19,7 @@ import {
   nextOptionLabel,
   resolveCardFields,
   shownOptionOf,
+  similarScheduleCategories,
   specLine,
   templateSourceOf,
   type ScheduleEntryView,
@@ -290,10 +291,14 @@ const categoryKeyOf = (value: string) => value.trim().replace(/\s+/g, " ").toLoc
  * Category picker options: the project's own categories first, then the studio's (template categories,
  * then the prefix dictionary) that the project does not use yet. Typing a name nobody knows creates it.
  */
-function categoryGroups(projectCategories: readonly string[], studio: readonly CategoryChoice[], section: Section, projectLabel: string, disableProject: boolean): CreatableSearchGroup[] {
+function categoryGroups(projectCategories: readonly string[], studio: readonly CategoryChoice[], section: Section, projectLabel: string, disableProject: boolean, typed = ""): CreatableSearchGroup[] {
   const inProject = new Set(projectCategories.map(categoryKeyOf));
   const fromStudio = studio.filter((choice) => choice.section === section && !inProject.has(categoryKeyOf(choice.category)));
+  // WO-SF-CATEGORY-SIMILAR-01: a typed name that looks like a studio category (HPL, Homogeneus Tile) offers it first,
+  // so its codes take the studio prefix; the typed name can still be created.
+  const similar = typed.trim().length >= 2 ? similarScheduleCategories(typed, fromStudio) : [];
   return [
+    { label: "Mungkin maksud Anda", options: similar.map((choice) => ({ id: `similar:${choice.category}`, label: choice.category, keywords: [typed], badge: choice.prefix ? <span className="font-ui-mono text-xs text-ink-tertiary">{choice.prefix}</span> : undefined })) },
     { label: projectLabel, options: projectCategories.map((name) => ({ id: name, label: name, disabled: disableProject })) },
     { label: "Studio categories", options: fromStudio.map((choice) => ({ id: choice.category, label: choice.category, badge: choice.prefix ? <span className="font-ui-mono text-xs text-ink-tertiary">{choice.prefix}</span> : undefined })) },
   ].filter((group) => group.options.length > 0);
@@ -303,24 +308,26 @@ function categoryGroups(projectCategories: readonly string[], studio: readonly C
 function NewCategoryInline({ command, projectId, section, categories, categoryChoices, className = "justify-self-start" }: { command: Command; projectId: string; section: Section; categories: readonly string[]; categoryChoices: readonly CategoryChoice[]; className?: string }) {
   const [hint, setHint] = useState<string | null>(null);
   const [round, setRound] = useState(0);
+  const [typed, setTyped] = useState("");
   const key = `new-category-${section}`;
-  const pick = async (name: string) => {
-    const value = name.trim();
+  const pick = async (picked: string) => {
+    const value = picked.replace(/^similar:/, "").trim();
     if (!value) return;
     const existing = categories.find((category) => categoryKeyOf(category) === categoryKeyOf(value));
     if (existing) { setHint(`${existing} is already in this project. Add to it with its own add tile.`); return; }
     setHint(null);
     const ok = await command.run(key, () => createScheduleEntryAction({ projectId, section, category: value, qty: null, unit: null, location: null, snapshot: null }));
-    if (ok) setRound((current) => current + 1);
+    if (ok) { setRound((current) => current + 1); setTyped(""); }
   };
   return (
     <div className={`grid gap-1 ${className}`}>
       <CreatableSearch
         key={round}
         label="New category"
-        groups={categoryGroups(categories, categoryChoices, section, "Already in this project", true)}
+        groups={categoryGroups(categories, categoryChoices, section, "Already in this project", true, typed)}
         value=""
         onValueChange={(name) => void pick(name)}
+        onQueryChange={setTyped}
         onCreate={(name) => name.trim()}
         createLabel={(name) => `New category “${name}”`}
         placeholder="+ New category"
@@ -1546,6 +1553,8 @@ function ImportDialog({ projectId, section, command, onClose }: { projectId: str
   const [file, setFile] = useState<{ name: string; base64: string } | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [result, setResult] = useState<{ created: number; updated: number } | null>(null);
+  /** WO-SF-CATEGORY-SIMILAR-01: the user confirms that look-alike new categories in the file are intended. */
+  const [acceptNewCategories, setAcceptNewCategories] = useState(false);
   const pending = command.isPending("import");
 
   const pick = async (file: File | undefined) => {
@@ -1572,7 +1581,7 @@ function ImportDialog({ projectId, section, command, onClose }: { projectId: str
 
   const submit = async () => {
     setResult(null);
-    await command.run("import", () => importScheduleCsvAction({ projectId, section: target, ...(file ? { file } : { csv }) }), (data) => setResult(data as { created: number; updated: number }));
+    await command.run("import", () => importScheduleCsvAction({ projectId, section: target, acceptNewCategories, ...(file ? { file } : { csv }) }), (data) => setResult(data as { created: number; updated: number }));
   };
 
   return (
@@ -1605,6 +1614,10 @@ function ImportDialog({ projectId, section, command, onClose }: { projectId: str
           <Button variant="ghost" size="sm" pending={command.isPending("import-template")} onClick={() => void downloadTemplate("xlsx")}>Excel template</Button>
           <Button variant="ghost" size="sm" pending={command.isPending("import-template")} onClick={() => void downloadTemplate("csv")}>CSV template</Button>
         </div>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-0.5" checked={acceptNewCategories} onChange={(event) => setAcceptNewCategories(event.target.checked)} />
+          <span>Kategori baru di file ini memang dimaksudkan<span className="block text-xs text-ink-tertiary">Biarkan kosong: import berhenti dulu kalau ada kategori baru yang mirip kategori studio (misalnya HPL vs High Pressure Laminate).</span></span>
+        </label>
         {result ? <Text size="sm">Imported: {result.created} new, {result.updated} updated.</Text> : null}
         {command.error ? <InlineError>{command.error}</InlineError> : null}
       </div>

@@ -23,6 +23,7 @@ import {
   parseScheduleCode,
   lowestFreeNumber,
   scheduleCode,
+  similarScheduleCategories,
   type ScheduleSection,
 } from "../domain/schedule";
 import {
@@ -288,6 +289,27 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
   }
 
   /**
+   * Categories the studio already knows, per section, for the category pickers: template categories
+   * in their settings order, then prefix-dictionary categories A to Z. `prefix` is the dictionary's when set.
+   */
+  async function studioCategoryChoices(): Promise<Array<{ section: ScheduleSection; category: string; prefix: string | null }>> {
+    const [templates, prefixes] = await Promise.all([
+      db.sfScheduleTemplateCategory.findMany({ orderBy: [{ sort_order: "asc" }, { category_key: "asc" }], select: { section: true, category: true, category_key: true } }),
+      db.sfSchedulePrefix.findMany({ orderBy: { category_key: "asc" }, select: { section: true, category: true, category_key: true, prefix: true } }),
+    ]);
+    const prefixOf = new Map(prefixes.map((row) => [`${row.section}:${row.category_key}`, row.prefix]));
+    const seen = new Set<string>();
+    const choices: Array<{ section: ScheduleSection; category: string; prefix: string | null }> = [];
+    for (const row of [...templates, ...prefixes]) {
+      const key = `${row.section}:${row.category_key}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      choices.push({ section: row.section, category: row.category, prefix: prefixOf.get(key) ?? null });
+    }
+    return choices;
+  }
+
+  /**
    * The one place a live schedule row or option is created (WO-SF-IDEAS-01). The schedule commands below and
    * StudioFlow callers that hold their own transaction (Ideas) share it, so codes, option labels and the
    * "a new option is never final" rule have a single home. Callers check access first (`requireAccess`) and
@@ -525,20 +547,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
      */
     async listCategoryChoices(input: ReadContext): Promise<Array<{ section: ScheduleSection; category: string; prefix: string | null }>> {
       requireRead(input.grants);
-      const [templates, prefixes] = await Promise.all([
-        db.sfScheduleTemplateCategory.findMany({ orderBy: [{ sort_order: "asc" }, { category_key: "asc" }], select: { section: true, category: true, category_key: true } }),
-        db.sfSchedulePrefix.findMany({ orderBy: { category_key: "asc" }, select: { section: true, category: true, category_key: true, prefix: true } }),
-      ]);
-      const prefixOf = new Map(prefixes.map((row) => [`${row.section}:${row.category_key}`, row.prefix]));
-      const seen = new Set<string>();
-      const choices: Array<{ section: ScheduleSection; category: string; prefix: string | null }> = [];
-      for (const row of [...templates, ...prefixes]) {
-        const key = `${row.section}:${row.category_key}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        choices.push({ section: row.section, category: row.category, prefix: prefixOf.get(key) ?? null });
-      }
-      return choices;
+      return studioCategoryChoices();
     },
 
     async listBrandChoices(input: ReadContext & { search?: string }) {
@@ -1040,13 +1049,43 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
      * free, so importing the sheet again finds the same rows. A simple
      * `category,brand,product,…` sheet is accepted as a fallback.
      */
-    async importCsv(input: CommandContext & { projectId: string; section: string; csv?: string; file?: { name: string; data: Buffer } }) {
+    async importCsv(input: CommandContext & { projectId: string; section: string; csv?: string; file?: { name: string; data: Buffer }; acceptNewCategories?: boolean }) {
       await requireScheduleCommand(input);
       const section = sectionOf(input.section);
       const grid = await scheduleGrid(input);
       const sheet = parseLegacyScheduleSheet(grid, section);
+      /**
+       * WO-SF-CATEGORY-SIMILAR-01: before anything is written, a sheet category that is new to the project and the studio
+       * but looks like a studio category (HPL/Plastic Laminate vs High Pressure Laminate) is sent back to the user, who
+       * either fixes the sheet or confirms the new category. A misspelling would otherwise get its own prefix (HP, not PL)
+       * and, for the Google Sheets export, land in the studio prefix dictionary.
+       */
+      const refuseLookAlikeCategories = async (labels: ReadonlyArray<string | null | undefined>) => {
+        if (input.acceptNewCategories) return;
+        const [projectRows, studio] = await Promise.all([
+          db.sfScheduleEntry.findMany({ where: { project_id: input.projectId, section }, distinct: ["category_key"], select: { category_key: true } }),
+          studioCategoryChoices(),
+        ]);
+        const inProject = new Set(projectRows.map((row) => row.category_key));
+        const studioOfSection = studio.filter((choice) => choice.section === section);
+        const studioKeys = new Set(studioOfSection.map((choice) => normalizeScheduleCategory(choice.category).key));
+        const lines: string[] = [];
+        const seen = new Set<string>();
+        for (const label of labels) {
+          if (!label?.trim()) continue;
+          const { key, label: typed } = normalizeScheduleCategory(label);
+          if (seen.has(key) || inProject.has(key) || studioKeys.has(key)) continue;
+          seen.add(key);
+          const suggestions = similarScheduleCategories(typed, studioOfSection);
+          if (suggestions.length > 0) lines.push(`"${typed}" → ${suggestions.map((choice) => `${choice.category}${choice.prefix ? ` (${choice.prefix})` : ""}`).join(" / ")}`);
+        }
+        if (lines.length > 0) {
+          throw invalid("SCHEDULE_CSV_CATEGORY_SIMILAR", `These categories are new but look like studio categories: ${lines.join("; ")}. Use the studio name in the sheet, or tick "the new categories are intended" and import again.`);
+        }
+      };
       if (sheet) {
         if (sheet.length === 0) throw invalid("SCHEDULE_CSV_EMPTY", "The sheet has a header but no rows.");
+        await refuseLookAlikeCategories(sheet.map((row) => row.category));
         return runTransaction(async (tx) => {
           await loadWritableProject(tx, input.projectId);
           let created = 0;
@@ -1133,6 +1172,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
       const rows = parseLegacyScheduleCsv(grid);
       if (rows.length === 0) throw invalid("SCHEDULE_CSV_EMPTY", "The CSV has no rows.");
+      await refuseLookAlikeCategories(rows.map((row) => row.category || row.schedule_category || row.kategori));
       return runTransaction(async (tx) => {
         await loadWritableProject(tx, input.projectId);
         let created = 0;

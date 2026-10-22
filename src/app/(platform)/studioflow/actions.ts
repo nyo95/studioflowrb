@@ -1059,6 +1059,8 @@ const ScheduleCsvImport = z.strictObject({
   csv: z.string().max(200000).optional(),
   /** An .xlsx or .csv upload as base64 (about 5 MB of file). */
   file: z.strictObject({ name: z.string().min(1).max(200), base64: z.string().max(7_200_000) }).optional(),
+  /** WO-SF-CATEGORY-SIMILAR-01: import even when new categories look like studio ones. */
+  acceptNewCategories: z.boolean().optional(),
 });
 export async function importScheduleCsvAction(input: z.infer<typeof ScheduleCsvImport>): Promise<ActionResult<{ created: number; updated: number }>> {
   return runSafeAction(async () => {

@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.176 | 2026-10-22 | feat(studioflow): suggest studio categories for look-alike names (Lead)
+
+- **Work order:** `WO-SF-CATEGORY-SIMILAR-01` (owner: suggest, never auto-map).
+- **Rule:** `similarScheduleCategories` (schedule domain) flags a typed category that is new but resembles a studio category of the same section: the studio name's initials are one of the typed words (HPL ↔ High Pressure Laminate), the names are at least 80% alike (Homogeneus ↔ Homogeneous), or they share a word of five letters or more (Plastic Laminate ↔ High Pressure Laminate). Exact matches never flag; up to three suggestions with prefixes.
+- **Schedule screen:** "+ New category" lists "Mungkin maksud Anda" first while typing (picking it uses the studio category and prefix); a truly new name can still be created.
+- **Import (both formats):** before anything is written, a sheet whose new categories look like studio ones is refused with `SCHEDULE_CSV_CATEGORY_SIMILAR` listing "typed → studio (prefix)"; the import dialog's "Kategori baru di file ini memang dimaksudkan" sends it through. Prevents a misspelling from getting its own prefix and, for the Google Sheets format, from entering the studio prefix dictionary. Categories the project already has are not questioned.
+- **Schedule Assistant:** a valid preview carries `warnings` (`SCHEDULE_CATEGORY_SIMILAR`, suggestions); the bridge interview tells the AI to ask which category is meant before applying. `listCategoryChoices` now shares one internal reader with the import check.
+- **Checks:** domain 3/3, import 2/2 (refused and nothing written, confirmed import, studio name and existing project category pass), Schedule Assistant suite with the new warning test 15/15, bridge 14/14. High gate (`STUDIOFLOW_LOCATION=kantor NEXT_DIST_DIR=.next-e2e node scripts/verify.mjs --tier high`): boundaries, legacy-runtime, whitespace, typecheck, lint, `npm test` 1274/1274, Prisma generate, production build PASS. Schedule screen browser walk is the owner's ([UNVERIFIED]).
+
 ## R9.175 | 2026-10-22 | plan(studioflow): suggest studio categories for look-alike names; fix HP/HO codes (Lead)
 
 - **Owner report:** HPL items in "2026-536 Sociolla SBZ The Breeze BSD Phase 2" were coded HP-xx instead of PL-xx.

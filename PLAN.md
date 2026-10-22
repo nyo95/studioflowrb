@@ -5,7 +5,7 @@ Scope: warn before a Schedule category is created that looks like a studio categ
 Module(s): StudioFlow (schedule domain, import, Schedule screen category picker, schedule composer door); Schedule Assistant bridge (interview text). No schema change.
 Target revision: R9.176 (this plan is R9.175).
 Risk: medium - touches the import path and the composer preview; a too-eager match would nag on real new categories, a too-weak one misses the case. Warnings never block a deliberate new category.
-Status: READY — executed by the Lead (owner, 2026-10-22)
+Status: DONE in R9.176 — Schedule screen walk pending (BACKLOG [UNVERIFIED]). Executed by the Lead (owner, 2026-10-22).
 Priority: P1
 Owner: Product Owner (decision 2026-10-22: "saran kategori mirip")
 Last updated: 2026-10-22
