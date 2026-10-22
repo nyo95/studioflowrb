@@ -1,16 +1,20 @@
 # WO-SKETCHUP-03 — SketchUp P1: option-aware links (plugin 1.3.0, module 1.1.0)
 
-Status: DRAFT — becomes READY after the owner has tested WO-SKETCHUP-02 (plugin 1.2.1) in SketchUp.
+Status: built in R9.194 (module 1.1.0, plugin 1.3.0) at the owner's request before the 1.2.1 test; one owner test in SketchUp covers WO-SKETCHUP-02 and -03.
 Module(s): `sketchup` (read contract, additive) and the plugin. No schema, no StudioFlow service change.
 Depends on: WO-SKETCHUP-02. Decisions: as in WO-SKETCHUP-02 (semantics, D1–D5, Q1–Q3).
 
 ## Server (module `sketchup` 1.1.0)
 
-- `GET projects/{id}/schedule`: each entry adds `createdAt` and
+- `GET projects/{id}/schedule`: each entry adds
   `options: [{ id, label, isFinal, status, title }]` (title = Brand + product of that option),
   read from the composer's `readContext` (already returns them). `title` of the entry stays for
-  plugin 1.2.x. No new route; `resolve` stays for 1.2.x.
-- Tests: options and final flag present; an entry without options returns `options: []`.
+  plugin 1.2.x. No new route; `resolve` stays for 1.2.x. `createdAt` (for a "recently created"
+  list after an MCP session) moves to P3: the composer door does not return it today, and P1 needs
+  no StudioFlow change.
+- Tests: options and final flag present; an entry without options returns `options: []`; an item
+  made from SketchUp has no option (D2); a deleted code is given to the next new item under a new
+  entry id and the old id resolves to `null` (D5).
   `docs/apps/sketchup/CONTRACT.md` updated.
 
 ## Plugin metadata (dictionary `BerkahStudio` on the material)
@@ -42,8 +46,10 @@ a material with a stale link, the plugin offers (asked) to rename it to `<code> 
 
 ## Plugin flow
 
-- After picking an item: if it has options, choose one (an only option is chosen); "tanpa opsi"
-  is offered for an entry without options. No option is created from SketchUp (Q2).
+- After picking an item: if it has options, choose one (an only option is chosen; the final one is
+  marked); an entry without options is linked as the entry. No option is created from SketchUp (Q2).
+- A linked material shows item, option and status, with actions: keep (then the merge offer),
+  rename to the expected name, choose another option, another item.
 - "Perbarui kode dari jadwal" becomes "Cek & perbarui": one schedule read, status of every linked
   material (materials collection only, no geometry traversal), summary grouped as rename /
   not final / option not chosen / stale / other project / conflict; apply on Yes in one undo step

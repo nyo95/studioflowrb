@@ -28,6 +28,6 @@ describe("application permission registration", () => {
     assert.deepEqual(modules.find("presentation")?.permissionIds, ["studioflow.presentation.manage"]);
     assert.deepEqual(modules.find("workspace-board"), { id: "workspace-board", name: "Workspace board", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"], initialState: "DISABLED" }, "the board starts off on every server");
     assert.deepEqual(modules.find("schedule-assistant"), { id: "schedule-assistant", name: "Schedule Assistant", version: "1.2.0", kind: "optional", parent: "studioflow", requires: ["studioflow"], permissionIds: ["studioflow.schedule-assistant.use"], initialState: "DISABLED" }, "the Schedule Assistant starts off on every server");
-    assert.deepEqual(modules.find("sketchup"), { id: "sketchup", name: "SketchUp", version: "1.0.0", kind: "optional", parent: "studioflow", requires: ["studioflow"], permissionIds: ["studioflow.sketchup.use"], initialState: "DISABLED" }, "SketchUp starts off on every server");
+    assert.deepEqual(modules.find("sketchup"), { id: "sketchup", name: "SketchUp", version: "1.1.0", kind: "optional", parent: "studioflow", requires: ["studioflow"], permissionIds: ["studioflow.sketchup.use"], initialState: "DISABLED" }, "SketchUp starts off on every server");
   });
 });

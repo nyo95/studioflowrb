@@ -9,7 +9,7 @@ import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 export const SKETCHUP_MODULE_MANIFEST = Object.freeze({
   id: "sketchup",
   name: "SketchUp",
-  version: "1.0.0",
+  version: "1.1.0",
   kind: "optional",
   parent: "studioflow",
   requires: Object.freeze(["studioflow"]),

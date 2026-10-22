@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
-# Plain-Ruby tests of the schedule link rules (WO-SKETCHUP-02): ruby tools/sketchup-plugin/test/link_rules_test.rb
+# Plain-Ruby tests of the schedule link rules (WO-SKETCHUP-02, WO-SKETCHUP-03): ruby tools/sketchup-plugin/test/link_rules_test.rb
 require 'minitest/autorun'
 require_relative '../src/berkahstudio/core/link_rules'
+require_relative '../src/berkahstudio/core/rules_engine'
 
 class LinkRulesTest < Minitest::Test
   Rules = BerkahStudio::MaterialScheduler::LinkRules
@@ -90,5 +91,68 @@ class LinkRulesTest < Minitest::Test
     assert Rules.keep_pending?('NETWORK')
     assert Rules.keep_pending?('IDEMPOTENCY_IN_PROGRESS')
     refute Rules.keep_pending?('PROJECT_ARCHIVED')
+  end
+
+  A = { 'id' => 'a', 'label' => 'A', 'isFinal' => false }.freeze
+  B = { 'id' => 'b', 'label' => 'B', 'isFinal' => true }.freeze
+  C = { 'id' => 'c', 'label' => 'C', 'isFinal' => false }.freeze
+
+  def test_names_follow_the_final_decision_and_never_guess_an_option
+    assert_equal 'PL-02', Rules.expected_name('PL-02', [], nil), 'item without options'
+    assert_equal 'PL-02', Rules.expected_name('PL-02', [A], nil), 'item-only link, one option'
+    assert_nil Rules.expected_name('PL-02', [A, B, C], nil), 'old item-only link to alternatives keeps its name'
+    assert_equal 'PL-02', Rules.expected_name('PL-02', [A, B, C], 'b'), 'final option'
+    assert_equal 'PL-02-A', Rules.expected_name('PL-02', [A, B, C], 'a')
+    assert_equal 'PL-02-C', Rules.expected_name('PL-02', [A, C], 'c'), 'nothing final yet: every alternative has its letter'
+    assert_equal 'PL-02', Rules.expected_name('PL-02', [A], 'a'), 'only option'
+    assert_nil Rules.expected_name('PL-02', [A, B], 'gone'), 'deleted option keeps the name'
+  end
+
+  def test_final_moving_from_a_to_b_swaps_the_names
+    before = [A.merge('isFinal' => true), B.merge('isFinal' => false)]
+    after = [A, B]
+    rows = [
+      { key: 1, name: Rules.expected_name('PL-02', before, 'a'), target: Rules.expected_name('PL-02', after, 'a') },
+      { key: 2, name: Rules.expected_name('PL-02', before, 'b'), target: Rules.expected_name('PL-02', after, 'b') }
+    ]
+    assert_equal [['PL-02', 'PL-02-A'], ['PL-02-B', 'PL-02']], rows.map { |row| [row[:name], row[:target]] }
+    plan = Rules.refresh_plan(rows, { 'PL-02' => 1, 'PL-02-B' => 2 })
+    assert_equal [1, 2], plan[:renames].map { |row| row[:key] }
+  end
+
+  def test_status
+    assert_equal [:no_spec, nil], Rules.link_status([], nil)
+    assert_equal [:option_not_chosen, 'B'], Rules.link_status([A, B], nil)
+    assert_equal [:final, 'B'], Rules.link_status([A, B], 'b')
+    assert_equal [:not_final, 'B'], Rules.link_status([A, B], 'a')
+    assert_equal [:alternative, nil], Rules.link_status([A, C], 'a')
+    assert_equal [:only_option, nil], Rules.link_status([A], 'a')
+    assert_equal [:option_missing, 'B'], Rules.link_status([A, B], 'x')
+  end
+
+  def test_merge_only_by_official_entry_and_option_id
+    link = ->(project, entry, option = nil) { { project_id: project, entry_id: entry, option_id: option } }
+    assert Rules.merge_candidate?(link.('p1', 'e1', 'a'), link.('p1', 'e1', 'a'), 'p1', 3)
+    refute Rules.merge_candidate?(link.('p1', 'e1', 'a'), link.('p1', 'e1', 'b'), 'p1', 3), 'two alternatives'
+    refute Rules.merge_candidate?(link.('p1', 'e1'), link.('p1', 'e1'), 'p1', 2), 'item-only links to an item with alternatives'
+    assert Rules.merge_candidate?(link.('p1', 'e1'), link.('p1', 'e1'), 'p1', 1)
+    refute Rules.merge_candidate?(link.('p1', 'e1'), link.('p1', 'e1', 'a'), 'p1', 1), 'one has an option, the other not'
+    refute Rules.merge_candidate?(link.('p1', 'e1', 'a'), link.('p2', 'e1', 'a'), 'p1', 1), 'another project'
+    refute Rules.merge_candidate?(link.('p1', '', nil), link.('p1', '', nil), 'p1', 0), 'unlinked, even with the same code'
+  end
+
+  def test_spread_corners
+    rectangle_with_extra_vertex = [[0, 0, 0], [50, 0, 0], [100, 0, 0], [100, 40, 0], [0, 40, 0]]
+    corners = Rules.spread_corners(rectangle_with_extra_vertex)
+    assert_operator Rules.area(*corners.map { |index| rectangle_with_extra_vertex[index] }), :>=, 1999
+    assert_nil Rules.spread_corners([[0, 0, 0], [1, 0, 0], [2, 0, 0]])
+  end
+
+  def test_component_tracker_accepts_option_names
+    engine = BerkahStudio::MaterialScheduler::RulesEngine
+    assert engine.is_registered_code?('PL-02-B', { 'PL' => 'HPL' })
+    assert_nil engine.parse_dirty('PL-02-B')
+    assert_equal 'PL', engine.prefix_for_code('PL-02-B')
+    assert engine.parse_dirty('PL-02 copy')
   end
 end

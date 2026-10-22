@@ -3,7 +3,7 @@ require 'sketchup.rb'
 require 'extensions.rb'
 
 module BerkahStudio
-  VERSION = '1.2.1'.freeze
+  VERSION = '1.3.0'.freeze
 
   # Ensure the extension is only registered once
   unless defined?(@extension)

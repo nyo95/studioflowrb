@@ -60,7 +60,7 @@ async function tokenFor(person: Person, scopes: readonly string[] = BOTH) {
 async function setModule(state: "ENABLED" | "DISABLED") {
   await testDb.prisma.moduleState.upsert({
     where: { module_id: "sketchup" },
-    create: { module_id: "sketchup", state, last_version: "1.0.0", updated_by: "test" },
+    create: { module_id: "sketchup", state, last_version: "1.1.0", updated_by: "test" },
     update: { state },
   });
 }
@@ -162,7 +162,7 @@ describe("module switch, token and scopes", () => {
 });
 
 describe("reads", () => {
-  it("lists the schedule with codes and the final option (else A) as title, and no storage keys", async () => {
+  it("lists the schedule with codes, the final option (else A) as title, every option, and no storage keys", async () => {
     const projectId = await newProject("Read");
     await entry(projectId, "Solid Surface", "SO", 1, [{ label: "A", brand: "Corian", product: "Deep Nocturne" }, { label: "B", brand: "Corian", product: "Glacier White", final: true }]);
     await entry(projectId, "Paint", "PT", 8, [{ label: "A", product: "Texture Paint" }]);
@@ -171,6 +171,11 @@ describe("reads", () => {
     const read = await schedule(secret, projectId);
     assert.equal(read.status, 200, JSON.stringify(read.body));
     assert.deepEqual(read.body.data.entries.map((row: { code: string; title: string }) => [row.code, row.title]), [["PT-08", "Texture Paint"], ["PT-09", ""], ["SO-01", "Corian Glacier White"]]);
+    // WO-SKETCHUP-03: every option with its id, letter, final flag and title; an item without options has none.
+    const options = read.body.data.entries.map((row: { code: string; options: Array<{ id: string; label: string; isFinal: boolean; status: string; title: string }> }) => [row.code, row.options.map((option) => [option.label, option.isFinal, option.status, option.title])]);
+    assert.deepEqual(options, [["PT-08", [["A", false, "DRAFT", "Texture Paint"]]], ["PT-09", []], ["SO-01", [["A", false, "DRAFT", "Corian Deep Nocturne"], ["B", true, "APPROVED", "Corian Glacier White"]]]]);
+    const ids = await testDb.prisma.sfScheduleOption.findMany({ select: { id: true } });
+    assert.deepEqual(new Set(read.body.data.entries.flatMap((row: { options: Array<{ id: string }> }) => row.options.map((option) => option.id))), new Set(ids.map((row) => row.id)));
     assert.equal(JSON.stringify(read.body).includes("image_key"), false);
     assert.ok(Array.isArray(read.body.data.categoryChoices));
     assert.equal(scheduleTitle([]), "");
@@ -215,6 +220,23 @@ describe("create entry", () => {
     const audit = await testDb.prisma.auditEvent.findFirstOrThrow({ where: { action: "studioflow.schedule.entry-created" } });
     assert.equal((audit.metadata as Record<string, unknown>).via, "sketchup");
     assert.equal((await create(secret, projectId, { section: "MATERIAL", category: "Solid Surface" }, "")).body.error?.code, "IDEMPOTENCY_KEY_REQUIRED");
+    // Owner D2: an item made from SketchUp has no option; the material links to the item.
+    assert.equal(await testDb.prisma.sfScheduleOption.count({ where: { entry_id: first.body.data.entryId } }), 0);
+  });
+
+  it("gives a deleted item's code to the next new item under a new entry id (owner D5)", async () => {
+    const projectId = await newProject("Reuse");
+    await testDb.prisma.sfSchedulePrefix.create({ data: { section: "MATERIAL", category: "Stone", category_key: "STONE", prefix: "ST" } });
+    const secret = await tokenFor(designer);
+    const marble = await create(secret, projectId, { section: "MATERIAL", category: "Stone" });
+    assert.equal(marble.body.data.code, "ST-01");
+    await testDb.prisma.sfScheduleEntry.delete({ where: { id: marble.body.data.entryId } });
+    const travertine = await create(secret, projectId, { section: "MATERIAL", category: "Stone" });
+    assert.equal(travertine.body.data.code, "ST-01");
+    assert.notEqual(travertine.body.data.entryId, marble.body.data.entryId);
+    // The plugin's old link (the deleted entry id) resolves to nothing, never to the new ST-01.
+    const resolved = await resolve(secret, projectId, [marble.body.data.entryId, travertine.body.data.entryId]);
+    assert.deepEqual(resolved.body.data, [{ entryId: marble.body.data.entryId, code: null }, { entryId: travertine.body.data.entryId, code: "ST-01" }]);
   });
 
   it("refuses a new category that looks like a studio one unless the user confirms it", async () => {

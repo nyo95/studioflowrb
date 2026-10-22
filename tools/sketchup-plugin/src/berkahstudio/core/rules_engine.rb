@@ -10,6 +10,12 @@ module BerkahStudio
         '%s-%02d' % [pref.upcase, num.to_i]
       end
 
+      # PL-02-B is option B of PL-02 (WO-SKETCHUP-03): [base code, '-B'], or [code, ''] without a letter suffix.
+      def self.split_suffix(code)
+        match = code.to_s.match(/\A(.+?-\d+)(-[A-Z]+)\z/)
+        match ? [match[1], match[2]] : [code.to_s, '']
+      end
+
       def self.make_code(prefix, number)
         return nil unless prefix =~ /^[A-Z]+$/ && number.to_i > 0
         '%s-%02d' % [prefix.upcase, number.to_i]
@@ -22,15 +28,15 @@ module BerkahStudio
       end
 
       def self.prefix_for_code(code)
-        c = canonical(code)
+        c = canonical(split_suffix(code)[0])
         return nil unless c
         c.split('-', 2)[0]
       end
 
-      # Checks if name is exactly a valid code pattern (e.g. "PT-1")
+      # Checks if name is exactly a valid code pattern (e.g. "PT-1", or "PT-01-B" for an alternative option)
       def self.format_valid?(name)
         return false unless name.is_a?(String)
-        !!(name =~ /^[A-Z]+-\d+$/)
+        !!(name =~ /^[A-Z]+-\d+(-[A-Z]+)?$/)
       end
 
       # Checks if name is a valid format AND the prefix is registered
@@ -51,8 +57,8 @@ module BerkahStudio
           num = $2.to_i
           suffix = $3
 
-          # A clean code (PL-1 or PL-01) is not dirty
-          return nil if name =~ /^[A-Z]+-\d+$/
+          # A clean code (PL-1, PL-01, or PL-01-B for an alternative option) is not dirty
+          return nil if name =~ /^[A-Z]+-\d+(-[A-Z]+)?$/
 
           return [pref, num, suffix]
         end

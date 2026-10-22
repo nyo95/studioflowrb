@@ -52,8 +52,11 @@ module BerkahStudio
       end
 
       def self.apply_code(material, code)
-        canonical = RulesEngine.canonical(code)
+        base, suffix = RulesEngine.split_suffix(code)
+        canonical = RulesEngine.canonical(base)
         return read(material) unless canonical
+
+        canonical += suffix
 
         prefix = RulesEngine.prefix_for_code(canonical)
         data = read(material)

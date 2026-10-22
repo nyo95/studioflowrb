@@ -4,7 +4,7 @@ require 'uri'
 
 module BerkahStudio
   module MaterialScheduler
-    # Pure rules of the schedule link (WO-SKETCHUP-02). No SketchUp calls here, so they run under plain Ruby
+    # Pure rules of the schedule link (WO-SKETCHUP-02, WO-SKETCHUP-03). No SketchUp calls here, so they run under plain Ruby
     # (tools/sketchup-plugin/test/link_rules_test.rb). A code (ST-01) is a label that StudioFlow may give to another
     # item later; identity is always the project id + entry id stored on the material.
     module LinkRules
@@ -74,6 +74,76 @@ module BerkahStudio
         return false unless octets.length == 4 && octets.all? { |value| value && value.between?(0, 255) }
 
         octets[0] == 10 || (octets[0] == 172 && octets[1].between?(16, 31)) || (octets[0] == 192 && octets[1] == 168)
+      end
+
+      # Owner D1 (WO-SKETCHUP-03): the plain code for the final option, the only option or an item without options;
+      # CODE-<letter> for a non-final alternative. nil = leave the name as it is (an old item-only link to an item with
+      # alternatives, or an option that was deleted): no option is ever guessed.
+      def self.expected_name(code, options, option_id)
+        options ||= []
+        return options.length <= 1 ? code : nil if option_id.to_s.empty?
+
+        option = options.find { |row| row['id'] == option_id }
+        return nil unless option
+        return code if option['isFinal'] || options.length == 1
+
+        "#{code}-#{option['label']}"
+      end
+
+      # [state, final option label or nil]. States: :no_spec, :single (item-only link, one option), :option_not_chosen,
+      # :option_missing, :final, :only_option, :not_final (another option is final), :alternative (nothing final yet).
+      def self.link_status(options, option_id)
+        options ||= []
+        final = options.find { |row| row['isFinal'] }
+        if option_id.to_s.empty?
+          return [:no_spec, nil] if options.empty?
+          return [:single, final && final['label']] if options.length == 1
+
+          return [:option_not_chosen, final && final['label']]
+        end
+        option = options.find { |row| row['id'] == option_id }
+        return [:option_missing, final && final['label']] unless option
+        return [:final, option['label']] if option['isFinal']
+        return [:not_final, final['label']] if final
+        return [:only_option, nil] if options.length == 1
+
+        [:alternative, nil]
+      end
+
+      # Merge only what the Schedule says is one specification (owner, 2026-10-22): the same project, the same entry and
+      # the same option id; two item-only links only when that item has at most one option. Never by name or code.
+      # a, b: { project_id:, entry_id:, option_id: }.
+      def self.merge_candidate?(a, b, project_id, option_count)
+        return false unless a[:project_id].to_s == project_id.to_s && b[:project_id].to_s == project_id.to_s
+        return false if a[:entry_id].to_s.empty? || a[:entry_id].to_s != b[:entry_id].to_s
+
+        a_option = a[:option_id].to_s
+        b_option = b[:option_id].to_s
+        return a_option == b_option if !a_option.empty? || !b_option.empty?
+
+        option_count <= 1
+      end
+
+      # Three well-spread corners of a face (indexes into points), so a texture position can be carried over exactly;
+      # nil when the face has no three corners that span an area. points: [[x, y, z], ...].
+      def self.spread_corners(points)
+        return nil if points.length < 3
+
+        first = 0
+        second = (1...points.length).max_by { |index| distance(points[first], points[index]) }
+        third = (0...points.length).max_by { |index| area(points[first], points[second], points[index]) }
+        area(points[first], points[second], points[third]) > 1e-6 ? [first, second, third] : nil
+      end
+
+      def self.distance(a, b)
+        Math.sqrt(a.zip(b).sum { |x, y| (x - y)**2 })
+      end
+
+      def self.area(a, b, c)
+        u = b.zip(a).map { |x, y| x - y }
+        v = c.zip(a).map { |x, y| x - y }
+        cross = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]]
+        Math.sqrt(cross.sum { |value| value**2 }) / 2.0
       end
 
       def self.pending_fresh?(pending, now)

@@ -21,7 +21,7 @@ with SketchUp > Extension Manager > Install Extension, then restart SketchUp.
 ## Rules
 
 - Codes use the Product Schedule's format, at least two digits (PL-01). PL-1 and PL-01 are the
-  same code.
+  same code. `PL-01-B` is option B of PL-01 when B is not final (WO-SKETCHUP-03).
 - Keep each change small and bump `VERSION`; record it in `CHANGELOG.md` like any revision.
 - Check a change with `ruby -wc` on every file and `ruby tools/sketchup-plugin/test/link_rules_test.rb`
   (Ruby 3.2 like SketchUp 2026; Docker `ruby:3.2-slim` where Ruby is not installed), then load it in SketchUp

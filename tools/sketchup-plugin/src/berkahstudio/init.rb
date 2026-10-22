@@ -58,7 +58,7 @@ unless file_loaded?(__FILE__)
   menu.add_item('Sambung ke StudioFlow...') {
     BerkahStudio::MaterialScheduler::ScheduleLink.connect
   }
-  menu.add_item('Perbarui kode dari jadwal') {
+  menu.add_item('Cek & perbarui kode dari jadwal') {
     BerkahStudio::MaterialScheduler::ScheduleLink.refresh_codes
   }
   menu.add_item('Putuskan sambungan StudioFlow') {

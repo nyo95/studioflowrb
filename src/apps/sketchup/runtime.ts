@@ -11,7 +11,7 @@ import { CreateEntryRequestSchema, ResolveRequestSchema, SKETCHUP_BODY_LIMIT_BYT
 import { SKETCHUP_READ_SCOPE, SKETCHUP_WRITE_SCOPE } from "./scope-grants";
 
 /**
- * The four SketchUp integration routes (WO-SKETCHUP-01 rev 2, Stage 1a). The plugin reads a project's schedule, asks
+ * The four SketchUp integration routes (WO-SKETCHUP-01 rev 2, Stage 1a; options in the schedule read, WO-SKETCHUP-03). The plugin reads a project's schedule, asks
  * StudioFlow for a new item's code, and resolves the items its materials are linked to. StudioFlow is reached only
  * through the schedule composer door, so access, codes, look-alike categories and audit are the Schedule's own.
  */
@@ -20,17 +20,25 @@ const GRANT = STUDIOFLOW_PERMISSIONS.sketchupUse;
 const VIA = "sketchup";
 type RouteContext = { params: Promise<{ projectId: string }> };
 type Principal = { userId: string; displayName: string; grants: readonly string[] };
-type ContextOption = { label: string; isFinal: boolean; brandName: string | null; productName: string | null };
+type ContextOption = { id: string; label: string; isFinal: boolean; status: string; brandName: string | null; productName: string | null };
 
 function contextOf(principal: Principal) {
   return { grants: principal.grants, actor: { kind: "USER" as const, userId: principal.userId, label: principal.displayName } };
 }
 
+function optionTitle(option: Pick<ContextOption, "brandName" | "productName">): string {
+  return [option.brandName, option.productName].filter((part) => part && part.trim() !== "").join(" ");
+}
+
 /** What the plugin shows for an item: the final option, else the first (A); Brand then product. */
 export function scheduleTitle(options: readonly ContextOption[]): string {
   const chosen = options.find((option) => option.isFinal) ?? options[0];
-  if (!chosen) return "";
-  return [chosen.brandName, chosen.productName].filter((part) => part && part.trim() !== "").join(" ");
+  return chosen ? optionTitle(chosen) : "";
+}
+
+/** WO-SKETCHUP-03: every option of an item, so the plugin links a material to one option and sees the final one. */
+export function scheduleOptions(options: readonly ContextOption[]) {
+  return options.map((option) => ({ id: option.id, label: option.label, isFinal: option.isFinal, status: option.status, title: optionTitle(option) }));
 }
 
 export const listProjects = createIntegrationRouteHandler({
@@ -48,7 +56,7 @@ export async function readSchedule(request: Request, { params }: RouteContext) {
       const context = await scheduleComposer.readContext({ ...contextOf(principal), projectId });
       return {
         project: context.project,
-        entries: context.entries.map((entry) => ({ id: entry.id, code: entry.code, section: entry.section, category: entry.category, prefix: entry.prefix, title: scheduleTitle(entry.options) })),
+        entries: context.entries.map((entry) => ({ id: entry.id, code: entry.code, section: entry.section, category: entry.category, prefix: entry.prefix, title: scheduleTitle(entry.options), options: scheduleOptions(entry.options) })),
         categoryChoices: context.categoryChoices,
       };
     },
