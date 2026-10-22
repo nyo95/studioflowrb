@@ -21,6 +21,12 @@ entitlements, per-customer encryption or code obfuscation without a new
 explicit owner decision. The Developer console is an operational control, not
 a licensing or copy-protection mechanism.
 
+**Amendment 2026-10-23 (D11).** Gated integration modules (AI assistant, MCP, companion plugins) have a second
+gate after "enabled": the Developer lists the users who may use them (`platform.integration_access`, console
+`/system`). It is not RBAC and is not a permission: no role, including the Platform Owner, holds it by role, and it
+adds no right. A listed user still passes their own RBAC and project rules on every action. Purpose: everyone can
+use the app by hand, but the owner's normal account does not become a super account just to run AI features.
+
 ## Why now
 
 Every capability added inside StudioFlow makes a later split more expensive. The

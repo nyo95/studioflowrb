@@ -27,7 +27,7 @@ own `bodyLimitBytes` when it is introduced.
 Schedule Assistant is the v1 Product Schedule composer. Its six routes sit at
 `/api/integrations/v1/schedule-assistant`; read/preview need
 `schedule-assistant:read`, apply needs `schedule-assistant:write`, and both
-require the enabled module's `studioflow.schedule-assistant.use` grant. An app's
+require the module to be On and the user to be on the Developer's access list for it (`platform.integration_access`, set at `/system`; not RBAC, so no role holds it). A scope entry names either an RBAC `grant` or such a `module`. An app's
 scope/grant pairs are composed outside `src/platform/` (the Account page and
 token action pass `[...REFERENCE_SCOPE_GRANTS, ...SCHEDULE_ASSISTANT_SCOPE_GRANTS]`
 to `createOwn`). Contract: `docs/apps/schedule-assistant/CONTRACT.md`.

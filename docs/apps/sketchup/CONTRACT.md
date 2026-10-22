@@ -8,8 +8,8 @@ never overwrites the Schedule).
 
 - `sketchup` 1.1.0, `kind: "optional"`, parent and requires `studioflow`,
   `initialState: "DISABLED"` (only the Developer switches it on).
-- Permission `studioflow.sketchup.use` (declared beside `scheduleAssistantUse` in StudioFlow's
-  permissions, in no built-in role profile; the Platform Owner holds it while the module is on).
+- No RBAC permission (R9.197; `studioflow.sketchup.use` is retired). Use is the Developer's access list
+  (`platform.integration_access`, `developerAccess: true`, edited at `/system`), which no role holds.
 - Stores no data: the link between a SketchUp material and its schedule item (project id +
   entry id) lives in the SketchUp model. Integration-only: no screen, listed in
   `INTEGRATION_ONLY_APPS`.
@@ -23,7 +23,7 @@ never overwrites the Schedule).
 | `sketchup:read` | projects, schedule, resolve |
 | `sketchup:write` | create an item |
 
-Both map to `studioflow.sketchup.use`. Reads also need project detail access (assigned
+Both need module access (module On and the user on the Developer's list). Reads also need project detail access (assigned
 Designer/Drafter or StudioFlow Manager). Creating an item needs the Schedule screen's write
 rule: `studioflow.schedule.manage`, assigned PIC or override holder, project not archived and
 not completed.

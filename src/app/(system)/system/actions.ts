@@ -54,6 +54,20 @@ export async function changeDeveloperModuleStateAction(
   }, { context: "developer_module_state" });
 }
 
+export async function changeIntegrationAccessAction(
+  moduleId: string,
+  userId: string,
+  allowed: boolean,
+): Promise<ActionResult<{ changed: boolean }>> {
+  return runSafeAction(async () => {
+    const rawToken = await requiredToken();
+    const result = await developerAccess.setIntegrationAccess(rawToken, moduleId, userId, allowed === true);
+    revalidatePath("/system");
+    revalidatePath("/account");
+    return result;
+  }, { context: "developer_integration_access" });
+}
+
 export async function developerSignOutAction(): Promise<void> {
   const rawToken = await requiredToken();
   await developerAccess.signOut(rawToken);

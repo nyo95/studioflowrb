@@ -10,9 +10,9 @@ Contract: `docs/apps/schedule-assistant/CONTRACT.md`.
 
 ## Before you start
 
-1. The Developer switches on the **Schedule Assistant** module. The Platform Owner holds
-   its permission automatically; anyone else needs it granted in Roles, plus the normal
-   Schedule permission and assignment to the project.
+1. The Developer switches on the **Schedule Assistant** module at `/system` and adds your user to
+   "AI and plugin access" there. This is not a Role: even the Platform Owner is not allowed until listed.
+   You still need the normal Schedule permission and assignment to the project.
 2. On **Account → Integration tokens**, create a token with both
    "Schedule Assistant: read project schedules" and "Schedule Assistant: change project
    schedules". The secret (`sfk_…`) is shown once.

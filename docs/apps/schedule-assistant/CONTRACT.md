@@ -10,9 +10,10 @@ that Work Order.
 - `schedule-assistant` 1.0.0, `kind: "optional"`, parent and requires `studioflow`,
   `initialState: "DISABLED"` (only the Developer switches
   it on).
-- Owns permission `studioflow.schedule-assistant.use` (in no built-in role profile; the
-  Platform Owner holds it while the module is on). Disabling the module removes the grant
-  everywhere at once.
+- Owns no RBAC permission (R9.197; the former `studioflow.schedule-assistant.use` is retired). Use is a
+  Developer-managed list, `platform.integration_access` (`developerAccess: true` in the manifest), edited at `/system`
+  under "AI and plugin access". No role, not even the Platform Owner, holds it by role. Turning the module off, or
+  removing a user from the list, stops that user's tokens at once; the token is checked on every call.
 - Stores no data in v1: idempotency lives in `platform.integration_request`, history in
   the platform audit. The first stored data adds `prisma/schema/schedule-assistant.prisma`
   with its own Postgres schema (MODULES-DECISION D8).
@@ -30,8 +31,8 @@ that Work Order.
 | `schedule-assistant:read` | the four reads and preview |
 | `schedule-assistant:write` | apply |
 
-Both map to grant `studioflow.schedule-assistant.use`. Identity and live grants come only
-from the token. Reads also require project detail access (assigned Designer/Drafter or
+Both need module access (module On and the user on the Developer's list). Identity and live grants come only
+from the token; the list only opens the door, every action still passes the user's own RBAC below. Reads also require project detail access (assigned Designer/Drafter or
 StudioFlow Manager). Preview and apply also require the Schedule screen's write rule:
 `studioflow.schedule.manage`, assigned PIC or override holder, project not archived and
 not completed. A manager without override reads but cannot apply.

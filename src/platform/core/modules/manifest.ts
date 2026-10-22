@@ -17,6 +17,11 @@ export type ModuleManifest = {
    * Developer turns on deliberately starts DISABLED; once stored, the Developer's choice always wins.
    */
   initialState?: "ENABLED" | "DISABLED";
+  /**
+   * A gated integration module (AI assistant, companion plugin): beyond the module being On, the Developer lists
+   * which users may use it. That list is not RBAC, so no role, not even the Platform Owner, holds it by role.
+   */
+  developerAccess?: boolean;
 };
 
 export type ModuleRegistry = {

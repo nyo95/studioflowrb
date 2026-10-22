@@ -18,9 +18,6 @@ export const STUDIOFLOW_PERMISSIONS = {
   scheduleManage: "studioflow.schedule.manage",
   ideasManage: "studioflow.ideas.manage",
   presentationManage: "studioflow.presentation.manage",
-  scheduleAssistantUse: "studioflow.schedule-assistant.use",
-  /** Held only through the SketchUp module (WO-SKETCHUP-01), like the Schedule Assistant's. */
-  sketchupUse: "studioflow.sketchup.use",
 } as const;
 
 /** Who a member is in StudioFlow (a PIC seat), listed apart from what they may do in the role editor. */

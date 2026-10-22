@@ -22,7 +22,7 @@ import { SKETCHUP_READ_SCOPE, SKETCHUP_SCOPE_GRANTS, SKETCHUP_WRITE_SCOPE } from
 
 let testDb: TestDb;
 const DESIGNER = Object.values(P).filter((permission) => permission !== P.projectManage && permission !== P.projectOverride && permission !== P.phaseOverride);
-const TOKEN_GRANTS = ["platform.integration.manage", P.sketchupUse];
+const TOKEN_GRANTS = ["platform.integration.manage"];
 const BOTH = [SKETCHUP_READ_SCOPE, SKETCHUP_WRITE_SCOPE];
 const BASE = "http://localhost/api/integrations/v1/sketchup";
 
@@ -53,6 +53,7 @@ function tokens() {
 }
 
 async function tokenFor(person: Person, scopes: readonly string[] = BOTH) {
+  await testDb.prisma.integrationAccess.upsert({ where: { module_id_user_id: { module_id: "sketchup", user_id: person.id } }, create: { module_id: "sketchup", user_id: person.id, granted_by: "test" }, update: {} });
   const created = await tokens().createOwn({ userId: person.id, displayName: person.name, grants: TOKEN_GRANTS, label: "SketchUp", scopes, scopeGrants: [...REFERENCE_SCOPE_GRANTS, ...SKETCHUP_SCOPE_GRANTS] });
   return created.secret;
 }
@@ -120,7 +121,7 @@ after(async () => {
 });
 
 describe("module switch, token and scopes", () => {
-  it("refuses every route while the module is off and offers the scopes only with the module grant", async () => {
+  it("refuses every route while the module is off and refuses a new token without the Developer's access", async () => {
     const projectId = await newProject("Switch");
     const secret = await tokenFor(designer);
     await setModule("DISABLED");
@@ -130,6 +131,7 @@ describe("module switch, token and scopes", () => {
     assert.equal((await create(secret, projectId, { section: "MATERIAL", category: "Paint" })).status, 403);
     await setModule("ENABLED");
     assert.equal((await call(listProjects(req("GET", "projects", secret)))).status, 200);
+    await testDb.prisma.integrationAccess.deleteMany({ where: { user_id: designer.id } });
     await assert.rejects(
       tokens().createOwn({ userId: designer.id, displayName: designer.name, grants: ["platform.integration.manage"], label: "No grant", scopes: [SKETCHUP_READ_SCOPE], scopeGrants: SKETCHUP_SCOPE_GRANTS }),
       (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN",
@@ -146,7 +148,7 @@ describe("module switch, token and scopes", () => {
     const secret = await tokenFor(designer);
     await setGrants(designer, DESIGNER.filter((permission) => permission !== P.scheduleManage));
     assert.equal((await create(secret, projectId, { section: "MATERIAL", category: "Paint" })).status, 403);
-    await setGrants(designer, DESIGNER.filter((permission) => permission !== P.sketchupUse));
+    await testDb.prisma.integrationAccess.deleteMany({ where: { user_id: designer.id } });
     assert.equal((await schedule(secret, projectId)).status, 403);
   });
 

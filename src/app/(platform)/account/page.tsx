@@ -10,7 +10,8 @@ import { parseStoredTheme, PLATFORM_APPEARANCE_THEME_DEFAULT, readPlatformGenera
 import { formatInstant } from "@platform/utilities/date";
 import { listUserSessions, logoutAllSessions, requirePrincipal, requirePrincipalGrants, currentSessionId } from "@platform/core/auth";
 import { prisma } from "@platform/core/db";
-import { integrationTokens, REFERENCE_SCOPE_GRANTS } from "@platform/core/integrations";
+import { hasIntegrationModuleAccess, integrationTokens, REFERENCE_SCOPE_GRANTS } from "@platform/core/integrations";
+import { enabledModuleIds } from "@platform/core/modules";
 import { hasPermission } from "@platform/core/rbac";
 import { userPreferences } from "@platform/runtime";
 import { AccountForms } from "./account-forms";
@@ -32,12 +33,24 @@ async function logoutAllAction(): Promise<void> {
   redirect("/login");
 }
 
+/** A scope is offered only when this person has its permission, or the Developer listed them for its module (and it is On). */
+async function allowedTokenScopes(userId: string, grants: Parameters<typeof hasPermission>[0]) {
+  const enabled = new Set(await enabledModuleIds());
+  const allowed: typeof REFERENCE_SCOPE_GRANTS[number][] = [];
+  for (const entry of [...REFERENCE_SCOPE_GRANTS, ...SCHEDULE_ASSISTANT_SCOPE_GRANTS, ...SKETCHUP_SCOPE_GRANTS]) {
+    const ok = entry.module !== undefined ? enabled.has(entry.module) && await hasIntegrationModuleAccess(prisma, userId, entry.module) : hasPermission(grants, entry.grant);
+    if (ok) allowed.push(entry);
+  }
+  return allowed;
+}
+
 export default async function AccountPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { principal, grants } = principalGrants;
   const canManageTokens = hasPermission(grants, "platform.integration.manage");
   const tokens = canManageTokens ? await integrationTokens.listOwn({ userId: principal.userId, grants }) : [];
+  const tokenScopes = canManageTokens ? await allowedTokenScopes(principal.userId, grants) : [];
 
   const [sessions, currentId, settings, preferences, organisation] = await Promise.all([
     listUserSessions(prisma, principal.userId),
@@ -102,7 +115,7 @@ export default async function AccountPage() {
               expiresAt: token.expiresAt ? formatInstant(token.expiresAt.toISOString(), { locale: settings.locale, timeZone: settings.timezone }) : null,
               status: token.revokedAt ? "revoked" : token.expiresAt && token.expiresAt <= new Date() ? "expired" : "active",
             }))}
-            scopes={[...REFERENCE_SCOPE_GRANTS, ...SCHEDULE_ASSISTANT_SCOPE_GRANTS, ...SKETCHUP_SCOPE_GRANTS].filter((entry) => hasPermission(grants, entry.grant)).map((entry) => ({ scope: entry.scope, label: SCOPE_LABELS[entry.scope] ?? entry.scope }))}
+            scopes={tokenScopes.map((entry) => ({ scope: entry.scope, label: SCOPE_LABELS[entry.scope] ?? entry.scope }))}
           />
         </PageSection>
       ) : null}

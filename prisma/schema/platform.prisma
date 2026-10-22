@@ -96,6 +96,7 @@ model User {
   preference UserPreference?
   tutorials  UserTutorial[]
   integration_tokens IntegrationToken[]
+  integration_access IntegrationAccess[]
 
   @@index([status])
   @@schema("platform")
@@ -120,6 +121,21 @@ model IntegrationToken {
 
   @@index([user_id, revoked_at])
   @@index([expires_at])
+  @@schema("platform")
+}
+
+/// Which users the Developer lets use a gated integration module (AI assistant, companion plugin). Deliberately NOT
+/// RBAC: no role can hold or grant it, so a Platform Owner is not allowed just by being Platform Owner.
+model IntegrationAccess {
+  module_id  String
+  user_id    String   @db.Uuid
+  granted_at DateTime @default(now())
+  granted_by String
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@id([module_id, user_id])
+  @@index([user_id])
   @@schema("platform")
 }
 

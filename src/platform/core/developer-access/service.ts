@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { prepareAuditEvent, type AuditWriter } from "@platform/core/audit";
 import { AppError } from "@platform/core/errors";
 import { changeModuleState, listModuleStates, type ModuleStateValue } from "@platform/core/modules/admin";
+import { changeIntegrationAccess, listIntegrationAccess } from "@platform/core/modules/integration-access";
 
 import {
   createDeveloperSessionToken,
@@ -247,5 +248,15 @@ export function createDeveloperAccessService(ports: DeveloperAccessPorts) {
     });
   }
 
-  return { enrollmentState, enroll, reset, signIn, resolveSession, requireSession, signOut, listModules, setModuleState };
+  async function listIntegrationAccessFor(rawToken: string) {
+    await requireSession(rawToken);
+    return listIntegrationAccess(ports.db);
+  }
+
+  async function setIntegrationAccess(rawToken: string, moduleId: string, userId: string, allowed: boolean) {
+    await requireSession(rawToken);
+    return changeIntegrationAccess({ moduleId, userId, allowed, runTransaction: ports.runTransaction, auditWriter: ports.auditWriter, now, actorLabel: "developer-web" });
+  }
+
+  return { enrollmentState, enroll, reset, signIn, resolveSession, requireSession, signOut, listModules, setModuleState, listIntegrationAccess: listIntegrationAccessFor, setIntegrationAccess };
 }

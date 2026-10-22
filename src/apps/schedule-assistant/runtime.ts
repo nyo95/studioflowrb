@@ -2,7 +2,6 @@ import "server-only";
 
 import { AppError } from "@platform/core/errors";
 import { createIntegrationRouteHandler } from "@platform/core/integrations";
-import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 import { studioFlowScheduleComposer as scheduleComposer } from "@/apps/studioflow/public/schedule-composer-runtime";
 
 import { ApplyRequestSchema, PreviewRequestSchema, SCHEDULE_ASSISTANT_APPLY_BODY_LIMIT_BYTES, SCHEDULE_ASSISTANT_BODY_LIMIT_BYTES, SearchQuerySchema, SectionQuerySchema } from "./contract";
@@ -14,7 +13,7 @@ import { SCHEDULE_ASSISTANT_READ_SCOPE, SCHEDULE_ASSISTANT_WRITE_SCOPE } from ".
  * idempotency record in the same transaction as the schedule writes. Route files only re-export these.
  */
 
-const GRANT = STUDIOFLOW_PERMISSIONS.scheduleAssistantUse;
+const MODULE = "schedule-assistant";
 type RouteContext = { params: Promise<{ projectId: string }> };
 type Principal = { userId: string; displayName: string; grants: readonly string[] };
 
@@ -30,7 +29,7 @@ function query<T>(schema: { safeParse(value: unknown): { success: true; data: T 
 
 export const listProjects = createIntegrationRouteHandler({
   scope: SCHEDULE_ASSISTANT_READ_SCOPE,
-  grant: GRANT,
+  module: MODULE,
   handle: ({ principal }) => scheduleComposer.listProjects(contextOf(principal)),
 });
 
@@ -38,7 +37,7 @@ export async function readContext(request: Request, { params }: RouteContext) {
   const { projectId } = await params;
   return createIntegrationRouteHandler({
     scope: SCHEDULE_ASSISTANT_READ_SCOPE,
-    grant: GRANT,
+    module: MODULE,
     handle: ({ principal }) => scheduleComposer.readContext({ ...contextOf(principal), projectId }),
   })(request);
 }
@@ -47,7 +46,7 @@ export async function searchBrands(request: Request) {
   const params = new URL(request.url).searchParams;
   return createIntegrationRouteHandler({
     scope: SCHEDULE_ASSISTANT_READ_SCOPE,
-    grant: GRANT,
+    module: MODULE,
     handle: ({ principal }) => scheduleComposer.searchBrands({ ...contextOf(principal), query: query(SearchQuerySchema, params.get("q"), "q") }),
   })(request);
 }
@@ -57,7 +56,7 @@ export async function searchReusableOptions(request: Request, { params }: RouteC
   const search = new URL(request.url).searchParams;
   return createIntegrationRouteHandler({
     scope: SCHEDULE_ASSISTANT_READ_SCOPE,
-    grant: GRANT,
+    module: MODULE,
     handle: ({ principal }) => scheduleComposer.searchReusableOptions({
       ...contextOf(principal),
       projectId,
@@ -71,7 +70,7 @@ export async function previewBatch(request: Request, { params }: RouteContext) {
   const { projectId } = await params;
   return createIntegrationRouteHandler({
     scope: SCHEDULE_ASSISTANT_READ_SCOPE,
-    grant: GRANT,
+    module: MODULE,
     body: PreviewRequestSchema,
     bodyLimitBytes: SCHEDULE_ASSISTANT_BODY_LIMIT_BYTES,
     handle: ({ principal, body }) => scheduleComposer.previewBatch({ ...contextOf(principal), projectId, operations: body.operations }),
@@ -82,7 +81,7 @@ export async function applyBatch(request: Request, { params }: RouteContext) {
   const { projectId } = await params;
   return createIntegrationRouteHandler({
     scope: SCHEDULE_ASSISTANT_WRITE_SCOPE,
-    grant: GRANT,
+    module: MODULE,
     body: ApplyRequestSchema,
     bodyLimitBytes: SCHEDULE_ASSISTANT_APPLY_BODY_LIMIT_BYTES,
     write: true,

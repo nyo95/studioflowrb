@@ -9,7 +9,7 @@ import { prisma, runSerializableTransaction, type TransactionClient } from "@pla
 import { AppError, createOperationalErrorReporter, toSafeErrorPayload, type SafeErrorPayload } from "@platform/core/errors";
 import { loadLiveGrants } from "@platform/core/rbac/services";
 import { getPermissionRegistry } from "@platform/core/rbac/registry";
-import { enabledPermissionIds } from "@platform/core/modules";
+import { enabledPermissionIds, requireModuleEnabled } from "@platform/core/modules";
 import { requirePermission, type PermissionGrants, type PermissionId } from "@platform/core/rbac";
 import { getPrincipalGrants } from "@platform/core/auth";
 
@@ -23,7 +23,11 @@ const DEFAULT_BODY_LIMIT_BYTES = 1024 * 1024;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9._:-]{1,200}$/;
 const SCOPE = /^[a-z][a-z0-9-]*:[a-z][a-z0-9-]*$/;
 
-export type IntegrationScopeGrant = { scope: string; grant: PermissionId };
+/**
+ * What a scope needs: an RBAC permission (`grant`), or Developer-granted access to a gated module (`module`). The
+ * second kind is deliberately outside RBAC: no role can hold it, so even the Platform Owner is not allowed by role.
+ */
+export type IntegrationScopeGrant = { scope: string; grant: PermissionId; module?: undefined } | { scope: string; module: string; grant?: undefined };
 export const REFERENCE_SCOPE_GRANTS: readonly IntegrationScopeGrant[] = Object.freeze([
   { scope: INTEGRATION_PING_SCOPE, grant: INTEGRATION_PING_GRANT },
 ]);
@@ -43,14 +47,26 @@ function toPublic(row: { id: string; label: string; token_prefix: string; scopes
   return { id: row.id, label: row.label, tokenPrefix: row.token_prefix, scopes: Object.freeze([...row.scopes]), expiresAt: row.expires_at, lastUsedAt: row.last_used_at, revokedAt: row.revoked_at, createdAt: row.created_at };
 }
 function requireManage(grants: PermissionGrants): void { requirePermission(grants, "platform.integration.manage"); }
-function cleanScopes(scopes: readonly string[], grants: PermissionGrants, scopeGrants: readonly IntegrationScopeGrant[]): string[] {
+type AccessReader = Pick<Db, "integrationAccess">;
+/** True when the Developer listed this user for the gated module. */
+export async function hasIntegrationModuleAccess(db: AccessReader, userId: string, moduleId: string): Promise<boolean> {
+  return (await db.integrationAccess.findUnique({ where: { module_id_user_id: { module_id: moduleId, user_id: userId } }, select: { user_id: true } })) !== null;
+}
+async function requireModuleAccess(db: AccessReader, userId: string, moduleId: string): Promise<void> {
+  await requireModuleEnabled(moduleId);
+  if (!(await hasIntegrationModuleAccess(db, userId, moduleId))) {
+    throw new AppError("FORBIDDEN", "INTEGRATION_ACCESS_DENIED", "This account is not allowed to use this integration.", { details: { moduleId } });
+  }
+}
+async function cleanScopes(scopes: readonly string[], userId: string, grants: PermissionGrants, scopeGrants: readonly IntegrationScopeGrant[], db: AccessReader): Promise<string[]> {
   if (!Array.isArray(scopes) || scopes.length === 0 || scopes.length > 50) throw new AppError("VALIDATION", "INTEGRATION_SCOPES_INVALID", "Choose one or more valid integration scopes.");
-  const policies = new Map(scopeGrants.map((entry) => [entry.scope, entry.grant]));
+  const policies = new Map(scopeGrants.map((entry) => [entry.scope, entry]));
   const result = [...new Set(scopes)];
   for (const scope of result) {
-    const grant = policies.get(scope);
-    if (!SCOPE.test(scope) || !grant) throw new AppError("VALIDATION", "INTEGRATION_SCOPE_UNKNOWN", "One or more integration scopes are not available.");
-    requirePermission(grants, grant);
+    const policy = policies.get(scope);
+    if (!SCOPE.test(scope) || !policy) throw new AppError("VALIDATION", "INTEGRATION_SCOPE_UNKNOWN", "One or more integration scopes are not available.");
+    if (policy.module !== undefined) await requireModuleAccess(db, userId, policy.module);
+    else requirePermission(grants, policy.grant);
   }
   return result;
 }
@@ -63,7 +79,7 @@ export function createIntegrationTokenService(ports: IntegrationTokenPorts) {
       const label = input.label.trim();
       if (!label || label.length > 120) throw new AppError("VALIDATION", "INTEGRATION_TOKEN_LABEL_INVALID", "Give this token a label of up to 120 characters.");
       if (input.expiresAt && (!Number.isFinite(input.expiresAt.getTime()) || input.expiresAt <= now())) throw new AppError("VALIDATION", "INTEGRATION_TOKEN_EXPIRY_INVALID", "The token expiry must be in the future.");
-      const scopes = cleanScopes(input.scopes, input.grants, input.scopeGrants ?? REFERENCE_SCOPE_GRANTS);
+      const scopes = await cleanScopes(input.scopes, input.userId, input.grants, input.scopeGrants ?? REFERENCE_SCOPE_GRANTS, db);
       const prefix = randomBytes(TOKEN_PREFIX_BYTES).toString("hex");
       const secretPart = randomBytes(SECRET_BYTES).toString("base64url");
       const secret = `sfk_${prefix}_${secretPart}`;
@@ -120,7 +136,9 @@ async function authenticate(request: Request): Promise<AuthenticatedIntegration>
 
 export type IntegrationRouteOptions<T> = {
   scope: string;
-  grant: PermissionId;
+  /** Exactly one of `grant` (RBAC permission) or `module` (Developer-granted access to a gated module). */
+  grant?: PermissionId;
+  module?: string;
   body?: ZodType<T>;
   /** Maximum request body size before JSON parsing. Defaults to 1 MiB. */
   bodyLimitBytes?: number;
@@ -136,7 +154,9 @@ export function createIntegrationRouteHandler<T = undefined>(options: Integratio
     try {
       const principal = await authenticate(request);
       if (!principal.scopes.includes(options.scope)) throw new AppError("FORBIDDEN", "INTEGRATION_SCOPE_DENIED", "This token does not have the required scope.");
-      requirePermission(principal.grants, options.grant);
+      if (options.module) await requireModuleAccess(prisma, principal.userId, options.module);
+      else if (options.grant) requirePermission(principal.grants, options.grant);
+      else throw new AppError("INVARIANT", "INTEGRATION_ROUTE_UNGATED", "An integration route needs a grant or a gated module.");
       const rawBody = options.body ? await readBodyWithinLimit(request, options.bodyLimitBytes ?? DEFAULT_BODY_LIMIT_BYTES) : "";
       let body: T;
       try { body = options.body ? options.body.parse(rawBody ? JSON.parse(rawBody) : undefined) : undefined as T; } catch { throw new AppError("VALIDATION", "INTEGRATION_BODY_INVALID", "The request body is invalid."); }

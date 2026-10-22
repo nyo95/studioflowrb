@@ -4,7 +4,6 @@ import { randomUUID } from "node:crypto";
 
 import { AppError } from "@platform/core/errors";
 import { createIntegrationRouteHandler } from "@platform/core/integrations";
-import { STUDIOFLOW_PERMISSIONS } from "@/apps/studioflow/public";
 import { studioFlowScheduleComposer as scheduleComposer } from "@/apps/studioflow/public/schedule-composer-runtime";
 
 import { CreateEntryRequestSchema, ResolveRequestSchema, SKETCHUP_BODY_LIMIT_BYTES } from "./contract";
@@ -16,7 +15,7 @@ import { SKETCHUP_READ_SCOPE, SKETCHUP_WRITE_SCOPE } from "./scope-grants";
  * through the schedule composer door, so access, codes, look-alike categories and audit are the Schedule's own.
  */
 
-const GRANT = STUDIOFLOW_PERMISSIONS.sketchupUse;
+const MODULE = "sketchup";
 const VIA = "sketchup";
 type RouteContext = { params: Promise<{ projectId: string }> };
 type Principal = { userId: string; displayName: string; grants: readonly string[] };
@@ -43,7 +42,7 @@ export function scheduleOptions(options: readonly ContextOption[]) {
 
 export const listProjects = createIntegrationRouteHandler({
   scope: SKETCHUP_READ_SCOPE,
-  grant: GRANT,
+  module: MODULE,
   handle: ({ principal }) => scheduleComposer.listProjects(contextOf(principal)),
 });
 
@@ -51,7 +50,7 @@ export async function readSchedule(request: Request, { params }: RouteContext) {
   const { projectId } = await params;
   return createIntegrationRouteHandler({
     scope: SKETCHUP_READ_SCOPE,
-    grant: GRANT,
+    module: MODULE,
     handle: async ({ principal }) => {
       const context = await scheduleComposer.readContext({ ...contextOf(principal), projectId });
       return {
@@ -67,7 +66,7 @@ export async function resolveEntries(request: Request, { params }: RouteContext)
   const { projectId } = await params;
   return createIntegrationRouteHandler({
     scope: SKETCHUP_READ_SCOPE,
-    grant: GRANT,
+    module: MODULE,
     body: ResolveRequestSchema,
     bodyLimitBytes: SKETCHUP_BODY_LIMIT_BYTES,
     handle: async ({ principal, body }) => {
@@ -83,7 +82,7 @@ export async function createEntry(request: Request, { params }: RouteContext) {
   const { projectId } = await params;
   return createIntegrationRouteHandler({
     scope: SKETCHUP_WRITE_SCOPE,
-    grant: GRANT,
+    module: MODULE,
     body: CreateEntryRequestSchema,
     bodyLimitBytes: SKETCHUP_BODY_LIMIT_BYTES,
     write: true,

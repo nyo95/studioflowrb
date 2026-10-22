@@ -29,7 +29,7 @@ import { SCHEDULE_ASSISTANT_READ_SCOPE, SCHEDULE_ASSISTANT_SCOPE_GRANTS, SCHEDUL
 let testDb: TestDb;
 const DESIGNER = Object.values(P).filter((permission) => permission !== P.projectManage && permission !== P.projectOverride && permission !== P.phaseOverride);
 const MANAGER = [...DESIGNER, P.projectManage];
-const TOKEN_GRANTS = ["platform.integration.manage", P.scheduleAssistantUse];
+const TOKEN_GRANTS = ["platform.integration.manage"];
 const BOTH = [SCHEDULE_ASSISTANT_READ_SCOPE, SCHEDULE_ASSISTANT_WRITE_SCOPE];
 const BASE = "http://localhost/api/integrations/v1/schedule-assistant";
 
@@ -59,7 +59,12 @@ function tokens() {
   return createIntegrationTokenService({ db: testDb.prisma, runTransaction: (work) => testDb.prisma.$transaction(work), auditWriter: createAuditEventWriter(), now: () => new Date(), generateId: randomUUID });
 }
 
+async function allow(person: Person) {
+  await testDb.prisma.integrationAccess.upsert({ where: { module_id_user_id: { module_id: "schedule-assistant", user_id: person.id } }, create: { module_id: "schedule-assistant", user_id: person.id, granted_by: "test" }, update: {} });
+}
+
 async function tokenFor(person: Person, scopes: readonly string[] = BOTH) {
+  await allow(person);
   const created = await tokens().createOwn({ userId: person.id, displayName: person.name, grants: TOKEN_GRANTS, label: "Schedule Assistant", scopes, scopeGrants: [...REFERENCE_SCOPE_GRANTS, ...SCHEDULE_ASSISTANT_SCOPE_GRANTS] });
   return created.secret;
 }
@@ -141,7 +146,7 @@ after(async () => {
 });
 
 describe("module switch, token and scopes", () => {
-  it("refuses every route while the module is off and offers the scopes only with the module grant", async () => {
+  it("refuses every route while the module is off and refuses a new token without the Developer's access", async () => {
     const projectId = await newProject("Switch");
     const secret = await tokenFor(designer);
     await setModule("DISABLED");
@@ -150,6 +155,7 @@ describe("module switch, token and scopes", () => {
     assert.equal((await preview(secret, projectId, [{ op: "apply_templates" }])).status, 403);
     await setModule("ENABLED");
     assert.equal((await call(listProjects(req("GET", "projects", secret)))).status, 200);
+    await testDb.prisma.integrationAccess.deleteMany({ where: { user_id: designer.id } });
     await assert.rejects(
       tokens().createOwn({ userId: designer.id, displayName: designer.name, grants: ["platform.integration.manage"], label: "No grant", scopes: [SCHEDULE_ASSISTANT_READ_SCOPE], scopeGrants: SCHEDULE_ASSISTANT_SCOPE_GRANTS }),
       (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN",
@@ -167,8 +173,24 @@ describe("module switch, token and scopes", () => {
     const secret = await tokenFor(designer);
     await setGrants(designer, DESIGNER.filter((permission) => permission !== P.scheduleManage));
     assert.equal((await preview(secret, projectId, [{ op: "apply_templates" }])).status, 403);
-    await setGrants(designer, DESIGNER.filter((permission) => permission !== P.scheduleAssistantUse));
-    assert.equal((await context(secret, projectId)).status, 403);
+    await testDb.prisma.integrationAccess.deleteMany({ where: { user_id: designer.id } });
+    const removed = await context(secret, projectId);
+    assert.equal(removed.status, 403);
+    assert.equal(removed.body.error?.code, "INTEGRATION_ACCESS_DENIED");
+  });
+
+  it("is not allowed by role: full RBAC without the Developer's list cannot make a token or call a route", async () => {
+    const everything = await seedUser("Pat Platformowner", Object.values(P));
+    await assert.rejects(
+      () => tokens().createOwn({ userId: everything.id, displayName: everything.name, grants: TOKEN_GRANTS, label: "x", scopes: BOTH, scopeGrants: [...REFERENCE_SCOPE_GRANTS, ...SCHEDULE_ASSISTANT_SCOPE_GRANTS] }),
+      (error: unknown) => error instanceof AppError && error.code === "INTEGRATION_ACCESS_DENIED",
+    );
+    const secret = await tokenFor(everything);
+    await testDb.prisma.integrationAccess.deleteMany({ where: { user_id: everything.id } });
+    assert.equal((await listProjects(new Request(`${BASE}/projects`, { headers: { authorization: `Bearer ${secret}` } }))).status, 403);
+    await setModule("DISABLED");
+    await allow(everything);
+    assert.equal((await listProjects(new Request(`${BASE}/projects`, { headers: { authorization: `Bearer ${secret}` } }))).status, 403);
   });
 });
 

@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.198 | 2026-10-23 | feat(platform): AI and plugin access is a Developer list, outside RBAC (Lead)
+
+- **Owner decision 2026-10-23:** everyone may use the app by hand under RBAC, but the AI assistant, MCP and plugins are for the owner only, and the owner's normal account must not become a super account (above the Platform Owner). So the "expensive" integrations are granted by the Developer, per user, at `/system`.
+- **What changed:** the two RBAC permissions `studioflow.schedule-assistant.use` and `studioflow.sketchup.use` are retired (migration deletes their role grants). New table `platform.integration_access (module_id, user_id)`; manifests of `schedule-assistant` (1.3.0) and `sketchup` carry `developerAccess: true`. The integration kit takes `module` instead of `grant`: the route needs the module On and the user on the list, checked on every call and when a token is made. Nothing else is widened: each action still passes the user's own RBAC, project assignment and Schedule rules.
+- **System console:** new "AI and plugin access" section: choose a person, Allow or Remove, per module; audited as `platform.integration-access.granted/revoked` with the Developer as actor. Account page offers a module's token scopes only to listed people. Token creation stays on the person's own Account page (the token must belong to the person it acts as).
+- **Existing tokens** stay stored but stop working (`INTEGRATION_ACCESS_DENIED`) until the user is listed.
+- **Tests:** schedule-assistant and sketchup integration suites (31) updated, plus a new "full RBAC without the list is refused" case; new `integration-access.integration.test.ts` (2). `npm test` 1298/1298 (none failed, skipped or cancelled); `tsc --noEmit`, eslint on the touched folders and `check:boundaries` clean. Not run: browser check of `/system` (needs the Developer authenticator code).
+- **Migration:** `20261022120000_integration_module_access` applied to the dev and test databases on :5433; rumah must run `prisma migrate deploy`. No dependency change. No push.
+- **Docs:** `docs/apps/platform/MODULES-DECISION.md` (D11), `INTEGRATIONS.md`, schedule-assistant and sketchup contracts, bridge README.
+
 ## R9.197 | 2026-10-22 | fix(studioflow): schedule inspector Save bar sits on the bottom edge (Lead)
 
 - **Owner report:** in the docked inspector the Save / Discard bar floated above the panel's bottom edge and the "filled dot" hint showed underneath it.
