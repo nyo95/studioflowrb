@@ -111,6 +111,14 @@ Order matters; each item is its own Work Order.
   plugin source moves to `tools/sketchup-plugin/`. Plan: `docs/apps/sketchup/WO-SKETCHUP-01.md` (Stage 0 Lead,
   1a Executor, 1b Lead; Stage 2 model-check report is an outline). Rev 1 (legacy push sync, merge queue,
   convergence planner, staging tables) is superseded and will not be built.
+  Follow-ups (owner 2026-10-22, second review): `WO-SKETCHUP-02` P0 link safety (stale links, reused
+  codes, id-verified merge, interrupted creation, other-project links, token transport) and
+  `WO-SKETCHUP-03` P1 option-aware links and names (PL-01 / PL-01-B), both in `docs/apps/sketchup/`.
+- [ ] [CLEANUP] SketchUp plugin legacy code still loaded but unreachable from the menus:
+  `core/api_client.rb`, `core/web_launcher.rb`, `core/csv_exporter.rb`, `ModelScanner`, the auto-sync and
+  `MaterialOps.apply_pull_data`/`merge_materials`/`swap`; `SyncService.material_selected` writes a texture
+  swatch to `ui/tmp` whenever the current material changes although nothing reads it (found in the
+  2026-10-22 SketchUp review).
 - [ ] [PLANNED][P3] Per-token rate limit for `/api/integrations/**` (none exists in
   Platform; do not invent one inside an extension).
 - [ ] [PLANNED][P3] Chatbot / AI gateway: a provider-neutral port with the key in

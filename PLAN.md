@@ -1,14 +1,17 @@
 # Active Plan
 
-Plan ID: WO-SKETCHUP-01 rev 2 (full plan: `docs/apps/sketchup/WO-SKETCHUP-01.md`)
-Scope: SketchUp plugin takes its material codes from the Product Schedule and links each material to its schedule item; plugin source moves into this repository.
-Module(s): new optional module `sketchup` (integration-only); StudioFlow permissions (one permission id); plugin under `tools/sketchup-plugin/`. No schema in Stage 1.
-Target revision: Stage 0 R9.180 (Lead), Stage 1a next free revision after it (Executor), Stage 1b after review (Lead). This plan is R9.179.
-Risk: medium - a new outside door that writes schedule items; reuses the composer door and the integration kit, so access, audit, idempotency and look-alike checks are already proven.
-Status: Stage 0 DONE in R9.180 (owner tries 1.1.7 in SketchUp); Stage 1a DONE in R9.188 (Lead); Stage 1b built in R9.189 (plugin 1.2.0), owner test in SketchUp owed.
+Plan ID: WO-SKETCHUP-02 (P0 link safety, full plan: `docs/apps/sketchup/WO-SKETCHUP-02.md`); next WO-SKETCHUP-03 (P1 option-aware links, DRAFT)
+Scope: SketchUp plugin keeps links safe when codes are reused, materials are merged, requests are interrupted or links point to deleted items or other projects.
+Module(s): plugin under `tools/sketchup-plugin/` only (P0). P1 adds an additive read field to module `sketchup`.
+Target revision: plan R9.192; P0 (Lead) R9.193.
+Risk: medium - renames and merges in real SketchUp models; every change asks first and is one undo step.
+Status: READY (P0, Lead executes); WO-SKETCHUP-01 Stage 1b built in R9.189, owner test in SketchUp owed together with P0.
 Priority: P2
-Owner: Product Owner (decisions 2026-10-22: proposal accepted except "wall labels read the Schedule")
+Owner: Product Owner (decisions 2026-10-22, second review: code = specification slot, reuse allowed; names PL-01 / PL-01-B; no auto option A; offline names unchanged; merge only by official entry and option id; http only for local/private addresses; alternatives from SketchUp deferred)
 Last updated: 2026-10-22
+
+Previous plan `WO-SKETCHUP-01` rev 2 (`docs/apps/sketchup/WO-SKETCHUP-01.md`): Stage 0, 1a, 1b built;
+its decision 13 is narrowed by WO-SKETCHUP-02 decision 8.
 
 `WO-SCHEDULE-ASSISTANT-04` (option photos and colour placeholders through the Assistant) is
 DONE in R9.186 (owner checks one photo and one colour on the Schedule screen); plan in `docs/apps/schedule-assistant/WO-SCHEDULE-ASSISTANT-04.md`.
@@ -18,34 +21,14 @@ Plan reconciliation: `WO-SCHEDULE-ASSISTANT-03` is DONE in R9.178 (owner walk ow
 
 ## Locked Decisions
 
-See the full plan, decisions 1–10. In short: only the Schedule allocates codes; link by
-schedule entry id; the model never overwrites the Schedule (area display only, fixture
-counts as suggestions in Stage 2); Wall Finish Labels stay independent; plugin source in
-`tools/sketchup-plugin/`; token + project picked from a list; module `sketchup` off by
-default with permission `studioflow.sketchup.use`; codes in Schedule format (PL-01),
-compared with leading zeros ignored; nothing of the legacy sync design is built.
+See `docs/apps/sketchup/WO-SKETCHUP-02.md` (semantics and decisions 1-8).
 
 ## Acceptance Criteria
 
-As in the full plan ("Acceptance (Stage 1)") plus the harness definition of done for 1a.
+As in WO-SKETCHUP-02 "Acceptance".
 
 ## Verification
 
-Stage 0: Ruby syntax check (`ruby -c`) of every plugin file, packaging script produces the
-`.rbz`, owner tries it in SketchUp. Stage 1a: high gate (`scripts/verify.mjs --tier high`
-with `NEXT_DIST_DIR=.next-e2e`), route tests listed in the plan. Stage 1b: Lead plus owner
-in SketchUp against the dev server.
-
-## Executor Prompt (Stage 1a — send only after the Lead's Stage 0 commit)
-
-Read `AGENTS.md`, `docs/agent/EXECUTOR.md`, `docs/agent/EXTENSIONS.md`,
-`docs/apps/platform/INTEGRATIONS.md`, `docs/apps/schedule-assistant/CONTRACT.md` and
-`docs/apps/sketchup/WO-SKETCHUP-01.md` (rev 2). Implement Stage 1a only: optional module
-`sketchup` 1.0.0 (manifest, scope-grants, runtime, contract, four routes via the integration
-kit, `docs/apps/sketchup/CONTRACT.md`), the permission id `studioflow.sketchup.use` beside
-`scheduleAssistantUse`, the token page composition, boundary listing as integration-only,
-and the tests the plan lists. Reach StudioFlow only through
-`src/apps/studioflow/public/schedule-composer.ts`; no Prisma schema, no plugin (Ruby) change,
-no screen. If the composer door cannot do something the plan needs, stop with BLOCKED.
-Run the high gate, update `CHANGELOG.md`, one local commit, no push. Reply only with a
-Planner/Reviewer prompt: outcome, commit, checks, limitations, dirty files, verdict request.
+`ruby -wc` on every plugin file, `ruby tools/sketchup-plugin/test/link_rules_test.rb`,
+`node tools/sketchup-plugin/build.mjs`; owner test in SketchUp against the dev server.
+No StudioFlow change in P0, so the high gate is not required.

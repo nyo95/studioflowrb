@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.192 | 2026-10-22 | plan(sketchup): P0 link safety and P1 option-aware links (Lead)
+
+- **Owner review (second):** a schedule code is the active specification slot of a category, not a product or SketchUp object; the lowest-free-number allocator and code reuse stay; identity is the entry id. A design change is not an option; no object-level assignment or material history. Decisions: names PL-01 (final or single option) / PL-01-B (non-final alternatives); a new entry from SketchUp has no option (already so); offline names unchanged; texture upload P3; http only for local/private addresses; alternatives are not created from SketchUp; merge only by the same official entry and option id (narrows WO-SKETCHUP-01 decision 13).
+- **Work orders:** `WO-SKETCHUP-02` READY (P0, plugin 1.2.1, Lead): id-verified merge with look comparison and chosen survivor, conflict-safe refresh that keeps stale links, stale-link and reused-code explanations, resumable "Item baru" (stored idempotency key), other-project status, token transport rule, plain-Ruby rule tests. `WO-SKETCHUP-03` DRAFT (P1): option list in the schedule read (module 1.1.0, additive), option id on the material, name/status table, "Cek & perbarui", Component Tracker accepts PL-02-B.
+- **BACKLOG:** follow-ups named on the SketchUp entry; new `[CLEANUP]` for unreachable legacy plugin code and the unused swatch writes.
+- **Checks:** documentation only.
+- **Revision note:** written as R9.191 in parallel with the timeline fix that was pushed first as R9.191; renumbered before push.
+
 ## R9.191 | 2026-10-22 | fix(studioflow): zero-day CD Mall and Design Handover-only plan editing (port of branch claude/r9-163-timeline-fixes) (Lead)
 
 - **Source:** remote branch `claude/r9-163-timeline-fixes` (`819f0c3`, `836b035`), written 2026-10-19 as "R9.163/R9.164" but never merged; main later used those numbers for other work, so the code is carried over here under the next free revision. Owner asked to merge every remote branch that still needed it.

@@ -50,7 +50,7 @@ that complexity and of collisions such as PL-1 in the model vs PL-01…07 in the
 12. (Owner) **Same code, any spelling.** SO-1, SO-001, so-01 and SO-01 are one code (prefix
     case-insensitive, leading zeros ignored); the plugin offers the matching schedule item and
     asks "Ini SO-01 · <brand product>?" instead of treating the spelling as a new code.
-13. (Owner) **Merge only inside the model, only on confirmation.** When two SketchUp materials
+13. (Owner; narrowed 2026-10-22 by WO-SKETCHUP-02 decision 8: candidates only by the same official entry and option id, never by code spelling) **Merge only inside the model, only on confirmation.** When two SketchUp materials
     are linked to the same schedule item (or carry the same code in two spellings), the plugin
     offers to merge them into one material named with the schedule code, showing face counts
     and warning when textures or colours differ; one undo step. The Schedule is never changed
