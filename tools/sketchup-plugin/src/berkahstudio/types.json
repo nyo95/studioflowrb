@@ -1,0 +1,16 @@
+{
+  "ACR": "Acrylic",
+  "CT": "Ceramic Tile",
+  "F": "Fabric",
+  "GL": "Glass",
+  "HT": "Homogeneous Tile",
+  "MSC": "Miscellaneous",
+  "MT": "Metal",
+  "PL": "High Pressure Laminate",
+  "PT": "Paint",
+  "SO": "Solid Surface",
+  "SPR": "Spray Paint",
+  "ST": "Stone",
+  "TER": "Terrazzo",
+  "WD": "Wood"
+}
