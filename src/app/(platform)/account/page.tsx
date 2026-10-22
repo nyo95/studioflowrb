@@ -48,9 +48,11 @@ export default async function AccountPage() {
   const principalGrants = await requirePrincipalGrants().catch(() => null);
   if (!principalGrants) redirect("/login");
   const { principal, grants } = principalGrants;
-  const canManageTokens = hasPermission(grants, "platform.integration.manage");
+  const tokenScopes = hasPermission(grants, "platform.integration.manage") ? await allowedTokenScopes(principal.userId, grants) : [];
+  // Owner 2026-10-23: with no tool open to this person (no module listing, no connection test) the token menu stays
+  // hidden altogether. A leftover token is harmless: every call checks the Developer list again.
+  const canManageTokens = tokenScopes.length > 0;
   const tokens = canManageTokens ? await integrationTokens.listOwn({ userId: principal.userId, grants }) : [];
-  const tokenScopes = canManageTokens ? await allowedTokenScopes(principal.userId, grants) : [];
 
   const [sessions, currentId, settings, preferences, organisation] = await Promise.all([
     listUserSessions(prisma, principal.userId),

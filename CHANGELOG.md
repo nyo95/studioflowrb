@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.200 | 2026-10-23 | fix(platform): hide the token menu when no tool is open to the person (Lead)
+
+- **Owner decision:** someone with the "manage own tokens" permission but on no Developer access list (and without the connection test) saw "Integration tokens" with an empty "Allowed to" and got "Choose one or more valid integration scopes." on create. The whole section now stays hidden for them; no message.
+- **How:** the Account page reads the allowed scopes first and shows the section only when at least one is offered; tokens are listed only then.
+- **Leftover tokens:** a person taken off the list no longer sees their old tokens, which is harmless: every call through a module checks the Developer list again (`requireModuleAccess` on use), so those tokens are refused.
+- **Checks:** `tsc --noEmit` clean; eslint clean on `account/`. Browser not checked (local pane signed out).
+
 ## R9.199 | 2026-10-23 | ui(studioflow): schedule inspector v2, one layout for every item (Lead)
 
 - **Owner request:** the inspector looked different per item (the option row wrapped differently, the action bar changed shape) and "Change photo" jumped straight to the file dialog although a colour can also be used. Built from the owner-approved mockup (artboard "Inspector v2", https://claude.ai/artifact/KtSjuhqAjjDN2snQUvGuPp).
