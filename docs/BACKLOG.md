@@ -41,6 +41,45 @@ scoped; otherwise it is added here as `[BUG]` with what was observed.
 Harness: `agent/EXTENSIONS.md`. Foundation: `apps/platform/INTEGRATIONS.md`.
 Order matters; each item is its own Work Order.
 
+- [ ] [PLANNED][P0] **Product Schedule Composer MCP (owner, 2026-10-22).** Build an
+  independent, provider-neutral optional module (`schedule-assistant`, parent and
+  required module `studioflow`, initially disabled) so Claude, Codex, OpenCode and
+  Gemini can compose one project's Product Schedule from a written brief. One MCP
+  bridge serves every client; local stdio is the first transport and it calls
+  versioned StudioFlow integration routes with the existing personal `sfk_` token.
+  StudioFlow stores no model-provider key and the module does not call an AI model.
+  The required flow is **read context -> prepare and validate a complete draft ->
+  show the user the proposed changes -> explicitly approved atomic apply -> read
+  back the actual saved schedule**. V1 reads the current schedule, studio templates,
+  category/prefix choices, active Master Data Brands and reusable options from past
+  projects. An approved batch may apply templates and create or update entries and
+  options; StudioFlow remains the authority for category spelling, code/prefix and
+  increment allocation, Brand snapshots, Material/Fixture field rules, and option
+  labels. A new option is never final merely because the agent created it.
+  V1 deliberately excludes delete, final/unfinal decisions, sample actions, image
+  upload, and global template/prefix changes. Use separate least-privilege read and
+  write token scopes; derive actor identity and live grants only from the token;
+  enforce assigned-team-or-manager project access and `studioflow.schedule.manage`;
+  audit every write; require one stable operation id; and commit the schedule batch,
+  integration idempotency result and audit in one transaction. The read contract
+  returns a bounded schedule DTO without signed image URLs or unrelated private
+  project data. No direct Prisma or StudioFlow-internal import is allowed.
+  **Lead must settle before a READY Work Order:** (1) the exact MCP tool names and
+  batch wire schema; (2) whether V1 may update existing entries/options or is
+  create-only (owner intent currently includes create + update); (3) whether template
+  application is always an explicit draft operation; (4) the confirmation contract
+  between validation and apply, including a digest so apply cannot differ from the
+  reviewed draft; (5) treatment of a Brand/category from the brief that is not in
+  current choices; (6) packaging/location of the standalone Node MCP bridge and its
+  four client setup examples. Step 0 must add a narrow transaction-aware Schedule
+  composer contract under StudioFlow's protected `public/` door; the extension may
+  not expose the private schedule service. Acceptance must cover no-write validation,
+  outsider and insufficient-scope refusal, archived/completed-project refusal,
+  unknown Brand handling, Material/Fixture validation, rollback of a partially
+  invalid batch, concurrent code allocation, exact idempotent replay, unchanged
+  non-final semantics, and smoke connection from all four MCP clients. This KB item
+  is the proposal for Claude to turn into a bounded READY Work Order; it authorizes
+  no implementation by itself.
 - [ ] [PLANNED][P3] Integration tokens, admin view: `platform.integration.admin` can list and revoke any
   token in the service (`listAny`, `revokeAny`) but there is no screen yet, and the list has no owner
   name. Add when a second person starts using tokens.
