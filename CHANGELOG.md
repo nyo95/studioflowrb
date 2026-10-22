@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.172 | 2026-10-22 | fix(platform): let bearer-token integration routes past the app login gate (Lead)
+
+- **Defect (since the integration kit landed):** `src/proxy.ts` redirected every request without the session cookie to `/login`, including `/api/integrations/**`, so a native client with an `sfk_` bearer token got a 307 to the login page and never reached the kit (the Schedule Assistant bridge, which refuses redirects, reported "StudioFlow could not be reached"). Route-level tests call the handlers directly and could not see it. Found while connecting the Claude desktop app on the kantor dev server.
+- **Fix:** `/api/integrations` joins the proxy's public paths (exact prefix, not look-alikes); the integration kit already fails closed with 401 without a valid token, and every route checks scope and live grants. Regression test in `src/proxy.test.ts`.
+- **Kantor dev setup (owner request, no code):** module `schedule-assistant` enabled with `npm run studioflow -- module enable schedule-assistant`; one integration token "Claude desktop (kantor dev)" (both Schedule Assistant scopes, 90 days, Platform Owner) created through the token service and written only into the local Claude config as MCP server `studioflow-schedule` (never printed). Bridge smoke over stdio against :3001: tools listed, `list_projects` 5 projects, `get_schedule_context` read, `preview_schedule_changes` valid with nothing written.
+- **Checks:** proxy tests 3/3; high gate (`STUDIOFLOW_LOCATION=kantor NEXT_DIST_DIR=.next-e2e node scripts/verify.mjs --tier high`): boundaries, legacy-runtime, whitespace, typecheck, lint, `npm test` 1268/1268, Prisma generate, production build PASS.
+
 ## R9.171 | 2026-10-22 | feat(bq): show and filter suppliers in the Cost Component picker; BQ dev seed (Lead)
 
 - **Owner/estimator report:** a gondola uses gypsum 9 mm bought from supplier A or B at different prices, so the picker must tell the two prices apart; it could not be tried without data.

@@ -9,8 +9,11 @@ const SESSION_COOKIE_NAME = "studioflow_session";
  * Routes outside the application session gate. `/system` owns an independent
  * Developer session and performs its own fail-closed checks in the route.
  * The component showcase at /ui-engine still needs an application session.
+ * `/api/integrations` is called by native clients with a bearer token and no
+ * cookie; the integration kit authenticates every request itself (401 without
+ * a valid token), so redirecting it to the login page only broke those clients.
  */
-const PUBLIC_PATHS = ["/login", "/system"];
+const PUBLIC_PATHS = ["/login", "/system", "/api/integrations"];
 
 /**
  * Optimistic public-route/session-cookie presence gating ONLY (CORE.md §3).
