@@ -94,6 +94,8 @@ describe("UI Engine foundation", () => {
       "shrinkImageFile",
       // R7.52 — activated by the project MOM image consumer.
       "ImageWorkspace",
+      // A plain colour as the picture (owner 2026-10-22: paint/laminate swatches without a photo); ImageWorkspace offers it with `allowColor`.
+      "ColorSwatchPicker",
       // Thumbnails that open large; first consumers are the StudioFlow phase notes (WO-SF-NOTEFEED-01).
       "ImageGallery",
       // Zoom in and mark up a copy of a picture; first consumer the Notes image viewer (owner 2026-10-15).

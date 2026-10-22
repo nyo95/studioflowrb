@@ -1,5 +1,19 @@
 # Changelog
 
+## R9.181 | 2026-10-22 | feat(ui-engine,studioflow): compact Schedule board cards; pick a colour instead of a photo (Lead)
+
+- **Owner request:** Schedule board cards were too large (4 per row at desktop width); and a paint/laminate item should be able to show a plain colour instead of an uploaded picture, as a shared tool.
+- **Schedule board:** cards now fill the width with auto-fill columns of at least 10.5rem (about 8-9 per row on a wide screen, 2 on a phone); title and spec values are xs and clamped to two lines (full text on hover); spec label sits above its value so narrow cards stay readable. Photo stays 4:5 to match the upload crop.
+- **UI Engine:** new `ColorSwatchPicker` (presets, native picker, typed hex, "Pick from screen" where the browser has EyeDropper) that hands on a solid-colour picture through the same `onPrepared(file)` as an image; `ImageWorkspace` offers it with `allowColor`. No storage or schema change: the swatch is saved as an ordinary option photo (file `color-<hex>.jpg`), so print, presentation, copy and templates carry it unchanged. Enabled on the three Schedule photo surfaces; MOM photos unchanged.
+- **Revision:** R9.180 is left for the SketchUp stage 0 named in R9.179.
+- **Checks:** `tsc --noEmit` clean; eslint clean on touched paths; `npm test` 1280/1280 pass (incl. new `color-swatch.test.ts`, updated ImageWorkspace dependency stub and UI Engine export list). Browser not checked (owner tests in browser).
+
+## R9.180 | 2026-10-22 | chore(sketchup): plugin source into the repo, 1.1.7 hygiene (Lead)
+
+- **Work order:** `WO-SKETCHUP-01` rev 2, Stage 0. Berkah Studio 1.1.6 (Codex cleanup) copied into `tools/sketchup-plugin/src/`; `node tools/sketchup-plugin/build.mjs` packs `dist/BerkahStudio_<version>.rbz` (zip with forward-slash names, no dependency, `dist/` ignored).
+- **Fixes (1.1.7):** the Auto-Rename category picker starts at "(pilih kategori)" and refuses OK without a choice (it defaulted to Acrylic); codes use the Schedule format with two digits (PL-01), PL-1 still counts as the same clean code; the menus Open Web Schedule, Sync from Web, Set Project Name, Set Server URL and Set API Key are removed and auto-sync is off until Stage 1b (they called legacy routes StudioFlow does not have); sync messages no longer claim a purge that never happens and no longer point to `berkahstudio_web`.
+- **Checks:** archive integrity (Python `zipfile.testzip`, 21 files), ESLint on `build.mjs`, line-by-line diff review against 1.1.6. **No Ruby syntax check:** no Ruby interpreter on this machine; the owner loads 1.1.7 in SketchUp (Ruby Console shows load errors). The StudioFlow app was not changed, so the high gate was not run (another session has uncommitted Schedule UI work in this checkout).
+
 ## R9.179 | 2026-10-22 | plan(sketchup): schedule-owned codes for the SketchUp plugin (Lead)
 
 - **Review of Berkah Studio 1.1.6** (Codex cleanup): local tools are sound and the 14 prefixes match the Schedule dictionary; every web feature calls legacy routes absent from the rebuild (`/api/sketchup/sync`, `/api/health`), binds projects by name with a per-project key, makes codes from the model (PL-1 vs Schedule PL-01), defaults the category picker to Acrylic, and reports a purge it does not do.

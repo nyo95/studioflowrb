@@ -78,6 +78,7 @@ function workspace(t: TestContext, options: Options = {}, cropRect = geometry.cr
   const dependencies: Props = {
     react, "react/jsx-runtime": { jsx: (type: string, props: Props) => ({ type, props }), jsxs: (type: string, props: Props) => ({ type, props }) },
     "next/image": { default: "img" }, "../primitives/actions": { Button: "button" }, "../primitives/forms": { Input: "input" },
+    "./color-swatch-picker": { ColorSwatchPicker: "color-swatch-picker" },
     "./file-intake": { useFileIntake: (value: Props) => { intake = value; return { active: false, target: {} }; } },
     "./image-adjust": adjustments, "./image-crop": { ...geometry, cropRect }, "./image-strokes": strokes,
   };

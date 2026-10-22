@@ -10,6 +10,7 @@ export * from "./hooks";
 export * from "./image-gallery";
 export * from "./image-markup";
 export * from "./image-workspace";
+export * from "./color-swatch-picker";
 export * from "./inline-edit";
 export * from "./pagination";
 export * from "./rich-text-editor";

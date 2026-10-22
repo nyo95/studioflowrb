@@ -5,6 +5,7 @@ import Image from "next/image";
 
 import { Button } from "../primitives/actions";
 import { Input } from "../primitives/forms";
+import { ColorSwatchPicker } from "./color-swatch-picker";
 import { useFileIntake } from "./file-intake";
 import { ADJUST_LIMITS, colorFilter, compressionSteps, formatSize, isNeutral, NEUTRAL_ADJUST, type ColorAdjust } from "./image-adjust";
 import { cropPreview, cropRect, panCrop, pinchCrop, zoomCrop, type CropPosition } from "./image-crop";
@@ -44,6 +45,8 @@ export type ImageWorkspaceProps = {
    * click into the workspace first. One open workspace per page should ask for this.
    */
   pasteFromPage?: boolean;
+  /** Offer a plain colour as the picture instead of a file (a paint or laminate swatch); it arrives through `onPrepared` like any image. */
+  allowColor?: boolean;
   disabled?: boolean;
 };
 
@@ -67,7 +70,7 @@ function clamp(value: number, min: number, max: number): number {
 
 /** Draws every stroke onto a 2D context at the given pixel size, shared by the live preview and the final bake so the two never drift apart. */
 /** Browser image preparation only; storage and consumer policy stay outside. */
-export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false, openOnMount = false, initialFile = null, pasteFromPage = false }: ImageWorkspaceProps) {
+export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jpeg,image/webp", maxBytes = 30 * 1024 * 1024, maxDimension = 1800, outputType = "image/png", outputQuality = 0.86, aspect, targetBytes = DEFAULT_TARGET_BYTES, disabled = false, openOnMount = false, initialFile = null, pasteFromPage = false, allowColor = false }: ImageWorkspaceProps) {
   const pickerRef = useRef<HTMLInputElement>(null);
   const opened = useRef(false);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -91,6 +94,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
   const [error, setError] = useState<string | null>(() => initialFile ? imageProblem(initialFile, accept, maxBytes) : null);
   const [adjust, setAdjust] = useState<ColorAdjust>(NEUTRAL_ADJUST);
   const [sizeNote, setSizeNote] = useState<string | null>(null);
+  const [colorMode, setColorMode] = useState(false);
   // Read once on the client; the controls only render after an image is chosen, so there is no server markup to disagree with.
   const [colorSupported] = useState(canBakeColorFilter);
   const busy = disabled || pending;
@@ -156,6 +160,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
     setError(problem);
     if (problem) return;
     endGestures();
+    setColorMode(false);
     setFile(selected);
     setPreviewUrl(URL.createObjectURL(selected));
     updateCrop({ zoom: 1, panX: 50, panY: 50 }); setNatural(null); setStrokes([]); setAdjust(NEUTRAL_ADJUST); setSizeNote(null); setTool("pan"); setColor(COLORS[0]);
@@ -273,7 +278,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
 
   return <div className={intake.active ? "grid gap-3 rounded-control shadow-plane p-3 outline-2 outline-dashed outline-offset-2 outline-line-focus" : "grid gap-3 rounded-control shadow-plane p-3"} aria-label={label} {...intake.target}>
     <input ref={pickerRef} className="sr-only" type="file" accept={accept} disabled={busy} onChange={(event) => { select(event.target.files?.[0]); event.target.value = ""; }} />
-    {!previewUrl ? <div className="grid gap-1.5"><Button type="button" variant="secondary" onClick={() => pickerRef.current?.click()} disabled={busy}>Choose image</Button><p className="text-xs text-ink-secondary">Or drop an image here, or paste one (Ctrl+V).</p></div> : <>
+    {colorMode ? <div className="grid gap-2"><ColorSwatchPicker label={`${label} colour`} aspect={aspect} outputType={outputType} disabled={disabled} onPrepared={onPrepared} /><div><Button type="button" size="sm" variant="ghost" onClick={() => setColorMode(false)} disabled={busy}>{previewUrl ? "Back to the image" : "Use an image instead"}</Button></div></div> : !previewUrl ? <div className="grid gap-1.5"><div className="flex flex-wrap gap-2"><Button type="button" variant="secondary" onClick={() => pickerRef.current?.click()} disabled={busy}>Choose image</Button>{allowColor ? <Button type="button" variant="secondary" onClick={() => { setError(null); setColorMode(true); }} disabled={busy}>Pick a colour</Button> : null}</div><p className="text-xs text-ink-secondary">Or drop an image here, or paste one (Ctrl+V).</p></div> : <>
       <div
         ref={viewportRef}
         className="relative overflow-hidden rounded-control border border-line bg-surface-muted touch-none"
@@ -324,7 +329,7 @@ export function ImageWorkspace({ label, onPrepared, accept = "image/png,image/jp
         </div> : null}
       </div>
       <p className="text-xs text-ink-secondary">Drag to move the photo, scroll or pinch to zoom. Pick a drawing tool to mark it up.</p>
-      <div className="flex flex-wrap gap-2"><Button type="button" variant="primary" disabled={disabled || !natural} pending={pending} onClick={prepare}>Use prepared image</Button><Button type="button" variant="secondary" onClick={() => { endGestures(); setStrokes((current) => current.slice(0, -1)); }} disabled={!strokes.length || busy}>Undo last stroke</Button><Button type="button" variant="secondary" onClick={() => { endGestures(); setStrokes([]); }} disabled={!strokes.length || busy}>Clear annotations</Button><Button type="button" variant="ghost" onClick={() => pickerRef.current?.click()} disabled={busy}>Choose another</Button></div>
+      <div className="flex flex-wrap gap-2"><Button type="button" variant="primary" disabled={disabled || !natural} pending={pending} onClick={prepare}>Use prepared image</Button><Button type="button" variant="secondary" onClick={() => { endGestures(); setStrokes((current) => current.slice(0, -1)); }} disabled={!strokes.length || busy}>Undo last stroke</Button><Button type="button" variant="secondary" onClick={() => { endGestures(); setStrokes([]); }} disabled={!strokes.length || busy}>Clear annotations</Button><Button type="button" variant="ghost" onClick={() => pickerRef.current?.click()} disabled={busy}>Choose another</Button>{allowColor ? <Button type="button" variant="ghost" onClick={() => { endGestures(); setColorMode(true); }} disabled={busy}>Pick a colour</Button> : null}</div>
     </>}
     {sizeNote && !error ? <p className="text-xs text-ink-secondary" aria-live="polite">{sizeNote}</p> : null}
     {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}

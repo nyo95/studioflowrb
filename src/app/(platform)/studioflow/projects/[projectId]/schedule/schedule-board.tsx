@@ -161,7 +161,7 @@ function InlinePhotoEditor({
         </div>
         <Button type="button" size="sm" variant="ghost" onClick={onClose} disabled={isPending(pendingKey)}>Cancel</Button>
       </div>
-      <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={onPrepared} disabled={isPending(pendingKey)} openOnMount={!initialFile} initialFile={initialFile} pasteFromPage />
+      <ImageWorkspace label="Schedule photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" allowColor onPrepared={onPrepared} disabled={isPending(pendingKey)} openOnMount={!initialFile} initialFile={initialFile} pasteFromPage />
       {photoError ? <InlineError>{photoError}</InlineError> : null}
     </div>
   );
@@ -372,7 +372,7 @@ function BoardView({
       {groups.map((group) => (
         <section key={group.category} className="grid gap-3" aria-label={group.category}>
           <GroupHeader title={<span className="inline-flex items-baseline gap-2"><span>{group.category}</span><span className="font-ui-mono font-normal text-ink-tertiary">{group.rows[0]?.code.split("-")[0]}</span></span>} count={group.rows.length} />
-          <div className="grid min-w-0 grid-cols-2 items-start gap-x-4 gap-y-7 @2xl:grid-cols-3 @4xl:grid-cols-4">
+          <div className="grid min-w-0 grid-cols-2 items-start gap-x-3 gap-y-5 @xl:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))]">
             {group.rows.map((entry) => {
               const shown = shownOptionOf(entry);
               const extras = extraChoicesOf(entry);
@@ -402,7 +402,7 @@ function BoardView({
                   }}
                   className={`group grid min-w-0 content-start text-left ${reorderEnabled ? "cursor-grab active:cursor-grabbing" : ""} ${draggingId === entry.id ? "opacity-40" : ""} ${dragOverId === entry.id && draggingId && draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}
                 >
-                  <button type="button" onClick={() => onOpen(entry.id)} className="relative mb-2.5 block aspect-[4/5] w-full overflow-hidden bg-surface-muted text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
+                  <button type="button" onClick={() => onOpen(entry.id)} className="relative mb-2 block aspect-[4/5] w-full overflow-hidden bg-surface-muted text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
                     {shown?.imageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={shown.imageUrl} alt={shown.productName} className="h-full w-full object-cover transition-opacity group-hover:opacity-90" draggable={false} />
@@ -414,15 +414,15 @@ function BoardView({
                   <button type="button" onClick={() => onOpen(entry.id)} className="grid min-w-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
                   <span className="mb-1 flex flex-wrap gap-1">{badges.map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span>
                   {shown ? (
-                    <span className="font-ui-sans text-sm font-semibold uppercase leading-tight text-ink">{shown.productName}</span>
+                    <span className="line-clamp-2 font-ui-sans text-xs font-semibold uppercase leading-snug text-ink" title={shown.productName}>{shown.productName}</span>
                   ) : (
-                    <span className="text-sm italic text-ink-tertiary">Reserved, no product yet</span>
+                    <span className="text-xs italic text-ink-tertiary">Reserved, no product yet</span>
                   )}
-                  <span className="mt-2 grid">
+                  <span className="mt-1.5 grid">
                     {details.map(([label, value]) => value ? (
-                      <span key={label} className="flex items-start justify-between gap-3 border-t border-line py-1">
+                      <span key={label} className="grid gap-px border-t border-line py-1" title={value}>
                         <span className="text-micro uppercase tracking-[0.06em] text-ink-tertiary">{label}</span>
-                        <span className="max-w-[70%] text-right text-xs text-ink [overflow-wrap:anywhere]">{value}</span>
+                        <span className="line-clamp-2 text-xs text-ink [overflow-wrap:anywhere]">{value}</span>
                       </span>
                     ) : null)}
                   </span>
@@ -989,7 +989,7 @@ function AddItemDrawer({ projectId, section, categoriesBySection, categoryChoice
           <ExtraFieldsEditor value={product.extra} onChange={(extra) => setProduct({ ...product, extra })} />
           <div className="grid grid-cols-[minmax(0,1fr)_2rem] items-start gap-2"><Field label="Notes"><SimpleTextEditor value={product.notes} onChange={(event) => setProduct({ ...product, notes: event.target.value })} maxLength={2000} rows={3} /></Field><IconButton size="sm" variant="ghost" label={displayed.includes("notes") ? "Hide Notes from card" : "Show Notes on card"} icon={displayed.includes("notes") ? <Eye aria-hidden="true" /> : <EyeOff aria-hidden="true" />} onClick={() => toggle("notes")} className="mt-6" /></div>
           {cardFields !== null ? <Button size="sm" variant="ghost" className="justify-self-start" onClick={() => setCardFields(null)}>Use default</Button> : null}
-          <div className="grid gap-2"><Text weight="semibold">Photo</Text><ImageWorkspace label="Schedule option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={setPreparedPhoto} disabled={pending} />{preparedPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedPhoto.name}</Text> : null}</div>
+          <div className="grid gap-2"><Text weight="semibold">Photo</Text><ImageWorkspace label="Schedule option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" allowColor onPrepared={setPreparedPhoto} disabled={pending} />{preparedPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedPhoto.name}</Text> : null}</div>
         </div>
         )}
         {hasProduct && !reuseHit && !product.productName.trim() ? <InlineError>Enter a Type, or clear the product fields to only reserve the code.</InlineError> : null}
@@ -1286,7 +1286,7 @@ function EntryPanelContent({
           {/* Photo of the selected option (4:5, as on the board). */}
           <div className="relative">
             {selectedId === "new" && canEdit ? (
-              <div className="grid gap-1"><ImageWorkspace label="New option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" onPrepared={setPreparedNewPhoto} disabled={savePending} pasteFromPage />{preparedNewPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedNewPhoto.name}</Text> : null}</div>
+              <div className="grid gap-1"><ImageWorkspace label="New option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" allowColor onPrepared={setPreparedNewPhoto} disabled={savePending} pasteFromPage />{preparedNewPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedNewPhoto.name}</Text> : null}</div>
             ) : selected && canEdit ? (
               <button type="button" onClick={() => openPhoto(selected.id)} {...photoIntake.target} aria-label={selected.imageUrl ? `Change photo of option ${selected.label}` : `Add photo to option ${selected.label}`} title="Click to choose, or drop / paste a photo (Ctrl+V)" className={`relative block w-full rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus ${photoIntake.active ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}>
                 <Thumb url={selected.imageUrl} alt={selected.productName} className="aspect-[4/5] !h-auto w-full !rounded-control" />
