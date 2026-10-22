@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.179 | 2026-10-22 | plan(sketchup): schedule-owned codes for the SketchUp plugin (Lead)
+
+- **Review of Berkah Studio 1.1.6** (Codex cleanup): local tools are sound and the 14 prefixes match the Schedule dictionary; every web feature calls legacy routes absent from the rebuild (`/api/sketchup/sync`, `/api/health`), binds projects by name with a per-project key, makes codes from the model (PL-1 vs Schedule PL-01), defaults the category picker to Acrylic, and reports a purge it does not do.
+- **Work order:** `WO-SKETCHUP-01` rev 2 replaces rev 1. Owner decisions: only the Schedule allocates codes; materials link to the schedule item; the model never overwrites the Schedule; Wall Finish Labels stay independent (they serve drawing checks); plugin source moves to `tools/sketchup-plugin/`. Stages: 0 plugin hygiene (Lead, R9.180), 1a backend module `sketchup` through the composer door (Executor), 1b plugin client (Lead), 2 model-check report (outline).
+- **BACKLOG:** the two deferred SketchUp entries merged into one rev-2 entry.
+- **Checks:** documentation only.
+
 ## R9.178 | 2026-10-22 | feat(schedule-assistant): finalize an option through the Assistant (Lead)
 
 - **Work order:** `WO-SCHEDULE-ASSISTANT-03` (owner: add it, and keep the MCP strict so a cheap or free model stays safe). Executed by the Lead at the owner's request instead of an Executor handoff.

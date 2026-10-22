@@ -1,74 +1,108 @@
-# WO-SKETCHUP-01 — SketchUp plugin sync (DEFERRED, not READY)
+# WO-SKETCHUP-01 — SketchUp plugin: schedule-owned codes (rev 2)
 
-Status: DEFERRED by the owner on 2026-10-09. Written so it can be picked up later;
-nothing here is built. Do not hand to the Executor until Status is READY and the
-Lead has done "Step 0".
-Parts: 01 (this file, Executor), 02 merge queue (Executor), 03 token page + screens (Lead).
+Status: Stage 0 READY (Lead); Stage 1a READY for the Executor after Stage 0 commits;
+Stage 1b (Lead) follows 1a; Stage 2 is an outline, not READY.
+Supersedes rev 1 (2026-10-09, legacy-style push sync with merge queue, convergence planner
+and anti-wipe staging). Owner decisions 2026-10-22.
 Harness: `docs/agent/EXTENSIONS.md`. Foundation: `docs/apps/platform/INTEGRATIONS.md`.
+Plugin under review: Berkah Studio 1.1.6 (Codex cleanup, 2026-10-22).
 
-## Locked decisions (owner, 2026-10-09)
+## Why rev 1 is replaced
 
-1. **Product Schedule is the source of truth, including the code** (PT-01, GL-2 …).
-   The plugin owns technical identity and geometry (uuid, area, counts, layers,
-   instance counts). A push reporting a code that differs from the linked entry is a
-   *divergence*, never an instruction; the server queues rename orders back to the
-   plugin (`merge_actions`). Legacy evidence (read-only, legacy `c4b0c46`):
-   `src/extensions/sketchup/lib/catalog-ownership.ts`,
-   `actions/sketchup-actions.ts` (`autoLinkSyncedMaterial`, `autoLinkSyncedFixture`,
-   `planCodeConvergence`). Ignore the stale "SketchUp is source of truth" comment in
-   the legacy sync route.
-2. A material the plugin pushes that has no Schedule entry creates one with the
-   pushed code; it fills quantity/unit/location only where the Schedule has none.
-3. Project is chosen **in the URL** (`/api/integrations/v1/sketchup/projects/{projectId}/sync`);
-   one token serves many projects. The legacy per-project key is purged.
-4. Safeguards kept from legacy: (a) **hard stop before any write** on invalid code,
-   missing uuid, duplicate uuid or duplicate code within one payload (HTTP 422 with
-   the offending lists); (b) **anti-wipe**: pruning staging rows needs
-   `full_snapshot: true` and at least one material, and never deletes a linked
-   Schedule entry or a reserved row; (c) rename reconciliation when one stale
-   same-code row carries work; ambiguous cases are skipped; (d) the response
-   acknowledges rows actually persisted, not the request echo.
-5. A pushed code that collides with another Schedule entry, or a slot held by an
-   unclaimed template item, does **not** stop the sync: skip the link, return it in
-   `sync_errors`/warnings. Only the in-payload duplicates (4a) stop it.
-6. The wire shape of legacy is kept: GET returns `{success, projectId, merge_actions:[{id,source,target}]}`;
-   POST takes `{materials[], ffes[]|ffe[], full_snapshot}`; confirm takes `{actionIds[]|action_ids[]}`.
-   Confirm only marks actions done; verification happens at the next push.
-   Body limit raised per route for the snapshot (`bodyLimitBytes`), value in the contract.
+Rev 1 let the plugin invent codes from the model (PL-1 = "next number among material
+names") and then reconciled them against the Schedule with rename orders, a merge queue,
+swap/cycle planning and anti-wipe rules. Two parties allocating codes is the root cause of
+that complexity and of collisions such as PL-1 in the model vs PL-01…07 in the Schedule.
 
-## Step 0 — Lead (before the Executor)
+## Locked decisions
 
-StudioFlow's `public/` has no Schedule door today. The Lead adds, in
-`src/apps/studioflow/public/` (protected core, so a Lead change): a narrow
-`schedule-sync` contract the extension may call — read an entry by project+code,
-create an entry with a code, update qty/unit/location only when empty, list all
-codes of a project in one call (for convergence). Executor must not import
-StudioFlow services or Prisma models. Record the contract in this file when done.
+1. (Owner) **Only the Product Schedule allocates codes.** The plugin asks StudioFlow:
+   pick an existing schedule item, or "new item in category X", for which StudioFlow
+   returns the code (e.g. PL-08). A manual rename without a connection stays possible
+   offline, but such a material is shown as "not linked".
+2. (Owner) **Link by schedule item, not by code.** The plugin stores on the SketchUp
+   material the StudioFlow project id and the schedule entry id. "Refresh codes" renames
+   linked materials to the item's current code, so a code change in the Schedule
+   (category move, renumber) reaches the model without a merge queue.
+3. (Owner) **The model never overwrites the Schedule.** Material area is shown only
+   (Material lines have no quantity). Fixture instance counts become suggestions the user
+   accepts or ignores (Stage 2).
+4. (Owner) **Wall Finish Labels stay independent of the Schedule.** They exist to check
+   the working drawings, so they keep their own data; no Schedule read for labels.
+5. (Owner) **The plugin source moves into this repository** at `tools/sketchup-plugin/`
+   (like the MCP bridge), with its build producing the `.rbz`.
+6. (Lead) Connection like the Schedule Assistant: personal token `sfk_…`, project chosen
+   from a list (never typed by name), module switched on by the Developer.
+7. (Lead) New optional module `sketchup` 1.0.0: `kind: "optional"`, parent/requires
+   `studioflow`, `initialState: "DISABLED"`, permission `studioflow.sketchup.use` (in no
+   built-in role profile; the Platform Owner holds it while the module is on), scopes
+   `sketchup:read` and `sketchup:write`, integration-only (no screen in Stage 1).
+8. (Lead) It reaches StudioFlow only through the existing server-only composer door
+   `src/apps/studioflow/public/schedule-composer.ts`; Stage 1 needs no StudioFlow service
+   change. The permission id is declared next to `scheduleAssistantUse` in StudioFlow's
+   permissions (a one-line protected-core change named here).
+9. (Lead) Codes keep StudioFlow's format (PL-01). The plugin compares codes with leading
+   zeros ignored (PL-1 = PL-01) so existing models are recognized.
+10. (Lead) Legacy per-project key, project-by-name binding, `/api/sketchup/*`, `/api/health`,
+    merge queue and staging tables are not built.
 
-## Part 01 scope (Executor)
+## Stage 0 — Lead (plugin hygiene, no StudioFlow change)
 
-- `prisma/schema/sketchup.prisma`, schema `sketchup`: staging tables for materials
-  and fixtures keyed by (project id as plain string, uuid) and (project id, code);
-  merge-action queue table (source code, target code, queue order, executed_at).
-  No relation to another schema; project and entry ids are plain strings.
-- `src/apps/sketchup/` per the harness template: `contract.ts` (zod), `domain/`
-  (code normalisation `PREFIX-n` ignoring leading zeros and case, duplicate
-  detection, rename reconciliation, convergence planner including temporary-code
-  hops for swaps and cycles), `services/` (sync, pending actions, confirm), tests.
-- Routes via the Platform integration kit, scope `sketchup:sync`, grants as the
-  Lead assigns; write routes are idempotent.
-- Audit every write; new permissions only if the Lead names them.
+- Copy the 1.1.6 package into `tools/sketchup-plugin/src/` (loader `berkahstudio.rb` +
+  `berkahstudio/`), plus a small packaging script that zips it to
+  `tools/sketchup-plugin/dist/BerkahStudio_<version>.rbz` (dist ignored by git).
+- Fixes: the category picker starts empty and requires a choice (today it defaults to
+  "ACR - Acrylic"); hide "Open Web Schedule", "Sync from Web", auto-sync and the API-key
+  menus until Stage 1b (they call routes that do not exist); remove the false
+  "Purged unused materials" text and the `cd berkahstudio_web` hint; codes it creates
+  offline use two digits (PL-01) to match the Schedule.
+- Version 1.1.7. README in `tools/sketchup-plugin/`. Ruby syntax check of every file.
 
-## Acceptance
+## Stage 1a — Executor (backend)
 
-Harness definition of done, plus: payload with a duplicate code writes nothing and
-returns 422; empty or non-`full_snapshot` push never prunes; a swap of two codes
-between model and Schedule resolves in one planned batch; confirm is idempotent;
-re-push after confirm queues nothing when codes agree.
+Module `src/apps/sketchup/` per the harness template, no Prisma schema (nothing stored:
+the link lives in the SketchUp model). Routes under `/api/integrations/v1/sketchup/`:
 
-## Open items before READY
+| Method + path | Scope | Result |
+|---|---|---|
+| `GET projects` | read | composer `listProjects` (id, name, status, canApply) |
+| `GET projects/{id}/schedule` | read | `{ project, entries: [{ id, code, section, category, prefix, title }], categoryChoices }` where `title` = final option, else option A: brand + product (no images, no storage keys) |
+| `POST projects/{id}/entries` | write | body `{ section, category, confirmNewCategory? }`; creates one schedule item through the composer (`previewBatch` then `applyBatch` with that digest, same transaction as the kit) and returns `{ entryId, code, category, prefix }`; needs `Idempotency-Key` |
+| `POST projects/{id}/resolve` | read | body `{ entryIds: uuid[] (1–500) }` → `[{ entryId, code \| null }]` (`null` = the item no longer exists) for "Refresh codes" |
 
-- Exact permission ids and which role gets them (Lead).
-- Whether a collision (decision 5) should also appear as a visible list in the UI (Part 03).
-- The Ruby plugin lives outside this repository; its URL change (project in the path,
-  Bearer token from the token page) is a separate owner task.
+Rules: same access as the Schedule Assistant (reads need project detail access; create needs
+the Schedule write rule, project not archived/completed). A category that is new and looks
+like a studio category (`SCHEDULE_CATEGORY_SIMILAR`) is refused with its suggestions unless
+`confirmNewCategory: true`. Audit rows from the composer carry `via = "sketchup"`.
+Scope/grant pairs are composed beside the Schedule Assistant's on the token page.
+Contract: `docs/apps/sketchup/CONTRACT.md`. Tests: auth, scope, module off, validation,
+idempotent replay, happy path for each route, look-alike refusal, read-only scope cannot
+create, another project's entry id resolves to `null`.
+
+## Stage 1b — Lead (plugin client)
+
+- "Connect to StudioFlow": server URL + token (stored in SketchUp preferences, never in the
+  package), project picked from `GET projects`, project id saved on the model.
+- Auto-Rename becomes "Kode dari jadwal": click a surface → list of the project's items
+  (code · category · brand product) filtered by category, or "Item baru di kategori…" →
+  StudioFlow returns the code → material renamed, entry id stored.
+- "Refresh codes": resolve all linked entry ids; rename changed ones in one undo step
+  (temporary names for swaps); a removed item leaves the material "not linked" with a notice.
+- Status in the dialog: linked / not linked / linked to another project.
+
+## Stage 2 — outline (not READY)
+
+Model check report in StudioFlow: schedule items not found in the model, model materials
+without a schedule link, area per item (display only), Fixture components linked the same
+way with instance counts offered as quantity suggestions. Needs a stored snapshot (own
+`sketchup` schema) and a Lead screen; planned after Stage 1 is in use.
+
+## Acceptance (Stage 1)
+
+1. A model connected to a project assigns PL-08 from "new item in High Pressure Laminate"
+   and PL-03 from picking an existing item; the Schedule shows the new item once, audited.
+2. After the Schedule moves an item (HP-01 → PL-01), "Refresh codes" renames the material
+   in the model; undo restores it.
+3. Without a token or with the module off, the plugin still renames offline and says the
+   material is not linked; nothing is sent.
+4. Wall Finish Labels and Component Tracker behave as in 1.1.6.

@@ -106,20 +106,11 @@ Order matters; each item is its own Work Order.
   text) on note images; a free-layout canvas was judged too big for now.
 - [ ] [UNVERIFIED] Token page on My preferences (R8.465): create (secret shown once, copy button),
   the list with Active/Expired/Revoked, Revoke; needs a user whose role has `platform.integration.manage`.
-- [ ] [PLANNED][P2] **DEFERRED by the owner 2026-10-09.** Plan written, not READY: `docs/apps/sketchup/WO-SKETCHUP-01.md`
-  (Schedule owns the code, project in the URL, Lead Step 0 = StudioFlow schedule door).
-  Original notes follow.
-- [ ] [PLANNED][P2] **DEFERRED by the owner 2026-10-19.** SketchUp plugin sync as the first extension (D-SF-06 lifted
-  for this work by the owner's 2026-10-09 request; needs its own plan and the
-  owner's answers on: project binding in the URL vs token, what the schedule gets
-  from a pushed material, and the merge-queue behaviour). Legacy evidence
-  (read-only, legacy HEAD `102ff85`): `src/app/api/sketchup/sync/route.ts` (GET
-  pending merge actions; POST `{materials[], ffes[], full_snapshot}` with
-  duplicate-identity hard stop, rename reconciliation, anti-wipe guard on
-  `full_snapshot`), `api/sketchup/merge/confirm/route.ts` (`{actionIds[]}`),
-  `extensions/sketchup/utils/merge-queue.ts`, `catalog-ownership.ts`. Keep the
-  wire shape and those safeguards; purge the anonymous per-project key and direct
-  Prisma in routes. The Ruby plugin source is outside that repository.
+- [ ] [PLANNED][P2] SketchUp plugin, rev 2 (owner 2026-10-22): the Schedule allocates every code, materials link to
+  the schedule item (not the code), the model never overwrites the Schedule, Wall Finish Labels stay independent,
+  plugin source moves to `tools/sketchup-plugin/`. Plan: `docs/apps/sketchup/WO-SKETCHUP-01.md` (Stage 0 Lead,
+  1a Executor, 1b Lead; Stage 2 model-check report is an outline). Rev 1 (legacy push sync, merge queue,
+  convergence planner, staging tables) is superseded and will not be built.
 - [ ] [PLANNED][P3] Per-token rate limit for `/api/integrations/**` (none exists in
   Platform; do not invent one inside an extension).
 - [ ] [PLANNED][P3] Chatbot / AI gateway: a provider-neutral port with the key in
