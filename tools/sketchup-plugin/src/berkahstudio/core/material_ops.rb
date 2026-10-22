@@ -58,8 +58,10 @@ module BerkahStudio
           return false
         end
 
+        # A code made offline is not the Schedule's: the material is not linked to a schedule item (WO-SKETCHUP-01).
+        ScheduleLink.unlink(material)
         UI.refresh_inspectors
-        Sketchup.set_status_text("Material #{old_name} menjadi #{code}")
+        Sketchup.set_status_text("Material #{old_name} menjadi #{code} (belum terhubung ke jadwal StudioFlow)")
         true
       rescue => e
         Logger.error(:material_auto_rename_failed, message: e.message)

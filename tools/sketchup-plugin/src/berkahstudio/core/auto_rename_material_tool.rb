@@ -11,7 +11,8 @@ module BerkahStudio
       def activate
         @cancelled = false
         @pending = false
-        Sketchup.set_status_text('Klik permukaan untuk memberi kode pada materialnya.')
+        text = StudioflowClient.connected? ? 'Klik permukaan untuk memberi kode dari jadwal StudioFlow.' : 'Klik permukaan untuk memberi kode pada materialnya (belum tersambung ke StudioFlow).'
+        Sketchup.set_status_text(text)
       end
 
       def deactivate(view)
@@ -47,7 +48,12 @@ module BerkahStudio
           begin
             model.select_tool(nil)
             next unless material.valid?
-            MaterialOps.prompt_auto_rename(material, model)
+            # Connected: the code comes from the Product Schedule. Offline: the old prefix picker, material not linked.
+            if StudioflowClient.connected?(model)
+              ScheduleLink.on_material(material, model)
+            else
+              MaterialOps.prompt_auto_rename(material, model)
+            end
           rescue => error
             Logger.error(:material_picker_failed, message: error.message)
             UI.messagebox("Rename material gagal:\n#{error.message}")

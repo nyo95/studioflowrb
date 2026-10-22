@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.189 | 2026-10-22 | feat(sketchup): plugin 1.2.0 takes codes from the Product Schedule (Lead)
+
+- **Work order:** `WO-SKETCHUP-01` rev 2, Stage 1b (decisions 11–14), executed by the Lead at the owner's request.
+- **Connect:** Extensions > Berkah Studio > Sambung ke StudioFlow... (server address, personal token kept in SketchUp preferences, project picked from the list and saved on the model); Putuskan sambungan StudioFlow.
+- **Auto-Rename when connected** (`core/schedule_link.rb`): a linked material shows its item and offers another; a name that reads as a schedule code (SO-1, SO-001, so-01 = SO-01) asks "Ini SO-01 · …?"; otherwise category, then item (similar names first) or "Item baru" (StudioFlow allocates the code, idempotent). Every step asks first. When another material belongs to the same item, it offers a merge inside the model only (surface counts, look-difference warning, one undo); the Schedule is never changed. Offline Auto-Rename keeps the category picker and unlinks the material.
+- **Perbarui kode dari jadwal:** resolves every linked material, renames changed codes through temporary names in one undo step, skips a target name held by an unrelated material, unlinks materials whose item is gone; a summary is confirmed first.
+- **HTTP** (`core/studioflow_client.rb`): `/api/integrations/v1/sketchup/*` with the Bearer token; StudioFlow's `safeMessage` and the common refusals (token, module off, access) are shown in plain words; a failure after the answer is reported, not lost.
+- **Checks:** `node tools/sketchup-plugin/build.mjs` packs 23 files; line-by-line review. **No Ruby syntax check** (no Ruby interpreter here) and **not run in SketchUp**: the owner's test in SketchUp against the dev server is the acceptance (WO acceptance 1–6).
+
 ## R9.188 | 2026-10-22 | feat(sketchup): SketchUp integration module, Stage 1a (Lead)
 
 - **Work order:** `WO-SKETCHUP-01` rev 2, Stage 1a, executed by the Lead at the owner's request.

@@ -19,6 +19,8 @@ require_relative 'core/model_scanner'
 require_relative 'core/web_launcher'
 require_relative 'core/material_ops'
 require_relative 'core/auto_rename_material_tool'
+require_relative 'core/studioflow_client'
+require_relative 'core/schedule_link'
 require_relative 'core/csv_exporter'
 
 # Require observers and API client
@@ -50,8 +52,17 @@ unless file_loaded?(__FILE__)
     BK::WallFinishPlan.clear_generated_labels
   }
 
-  # Web schedule, sync and connection settings return in WO-SKETCHUP-01 Stage 1b, against the StudioFlow
-  # sketchup module (token + project picked from a list). The old routes they called do not exist.
+  # ── StudioFlow (WO-SKETCHUP-01 Stage 1b) ───────────────────────────────────
+  menu.add_separator
+  menu.add_item('Sambung ke StudioFlow...') {
+    BerkahStudio::MaterialScheduler::ScheduleLink.connect
+  }
+  menu.add_item('Perbarui kode dari jadwal') {
+    BerkahStudio::MaterialScheduler::ScheduleLink.refresh_codes
+  }
+  menu.add_item('Putuskan sambungan StudioFlow') {
+    BerkahStudio::MaterialScheduler::ScheduleLink.disconnect
+  }
 
   menu.add_separator
   menu.add_item('Reload Plugin') {
@@ -78,8 +89,8 @@ module BerkahStudio
       cmd_auto_rename = UI::Command.new('Auto-Rename') {
         AutoRenameMaterialTool.activate
       }
-      cmd_auto_rename.tooltip = 'Auto-Rename Material — click a surface and choose its category'
-      cmd_auto_rename.status_bar_text = 'Klik permukaan, pilih kategori, lalu nama material diberi prefix dan nomor unik.'
+      cmd_auto_rename.tooltip = 'Auto-Rename Material — click a surface; the code comes from the StudioFlow schedule'
+      cmd_auto_rename.status_bar_text = 'Klik permukaan: pilih item jadwal StudioFlow (atau kategori kalau belum tersambung).'
       cmd_auto_rename.small_icon = File.join(icons_dir, 'code.png')
       cmd_auto_rename.large_icon = File.join(icons_dir, 'code.png')
 
@@ -116,6 +127,8 @@ module BerkahStudio
       load File.join(ROOT, 'core/web_launcher.rb')
       load File.join(ROOT, 'core/material_ops.rb')
       load File.join(ROOT, 'core/auto_rename_material_tool.rb')
+      load File.join(ROOT, 'core/studioflow_client.rb')
+      load File.join(ROOT, 'core/schedule_link.rb')
       load File.join(ROOT, 'core/csv_exporter.rb')
       load File.join(ROOT, 'core/sync_service.rb')
       load File.join(ROOT, 'core/api_client.rb')
