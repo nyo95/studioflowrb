@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.196 | 2026-10-22 | ui(studioflow): Product Schedule fixed header and docked inspector (Lead)
+
+- **Owner request:** the R9.195 pane was messy; the pane must sit fixed on the right like a toolbar and the header must not scroll. Built from the owner-approved mockup (https://claude.ai/artifact/KtSjuhqAjjDN2snQUvGuPp).
+- **Layout (lg and up):** the schedule page joins Phases as a `data-fill-page`: project header and schedule toolbar stay put, the board/list scrolls in its own column, and the inspector is a full-height column on the right (24rem, 26rem from xl) with its own scroll and the Save/Discard bar always visible. The "Product Schedule" card header is gone (the section is labelled for screen readers). Below lg the page scrolls as before and an open item covers the screen.
+- **Inspector states:** nothing open (a short hint), one item (the editor), several ticked in Select mode (count, picked codes, Select all / Clear, and the Delete box). Below lg the bulk bar stays as in R9.195.
+- **Toolbar:** section and view tabs, a new search (code, category, location, shown type and brand), Select / Done selecting with an icon, Print, Set up, Add item; progress and filter chips in one compact row. The empty state names the search when nothing matches.
+- **Editor in the narrow column:** photo and Type side by side, spec fields full width below; the eye toggles became small dots (filled = on the card and in print).
+- **Not included from the mockup:** bulk "Move to category", "Request samples" and "Show / hide fields" (no backend for several items yet).
+- **Checks:** `tsc --noEmit` clean; eslint clean on the project pages; `schedule.regression.test.ts` 28/28; browser check on the local dev server at 1200x720 (inspector 317 to 690 px, its body scrolls, Save visible; bulk panel lists 2 picked) and 375x812 (editor full screen, no sideways scroll). Not run: full `npm test`, a real bulk delete.
+
 ## R9.195 | 2026-10-22 | feat(studioflow): Product Schedule bulk delete and docked item editor (Lead)
 
 - **Owner request:** delete several schedule items at once; show the item editor as a pane fixed beside the board instead of a pop-up.

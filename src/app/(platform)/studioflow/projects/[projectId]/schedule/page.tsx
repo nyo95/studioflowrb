@@ -4,7 +4,7 @@ import { AppError } from "@platform/core/errors";
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P, STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { SectionCard } from "@/platform/ui_engine";
+import { Surface } from "@/platform/ui_engine";
 
 import { pageProjectAccess, pageSession } from "../../../_components/session";
 import { ReadOnlyNotice } from "../../../_components/read-only-notice";
@@ -31,7 +31,8 @@ export default async function ProjectSchedulePage({ params, searchParams }: { pa
   return (
     <>
     {project.archivedAt === null && !access.completed && !access.canEditDocuments ? <ReadOnlyNotice scope="project" className="mb-3" /> : null}
-    <SectionCard title="Product Schedule" description="Materials and fixtures specified for this project, each with its options and the chosen final one." count={entries.length} padded={false} className="!overflow-clip">
+    {/* Owner 2026-10-22: on wide screens the schedule fills the window under the project header, which stays put; only the board and the inspector scroll. */}
+    <Surface as="section" aria-label="Product Schedule" data-fill-page className="flex min-w-0 flex-col overflow-clip lg:min-h-0 lg:flex-1">
       <ScheduleBoard
         initialOpenId={typeof entry === "string" && entries.some((item) => item.id === entry) ? entry : null}
         projectId={projectId}
@@ -42,7 +43,7 @@ export default async function ProjectSchedulePage({ params, searchParams }: { pa
         canManageTemplates={hasPermission(grants, P.settingsManage)}
         templatesHref={STUDIOFLOW_ROUTES.scheduleTemplates}
       />
-    </SectionCard>
+    </Surface>
     </>
   );
 }

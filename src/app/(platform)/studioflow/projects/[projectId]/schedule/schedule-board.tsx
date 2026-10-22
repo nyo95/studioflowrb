@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Crown, Eye, EyeOff, History, ImageIcon, Plus, Printer, Search, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, Crown, Eye, EyeOff, History, ImageIcon, Plus, LayoutGrid, Printer, Search, SquareCheck, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -259,6 +259,13 @@ function entryMatchesFilter(entry: ScheduleEntryView, filter: ScheduleFilter) {
  * check beside the code) so the badges left on the board are only the ones that still need someone (owner 2026-10-22).
  */
 type EntryBadge = { label: string; tone: "success" | "neutral" | "warning"; quiet?: boolean };
+
+/** Free-text search over what the board shows: code, category, location and the shown option's type and brand. */
+function entryMatchesQuery(entry: ScheduleEntryView, needle: string) {
+  const shown = shownOptionOf(entry);
+  return [entry.code, entry.category, entry.location, shown?.productName, shown?.brandName]
+    .some((value) => value?.toLowerCase().includes(needle));
+}
 
 function entryBadges(entry: ScheduleEntryView): EntryBadge[] {
   const final = finalOf(entry);
@@ -536,7 +543,9 @@ export function ScheduleBoard({
 
   const sectionEntries = useMemo(() => entries.filter((entry) => entry.section === section), [entries, section]);
   const progress = useMemo(() => scheduleFilterCounts(sectionEntries), [sectionEntries]);
-  const visibleEntries = useMemo(() => sectionEntries.filter((entry) => entryMatchesFilter(entry, filter)), [sectionEntries, filter]);
+  const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
+  const visibleEntries = useMemo(() => sectionEntries.filter((entry) => entryMatchesFilter(entry, filter) && (!needle || entryMatchesQuery(entry, needle))), [sectionEntries, filter, needle]);
 
   const groups = useMemo(() => {
     const map = new Map<string, ScheduleEntryView[]>();
@@ -557,6 +566,8 @@ export function ScheduleBoard({
   const pickedIds = useMemo(() => [...selectedIds].filter((id) => visibleIds.has(id)), [selectedIds, visibleIds]);
   const toggleSelected = (id: string) => setSelectedIds((current) => { const next = new Set(current); if (!next.delete(id)) next.add(id); return next; });
   const stopSelecting = () => { setSelecting(false); setSelectedIds(new Set()); };
+  const allPicked = visibleEntries.length > 0 && pickedIds.length === visibleEntries.length;
+  const toggleAllVisible = () => setSelectedIds(allPicked ? new Set() : new Set(visibleEntries.map((entry) => entry.id)));
   const visibleOpenIndex = open ? visibleEntries.findIndex((entry) => entry.id === open.id) : -1;
 
   const askDiscard = async () => {
@@ -657,202 +668,242 @@ export function ScheduleBoard({
     void run(`reorder-${prefix}`, () => reorderScheduleEntriesAction({ projectId, section, prefix, orderedIds: ids }));
   };
 
+  const inspectorItem = open && !selecting ? open : null;
+  const bulkOpen = selecting && pickedIds.length > 0;
+
   return (
-    <div className="grid">
-      <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle bg-surface px-(--ui-section-px) py-2.5">
-        {/* changeSection reads the draft ref only when this browser event fires; passing it through the shared tab contract keeps the existing discard guard intact. */}
-        {/* eslint-disable-next-line react-hooks/refs */}
-        <div className="flex min-w-0 flex-wrap items-center gap-2"><PillTabs label="Schedule section" items={(["MATERIAL", "FIXTURE"] as const).map((key) => ({ key, label: SECTION_LABEL[key], active: section === key, count: counts[key], onSelect: changeSection.bind(null, key) }))} /><PillTabs label="Schedule view" items={[{ key: "board", label: "Board", active: viewMode === "board", onSelect: () => setViewMode("board") }, { key: "list", label: "List", active: viewMode === "list", onSelect: () => setViewMode("list") }]} /></div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            prefetch={false}
-            target="_blank"
-            href={STUDIOFLOW_ROUTES.projectSchedulePrint(projectId)}
-            className="inline-flex min-h-(--ui-control-height-sm) items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 text-xs font-medium text-ink hover:border-line-strong"
-          >
-            <Printer aria-hidden="true" className="h-3.5 w-3.5" /> Print / PDF
-          </Link>
-          {canEdit || canManageTemplates ? <ButtonMenu label="Set up" variant="secondary" items={[
-            ...(canEdit ? [
-              { label: "Apply studio templates", onSelect: () => void applyTemplates() },
-              { label: "Import CSV", onSelect: () => setDialog("import") },
-            ] : []),
-            ...(canManageTemplates ? [{ label: "Schedule templates", onSelect: () => router.push(templatesHref) }] : []),
-          ]} /> : null}
-          {canEdit && !selecting && visibleEntries.length > 0 ? <Button size="sm" variant="secondary" onClick={() => void startSelecting()}>Select</Button> : null}
-          {canEdit ? (
-          <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setDialog("add")}>
-            Add item
-          </Button>
-          ) : null}
+    <div className="flex min-w-0 flex-col lg:min-h-0 lg:flex-1">
+      {/* Toolbar: on wide screens it never scrolls; only the board and the inspector below it do (owner, 2026-10-22). */}
+      <div className="sticky top-0 z-20 grid shrink-0 gap-2.5 border-b border-line-subtle bg-surface px-(--ui-section-px) py-2.5 lg:static">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* changeSection reads the draft ref only when this browser event fires; passing it through the shared tab contract keeps the existing discard guard intact. */}
+          {/* eslint-disable-next-line react-hooks/refs */}
+          <PillTabs label="Schedule section" items={(["MATERIAL", "FIXTURE"] as const).map((key) => ({ key, label: SECTION_LABEL[key], active: section === key, count: counts[key], onSelect: changeSection.bind(null, key) }))} />
+          <PillTabs label="Schedule view" items={[{ key: "board", label: "Board", active: viewMode === "board", onSelect: () => setViewMode("board") }, { key: "list", label: "List", active: viewMode === "list", onSelect: () => setViewMode("list") }]} />
+          <label className="flex h-(--ui-control-height-sm) w-full items-center gap-2 rounded-control border border-line bg-surface px-2.5 text-ink-tertiary focus-within:border-line-focus sm:w-60">
+            <Search aria-hidden="true" className="h-3.5 w-3.5 shrink-0" />
+            <span className="sr-only">Search items</span>
+            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search code, type, brand…" className="min-w-0 flex-1 bg-transparent text-sm text-ink placeholder:text-ink-tertiary focus:outline-none" />
+          </label>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            {canEdit && sectionEntries.length > 0 ? (
+              selecting
+                ? <Button size="sm" variant="secondary" leadingIcon={<SquareCheck className="h-3.5 w-3.5" />} onClick={stopSelecting}>Done selecting</Button>
+                : <Button size="sm" variant="ghost" leadingIcon={<SquareCheck className="h-3.5 w-3.5" />} onClick={() => void startSelecting()}>Select</Button>
+            ) : null}
+            <Link
+              prefetch={false}
+              target="_blank"
+              href={STUDIOFLOW_ROUTES.projectSchedulePrint(projectId)}
+              className="inline-flex min-h-(--ui-control-height-sm) items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 text-xs font-medium text-ink hover:border-line-strong"
+            >
+              <Printer aria-hidden="true" className="h-3.5 w-3.5" /> Print / PDF
+            </Link>
+            {canEdit || canManageTemplates ? <ButtonMenu label="Set up" variant="secondary" items={[
+              ...(canEdit ? [
+                { label: "Apply studio templates", onSelect: () => void applyTemplates() },
+                { label: "Import CSV", onSelect: () => setDialog("import") },
+              ] : []),
+              ...(canManageTemplates ? [{ label: "Schedule templates", onSelect: () => router.push(templatesHref) }] : []),
+            ]} /> : null}
+            {canEdit ? (
+              <Button size="sm" variant="primary" leadingIcon={<Plus className="h-3.5 w-3.5" />} onClick={() => setDialog("add")}>
+                Add item
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex items-center gap-2.5">
+            <span className="whitespace-nowrap text-sm font-medium text-ink">{progress.final} of {progress.all} final</span>
+            <ProgressBar value={progress.final} max={progress.all} label={`${progress.final} of ${progress.all} final`} className="!w-28 shrink-0" />
+          </div>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Schedule progress filter">
+            <FilterChip selected={filter === "all"} count={progress.all} onClick={() => setFilter("all")}>All</FilterChip>
+            <FilterChip selected={filter === "decision"} count={progress.decision} onClick={() => setFilter("decision")}>Needs a decision</FilterChip>
+            <FilterChip selected={filter === "sample"} count={progress.sample} onClick={() => setFilter("sample")}>Sample waiting</FilterChip>
+            <FilterChip selected={filter === "empty"} count={progress.empty} onClick={() => setFilter("empty")}>No product yet</FilterChip>
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-2 border-b border-line-subtle px-(--ui-section-px) py-3">
-        <div className="flex items-center justify-between gap-3 text-sm"><span className="font-medium text-ink">{progress.final} of {progress.all} final</span><span className="text-ink-tertiary">{progress.all ? Math.round((progress.final / progress.all) * 100) : 0}%</span></div>
-        <ProgressBar value={progress.final} max={progress.all} label={`${progress.final} of ${progress.all} final`} />
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Schedule progress filter">
-          <FilterChip selected={filter === "all"} count={progress.all} onClick={() => setFilter("all")}>All</FilterChip>
-          <FilterChip selected={filter === "decision"} count={progress.decision} onClick={() => setFilter("decision")}>Needs a decision</FilterChip>
-          <FilterChip selected={filter === "sample"} count={progress.sample} onClick={() => setFilter("sample")}>Sample waiting</FilterChip>
-          <FilterChip selected={filter === "empty"} count={progress.empty} onClick={() => setFilter("empty")}>No product yet</FilterChip>
-        </div>
-      </div>
-
+      {/* Narrow screens have no inspector column: bulk actions sit in a bar instead. */}
       {selecting ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle bg-surface-muted px-(--ui-section-px) py-2" role="region" aria-label="Bulk actions">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line-subtle bg-surface-muted px-(--ui-section-px) py-2 lg:hidden" role="region" aria-label="Bulk actions">
           <div className="flex items-center gap-3 text-sm">
             <span className="font-medium text-ink" role="status">{pickedIds.length} selected</span>
-            <Button size="sm" variant="ghost" onClick={() => setSelectedIds(pickedIds.length === visibleEntries.length ? new Set() : new Set(visibleEntries.map((entry) => entry.id)))}>{pickedIds.length === visibleEntries.length ? "Clear selection" : `Select all ${visibleEntries.length}`}</Button>
+            <Button size="sm" variant="ghost" onClick={toggleAllVisible}>{allPicked ? "Clear selection" : `Select all ${visibleEntries.length}`}</Button>
           </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="danger" leadingIcon={<Trash2 className="h-3.5 w-3.5" />} disabled={pickedIds.length === 0} pending={command.pendingKeys.includes("bulk-delete")} onClick={() => void removeSelected()}>Delete{pickedIds.length ? ` ${pickedIds.length}` : ""}</Button>
-            <Button size="sm" variant="secondary" onClick={stopSelecting}>Done</Button>
-          </div>
+          <Button size="sm" variant="danger" leadingIcon={<Trash2 className="h-3.5 w-3.5" />} disabled={pickedIds.length === 0} pending={command.pendingKeys.includes("bulk-delete")} onClick={() => void removeSelected()}>Delete{pickedIds.length ? ` ${pickedIds.length}` : ""}</Button>
         </div>
       ) : null}
 
-      {error && !open && !dialog ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
-      {notice ? <Text size="sm" tone="secondary" role="status" className="px-(--ui-section-px) pt-2">{notice}</Text> : null}
-
-      {groups.length === 0 ? (
-        <div className="grid">
-          <EmptyState
-            title={progress.all === 0 ? `No ${SECTION_LABEL[section].toLowerCase()} items yet` : "No items match this filter"}
-            description={progress.all === 0 && canEdit ? "Start a category below, add an item, apply the studio templates, or import the Google Sheets schedule." : progress.all === 0 ? "This project has no schedule items in this section." : "Choose another progress filter to see more items."}
-            className="py-10"
-          />
-          {progress.all === 0 && canEdit ? <NewCategoryInline command={command} projectId={projectId} section={section} categories={[]} categoryChoices={categoryChoices} className="mb-8 justify-self-center" /> : null}
-        </div>
-      ) : (
-        <div className={open ? "grid lg:grid-cols-[minmax(0,1fr)_30rem]" : "grid"}>
-          <div className="min-w-0">
-            {viewMode === "board" ? (
-              <BoardView
-                projectId={projectId}
-                groups={groups}
-                command={command}
-                onOpen={(id) => openEntry(id)}
-                canEdit={canEdit}
-                filter={filter}
-                section={section}
-                onReorder={reorderGroup}
-                onDelete={(entry) => void removeEntry(entry)}
-                categoryChoices={categoryChoices}
-                openId={openId}
-                selecting={selecting}
-                selectedIds={selectedIds}
-                onToggle={toggleSelected}
+      <div className="flex min-w-0 lg:min-h-0 lg:flex-1">
+        <div className="min-w-0 flex-1 lg:overflow-y-auto lg:overscroll-contain">
+          {error && !open && !dialog ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
+          {notice ? <Text size="sm" tone="secondary" role="status" className="px-(--ui-section-px) pt-2">{notice}</Text> : null}
+          {groups.length === 0 ? (
+            <div className="grid">
+              <EmptyState
+                title={progress.all === 0 ? `No ${SECTION_LABEL[section].toLowerCase()} items yet` : needle ? `Nothing matches "${query.trim()}"` : "No items match this filter"}
+                description={progress.all === 0 && canEdit ? "Start a category below, add an item, apply the studio templates, or import the Google Sheets schedule." : progress.all === 0 ? "This project has no schedule items in this section." : needle ? "Try another word, or clear the search." : "Choose another progress filter to see more items."}
+                className="py-10"
               />
-            ) : (
-              <div className="grid">
-                <div className="hidden items-center gap-3 border-b border-line px-(--ui-section-px) py-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary sm:flex" aria-hidden="true">
-                  {selecting ? <span className="w-5 shrink-0" /> : null}
-                  <span className="w-11 shrink-0" />
-                  <span className="w-14 shrink-0">Code</span>
-                  <span className="min-w-0 flex-1">Type</span>
-                  <span className="w-28 shrink-0">Location</span>
-                  <span className="w-20 shrink-0 text-right">Qty</span>
-                  <span className="w-8 shrink-0" />
-                </div>
-                {groups.map((group) => (
-                  <section key={group.category} className="border-b border-line-subtle last:border-b-0">
-                    <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
-                      <h3 className="m-0 text-label text-ink-secondary">{group.category}</h3>
-                      <Text size="sm" tone="tertiary">{group.rows.length}</Text>
+              {progress.all === 0 && canEdit ? <NewCategoryInline command={command} projectId={projectId} section={section} categories={[]} categoryChoices={categoryChoices} className="mb-8 justify-self-center" /> : null}
+            </div>
+          ) : (
+            <>
+                {viewMode === "board" ? (
+                  <BoardView
+                    projectId={projectId}
+                    groups={groups}
+                    command={command}
+                    onOpen={(id) => openEntry(id)}
+                    canEdit={canEdit}
+                    filter={filter}
+                    section={section}
+                    onReorder={reorderGroup}
+                    onDelete={(entry) => void removeEntry(entry)}
+                    categoryChoices={categoryChoices}
+                    openId={openId}
+                    selecting={selecting}
+                    selectedIds={selectedIds}
+                    onToggle={toggleSelected}
+                  />
+                ) : (
+                  <div className="grid">
+                    <div className="hidden items-center gap-3 border-b border-line px-(--ui-section-px) py-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary sm:flex" aria-hidden="true">
+                      {selecting ? <span className="w-5 shrink-0" /> : null}
+                      <span className="w-11 shrink-0" />
+                      <span className="w-14 shrink-0">Code</span>
+                      <span className="min-w-0 flex-1">Type</span>
+                      <span className="w-28 shrink-0">Location</span>
+                      <span className="w-20 shrink-0 text-right">Qty</span>
+                      <span className="w-8 shrink-0" />
                     </div>
-                    <ul className="m-0 list-none divide-y divide-line-subtle p-0">
-                      {group.rows.map((entry, index) => {
-                        const shown = shownOptionOf(entry);
-                        const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
-                        return (
-                          <li
-                            key={entry.id}
-                            id={`schedule-entry-${entry.id}`}
-                            draggable={canEdit && filter === "all" && !selecting}
-                            onDragStart={listDrag.start(entry.id)}
-                            onDragEnd={listDrag.end}
-                            onDragOver={listDrag.over(entry.id, canEdit && filter === "all")}
-                            onDragLeave={listDrag.leave(entry.id)}
-                            onDrop={(event) => {
-                              event.preventDefault();
-                              if (listDrag.draggingId) reorderGroup(group.rows, listDrag.draggingId, entry.id);
-                              listDrag.end();
-                            }}
-                            className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit && filter === "all" ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
-                          >
-                            {selecting ? <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => toggleSelected(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} /> : null}
-                            <button type="button" onClick={() => (selecting ? toggleSelected(entry.id) : openEntry(entry.id))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                              <Thumb url={shown?.imageUrl ?? null} alt={shown ? shown.productName : `${entry.code} has no photo`} />
-                              <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
-                              <span className="grid min-w-0 flex-1 gap-0.5">
-                                {shown ? (
-                                  <>
-                                    <span className="truncate text-sm font-medium text-ink">
-                                      {shown.productName}
-                                      {shown.brandName ? <span className="font-normal text-ink-secondary"> · ex. {shown.brandName}</span> : null}
-                                    </span>
-                                    {specLine(shown) ? <span className="truncate text-xs text-ink-tertiary">{specLine(shown)}</span> : null}
-                                  </>
-                                ) : (
-                                  <span className="text-sm italic text-ink-tertiary">Reserved — no product yet</span>
-                                )}
-                              </span>
-                              <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
-                              <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
-                              {entryBadges(entry).map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}
-                            </button>
-                            {(canEdit || canManageTemplates) && !selecting ? (
-                              <RowActionMenu
-                                label={`Actions for ${entry.code}`}
-                                pending={busy}
-                                items={[
-                                  { label: "Open", onSelect: () => openEntry(entry.id) },
-                                  ...(canManageTemplates && templateSourceOf(entry)
-                                    ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
-                                    : []),
-                                  ...(canEdit ? [
-                                    { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: filter !== "all" || index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
-                                    { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: filter !== "all" || index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
-                                    { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
-                                    { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
-                                  ] : []),
-                                ]}
-                              />
-                            ) : null}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </section>
-                ))}
-              </div>
-            )}
-          </div>
-        {open ? (
-          <DockedEntryPanel
-            key={open.id}
-            projectId={projectId}
-            entry={open}
-            brands={brands}
-            canEdit={canEdit}
-            command={command}
-            confirm={confirm.confirm}
-            canManageTemplates={canManageTemplates}
-            categories={categories}
-            previousId={visibleOpenIndex > 0 ? visibleEntries[visibleOpenIndex - 1]?.id ?? null : null}
-            nextId={visibleOpenIndex >= 0 ? visibleEntries[visibleOpenIndex + 1]?.id ?? null : null}
-            onNavigate={(id) => void navigateEntry(id)}
-            onMove={() => setDialog({ move: open })}
-            onDelete={() => void removeEntry(open)}
-            onClose={() => void closeEditor()}
-            onDirtyChange={(dirty) => { editorDirtyRef.current = dirty; }}
-            initialPhotoOptionId={autoPhotoOptionId}
-          />
-        ) : null}
+                    {groups.map((group) => (
+                      <section key={group.category} className="border-b border-line-subtle last:border-b-0">
+                        <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
+                          <h3 className="m-0 text-label text-ink-secondary">{group.category}</h3>
+                          <Text size="sm" tone="tertiary">{group.rows.length}</Text>
+                        </div>
+                        <ul className="m-0 list-none divide-y divide-line-subtle p-0">
+                          {group.rows.map((entry, index) => {
+                            const shown = shownOptionOf(entry);
+                            const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
+                            return (
+                              <li
+                                key={entry.id}
+                                id={`schedule-entry-${entry.id}`}
+                                draggable={canEdit && filter === "all" && !selecting}
+                                onDragStart={listDrag.start(entry.id)}
+                                onDragEnd={listDrag.end}
+                                onDragOver={listDrag.over(entry.id, canEdit && filter === "all")}
+                                onDragLeave={listDrag.leave(entry.id)}
+                                onDrop={(event) => {
+                                  event.preventDefault();
+                                  if (listDrag.draggingId) reorderGroup(group.rows, listDrag.draggingId, entry.id);
+                                  listDrag.end();
+                                }}
+                                className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit && filter === "all" ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
+                              >
+                                {selecting ? <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => toggleSelected(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} /> : null}
+                                <button type="button" onClick={() => (selecting ? toggleSelected(entry.id) : openEntry(entry.id))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                                  <Thumb url={shown?.imageUrl ?? null} alt={shown ? shown.productName : `${entry.code} has no photo`} />
+                                  <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
+                                  <span className="grid min-w-0 flex-1 gap-0.5">
+                                    {shown ? (
+                                      <>
+                                        <span className="truncate text-sm font-medium text-ink">
+                                          {shown.productName}
+                                          {shown.brandName ? <span className="font-normal text-ink-secondary"> · ex. {shown.brandName}</span> : null}
+                                        </span>
+                                        {specLine(shown) ? <span className="truncate text-xs text-ink-tertiary">{specLine(shown)}</span> : null}
+                                      </>
+                                    ) : (
+                                      <span className="text-sm italic text-ink-tertiary">Reserved — no product yet</span>
+                                    )}
+                                  </span>
+                                  <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
+                                  <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
+                                  {entryBadges(entry).map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}
+                                </button>
+                                {(canEdit || canManageTemplates) && !selecting ? (
+                                  <RowActionMenu
+                                    label={`Actions for ${entry.code}`}
+                                    pending={busy}
+                                    items={[
+                                      { label: "Open", onSelect: () => openEntry(entry.id) },
+                                      ...(canManageTemplates && templateSourceOf(entry)
+                                        ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
+                                        : []),
+                                      ...(canEdit ? [
+                                        { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: filter !== "all" || index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
+                                        { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: filter !== "all" || index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
+                                        { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
+                                        { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
+                                      ] : []),
+                                    ]}
+                                  />
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </section>
+                    ))}
+                  </div>
+                )}
+            </>
+          )}
         </div>
-      )}
 
+        {/* The inspector: docked to the right edge on wide screens, always there, with its own scroll (owner, 2026-10-22).
+            On narrow screens it only appears, full screen, while one item is open. */}
+        <aside
+          aria-label={inspectorItem ? `Edit ${inspectorItem.code}` : bulkOpen ? "Selected items" : "Inspector"}
+          onKeyDown={(event) => { if (event.key === "Escape" && inspectorItem && !event.defaultPrevented) void closeEditor(); }}
+          className={`${inspectorItem ? "fixed inset-0 z-40 flex" : "hidden"} min-h-0 flex-col bg-surface lg:static lg:z-auto lg:flex lg:w-[24rem] lg:shrink-0 lg:border-l lg:border-line-subtle xl:w-[26rem]`}
+        >
+          {inspectorItem ? (
+            <DockedEntryPanel
+              key={inspectorItem.id}
+              projectId={projectId}
+              entry={inspectorItem}
+              brands={brands}
+              canEdit={canEdit}
+              command={command}
+              confirm={confirm.confirm}
+              canManageTemplates={canManageTemplates}
+              categories={categories}
+              previousId={visibleOpenIndex > 0 ? visibleEntries[visibleOpenIndex - 1]?.id ?? null : null}
+              nextId={visibleOpenIndex >= 0 ? visibleEntries[visibleOpenIndex + 1]?.id ?? null : null}
+              onNavigate={(id) => void navigateEntry(id)}
+              onMove={() => setDialog({ move: inspectorItem })}
+              onDelete={() => void removeEntry(inspectorItem)}
+              onClose={() => void closeEditor()}
+              onDirtyChange={(dirty) => { editorDirtyRef.current = dirty; }}
+              initialPhotoOptionId={autoPhotoOptionId}
+            />
+          ) : bulkOpen ? (
+            <BulkPanel
+              picked={visibleEntries.filter((entry) => selectedIds.has(entry.id))}
+              total={visibleEntries.length}
+              allPicked={allPicked}
+              onToggleAll={toggleAllVisible}
+              onClear={() => setSelectedIds(new Set())}
+              onDelete={() => void removeSelected()}
+              deleting={command.pendingKeys.includes("bulk-delete")}
+            />
+          ) : (
+            <div className="grid flex-1 place-content-center justify-items-center gap-2 p-8 text-center">
+              <span className="grid h-12 w-12 place-items-center rounded-control bg-surface-muted text-ink-secondary"><LayoutGrid aria-hidden="true" className="h-5 w-5" /></span>
+              <Text weight="semibold">{selecting ? "Tick the items to act on" : "Pick an item to edit it here"}</Text>
+              <Text size="sm" tone="secondary" className="max-w-64">{selecting ? "What you can do with them shows here. Done selecting goes back to editing." : "The board stays in view while you edit. Select acts on several items at once."}</Text>
+            </div>
+          )}
+        </aside>
+      </div>
 
       {dialog === "add" ? (
         <AddItemDrawer projectId={projectId} section={section} categoriesBySection={categoriesBySection} categoryChoices={categoryChoices} brands={brands} command={command} confirm={confirm.confirm} onClose={() => setDialog(null)} />
@@ -1314,7 +1365,11 @@ function EntryPanelContent({
   });
   const visibilityAction = (key: string, label: string) => {
     const on = displayCardFields.includes(key);
-    return <IconButton size="sm" variant="ghost" label={on ? `Hide ${label} from card` : `Show ${label} on card`} icon={on ? <Eye aria-hidden="true" /> : <EyeOff aria-hidden="true" />} aria-pressed={on} disabled={disabled} onClick={() => toggleCardField(key)} className="!h-6 !min-h-6 !w-6 !p-1" />;
+    return (
+      <button type="button" aria-label={on ? `Hide ${label} from card` : `Show ${label} on card`} title={on ? "Shown on the card and in print" : "Hidden on the card"} aria-pressed={on} disabled={disabled} onClick={() => toggleCardField(key)} className="grid h-6 w-6 shrink-0 place-items-center rounded-full hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-line-focus disabled:opacity-50">
+        <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full border-[1.5px] ${on ? "border-action bg-action" : "border-line-strong bg-transparent"}`} />
+      </button>
+    );
   };
   const busyKey = selected ? `${entry.id}-opt-${selected.id}` : "";
 
@@ -1373,7 +1428,7 @@ function EntryPanelContent({
       {photoFor && entry.options.some((option) => option.id === photoFor) ? (
         <InlinePhotoEditor projectId={projectId} entryCode={entry.code} option={entry.options.find((option) => option.id === photoFor)!} command={command} initialFile={handedPhoto} onClose={() => { setPhotoFor(null); setHandedPhoto(null); }} />
       ) : (
-        <div className="grid items-start gap-4 sm:grid-cols-[8.5rem_minmax(0,1fr)]">
+        <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-start gap-x-3 gap-y-2.5">
           {/* Photo of the selected option (4:5, as on the board). */}
           <div className="relative">
             {selectedId === "new" && canEdit ? (
@@ -1386,10 +1441,10 @@ function EntryPanelContent({
             ) : (
               <Thumb url={selected?.imageUrl ?? null} alt={selected?.productName ?? "No photo"} className="aspect-[4/5] !h-auto w-full !rounded-control" />
             )}
-            {selectedId !== "new" && selected && canEdit ? <Text as="p" size="sm" tone="tertiary" className="mt-1 text-center">Or paste a photo (Ctrl+V)</Text> : null}
+            {selectedId !== "new" && selected && canEdit ? <Text as="p" size="sm" tone="tertiary" className="mt-1 text-center text-[11px] leading-tight">Or paste (Ctrl+V)</Text> : null}
           </div>
 
-          <div className="grid min-w-0 gap-2.5">
+          <div className="contents">
             <input
               aria-label="Type"
               value={draft.productName}
@@ -1399,7 +1454,7 @@ function EntryPanelContent({
               placeholder="Type, e.g. Nude Pro - ATS 1132 M"
               className="h-10 w-full rounded-[6px] border border-transparent bg-transparent px-0 text-lg font-semibold leading-tight tracking-tight text-ink placeholder:text-sm placeholder:font-normal placeholder:text-ink-tertiary hover:border-line-subtle focus:border-line-focus focus:bg-surface focus:px-1.5 focus:outline-none"
             />
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="col-span-full grid grid-cols-2 gap-1.5">
               <CardPlate label="Brand" action={visibilityAction("brand", "Brand")}>
                 <CreatableSearch
                   label="Brand"
@@ -1442,7 +1497,7 @@ function EntryPanelContent({
                 </CardPlate>
               ))}
             </div>
-            <ExtraFieldsEditor value={draft.extra} onChange={(extra) => updateDraft({ extra })} />
+            <div className="col-span-full"><ExtraFieldsEditor value={draft.extra} onChange={(extra) => updateDraft({ extra })} /></div>
           </div>
         </div>
       )}
@@ -1453,8 +1508,8 @@ function EntryPanelContent({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Eye aria-hidden="true" className="h-3.5 w-3.5 text-ink-tertiary" />
-        <Text size="sm" tone="tertiary">The eye shows a field on the board card and in print. Hidden fields stay editable.</Text>
+        <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full border-[1.5px] border-action bg-action" />
+        <Text size="sm" tone="tertiary">A filled dot shows the field on the board card and in print. Hidden fields stay editable.</Text>
         {canEdit && cardFieldsDraft !== null ? <Button type="button" size="sm" variant="ghost" disabled={savePending} onClick={() => setCardFieldsDraft(null)}>Use default</Button> : null}
       </div>
 
@@ -1517,28 +1572,22 @@ function DockedEntryPanel({
   const state = finalOf(entry) ? "Final chosen" : entry.options.length ? "Needs a decision" : "No product yet";
   const source = templateSourceOf(entry);
   return (
-    <aside
-      aria-label={`Edit ${entry.code}`}
-      onKeyDown={(event) => { if (event.key === "Escape" && !event.defaultPrevented) onClose(); }}
-      className="fixed inset-0 z-40 flex min-h-0 flex-col bg-surface lg:sticky lg:inset-auto lg:top-[3.25rem] lg:z-auto lg:max-h-[calc(100vh-3.25rem)] lg:border-l lg:border-line-subtle"
-    >
-      <header className="flex items-start justify-between gap-2 border-b border-line-subtle px-4 py-3">
-        <div className="grid min-w-0 gap-0.5">
-          <div className="flex min-w-0 items-center gap-1">
-            <h2 className="m-0 truncate text-base font-semibold text-ink">{entry.code} · {entry.category}</h2>
-            <IconButton size="sm" variant="ghost" label="Previous item" icon={<ArrowLeft aria-hidden="true" />} disabled={!previousId} onClick={() => { if (previousId) onNavigate(previousId); }} />
-            <IconButton size="sm" variant="ghost" label="Next item" icon={<ArrowRight aria-hidden="true" />} disabled={!nextId} onClick={() => { if (nextId) onNavigate(nextId); }} />
-            <RowActionMenu label={`Actions for ${entry.code}`} items={[
-              { label: "Move to category…", disabled: categories.length < 2, onSelect: onMove },
-              ...(canManageTemplates && source ? [{ label: "Save as template item", onSelect: () => { void command.run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })); } }] : []),
-              { label: "Delete", danger: true, separatorBefore: true, onSelect: onDelete },
-            ]} />
-          </div>
-          <Text size="sm" tone="secondary">{SECTION_LABEL[entry.section]} · {state}</Text>
+    <>
+      <header className="grid shrink-0 gap-0.5 border-b border-line-subtle py-2.5 pl-4 pr-2">
+        <div className="flex min-w-0 items-center gap-0.5">
+          <h2 className="m-0 mr-auto min-w-0 truncate text-base font-semibold text-ink"><span className="font-ui-mono">{entry.code}</span> <span className="text-ink-secondary">· {entry.category}</span></h2>
+          <IconButton size="sm" variant="ghost" label="Previous item" icon={<ArrowLeft aria-hidden="true" />} disabled={!previousId} onClick={() => { if (previousId) onNavigate(previousId); }} />
+          <IconButton size="sm" variant="ghost" label="Next item" icon={<ArrowRight aria-hidden="true" />} disabled={!nextId} onClick={() => { if (nextId) onNavigate(nextId); }} />
+          <RowActionMenu label={`Actions for ${entry.code}`} items={[
+            { label: "Move to category…", disabled: categories.length < 2, onSelect: onMove },
+            ...(canManageTemplates && source ? [{ label: "Save as template item", onSelect: () => { void command.run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })); } }] : []),
+            { label: "Delete", danger: true, separatorBefore: true, onSelect: onDelete },
+          ]} />
+          <IconButton size="sm" variant="ghost" label="Close editor" icon={<X aria-hidden="true" />} onClick={onClose} />
         </div>
-        <IconButton size="sm" variant="ghost" label="Close editor" icon={<X aria-hidden="true" />} onClick={onClose} />
+        <Text size="sm" tone="secondary">{SECTION_LABEL[entry.section]} · {state}</Text>
       </header>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
         <EntryPanelContent
           projectId={projectId}
           entry={entry}
@@ -1551,7 +1600,41 @@ function DockedEntryPanel({
           initialPhotoOptionId={initialPhotoOptionId}
         />
       </div>
-    </aside>
+    </>
+  );
+}
+
+/** The inspector while several items are ticked: what is picked, and what can be done with all of them at once. */
+function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, deleting }: { picked: readonly ScheduleEntryView[]; total: number; allPicked: boolean; onToggleAll: () => void; onClear: () => void; onDelete: () => void; deleting: boolean }) {
+  const count = picked.length;
+  const items = `${count} item${count === 1 ? "" : "s"}`;
+  return (
+    <>
+      <header className="flex shrink-0 items-center gap-1 border-b border-line-subtle py-2.5 pl-4 pr-2">
+        <h2 className="m-0 mr-auto text-base font-semibold text-ink" role="status">{count} selected</h2>
+        <Button size="sm" variant="ghost" onClick={onToggleAll}>{allPicked ? "Clear all" : `Select all ${total}`}</Button>
+        <IconButton size="sm" variant="ghost" label="Clear selection" icon={<X aria-hidden="true" />} onClick={onClear} />
+      </header>
+      <div className="grid min-h-0 flex-1 content-start gap-5 overflow-y-auto overscroll-contain p-4">
+        <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0" aria-label="Selected items">
+          {picked.map((entry) => {
+            const shown = shownOptionOf(entry);
+            return (
+              <li key={entry.id} className="inline-flex max-w-full items-center gap-1.5 rounded-action bg-surface-muted py-1 pl-1 pr-2 text-xs">
+                <Thumb url={shown?.imageUrl ?? null} alt="" className="h-6 w-5" />
+                <span className="font-ui-mono font-semibold tabular-nums text-ink">{entry.code}</span>
+                <span className="truncate text-ink-secondary">{shown?.productName ?? "No product yet"}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="grid gap-2 rounded-control border border-danger-line bg-danger-surface p-3">
+          <Text size="sm" weight="semibold" className="text-danger">Delete {items}</Text>
+          <Text size="sm" tone="secondary">Each item and all its options are removed. Their codes are left empty; other codes do not shift.</Text>
+          <Button size="sm" variant="danger-primary" className="justify-self-start" leadingIcon={<Trash2 className="h-3.5 w-3.5" />} pending={deleting} onClick={onDelete}>Delete {items}</Button>
+        </div>
+      </div>
+    </>
   );
 }
 
