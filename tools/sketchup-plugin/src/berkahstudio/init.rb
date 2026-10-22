@@ -19,6 +19,7 @@ require_relative 'core/model_scanner'
 require_relative 'core/web_launcher'
 require_relative 'core/material_ops'
 require_relative 'core/auto_rename_material_tool'
+require_relative 'core/link_rules'
 require_relative 'core/studioflow_client'
 require_relative 'core/schedule_link'
 require_relative 'core/csv_exporter'
@@ -127,6 +128,7 @@ module BerkahStudio
       load File.join(ROOT, 'core/web_launcher.rb')
       load File.join(ROOT, 'core/material_ops.rb')
       load File.join(ROOT, 'core/auto_rename_material_tool.rb')
+      load File.join(ROOT, 'core/link_rules.rb')
       load File.join(ROOT, 'core/studioflow_client.rb')
       load File.join(ROOT, 'core/schedule_link.rb')
       load File.join(ROOT, 'core/csv_exporter.rb')

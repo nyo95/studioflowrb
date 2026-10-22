@@ -11,7 +11,12 @@ module BerkahStudio
       def activate
         @cancelled = false
         @pending = false
-        text = StudioflowClient.connected? ? 'Klik permukaan untuk memberi kode dari jadwal StudioFlow.' : 'Klik permukaan untuk memberi kode pada materialnya (belum tersambung ke StudioFlow).'
+        # The project is named so a model copied from another project's file is noticed before anything is linked.
+        text = if StudioflowClient.connected?
+                 "Proyek StudioFlow: #{StudioflowClient.project_name}. Klik permukaan untuk memberi kode dari jadwal."
+               else
+                 'Klik permukaan untuk memberi kode pada materialnya (belum tersambung ke StudioFlow).'
+               end
         Sketchup.set_status_text(text)
       end
 

@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require 'json'
-require 'securerandom'
 
 module BerkahStudio
   module MaterialScheduler
@@ -63,16 +62,22 @@ module BerkahStudio
         request(:post, "projects/#{project_id}/resolve", { entryIds: entry_ids }, &done)
       end
 
-      # The Idempotency-Key makes a retried click safe: StudioFlow replays the first answer instead of a second item.
-      def self.create_entry(project_id, section, category, confirm_new_category = false, &done)
+      # The caller keeps idempotency_key on the material until StudioFlow answers; sending the same key and body again
+      # replays the first answer instead of creating a second item (WO-SKETCHUP-02).
+      def self.create_entry(project_id, section, category, idempotency_key, confirm_new_category = false, &done)
         body = { section: section, category: category }
         body[:confirmNewCategory] = true if confirm_new_category
-        request(:post, "projects/#{project_id}/entries", body, SecureRandom.uuid, &done)
+        request(:post, "projects/#{project_id}/entries", body, idempotency_key, &done)
       end
 
       # Calls back on the main thread, outside the HTTP callback, with (data, nil) or (nil, error).
       # error is { code:, message: }; a network failure has code 'NETWORK'.
       def self.request(method, path, body, idempotency_key = nil, &done)
+        # The token travels with every request: never over plain http outside this computer or a private network.
+        if LinkRules.server_check(server) == :refuse
+          message = "#{server} memakai http di luar jaringan kantor; token tidak dikirim. Sambung ulang dengan alamat https://."
+          return UI.start_timer(0, false) { done.call(nil, { code: 'INSECURE_SERVER', message: message }) }
+        end
         url = "#{server}#{API_PATH}#{path}"
         verb = method == :post ? Sketchup::Http::POST : Sketchup::Http::GET
         req = Sketchup::Http::Request.new(url, verb)

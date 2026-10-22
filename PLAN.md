@@ -5,7 +5,7 @@ Scope: SketchUp plugin keeps links safe when codes are reused, materials are mer
 Module(s): plugin under `tools/sketchup-plugin/` only (P0). P1 adds an additive read field to module `sketchup`.
 Target revision: plan R9.192; P0 (Lead) R9.193.
 Risk: medium - renames and merges in real SketchUp models; every change asks first and is one undo step.
-Status: READY (P0, Lead executes); WO-SKETCHUP-01 Stage 1b built in R9.189, owner test in SketchUp owed together with P0.
+Status: P0 built in R9.193 (plugin 1.2.1); owner test in SketchUp owed (together with WO-SKETCHUP-01 Stage 1b). WO-SKETCHUP-03 becomes READY after that test.
 Priority: P2
 Owner: Product Owner (decisions 2026-10-22, second review: code = specification slot, reuse allowed; names PL-01 / PL-01-B; no auto option A; offline names unchanged; merge only by official entry and option id; http only for local/private addresses; alternatives from SketchUp deferred)
 Last updated: 2026-10-22

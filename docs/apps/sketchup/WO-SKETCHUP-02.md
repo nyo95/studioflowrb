@@ -1,6 +1,6 @@
 # WO-SKETCHUP-02 — SketchUp plugin P0: link safety (plugin 1.2.1)
 
-Status: READY (owner decisions 2026-10-22, second review). Lead executes (plugin only).
+Status: built in R9.193 (plugin 1.2.1); owner test in SketchUp owed. Lead executes (plugin only).
 Module(s): plugin `tools/sketchup-plugin/` only. No StudioFlow, schema or route change.
 Depends on: WO-SKETCHUP-01 Stage 1b (plugin 1.2.0, R9.189/R9.190).
 Followed by: WO-SKETCHUP-03 (P1, option-aware links).
@@ -30,8 +30,8 @@ behind a confirmation and one undo step.
 5. (Owner D5) Code reuse is expected; a stale entry id is never redirected to the entry that
    now carries the same code.
 6. (Owner, Q1) Token transport: `https://` everywhere; `http://` only for localhost and
-   private-network addresses (10/8, 172.16/12, 192.168/16, 127/8, `*.local`), with a
-   one-time warning per server for a private-network address.
+   private-network addresses (10/8, 172.16/12, 192.168/16, `*.local`, single-label LAN host
+   names), with a warning when connecting; a refused address sends no request at all.
 7. (Owner, Q2) Creating an alternative option from SketchUp is deferred: options are made in
    the Product Schedule or through the MCP; the plugin links to existing ones (P1).
 8. (Owner, Q3) **Merge is verified by official ids only.** Narrows WO-SKETCHUP-01 decision 13:
@@ -39,15 +39,14 @@ behind a confirmation and one undo step.
    the same entry id and the same option id; in P0 (no option ids yet) only when both link the
    same entry and that entry has at most one option. Never by name or code spelling, never for
    a stale or other-project link. Decision 12 (SO-1 = SO-01 offered for *linking*, asked first)
-   stays.
+   stays. The schedule read of module 1.0.0 carries no option ids or option count, so P0 cannot
+   verify an option: **P0 switches the merge offer off**; WO-SKETCHUP-03 brings it back with option
+   ids and the look-safe merge below.
 
 ## P0 work
 
-1. **Merge (B1, B2, B9).** Candidates per decision 8. Compare look: texture image content
-   (written once per material to a temp file and hashed), texture width/height, colour, alpha,
-   colorize type. Same look → merge keeps the appearance. Different look → default answer is
-   "Jangan gabung"; to continue, the user picks which material's look survives. One traversal
-   for all replaced materials (definitions visited once). Face counts from the same single pass.
+1. **Merge (B1, B2).** The merge offer after linking is removed (decision 8); linking never
+   changes another material. The look-safe merge (B9) moves to WO-SKETCHUP-03.
 2. **Refresh (B3, B6).** A target name wanted by more than one material, or held by a material
    that is not being renamed, is given to nobody and listed as a conflict. An entry that no
    longer exists keeps the material's link (entry id and project id stay) and is listed as
@@ -71,16 +70,15 @@ behind a confirmation and one undo step.
 6. **Token transport (B8)** per decision 6, checked when connecting and before every request.
 7. Pure rules (refresh plan, merge eligibility, look comparison, server-address check, pending
    expiry) live in `core/link_rules.rb` without SketchUp calls and are tested with plain Ruby
-   (`tools/sketchup-plugin/test/link_rules_test.rb`, minitest from the Ruby standard library).
+   (`tools/sketchup-plugin/test/link_rules_test.rb`, minitest bundled with Ruby).
 
 Out of scope: option ids, naming suffixes, server changes (WO-SKETCHUP-03); legacy dead code
 (BACKLOG `[CLEANUP]`); texture upload (P3).
 
 ## Acceptance
 
-1. Two materials linked to one entry that has two or more options are never offered a merge.
-2. A merge of two materials with identical textures leaves every face's look unchanged; one
-   undo restores both materials.
+1. Linking a material never offers to merge it with another material (P0).
+2. (moved to WO-SKETCHUP-03: look-safe merge.)
 3. Refresh with two materials linked to the same entry succeeds for every other material and
    lists that conflict; nothing raises.
 4. Network cut after "Item baru" was stored by StudioFlow, then a second click: one entry exists

@@ -48,7 +48,12 @@ a material with a stale link, the plugin offers (asked) to rename it to `<code> 
   material (materials collection only, no geometry traversal), summary grouped as rename /
   not final / option not chosen / stale / other project / conflict; apply on Yes in one undo step
   with temporary names (final moving A → B swaps `PL-02` and `PL-02-A`).
-- Merge candidates: same project, same entry id and same option id (decision Q3).
+- Merge comes back (off since WO-SKETCHUP-02): candidates only with the same project, entry id and
+  option id (decision Q3), or two entry-only links to an entry with at most one option. Look
+  compared by texture image content, texture size, colour, alpha and colorize type; same look →
+  merge keeps every face's look; different look → default "Jangan gabung", and to continue the user
+  picks the surviving look. One traversal for all replaced materials (each definition once), face
+  counts from the same pass. One undo step; the Schedule is never changed.
 - Component Tracker and `MaterialMetadata.apply_code` accept `PREFIX-NN-L` (registered prefix,
   letter suffix) as a valid code; `parse_dirty` does not flag it.
 
@@ -62,8 +67,11 @@ a material with a stale link, the plugin offers (asked) to rename it to `<code> 
    "opsi belum dipilih"; opening an old model changes nothing.
 4. Entry created from SketchUp has no option and the material is `PL-02` "belum ada spesifikasi".
 5. Component Tracker shows `PL-02-B` as Valid Code.
-6. Plugin 1.2.x keeps working against module 1.1.0.
-7. Checks: sketchup integration tests, high gate, plugin `ruby -wc`, rule tests, owner test in SketchUp.
+6. Two materials linked to different options of one entry are never offered a merge; a merge of two
+   materials with identical textures leaves every face's look (including texture position) unchanged;
+   one undo restores both.
+7. Plugin 1.2.x keeps working against module 1.1.0.
+8. Checks: sketchup integration tests, high gate, plugin `ruby -wc`, rule tests, owner test in SketchUp.
 
 ## Rollback
 

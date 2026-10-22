@@ -1,5 +1,17 @@
 # Changelog
 
+## R9.193 | 2026-10-22 | fix(sketchup): plugin 1.2.1 keeps schedule links safe (Lead)
+
+- **Work order:** `WO-SKETCHUP-02` (P0), owner decisions of 2026-10-22 (second review). Plugin only; StudioFlow unchanged.
+- **Identity, not code:** a material whose item was deleted is explained on click ("dulu ST-01 · Marmer Merah") and the choice starts at "Biarkan"; when its code now belongs to a new item, that item is named and linked only on request. Links store a code/title snapshot (`studioflow_link_code`, `studioflow_link_title`). A material linked to another project is said so; the tool's status text names the connected project.
+- **Merge offer removed** until option ids exist (WO-SKETCHUP-03): it chose candidates by code spelling and by entry, which could join alternatives.
+- **Perbarui kode:** a name wanted by two materials, or held by a material that keeps its name, goes to nobody and is listed (it used to give one name to two materials); an item that is gone no longer unlinks the material, which keeps its name and old link and is listed; materials linked to other projects are counted.
+- **Item baru survives a lost answer:** the idempotency key is stored on the material before the request (`studioflow_pending`); the next click on it resends the same request so StudioFlow replays the same item; a refusal clears it, an unsure answer (network, unreadable reply, in progress) keeps it; older than 23 h is dropped with a notice. An answer that arrives after the model or material is gone is reported with the created code instead of being dropped.
+- **Token transport:** https everywhere; http only for localhost and private-network addresses (warning when connecting); a refused address sends no request.
+- **Rules** in `core/link_rules.rb` (pure Ruby) with `tools/sketchup-plugin/test/link_rules_test.rb`.
+- **Docs:** `WO-SKETCHUP-02` (merge off in P0; look-safe merge moved to `WO-SKETCHUP-03`), plugin READMEs, `PLAN.md`.
+- **Checks:** `ruby -wc` on all 20 plugin files (local Ruby 3.3.6; SketchUp 2026 ships 3.2): Syntax OK; rule tests 9 runs / 42 assertions pass; a stubbed-SketchUp smoke run (not committed) of stale-link leave and explicit link, interrupted Item baru resumed with the same key, refresh with a shared target and an other-project link, insecure server refusal; `node tools/sketchup-plugin/build.mjs` packs 24 files. **Not run in SketchUp:** the owner's test against the dev server (WO-SKETCHUP-02 acceptance 1, 3-7, with WO-SKETCHUP-01 acceptance 1-5) is the end-to-end check.
+
 ## R9.192 | 2026-10-22 | plan(sketchup): P0 link safety and P1 option-aware links (Lead)
 
 - **Owner review (second):** a schedule code is the active specification slot of a category, not a product or SketchUp object; the lowest-free-number allocator and code reuse stay; identity is the entry id. A design change is not an option; no object-level assignment or material history. Decisions: names PL-01 (final or single option) / PL-01-B (non-final alternatives); a new entry from SketchUp has no option (already so); offline names unchanged; texture upload P3; http only for local/private addresses; alternatives are not created from SketchUp; merge only by the same official entry and option id (narrows WO-SKETCHUP-01 decision 13).

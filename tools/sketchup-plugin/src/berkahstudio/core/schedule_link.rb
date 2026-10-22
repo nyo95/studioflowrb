@@ -1,23 +1,29 @@
 # frozen_string_literal: true
 
+require 'json'
+require 'securerandom'
 require 'set'
 
 module BerkahStudio
   module MaterialScheduler
-    # Codes from the Product Schedule (WO-SKETCHUP-01 Stage 1b). StudioFlow allocates every code; a SketchUp material
-    # is linked to its schedule item (project id + entry id stored on the material). Every link, rename, new item and
-    # merge waits for the user's answer (decisions 11-13). Merging only touches this model, never the Schedule.
+    # Codes from the Product Schedule (WO-SKETCHUP-01 Stage 1b, WO-SKETCHUP-02). StudioFlow allocates every code and may
+    # give a deleted item's code to a new item later, so a SketchUp material is identified with its item only through
+    # the project id + entry id stored on it, never through its name. Every link, rename and new item waits for the
+    # user's answer. Merging returns with option ids (WO-SKETCHUP-03): one entry may hold alternatives that look alike.
     module ScheduleLink
       DICT = 'BerkahStudio'.freeze
       ENTRY_KEY = 'studioflow_entry_id'.freeze
       PROJECT_KEY = 'studioflow_project_id'.freeze
+      # What the link said when it was made or last refreshed, to explain a link whose item is gone.
+      CODE_KEY = 'studioflow_link_code'.freeze
+      TITLE_KEY = 'studioflow_link_title'.freeze
+      # An "Item baru" request that has not been answered yet: { key, projectId, section, category, at }.
+      PENDING_KEY = 'studioflow_pending'.freeze
       SECTION = 'MATERIAL'.freeze
       CHOOSE = '(pilih)'.freeze
 
-      # SO-1, SO-001, so-01 and SO-01 are one code (decision 12): prefix case-insensitive, leading zeros ignored.
       def self.code_key(name)
-        match = name.to_s.strip.match(/\A([A-Za-z]+)\s*-\s*0*(\d+)\z/)
-        match ? "#{match[1].upcase}-#{match[2].to_i}" : nil
+        LinkRules.code_key(name)
       end
 
       def self.entry_label(entry)
@@ -37,9 +43,24 @@ module BerkahStudio
         id.empty? ? nil : id
       end
 
+      # What the material was last linked to, for messages ("dulu ST-01 · Marmer Merah").
+      def self.former_label(material)
+        code = material.get_attribute(DICT, CODE_KEY).to_s
+        title = material.get_attribute(DICT, TITLE_KEY).to_s.strip
+        return 'item lama (kodenya tidak tercatat)' if code.empty?
+
+        title.empty? ? code : "#{code} · #{title}"
+      end
+
       def self.unlink(material)
-        material.delete_attribute(DICT, ENTRY_KEY)
-        material.delete_attribute(DICT, PROJECT_KEY)
+        [ENTRY_KEY, PROJECT_KEY, CODE_KEY, TITLE_KEY].each { |key| material.delete_attribute(DICT, key) }
+      end
+
+      def self.pending(material)
+        data = JSON.parse(material.get_attribute(DICT, PENDING_KEY).to_s)
+        data.is_a?(Hash) ? data : nil
+      rescue JSON::ParserError
+        nil
       end
 
       # ── Connect ──────────────────────────────────────────────────────────────
@@ -56,9 +77,12 @@ module BerkahStudio
         server = input[0].to_s.strip.chomp('/')
         token = input[1].to_s.strip
         token = StudioflowClient.token if token.empty?
-        unless server =~ %r{\Ahttps?://}i
-          UI.messagebox('Alamat StudioFlow harus diawali http:// atau https://')
-          return
+        case LinkRules.server_check(server)
+        when :refuse
+          return UI.messagebox("Alamat StudioFlow harus https://...\nhttp:// hanya boleh untuk komputer ini (localhost) atau jaringan kantor (mis. 192.168.x.x), karena token ikut terkirim di setiap permintaan.")
+        when :warn
+          answer = UI.messagebox("#{server} memakai http (tanpa enkripsi). Token ikut terkirim dan bisa dibaca orang lain di jaringan yang sama.\n\nLanjutkan hanya kalau ini jaringan kantor yang kamu percaya.", MB_YESNO)
+          return unless answer == IDYES
         end
         unless StudioflowClient.valid_token?(token)
           UI.messagebox("Token tidak dikenali. Buat token di StudioFlow (Account > Integration tokens) dengan izin SketchUp, lalu tempel di sini.")
@@ -98,6 +122,8 @@ module BerkahStudio
 
       def self.on_material(material, model)
         project_id = StudioflowClient.project_id(model)
+        return if resume_pending(material, model, project_id)
+
         Sketchup.set_status_text('Berkah Studio: membaca jadwal dari StudioFlow...')
         StudioflowClient.schedule(project_id) do |schedule, error|
           Sketchup.set_status_text('')
@@ -110,25 +136,47 @@ module BerkahStudio
 
       def self.decide(material, model, project_id, schedule)
         entries = schedule['entries'] || []
-        linked = linked_entry_id(material, project_id)
-        entry = linked && entries.find { |row| row['id'] == linked }
-        if entry
+        state = LinkRules.classify(material.get_attribute(DICT, PROJECT_KEY), material.get_attribute(DICT, ENTRY_KEY), project_id, entries.map { |row| row['id'] })
+        case state
+        when :linked
+          entry = entries.find { |row| row['id'] == material.get_attribute(DICT, ENTRY_KEY) }
           answer = UI.messagebox("Material \"#{material.name}\" terhubung ke #{entry_label(entry)}.\n\nGanti ke item lain?", MB_YESNO)
-          return picker(material, model, project_id, schedule) if answer == IDYES
-
-          return offer_merge(material, model, project_id, entry)
+          return answer == IDYES ? picker(material, model, project_id, schedule) : nil
+        when :other_project
+          answer = UI.messagebox("Material \"#{material.name}\" tertaut ke item proyek StudioFlow lain (dulu #{former_label(material)}), bukan proyek model ini.\n\nHubungkan ke item proyek ini?", MB_YESNO)
+          return unless answer == IDYES
+        when :stale
+          return stale_choice(material, model, project_id, schedule)
         end
 
         key = code_key(material.name)
         match = key && entries.find { |row| code_key(row['code']) == key }
-        if match
-          answer = UI.messagebox("Material \"#{material.name}\":\nIni #{entry_label(match)}?\n\nYes = hubungkan, No = pilih item lain, Cancel = batal.", MB_YESNOCANCEL)
-          return link(material, model, project_id, match) if answer == IDYES
-          return picker(material, model, project_id, schedule) if answer == IDNO
+        return picker(material, model, project_id, schedule) unless match
 
-          return
-        end
-        picker(material, model, project_id, schedule)
+        answer = UI.messagebox("Material \"#{material.name}\" belum tertaut ke jadwal.\nIni #{entry_label(match)}?\n\nYes = hubungkan, No = pilih item lain, Cancel = batal.", MB_YESNOCANCEL)
+        return link(material, model, project_id, match) if answer == IDYES
+        return picker(material, model, project_id, schedule) if answer == IDNO
+      end
+
+      # The item this material was linked to is gone. Its code may already belong to a new item (StudioFlow reuses free
+      # numbers), so the choice starts at "leave it" and the new item is named, never assumed (D5).
+      def self.stale_choice(material, model, project_id, schedule)
+        entries = schedule['entries'] || []
+        key = code_key(material.name)
+        match = key && entries.find { |row| code_key(row['code']) == key }
+        leave = 'Biarkan (jangan tautkan)'
+        other = 'Pilih item lain...'
+        choices = [leave]
+        choices << list_safe("Tautkan ke item baru #{entry_label(match)}") if match
+        choices << other
+        note = match ? "\nKode #{match['code']} sekarang dipakai item lain: #{entry_label(match)}." : ''
+        input = UI.inputbox(['Tindakan'], [leave], [choices.join('|')], "Tautan tidak berlaku: #{material.name}")
+        UI.messagebox("Material \"#{material.name}\" dulu tertaut ke #{former_label(material)}, yang sudah dihapus dari jadwal.#{note}\nMaterial dibiarkan; tautan lamanya tetap tercatat.") if input.nil? || input[0] == leave
+        return if input.nil? || input[0] == leave
+        return unless Sketchup.active_model == model && material.valid?
+        return picker(material, model, project_id, schedule) if input[0] == other
+
+        link(material, model, project_id, match)
       end
 
       def self.picker(material, model, project_id, schedule)
@@ -159,13 +207,52 @@ module BerkahStudio
         answer = UI.messagebox("Buat item baru di \"#{category}\"? StudioFlow memberi kodenya, lalu material \"#{material.name}\" memakai kode itu.", MB_YESNO)
         return unless answer == IDYES
 
-        Sketchup.set_status_text('Berkah Studio: membuat item di StudioFlow...')
-        StudioflowClient.create_entry(project_id, SECTION, category) do |created, error|
-          Sketchup.set_status_text('')
-          next UI.messagebox(StudioflowClient.explain(error)) if error
-          next unless Sketchup.active_model == model && material.valid?
+        # The key is kept on the material until StudioFlow answers, so a second click after a lost answer replays the
+        # same request and gets the same item instead of a second one.
+        request = { 'key' => SecureRandom.uuid, 'projectId' => project_id, 'section' => SECTION, 'category' => category, 'at' => Time.now.to_i }
+        Undo.wrap('Item baru (menunggu StudioFlow)') { material.set_attribute(DICT, PENDING_KEY, JSON.generate(request)) }
+        send_create(material, model, request)
+      end
 
-          link(material, model, project_id, { 'id' => created['entryId'], 'code' => created['code'], 'title' => '' })
+      # A click on a material with an unanswered "Item baru" finishes that request first (WO-SKETCHUP-02).
+      def self.resume_pending(material, model, project_id)
+        request = pending(material)
+        return false unless request
+
+        if request['projectId'] != project_id || !LinkRules.pending_fresh?(request, Time.now)
+          Undo.wrap('Hapus permintaan lama') { material.delete_attribute(DICT, PENDING_KEY) }
+          UI.messagebox("Permintaan \"Item baru di #{request['category']}\" untuk material ini sudah terlalu lama atau untuk proyek lain, jadi tidak diulang.\nCek di Product Schedule apakah itemnya sudah dibuat; kalau ya, tautkan lewat daftar item.")
+          return false
+        end
+        answer = UI.messagebox("Permintaan \"Item baru di #{request['category']}\" untuk material \"#{material.name}\" belum mendapat jawaban dari StudioFlow.\n\nYes = selesaikan (tidak membuat item kedua), No = batalkan permintaan itu.", MB_YESNOCANCEL)
+        return true if answer == IDCANCEL
+
+        if answer == IDNO
+          Undo.wrap('Batalkan permintaan item baru') { material.delete_attribute(DICT, PENDING_KEY) }
+          UI.messagebox('Permintaan dibatalkan di SketchUp. Kalau StudioFlow sempat membuat itemnya, item itu tetap ada di Product Schedule.')
+          return false
+        end
+        send_create(material, model, request)
+        true
+      end
+
+      def self.send_create(material, model, request)
+        Sketchup.set_status_text('Berkah Studio: membuat item di StudioFlow...')
+        StudioflowClient.create_entry(request['projectId'], request['section'], request['category'], request['key']) do |created, error|
+          Sketchup.set_status_text('')
+          alive = Sketchup.active_model == model && material.valid?
+          if error
+            if alive && !LinkRules.keep_pending?(error[:code])
+              Undo.wrap('Hapus permintaan item baru') { material.delete_attribute(DICT, PENDING_KEY) }
+            end
+            retry_note = LinkRules.keep_pending?(error[:code]) ? "\n\nKlik material ini lagi dengan Auto-Rename untuk mencoba lagi; StudioFlow tidak akan membuat item kedua." : ''
+            next UI.messagebox("#{StudioflowClient.explain(error)}#{retry_note}")
+          end
+          unless alive
+            next UI.messagebox("StudioFlow sudah membuat item #{created['code']} (#{created['category']}), tetapi material atau modelnya sudah tidak terbuka.\nBuka modelnya lalu klik materialnya: permintaan yang sama dilanjutkan, atau tautkan lewat daftar item #{created['category']}.")
+          end
+
+          link(material, model, request['projectId'], { 'id' => created['entryId'], 'code' => created['code'], 'title' => '' })
         end
       end
 
@@ -181,83 +268,22 @@ module BerkahStudio
 
       def self.link(material, model, project_id, entry)
         code = entry['code'].to_s
+        taken = model.materials[code]
         Undo.wrap('Kode dari jadwal') do
           material.set_attribute(DICT, ENTRY_KEY, entry['id'])
           material.set_attribute(DICT, PROJECT_KEY, project_id)
-          taken = model.materials[code]
+          material.set_attribute(DICT, CODE_KEY, code)
+          material.set_attribute(DICT, TITLE_KEY, entry['title'].to_s)
+          material.delete_attribute(DICT, PENDING_KEY)
           material.name = code unless taken && taken != material
           MaterialMetadata.apply_code(material, code)
         end
         ModelScanner.invalidate_cache
         EventBus.publish(:data_changed)
         Sketchup.set_status_text("Material terhubung ke #{entry_label(entry)}")
-        offer_merge(material, model, project_id, entry)
-      end
+        return unless taken && taken != material
 
-      # ── Merge (decision 13) ──────────────────────────────────────────────────
-
-      def self.offer_merge(material, model, project_id, entry)
-        key = code_key(entry['code'])
-        others = model.materials.select do |other|
-          other != material && (linked_entry_id(other, project_id) == entry['id'] || code_key(other.name) == key)
-        end
-        if others.empty?
-          return if material.name == entry['code']
-
-          return UI.messagebox("Nama \"#{entry['code']}\" sudah dipakai material lain, jadi material ini terhubung tetapi namanya tetap \"#{material.name}\".")
-        end
-
-        counts = usage_counts(model, [material] + others)
-        lines = ([material] + others).map { |row| "• #{row.name}: #{counts[row]} permukaan" }
-        differs = others.any? { |other| look_of(other) != look_of(material) }
-        warning = differs ? "\n\nPERHATIAN: tekstur/warnanya berbeda. Setelah digabung semua memakai tampilan \"#{material.name}\"." : ''
-        answer = UI.messagebox("Ada #{others.length + 1} material untuk #{entry_label(entry)}:\n#{lines.join("\n")}#{warning}\n\nGabungkan jadi satu material \"#{entry['code']}\"? (bisa di-undo)", MB_YESNO)
-        if answer != IDYES
-          return if material.name == entry['code']
-
-          return UI.messagebox("Material tidak digabung. Material ini terhubung ke #{entry['code']} tetapi namanya tetap \"#{material.name}\" karena nama itu dipakai material lain.")
-        end
-
-        Undo.wrap('Gabungkan material') do
-          others.each do |other|
-            MaterialOps.replace_material_in_entities(model.entities, other, material, Set.new)
-            model.definitions.each do |definition|
-              next if definition.image?
-
-              MaterialOps.replace_material_in_entities(definition.entities, other, material, Set.new)
-            end
-            model.materials.remove(other)
-          end
-          material.name = entry['code'] unless material.name == entry['code']
-          material.set_attribute(DICT, ENTRY_KEY, entry['id'])
-          material.set_attribute(DICT, PROJECT_KEY, project_id)
-          MaterialMetadata.apply_code(material, entry['code'])
-        end
-        ModelScanner.invalidate_cache
-        EventBus.publish(:data_changed)
-        Sketchup.set_status_text("#{others.length + 1} material digabung menjadi #{entry['code']}")
-      end
-
-      # Faces painted with each material, counted once per definition (not per copy).
-      def self.usage_counts(model, materials)
-        counts = Hash.new(0)
-        wanted = materials.to_set
-        tally = lambda do |entities|
-          entities.each do |entity|
-            next unless entity.is_a?(Sketchup::Face) || entity.is_a?(Sketchup::Group) || entity.is_a?(Sketchup::ComponentInstance)
-
-            counts[entity.material] += 1 if wanted.include?(entity.material)
-            counts[entity.back_material] += 1 if entity.is_a?(Sketchup::Face) && wanted.include?(entity.back_material)
-          end
-        end
-        tally.call(model.entities)
-        model.definitions.each { |definition| tally.call(definition.entities) unless definition.image? }
-        counts
-      end
-
-      def self.look_of(material)
-        texture = material.texture
-        [texture ? File.basename(texture.filename.to_s) : nil, material.color.to_a]
+        UI.messagebox("Material terhubung ke #{entry_label(entry)}, tetapi nama \"#{code}\" sudah dipakai material lain, jadi namanya tetap \"#{material.name}\".\nGanti atau bersihkan material \"#{code}\" yang lain dulu kalau nama ini harus dipakai.")
       end
 
       # ── Refresh codes ────────────────────────────────────────────────────────
@@ -279,32 +305,35 @@ module BerkahStudio
           next UI.messagebox(StudioflowClient.explain(error)) if error
           next unless Sketchup.active_model == model
 
-          apply_refresh(model, project_id, linked, rows.to_h { |row| [row['entryId'], row['code']] })
+          apply_refresh(model, project_id, linked.select(&:valid?), rows.to_h { |row| [row['entryId'], row['code']] })
         end
       end
 
       def self.apply_refresh(model, project_id, linked, codes)
-        renames = []
-        gone = []
-        linked.each do |material|
-          next unless material.valid?
-
-          code = codes[linked_entry_id(material, project_id)]
-          if code.nil?
-            gone << material
-          elsif material.name != code
-            renames << [material, code]
-          end
+        by_key = {}
+        rows = linked.map do |material|
+          by_key[material.entityID] = material
+          { key: material.entityID, name: material.name, target: codes[linked_entry_id(material, project_id)] }
         end
-        return UI.messagebox('Semua kode material sudah sama dengan jadwal.') if renames.empty? && gone.empty?
+        holders = model.materials.to_h { |material| [material.name, material.entityID] }
+        plan = LinkRules.refresh_plan(rows, holders)
+        others = model.materials.count { |material| !material.get_attribute(DICT, ENTRY_KEY).to_s.empty? && material.get_attribute(DICT, PROJECT_KEY).to_s != project_id }
+        renames = plan[:renames].map { |row| [by_key[row[:key]], row[:target]] }
+        if renames.empty? && plan[:conflicts].empty? && plan[:stale].empty?
+          return UI.messagebox("Semua kode material sudah sama dengan jadwal.#{others.positive? ? "\n#{others} material tertaut ke proyek lain dan tidak dicek." : ''}")
+        end
 
-        moving = renames.map(&:first).to_set
-        blocked = renames.select { |material, code| (holder = model.materials[code]) && !moving.include?(holder) }
-        renames -= blocked
         summary = []
         summary << "#{renames.length} material diganti namanya:\n#{renames.first(15).map { |m, c| "• #{m.name} → #{c}" }.join("\n")}#{renames.length > 15 ? "\n• ..." : ''}" unless renames.empty?
-        summary << "#{gone.length} material tidak lagi terhubung (itemnya sudah tidak ada di jadwal): #{gone.first(10).map(&:name).join(', ')}" unless gone.empty?
-        summary << "#{blocked.length} dilewati karena namanya dipakai material lain: #{blocked.map { |m, c| "#{m.name} → #{c}" }.join(', ')}" unless blocked.empty?
+        unless plan[:stale].empty?
+          summary << "#{plan[:stale].length} material tertaut ke item yang sudah dihapus dari jadwal (nama dan tautan lama dibiarkan, klik materialnya untuk menautkan ulang): #{plan[:stale].first(10).map { |row| row[:name] }.join(', ')}"
+        end
+        unless plan[:conflicts].empty?
+          summary << "#{plan[:conflicts].length} dilewati karena namanya bentrok (dipakai material lain, atau beberapa material tertaut ke item yang sama): #{plan[:conflicts].first(10).map { |row| "#{row[:name]} → #{row[:target]}" }.join(', ')}"
+        end
+        summary << "#{others} material tertaut ke proyek lain dan tidak dicek." if others.positive?
+        return UI.messagebox("Tidak ada nama yang diganti.\n\n#{summary.join("\n\n")}") if renames.empty?
+
         answer = UI.messagebox("Perbarui kode dari jadwal?\n\n#{summary.join("\n\n")}", MB_YESNO)
         return unless answer == IDYES
 
@@ -313,9 +342,9 @@ module BerkahStudio
           renames.each_with_index { |(material, _code), index| material.name = "__studioflow_#{index}_#{material.entityID}" }
           renames.each do |material, code|
             material.name = code
+            material.set_attribute(DICT, CODE_KEY, code)
             MaterialMetadata.apply_code(material, code)
           end
-          gone.each { |material| unlink(material) }
         end
         ModelScanner.invalidate_cache
         EventBus.publish(:data_changed)

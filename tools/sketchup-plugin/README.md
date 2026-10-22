@@ -1,11 +1,13 @@
 # Berkah Studio SketchUp plugin
 
 Source of the Berkah Studio extension for SketchUp (moved here from the 1.1.6 package on
-2026-10-22, `WO-SKETCHUP-01` rev 2 Stage 0). Plan: `docs/apps/sketchup/WO-SKETCHUP-01.md`.
+2026-10-22, `WO-SKETCHUP-01` rev 2 Stage 0). Plans: `docs/apps/sketchup/WO-SKETCHUP-01.md`,
+`WO-SKETCHUP-02.md` (link safety), `WO-SKETCHUP-03.md` (option-aware links).
 
 - `src/berkahstudio.rb` — the loader SketchUp registers; `VERSION` lives here.
 - `src/berkahstudio/` — the extension: Auto-Rename Material, Component Tracker, Wall Finish
-  Labels. Sync with StudioFlow is switched off until Stage 1b.
+  Labels, codes from the Product Schedule (Sambung ke StudioFlow).
+- `test/` — plain-Ruby tests of the pure link rules (`core/link_rules.rb`).
 
 ## Build
 
@@ -21,5 +23,6 @@ with SketchUp > Extension Manager > Install Extension, then restart SketchUp.
 - Codes use the Product Schedule's format, at least two digits (PL-01). PL-1 and PL-01 are the
   same code.
 - Keep each change small and bump `VERSION`; record it in `CHANGELOG.md` like any revision.
-- No Ruby interpreter is installed on the development machines yet: check a change by loading
-  it in SketchUp (Extensions > Berkah Studio > Reload Plugin, Ruby Console for errors).
+- Check a change with `ruby -wc` on every file and `ruby tools/sketchup-plugin/test/link_rules_test.rb`
+  (Ruby 3.2 like SketchUp 2026; Docker `ruby:3.2-slim` where Ruby is not installed), then load it in SketchUp
+  (Extensions > Berkah Studio > Reload Plugin, Ruby Console for errors).
