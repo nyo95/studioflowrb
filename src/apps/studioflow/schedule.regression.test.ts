@@ -168,3 +168,11 @@ describe("WO-SF-SCHEDULE-SHEET-01 list follows the studio sheet", () => {
     assert.doesNotMatch(schedulePrint, /\.contact\b/);
   });
 });
+
+describe("List category groups collapse", () => {
+  it("toggles each group and keeps the open item's group visible", () => {
+    assert.match(scheduleBoard, /aria-expanded=\{!collapsed\}/);
+    assert.match(scheduleBoard, /collapsedGroups\.has\(group\.category\) && !group\.rows\.some\(\(row\) => row\.id === openId\)/);
+    assert.match(scheduleBoard, /<ul hidden=\{collapsed\}/);
+  });
+});

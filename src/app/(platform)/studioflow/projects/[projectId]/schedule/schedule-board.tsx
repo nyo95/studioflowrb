@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, ClipboardPaste, Eye, EyeOff, History, ImageIcon, LayoutGrid, Package, Palette, Plus, Printer, Search, SquareCheck, Trash2, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, ChevronRight, ClipboardPaste, Eye, EyeOff, History, ImageIcon, LayoutGrid, Package, Palette, Plus, Printer, Search, SquareCheck, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -595,6 +595,13 @@ export function ScheduleBoard({
   // reordering is offered only while neither is in use, because a moved row would jump away from where it was dropped.
   const [listSort, setListSort] = useState<{ key: ListSortKey; direction: SortDirection } | null>(null);
   const [listFilters, setListFilters] = useState<Record<ListFilterKey, string>>(NO_LIST_FILTERS);
+  // Collapsed category groups of the List; a group holding the open item always shows it.
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleGroup = (category: string) => setCollapsedGroups((current) => {
+    const next = new Set(current);
+    if (!next.delete(category)) next.add(category);
+    return next;
+  });
   const listFiltered = Object.values(listFilters).some((value) => value !== "ALL");
   const listManual = filter === "all" && listSort === null && !listFiltered;
   const listGroups = useMemo(() => {
@@ -810,6 +817,9 @@ export function ScheduleBoard({
                   onValueChange: (value: string) => setListFilters((current) => ({ ...current, [key]: value })),
                 }))}
               />
+              <Button size="sm" variant="ghost" onClick={() => setCollapsedGroups(collapsedGroups.size > 0 ? new Set() : new Set(listGroups.map((group) => group.category)))}>
+                {collapsedGroups.size > 0 ? "Expand all" : "Collapse all"}
+              </Button>
               {listSort ? (
                 <FilterChip selected aria-label="Back to the studio order" onClick={() => setListSort(null)}>
                   Sorted · studio order<X size={12} aria-hidden="true" />
@@ -882,13 +892,23 @@ export function ScheduleBoard({
                       <span className="w-8 shrink-0" />
                     </div>
                     {listGroups.length === 0 ? <EmptyState title="No items match these filters" description="Clear a column filter to see more items." className="py-10" /> : null}
-                    {listGroups.map((group) => (
+                    {listGroups.map((group) => {
+                      const collapsed = collapsedGroups.has(group.category) && !group.rows.some((row) => row.id === openId);
+                      return (
                       <section key={group.category} className="border-b border-line-subtle last:border-b-0">
-                        <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
-                          <h3 className="m-0 text-label text-ink-secondary">{group.category}</h3>
-                          <Text size="sm" tone="tertiary">{group.rows.length}</Text>
-                        </div>
-                        <ul className="m-0 list-none divide-y divide-line-subtle p-0">
+                        <h3 className="m-0 bg-surface-muted">
+                          <button
+                            type="button"
+                            aria-expanded={!collapsed}
+                            onClick={() => toggleGroup(group.category)}
+                            className="flex w-full items-center gap-2 px-(--ui-section-px) py-1.5 text-left [&:hover_span]:text-ink focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-line-focus"
+                          >
+                            {collapsed ? <ChevronRight aria-hidden="true" className="h-3.5 w-3.5 text-ink-tertiary" /> : <ChevronDown aria-hidden="true" className="h-3.5 w-3.5 text-ink-tertiary" />}
+                            <span className="text-label text-ink-secondary">{group.category}</span>
+                            <Text as="span" size="sm" tone="tertiary">{group.rows.length}</Text>
+                          </button>
+                        </h3>
+                        <ul hidden={collapsed} className="m-0 list-none divide-y divide-line-subtle p-0">
                           {group.rows.map((entry, index) => {
                             const shown = shownOptionOf(entry);
                             const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
@@ -946,7 +966,8 @@ export function ScheduleBoard({
                           })}
                         </ul>
                       </section>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
             </>

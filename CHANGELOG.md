@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.208 | 2026-10-23 | ui(studioflow): Product Schedule List groups collapse and expand (Lead)
+
+- **Owner request:** each category heading in the List (for example SPRAY PAINT 12) folds its rows away and opens them again; "Collapse all / Expand all" sits beside Filters. A group holding the item open in the inspector always stays open.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, schedule regression tests 32/32. Browser check is the owner's on :3001.
+
 ## R9.207 | 2026-10-23 | ui(studioflow): Product Schedule List follows the studio sheet, sortable and filterable (Lead)
 
 - **Columns:** Code, Material type (Category for Fixture), Ex, Type, Initials type (Color, Pattern, Finishing summary), Image, Location (two lines, no longer cut short), Contact, Qty for Fixture only, Status. Category group headers stay.
