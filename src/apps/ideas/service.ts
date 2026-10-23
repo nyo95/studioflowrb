@@ -254,12 +254,6 @@ export function createIdeaService(db: IdeasDb, ports: IdeasPorts) {
       } catch (error) { await discardNew(key); throw error; }
     },
 
-    async useNoteImageInSchedule(input: IdeasContext & { operationId?: string; projectId: string; phaseId?: string | null; imageId: string; target: IdeaUseTarget; option: IdeaOptionText }) {
-      requireIdeas(input);
-      const image = await ports.studioFlow.readWorkspaceImageSource(input);
-      return ports.studioFlow.placeExternalImageInSchedule({ ...input, operationId: input.operationId ?? randomUUID(), source: { key: image.key, contentType: image.contentType }, metadata: { source: "phase-note-image" } });
-    },
-
     async removeScheduleOptionUsage(optionId: string) {
       await db.sfIdeaUsage.deleteMany({ where: { option_id: optionId } });
     },

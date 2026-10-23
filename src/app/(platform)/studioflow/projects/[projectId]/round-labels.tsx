@@ -4,7 +4,8 @@ import { useState } from "react";
 
 import { Button, InlineError } from "@/platform/ui_engine";
 
-import { saveNoteImageToIdeasAction, applyNoteImageToScheduleAction } from "@/apps/ideas/public/image-actions";
+import { saveNoteImageToIdeasAction } from "@/apps/ideas/public/image-actions";
+import { applyNoteImageToScheduleAction } from "../../actions";
 import { addWorkspaceImageToMoodboardAction } from "@/apps/presentation/public/image-actions";
 import { UseInScheduleDialog } from "@/apps/ideas/public/use-in-schedule-dialog";
 import type { IterationView } from "../../_components/phase-commands";
@@ -51,10 +52,10 @@ export function NoteImageActions({ image, projectId, projectName, phaseId, canUs
   return (
     <>
       {ideasEnabled ? <Button size="sm" variant="secondary" pending={pending} disabled={saved} onClick={() => void save()}>{saved ? "Saved to Ideas" : "Save to Ideas"}</Button> : null}
-      {ideasEnabled ? <Button size="sm" variant="secondary" onClick={() => setUsing(true)}>Use in schedule</Button> : null}
+      <Button size="sm" variant="secondary" onClick={() => setUsing(true)}>Use in schedule</Button>
       {presentationEnabled ? <Button size="sm" variant="secondary" pending={moodboard === "pending"} disabled={moodboard === "done"} onClick={() => void addToMoodboard()}>{moodboard === "done" ? "Added to moodboard" : "Add to moodboard"}</Button> : null}
       {error ? <InlineError>{error}</InlineError> : null}
-      {ideasEnabled && using ? (
+      {using ? (
         <UseInScheduleDialog
           initialName=""
           initialNotes=""

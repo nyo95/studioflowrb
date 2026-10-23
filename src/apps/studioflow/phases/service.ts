@@ -592,7 +592,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
 
     async getPhaseDetail(input: WorkSectionReadContext & { projectId: string; phaseId: string }) {
       // The detail carries the phase's private notes, so it follows the same assignment rule as Notes reads.
-      await requireProjectDetailAccess(db, input);
+      const { canReadBook } = await requireProjectDetailAccess(db, input);
       const phase = await db.sfPhase.findUnique({
         where: { id: input.phaseId },
         select: {
@@ -620,7 +620,7 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
       const snap = phaseSnapshot(phase);
       const kindNames = iterationKinds(phase.iteration_kinds_snapshot);
       const isSupervision = isLegacySupervisionDefinition(phase.definition_id);
-      const phaseNotes = await readPhaseNotes(phase.id, snap.prefixSnapshot, kindNames);
+      const phaseNotes = await readPhaseNotes(phase.id, snap.prefixSnapshot, kindNames, canReadBook);
       const seatUserId = snap.seatSnapshot === "drafter" ? phase.project.pic_drafter_id : phase.project.pic_designer_id;
       // R2.4E: Warning projection — non-blocking indicators for UI.
       // Warning-only checklist items (the merged requirements) count here, never in blockers.

@@ -8,13 +8,12 @@ import {
   P,
   assertProjectWritable,
   getProjectAccess,
-  invalid,
   notFound,
+  readNoteImageObject,
   requireCommand,
   requirePermission,
   requireProjectAccess,
   requireRead,
-  requireWorkSectionAccess,
   type CommandContext,
   type ReadContext,
 } from "../shared";
@@ -48,13 +47,8 @@ export function createStudioFlowPresentationBridge(db: PrismaClient) {
     async readWorkspaceImageSource(input: CommandContext & { projectId: string; phaseId?: string | null; imageId: string }) {
       const actorId = requireCommand(input, P.presentationManage);
       requirePermission(input.grants, P.projectRead);
-      await requireWorkSectionAccess(db, { ...input, actorId });
-      const image = await db.sfWorkspaceCard.findFirst({
-        where: { id: input.imageId, kind: "IMAGE", project_id: input.projectId, ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
-        select: { id: true, storage_key: true, content_type: true },
-      });
-      if (!image?.storage_key || !image.content_type) throw invalid("NOTE_IMAGE_NOT_FOUND", "This note image no longer exists.");
-      return { key: image.storage_key, contentType: image.content_type };
+      const image = await readNoteImageObject(db, { ...input, actorId });
+      return { key: image.key, contentType: image.contentType };
     },
 
     async requireProjectDocumentWrite(input: CommandContext & { projectId: string }) {

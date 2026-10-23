@@ -67,6 +67,13 @@ export function requireCommand(ctx: CommandContext, permission: string): string 
 export type ProjectAccess = {
   override: boolean;
   canSeeWorkSections: boolean;
+  /** Invited to this project's book by a PIC (never true for a PIC; a PIC reads the book as a PIC). */
+  isBookMember: boolean;
+  /**
+   * May read and write the project's private book (WO-SF-BOOK-01): a PIC or an invited member, nobody else. Managers,
+   * override holders and the Platform Owner are not book readers; they see workflow records only.
+   */
+  canReadBook: boolean;
   /** A completed project is read-only for everyone until it is reopened (owner, 2026-10-04). */
   completed: boolean;
   isDesigner: boolean;
@@ -86,7 +93,23 @@ type ProjectAccessFacts = {
   pic_designer_id: string | null;
   pic_drafter_id: string | null;
   phases: Array<{ id: string; seat_snapshot: string }>;
+  /** The actor's own membership row, if any; omitted by callers that only evaluate PIC/manager facts. */
+  book_members?: Array<{ user_id: string }>;
 };
+
+/** The relation select that gives `projectAccessFromFacts` the actor's own membership. */
+export function bookMemberFact(actorId: string) {
+  return { where: { user_id: actorId }, select: { user_id: true } } as const;
+}
+
+/**
+ * The one reader predicate for lists of workspace cards: workflow records are the project's official history and stay
+ * visible to anyone who may see the project's work sections; every other card needs a book reader (PIC or member).
+ * Mirrors `ProjectAccess.canReadBook`; a test keeps the two in step.
+ */
+export function visibleBookCardsWhere(actorId: string): Prisma.SfWorkspaceCardWhereInput {
+  return { OR: [{ workflow_record: true }, { project: { OR: [{ pic_designer_id: actorId }, { pic_drafter_id: actorId }, { book_members: { some: { user_id: actorId } } }] } }] };
+}
 
 /** The single StudioFlow PIC-assignment policy, evaluated from already-read project facts. */
 export function projectAccessFromFacts(project: ProjectAccessFacts, input: { grants: PermissionGrants; actorId: string }): ProjectAccess {
@@ -94,11 +117,14 @@ export function projectAccessFromFacts(project: ProjectAccessFacts, input: { gra
   const override = hasProjectAssignmentOverride(input.grants);
   const isDesigner = project.pic_designer_id === input.actorId;
   const isDrafter = project.pic_drafter_id === input.actorId;
+  const isBookMember = !isDesigner && !isDrafter && Boolean(project.book_members?.some((member) => member.user_id === input.actorId));
   const completed = project.status === "COMPLETED";
   const open = !completed;
   return {
     override,
-    canSeeWorkSections: isDesigner || isDrafter || manager,
+    canSeeWorkSections: isDesigner || isDrafter || manager || isBookMember,
+    isBookMember,
+    canReadBook: isDesigner || isDrafter || isBookMember,
     completed,
     isDesigner,
     isDrafter,
@@ -114,21 +140,47 @@ export function projectAccessFromFacts(project: ProjectAccessFacts, input: { gra
 
 /** The single StudioFlow PIC-assignment policy (WO-SF-ACCESS-01). */
 export async function getProjectAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<ProjectAccess> {
-  const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } } } });
+  const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { status: true, pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } }, book_members: bookMemberFact(input.actorId) } });
   if (!project) throw notFound("project");
   return projectAccessFromFacts(project, input);
 }
 
 /** Hidden work sections must also stay private through cross-module image sources. */
-export async function requireWorkSectionAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<void> {
+export async function requireWorkSectionAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<ProjectAccess> {
   const access = await getProjectAccess(tx, input);
-  if (!access.canSeeWorkSections) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "This project's work sections are restricted to its assigned team and managers.");
+  if (!access.canSeeWorkSections) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "This project's work sections are restricted to its assigned team, invited members and managers.");
+  return access;
+}
+
+/**
+ * One stored note image for another module. A workflow record's image reads for anyone who sees the work sections;
+ * every other image only for a book reader, and a hidden image answers exactly like a missing one.
+ */
+export async function readNoteImageObject(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string; phaseId?: string | null; imageId: string }) {
+  const access = await requireWorkSectionAccess(tx, input);
+  const image = await tx.sfWorkspaceCard.findFirst({
+    where: { id: input.imageId, kind: "IMAGE", project_id: input.projectId, ...(access.canReadBook ? {} : { workflow_record: true }), ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
+    select: { id: true, storage_key: true, content_type: true, bytes: true, project: { select: { name: true } } },
+  });
+  if (!image?.storage_key || !image.content_type || image.bytes === null) throw new AppError("NOT_FOUND", "NOTE_IMAGE_NOT_FOUND", "This note image no longer exists.");
+  return { id: image.id, key: image.storage_key, contentType: image.content_type, bytes: image.bytes, projectName: image.project.name };
+}
+
+export function bookForbidden(): AppError {
+  return new AppError("FORBIDDEN", "PERMISSION_DENIED", "This project's book is private to its designer, drafter and the people they invited.");
+}
+
+/** Reads and writes of the private book: a PIC or an invited member. */
+export async function requireBookAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<ProjectAccess> {
+  const access = await getProjectAccess(tx, input);
+  if (!access.canReadBook) throw bookForbidden();
+  return access;
 }
 
 /** Project detail is confidential: the directory is broad, but detail belongs to the assigned team and Studio Managers. */
-export async function requireProjectDetailAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<void> {
+export async function requireProjectDetailAccess(tx: Db | TxClient, input: { grants: PermissionGrants; actorId: string; projectId: string }): Promise<ProjectAccess> {
   requireRead(input.grants);
-  await requireWorkSectionAccess(tx, input);
+  return requireWorkSectionAccess(tx, input);
 }
 
 /** Who may mark a project completed or reopen it: either PIC, or an override holder. */

@@ -433,6 +433,62 @@ export async function setPhaseNoteTagsAction(input: z.infer<typeof NoteTagsInput
   });
 }
 
+// ── The Project book: members and "Use in schedule" (WO-SF-BOOK-01) ─────────
+// These do not depend on the Workspace board or Ideas modules; the book is StudioFlow's own.
+
+const BookMemberInput = z.strictObject({ projectId: Id, userId: Id });
+
+export async function listBookMembersAction(projectId: string) {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.workspace.listBookMembers({ grants: ctx.grants, actorId: ctx.userId, projectId: parse(Id, projectId) });
+  });
+}
+
+export async function addBookMemberAction(input: z.infer<typeof BookMemberInput>): Promise<ActionResult<{ memberId: string; added: boolean }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(BookMemberInput, input);
+    const result = await studioFlow.workspace.addBookMember({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+export async function removeBookMemberAction(input: z.infer<typeof BookMemberInput>): Promise<ActionResult<{ memberId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(BookMemberInput, input);
+    const result = await studioFlow.workspace.removeBookMember({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+const OptionalShort = (max: number) => z.string().max(max).nullish();
+const NoteUseInput = z.strictObject({
+  projectId: Id,
+  phaseId: Id.nullable().optional(),
+  imageId: Id,
+  operationId: Id,
+  target: z.discriminatedUnion("kind", [
+    z.strictObject({ kind: z.literal("new-item"), section: z.string().max(20), category: z.string().max(120), qty: OptionalShort(20), unit: OptionalShort(40), location: OptionalShort(160) }),
+    z.strictObject({ kind: z.literal("option"), entryId: Id }),
+  ]),
+  option: z.strictObject({ productName: z.string().max(200), brandName: OptionalShort(200), color: OptionalShort(200), pattern: OptionalShort(200), finishing: OptionalShort(200), dimension: OptionalShort(200), notes: OptionalShort(2000) }),
+});
+
+/** "Use in schedule" straight from a note image, in the note's own project: a book reader who may edit the Schedule. */
+export async function applyNoteImageToScheduleAction(input: z.infer<typeof NoteUseInput>): Promise<ActionResult<{ projectId: string; entryId: string; optionId: string; code: string; label: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(NoteUseInput, input);
+    const result = await studioFlow.workspace.useNoteImageInSchedule({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
 const ProjectNotesQuery = z.strictObject({ projectId: Id, threadId: Id.optional(), inThreads: z.literal(true).optional(), phaseId: Id.optional(), clientFeedback: z.boolean().optional(), starred: z.boolean().optional(), tag: z.string().max(32).optional(), entryId: Id.optional(), cursor: z.string().max(500).optional(), limit: z.number().int().min(1).max(100).optional() });
 export async function listProjectNotesAction(input: z.infer<typeof ProjectNotesQuery>) {
   return runSafeAction(async () => {
@@ -672,7 +728,7 @@ export async function projectCompletionReadinessAction(projectId: string) {
 export async function listStarredPhaseNotesAction(projectId: string) {
   return runSafeAction(async () => {
     const ctx = await context();
-    return studioFlow.phases.listStarredPhaseNotes({ grants: ctx.grants, projectId: parse(Id, projectId) });
+    return studioFlow.phases.listStarredPhaseNotes({ grants: ctx.grants, actorId: ctx.userId, projectId: parse(Id, projectId) });
   });
 }
 

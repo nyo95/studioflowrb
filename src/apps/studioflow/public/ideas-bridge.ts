@@ -1,28 +1,13 @@
 import "server-only";
 
-import { Prisma, type PrismaClient } from "@/generated/prisma/client";
-import { createPrivateObjectKey } from "@platform/core/storage";
+import type { PrismaClient } from "@/generated/prisma/client";
 
-import { discardObjects } from "../asset-cleanup";
-import { STUDIOFLOW_IMAGE_TYPES } from "../domain/images";
 import { scheduleCode } from "../domain/schedule";
+import { placeExternalImageInSchedule, type ExternalScheduleOption, type ExternalScheduleTarget } from "../schedule/external-placement";
 import { createScheduleService } from "../schedule/service";
-import type { SnapshotInput } from "../schedule/sync";
-import { hasPermission, hasProjectAssignmentOverride, invalid, P, projectAccessFromFacts, requireCommand, requirePermission, requireWorkSectionAccess, type CommandContext, type StudioFlowPorts } from "../shared";
+import { hasPermission, hasProjectAssignmentOverride, P, projectAccessFromFacts, readNoteImageObject, requireBookAccess, requireCommand, requirePermission, type CommandContext, type StudioFlowPorts } from "../shared";
 
-export type ExternalScheduleTarget =
-  | { kind: "new-item"; section: string; category: string; qty?: string | null; unit?: string | null; location?: string | null }
-  | { kind: "option"; entryId: string };
-
-export type ExternalScheduleOption = {
-  productName: string;
-  brandName?: string | null;
-  color?: string | null;
-  pattern?: string | null;
-  finishing?: string | null;
-  dimension?: string | null;
-  notes?: string | null;
-};
+export type { ExternalScheduleOption, ExternalScheduleTarget };
 
 export type StudioFlowIdeasBridge = ReturnType<typeof createStudioFlowIdeasBridge>;
 
@@ -89,13 +74,9 @@ export function createStudioFlowIdeasBridge(db: PrismaClient, ports: StudioFlowP
     async readWorkspaceImageSource(input: CommandContext & { projectId: string; phaseId?: string | null; imageId: string }) {
       const actorId = requireCommand(input, P.ideasManage);
       requirePermission(input.grants, P.projectRead);
-      await requireWorkSectionAccess(db, { ...input, actorId });
-      const image = await db.sfWorkspaceCard.findFirst({
-        where: { id: input.imageId, kind: "IMAGE", project_id: input.projectId, ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
-        select: { id: true, storage_key: true, content_type: true, bytes: true, project: { select: { name: true } } },
-      });
-      if (!image || !image.storage_key || !image.content_type || image.bytes === null) throw invalid("NOTE_IMAGE_NOT_FOUND", "This note image no longer exists.");
-      return { id: image.id, key: image.storage_key, contentType: image.content_type, bytes: image.bytes, projectName: image.project.name };
+      // Saving to Ideas copies the image out of the book, so it takes a book reader (PIC or invited member).
+      await requireBookAccess(db, { ...input, actorId });
+      return readNoteImageObject(db, { ...input, actorId });
     },
 
     async placeExternalImageInSchedule(input: CommandContext & {
@@ -108,35 +89,7 @@ export function createStudioFlowIdeasBridge(db: PrismaClient, ports: StudioFlowP
     }) {
       requirePermission(input.grants, P.ideasManage);
       await schedule.writer.requireAccess(input);
-      const previous = await db.sfExternalSchedulePlacement.findUnique({ where: { operation_id: input.operationId } });
-      if (previous?.entry_id && previous.option_id && previous.code && previous.label) {
-        return { projectId: previous.project_id, entryId: previous.entry_id, optionId: previous.option_id, code: previous.code, label: previous.label };
-      }
-
-      const extension = STUDIOFLOW_IMAGE_TYPES[input.source.contentType] ?? "png";
-      const key = createPrivateObjectKey(`studioflow/schedule/${input.projectId}`, extension);
-      await ports.storage.copy({ fromKey: input.source.key, toKey: key });
-      try {
-        return await ports.runTransaction(async (tx) => {
-          await tx.sfExternalSchedulePlacement.create({ data: { operation_id: input.operationId, project_id: input.projectId } });
-          const snapshot: SnapshotInput = { ...input.option, brandId: null, imageKey: key };
-          const created = input.target.kind === "new-item"
-            ? await schedule.writer.createEntry(tx, { actor: input.actor, projectId: input.projectId, section: input.target.section, category: input.target.category, qty: input.target.qty, unit: input.target.unit, location: input.target.location, snapshot, metadata: input.metadata })
-            : await schedule.writer.createOption(tx, { actor: input.actor, projectId: input.projectId, entryId: input.target.entryId, snapshot, metadata: input.metadata });
-          const placed = { projectId: input.projectId, entryId: created.entryId, optionId: created.optionId!, code: created.code, label: created.label! };
-          await tx.sfExternalSchedulePlacement.update({ where: { operation_id: input.operationId }, data: { entry_id: placed.entryId, option_id: placed.optionId, code: placed.code, label: placed.label } });
-          return placed;
-        });
-      } catch (error) {
-        await discardObjects(db, ports.storage, [key]);
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-          const receipt = await db.sfExternalSchedulePlacement.findUnique({ where: { operation_id: input.operationId } });
-          if (receipt?.entry_id && receipt.option_id && receipt.code && receipt.label) {
-            return { projectId: receipt.project_id, entryId: receipt.entry_id, optionId: receipt.option_id, code: receipt.code, label: receipt.label };
-          }
-        }
-        throw error;
-      }
+      return placeExternalImageInSchedule(db, ports, schedule, input);
     },
   };
 }

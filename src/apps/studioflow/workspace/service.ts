@@ -12,11 +12,16 @@ import { orderedScheduleOptions, parseTypedScheduleCode, scheduleCode } from "..
 import {
   P,
   assertProjectWritable,
+  bookForbidden,
   conflict,
+  getProjectAccess,
   invalid,
+  loadWritableProject,
   notFound,
   nowOf,
   optionalText,
+  readNoteImageObject,
+  requireBookAccess,
   requireCommand,
   requireProjectAccess,
   requireRead,
@@ -31,6 +36,8 @@ import {
   type WorkSectionReadContext,
 } from "../shared";
 import { discardObjects, enqueueUnreferencedCleanup } from "../asset-cleanup";
+import { placeExternalImageInSchedule, type ExternalScheduleOption, type ExternalScheduleTarget } from "../schedule/external-placement";
+import { createScheduleService } from "../schedule/service";
 
 /**
  * Project Workspace (WO-SF-WORKSPACE-01, owner 2026-10-12): one Workspace per project. Since WO-SF-WORKSPACE-04 it is
@@ -180,30 +187,55 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     return phase;
   }
 
-  /** The gate for one card: its phase label's rule, or the project rule when it has none. */
-  async function writableScope(tx: TxClient, input: ProjectInput, phaseId: string | null) {
+  /** An invited member (not a PIC) writes the book while the project is open and active, without any phase or document right. */
+  async function writableForMember(tx: TxClient, input: ProjectInput, phaseId: string | null) {
+    const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true, status: true } });
+    if (!project) throw notFound("project");
+    assertProjectWritable(project);
+    if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing its notes.");
+    if (phaseId) await validatePhaseLabel(tx, input.projectId, phaseId);
+  }
+
+  /** Whether the caller is a book reader (PIC or invited member) of the card's project. */
+  async function isBookReader(tx: TxClient, input: ProjectInput): Promise<boolean> {
+    return (await getProjectAccess(tx, { grants: input.grants, actorId: input.actor.userId ?? "", projectId: input.projectId })).canReadBook;
+  }
+
+  /**
+   * The gate for one card: a private card needs a book reader (a PIC keeps the phase label's rule, or the project rule
+   * without one; an invited member needs only an open, active project). A workflow record keeps today's rule alone.
+   */
+  async function writableScope(tx: TxClient, input: ProjectInput, phaseId: string | null, options: { workflowRecord?: boolean } = {}) {
+    if (!options.workflowRecord) {
+      const actorId = requireCommand(input, P.phaseWork);
+      const access = await getProjectAccess(tx, { grants: input.grants, actorId, projectId: input.projectId });
+      if (!access.canReadBook) throw bookForbidden();
+      if (access.isBookMember) return writableForMember(tx, input, phaseId);
+    }
     if (phaseId) await writablePhase(tx, { ...input, phaseId });
     else await writableProject(tx, input);
   }
 
+  /** A card the caller may not read answers exactly like a missing one. */
   async function loadCard(tx: TxClient, input: ProjectInput & { cardId: string }, phaseId?: string): Promise<CardRow> {
     const card = await tx.sfWorkspaceCard.findFirst({
       where: { id: input.cardId, project_id: input.projectId, ...(phaseId ? { phase_id: phaseId } : {}) },
       select: CARD_ROW_SELECT,
     });
     if (!card) throw cardNotFound();
+    if (!card.workflow_record && !(await isBookReader(tx, input))) throw cardNotFound();
     return card;
   }
 
   /** Loads a card and checks the caller may write it and, when given, still holds the version they read. */
   async function writableCard(tx: TxClient, input: ProjectInput & { cardId: string; version?: number }, phaseId?: string) {
     const card = await loadCard(tx, input, phaseId);
-    await writableScope(tx, input, card.phase_id);
+    await writableScope(tx, input, card.phase_id, { workflowRecord: card.workflow_record });
     if (input.version !== undefined && input.version !== card.version) throw staleCard();
     return card;
   }
 
-  async function audit(tx: TxClient, actor: AuditActor, entity: "workspace-card" | "workspace-section" | "workspace-thread", action: string, entityId: string, metadata: Record<string, unknown>) {
+  async function audit(tx: TxClient, actor: AuditActor, entity: "workspace-card" | "workspace-section" | "workspace-thread" | "book-member", action: string, entityId: string, metadata: Record<string, unknown>) {
     await writeAudit(ports, tx, { action: `studioflow.${entity}.${action}`, entityType: entity, entityId, actor, metadata });
   }
 
@@ -280,10 +312,12 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     if (entries.length) await tx.sfNoteItemLink.createMany({ data: entries.map((entry) => ({ card_id: cardId, entry_id: entry.id, code_snapshot: scheduleCode(entry.prefix, entry.increment) })) });
   }
 
-  async function validateReply(tx: TxClient, projectId: string, replyToId: string | undefined, threadId?: string | null) {
+  async function validateReply(tx: TxClient, input: ProjectInput, replyToId: string | undefined, threadId?: string | null) {
     if (!replyToId) return null;
     if (threadId === null) throw invalid("NOTE_REPLY_INVALID", "Reply to a message in this thread.");
-    const target = await tx.sfWorkspaceCard.findFirst({ where: { id: replyToId, project_id: projectId, ...(threadId ? { thread_id: threadId } : {}) }, select: { id: true } });
+    // Someone who cannot read the book may only answer a workflow record, so a private card's id cannot be probed.
+    const reader = await isBookReader(tx, input);
+    const target = await tx.sfWorkspaceCard.findFirst({ where: { id: replyToId, project_id: input.projectId, ...(reader ? {} : { workflow_record: true }), ...(threadId ? { thread_id: threadId } : {}) }, select: { id: true } });
     if (!target) throw invalid("NOTE_REPLY_INVALID", "Reply to a note in this project.");
     return target.id;
   }
@@ -327,7 +361,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       await validatePhaseLabel(tx, input.projectId, phaseId);
       await writableScope(tx, input, phaseId);
       const threadId = input.thread ? await threadForPost(tx, { ...input, thread: input.thread }, true) : undefined;
-      const replyToId = await validateReply(tx, input.projectId, input.replyToId, threadId);
+      const replyToId = await validateReply(tx, input, input.replyToId, threadId);
       const card = await insertWorkspaceCard(tx, ports, { projectId: input.projectId, phaseId, threadId: threadId ?? undefined, body, origin: input.origin ?? "NOTE", textStyle, actor: input.actor, at: nowOf(ports), ...(input.thread ? {} : canvas) });
       if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: card.id }, data: { reply_to_id: replyToId } });
       await syncTags(tx, card.id, input.projectId, input.tags);
@@ -496,24 +530,25 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     // Scope and access are checked before touching storage, then again inside the write transaction.
     await runTransaction(async (tx) => {
       if (input.thread) await lockProject(tx, input.projectId);
-      await writableScope(tx, input, (await resolve(tx)).phaseId);
+      const first = await resolve(tx);
+      await writableScope(tx, input, first.phaseId, { workflowRecord: first.workflowRecord });
       if (input.thread) {
         const threadId = await threadForPost(tx, { ...input, thread: input.thread }, false);
-        await validateReply(tx, input.projectId, input.replyToId, threadId);
+        await validateReply(tx, input, input.replyToId, threadId);
       }
     });
     const key = createPrivateObjectKey(`studioflow/notes/${input.projectId}`, extension);
     return storeThen(key, { contentType: input.file.contentType, bytes, body: input.file.body }, () => runTransaction(async (tx) => {
       if (input.thread) await lockProject(tx, input.projectId);
       const resolved = await resolve(tx);
-      await writableScope(tx, input, resolved.phaseId);
+      await writableScope(tx, input, resolved.phaseId, { workflowRecord: resolved.workflowRecord });
       const threadId = input.thread ? await threadForPost(tx, { ...input, thread: input.thread }, true) : undefined;
       const element = await insertWorkspaceCard(tx, ports, {
         projectId: input.projectId, phaseId: resolved.phaseId, threadId: threadId ?? undefined, iterationId: resolved.iterationId, body: "", origin: resolved.origin, workflowRecord: resolved.workflowRecord,
         actor: input.actor, at: nowOf(ports), ...(input.thread ? {} : resolved.place),
         kind: "IMAGE", asset: { storage_key: key, content_type: input.file.contentType, bytes, uploaded_by_id: input.actor.userId ?? null, uploaded_by_name: input.actor.label },
       });
-      const replyToId = await validateReply(tx, input.projectId, input.replyToId, threadId);
+      const replyToId = await validateReply(tx, input, input.replyToId, threadId);
       if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: element.id }, data: { reply_to_id: replyToId } });
       await syncTags(tx, element.id, input.projectId, input.tags);
       await audit(tx, input.actor, "workspace-card", "created", element.id, { projectId: input.projectId, phaseId: resolved.phaseId, kind: "IMAGE", bytes });
@@ -535,7 +570,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         projectId: input.projectId, phaseId, body: "", origin: input.clientAnswer ? "CLIENT_ANSWER" : "NOTE", actor: input.actor, at: nowOf(ports), ...canvas,
         kind: "FILE", asset: { storage_key: key, content_type: file.contentType, bytes: file.bytes, file_name: file.name, uploaded_by_id: input.actor.userId ?? null, uploaded_by_name: input.actor.label },
       });
-      const replyToId = await validateReply(tx, input.projectId, input.replyToId);
+      const replyToId = await validateReply(tx, input, input.replyToId);
       if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: element.id }, data: { reply_to_id: replyToId } });
       await syncTags(tx, element.id, input.projectId, input.tags);
       await audit(tx, input.actor, "workspace-card", "created", element.id, { projectId: input.projectId, phaseId, kind: "FILE", bytes: file.bytes });
@@ -558,7 +593,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       const y = canvasInteger(input.y, 0, "Thread y");
       return runTransaction(async (tx) => {
         await lockProject(tx, input.projectId);
-        await writableProject(tx, input);
+        await writableScope(tx, input, null);
         const thread = await tx.sfWorkspaceThread.findFirst({ where: { id: input.threadId, project_id: input.projectId } });
         if (!thread) throw notFound("workspace thread");
         if (thread.anchor_card_id) throw conflict("WORKSPACE_THREAD_ANCHORED", "An attached marker moves with its element.");
@@ -625,10 +660,11 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
         assertProjectWritable(project);
         if (project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing its notes.");
 
-        const cardRows = await tx.sfWorkspaceCard.findMany({ where: { id: { in: [...cardsById.keys()] }, project_id: input.projectId }, select: { id: true, phase_id: true, thread_id: true } });
+        const reader = await isBookReader(tx, input);
+        const cardRows = await tx.sfWorkspaceCard.findMany({ where: { id: { in: [...cardsById.keys()] }, project_id: input.projectId, ...(reader ? {} : { workflow_record: true }) }, select: { id: true, phase_id: true, thread_id: true, workflow_record: true } });
         if (cardRows.length !== cardsById.size) throw cardNotFound();
         if (cardRows.some((card) => card.thread_id)) throw invalid("WORKSPACE_THREAD_MESSAGE", "Thread messages cannot be placed on the board.");
-        for (const card of cardRows) await writableScope(tx, input, card.phase_id);
+        for (const card of cardRows) await writableScope(tx, input, card.phase_id, { workflowRecord: card.workflow_record });
         for (const card of cardRows) {
           const item = cardsById.get(card.id)!;
           await tx.sfWorkspaceCard.update({ where: { id: card.id }, data: { canvas_x: item.x, canvas_y: item.y, canvas_w: item.w } });
@@ -659,7 +695,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     kind: WorkspaceElementKind; text_style: WorkspaceTextStyle; storage_key: string | null; content_type: string | null; bytes: number | null; file_name: string | null;
     iteration: { id: string; major: number; name: string } | null;
     phase: { id: string; name_snapshot: string; prefix_snapshot: string; iteration_kinds_snapshot: unknown } | null;
-    reply_to?: { id: string; kind: WorkspaceElementKind; body: string; file_name: string | null; author_name: string | null; origin: WorkspaceCardOrigin } | null;
+    reply_to?: { id: string; kind: WorkspaceElementKind; body: string; file_name: string | null; author_name: string | null; origin: WorkspaceCardOrigin; workflow_record: boolean } | null;
     note_tag_links?: Array<{ tag: { name: string } }>;
     note_item_links?: Array<{ code_snapshot: string; entry: { id: string; prefix: string; increment: number; section: string; location: string | null; active_index: number; options: Array<{ label: string; created_at: Date; is_final: boolean; product_name: string; image_key: string | null }> } }>;
   };
@@ -667,7 +703,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     anchored_threads: { select: { _count: { select: { messages: true } } } },
     iteration: { select: { id: true, major: true, name: true } },
     phase: { select: { id: true, name_snapshot: true, prefix_snapshot: true, iteration_kinds_snapshot: true } },
-    reply_to: { select: { id: true, kind: true, body: true, file_name: true, author_name: true, origin: true } },
+    reply_to: { select: { id: true, kind: true, body: true, file_name: true, author_name: true, origin: true, workflow_record: true } },
     note_tag_links: { include: { tag: { select: { name: true } } } },
     note_item_links: { include: { entry: { select: { id: true, prefix: true, increment: true, section: true, location: true, active_index: true, options: { select: { label: true, created_at: true, is_final: true, product_name: true, image_key: true } } } } } },
   } as const;
@@ -678,11 +714,12 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     return iterationShortName(row.iteration.name, row.phase.prefix_snapshot, row.iteration, kinds.includes(row.iteration.name));
   }
 
-  async function cardView(row: CardReadRow) {
+  /** `reader` false: the caller sees workflow records only, so nothing of a private card (a reply target, a thread's count) shows through one. */
+  async function cardView(row: CardReadRow, reader: boolean) {
     return {
       id: row.id,
       threadId: row.thread_id,
-      anchoredThreadMessages: (row.anchored_threads ?? []).reduce((sum, thread) => sum + thread._count.messages, 0),
+      anchoredThreadMessages: reader ? (row.anchored_threads ?? []).reduce((sum, thread) => sum + thread._count.messages, 0) : 0,
       sortOrder: row.sort_order,
       version: row.version,
       body: row.body,
@@ -703,7 +740,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       textStyle: row.text_style,
       images: await elementImages(row),
       file: await elementFile(row),
-      replyTo: row.reply_to ? { id: row.reply_to.id, kind: row.reply_to.kind, excerpt: row.reply_to.kind === "FILE" ? row.reply_to.file_name ?? "" : row.reply_to.kind === "IMAGE" ? "" : row.reply_to.body.slice(0, 120), authorName: row.reply_to.author_name, clientFeedback: row.reply_to.origin === "CLIENT_ANSWER" } : null,
+      replyTo: row.reply_to && (reader || row.reply_to.workflow_record) ? { id: row.reply_to.id, kind: row.reply_to.kind, excerpt: row.reply_to.kind === "FILE" ? row.reply_to.file_name ?? "" : row.reply_to.kind === "IMAGE" ? "" : row.reply_to.body.slice(0, 120), authorName: row.reply_to.author_name, clientFeedback: row.reply_to.origin === "CLIENT_ANSWER" } : null,
       tags: row.note_tag_links?.map((link) => link.tag.name) ?? [],
       items: await Promise.all((row.note_item_links ?? []).map(async (link) => {
         const options = orderedScheduleOptions(link.entry.options);
@@ -717,13 +754,13 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     /** The project's board: every element in stored order (top to bottom); optionally only those labelled with one phase. */
     async readWorkspace(input: WorkSectionReadContext & { projectId: string; phaseId?: string | null }) {
       requireRead(input.grants);
-      await requireWorkSectionAccess(db, input);
+      const { canReadBook } = await requireWorkSectionAccess(db, input);
       const rows = await db.sfWorkspaceCard.findMany({
-        where: { project_id: input.projectId, thread_id: null, ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
+        where: { project_id: input.projectId, thread_id: null, ...(canReadBook ? {} : { workflow_record: true }), ...(input.phaseId ? { phase_id: input.phaseId } : {}) },
         orderBy: [{ sort_order: "asc" }, { id: "asc" }],
         include: CARD_INCLUDE,
       });
-      return Promise.all(rows.map((row) => cardView(row as CardReadRow)));
+      return Promise.all(rows.map((row) => cardView(row as CardReadRow, canReadBook)));
     },
 
     /** The project's phases as label choices. */
@@ -735,23 +772,24 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
 
     async listWorkspaceThreads(input: WorkSectionReadContext & { projectId: string }) {
       requireRead(input.grants);
-      await requireWorkSectionAccess(db, input);
-      const rows = await db.sfWorkspaceThread.findMany({ where: { project_id: input.projectId }, orderBy: [{ created_at: "asc" }, { id: "asc" }], include: { messages: { select: { origin: true, created_at: true }, orderBy: [{ created_at: "desc" }, { id: "desc" }] } } });
+      const { canReadBook } = await requireWorkSectionAccess(db, input);
+      // A thread is its messages; without the book only a thread holding a workflow record shows, counted by those alone.
+      const rows = await db.sfWorkspaceThread.findMany({ where: { project_id: input.projectId, ...(canReadBook ? {} : { messages: { some: { workflow_record: true } } }) }, orderBy: [{ created_at: "asc" }, { id: "asc" }], include: { messages: { where: canReadBook ? {} : { workflow_record: true }, select: { origin: true, created_at: true }, orderBy: [{ created_at: "desc" }, { id: "desc" }] } } });
       return rows.map((row) => ({ id: row.id, version: row.version, x: row.x, y: row.y, anchorCardId: row.anchor_card_id, offsetX: row.offset_x, offsetY: row.offset_y, messageCount: row.messages.length, clientFeedback: row.messages.some((message) => message.origin === "CLIENT_ANSWER"), lastMessageAt: row.messages[0]?.created_at ?? null }));
     },
 
     async listProjectNotes(input: WorkSectionReadContext & { projectId: string; threadId?: string; inThreads?: true; phaseId?: string; clientFeedback?: boolean; starred?: boolean; tag?: string; entryId?: string; cursor?: string; limit?: number }) {
       requireRead(input.grants);
-      await requireWorkSectionAccess(db, input);
+      const { canReadBook } = await requireWorkSectionAccess(db, input);
       const limit = Math.min(Math.max(input.limit ?? 50, 1), 100);
       const cursor = input.cursor ? (() => { try { return JSON.parse(Buffer.from(input.cursor, "base64url").toString("utf8")) as { createdAt: string; id: string }; } catch { throw invalid("NOTE_CURSOR_INVALID", "The notes cursor is invalid."); } })() : null;
       const rows = await db.sfWorkspaceCard.findMany({
-        where: { project_id: input.projectId, ...(input.threadId ? { thread_id: input.threadId } : input.inThreads ? { thread_id: { not: null } } : {}), ...(input.phaseId ? { phase_id: input.phaseId } : {}), ...(input.clientFeedback === undefined ? {} : { origin: input.clientFeedback ? "CLIENT_ANSWER" : { not: "CLIENT_ANSWER" } }), ...(input.starred === undefined ? {} : { is_pinned: input.starred }), ...(input.tag ? { note_tag_links: { some: { tag: { key: input.tag.replace(/^#/, "").toLocaleLowerCase("id-ID") } } } } : {}), ...(input.entryId ? { note_item_links: { some: { entry_id: input.entryId } } } : {}), ...(cursor ? { OR: [{ created_at: { lt: new Date(cursor.createdAt) } }, { created_at: new Date(cursor.createdAt), id: { lt: cursor.id } }] } : {}) },
+        where: { project_id: input.projectId, ...(canReadBook ? {} : { workflow_record: true }), ...(input.threadId ? { thread_id: input.threadId } : input.inThreads ? { thread_id: { not: null } } : {}), ...(input.phaseId ? { phase_id: input.phaseId } : {}), ...(input.clientFeedback === undefined ? {} : { origin: input.clientFeedback ? "CLIENT_ANSWER" : { not: "CLIENT_ANSWER" } }), ...(input.starred === undefined ? {} : { is_pinned: input.starred }), ...(input.tag ? { note_tag_links: { some: { tag: { key: input.tag.replace(/^#/, "").toLocaleLowerCase("id-ID") } } } } : {}), ...(input.entryId ? { note_item_links: { some: { entry_id: input.entryId } } } : {}), ...(cursor ? { OR: [{ created_at: { lt: new Date(cursor.createdAt) } }, { created_at: new Date(cursor.createdAt), id: { lt: cursor.id } }] } : {}) },
         orderBy: [{ created_at: "desc" }, { id: "desc" }], take: limit + 1, include: CARD_INCLUDE,
       });
       const page = rows.slice(0, limit);
       const next = rows.length > limit && page.length ? Buffer.from(JSON.stringify({ createdAt: page[page.length - 1].created_at.toISOString(), id: page[page.length - 1].id })).toString("base64url") : null;
-      return { notes: await Promise.all(page.map((row) => cardView(row as CardReadRow))), cursor: next };
+      return { notes: await Promise.all(page.map((row) => cardView(row as CardReadRow, canReadBook))), cursor: next };
     },
 
     async searchNoteItems(input: ReadContext & { projectId: string; query: string }) {
@@ -776,13 +814,83 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
 
     async listNoteTags(input: WorkSectionReadContext & { projectId: string; query?: string }) {
       requireRead(input.grants);
-      await requireWorkSectionAccess(db, input);
-      const tags = await db.sfNoteTag.findMany({ where: { project_id: input.projectId, ...(input.query ? { key: { contains: input.query.replace(/^#/, "").toLocaleLowerCase("id-ID"), mode: "insensitive" } } : {}) }, include: { _count: { select: { links: true } } } });
+      const { canReadBook } = await requireWorkSectionAccess(db, input);
+      // Without the book a tag exists only through the workflow records that carry it.
+      const linkScope = canReadBook ? {} : { card: { workflow_record: true } };
+      const tags = await db.sfNoteTag.findMany({ where: { project_id: input.projectId, ...(canReadBook ? {} : { links: { some: linkScope } }), ...(input.query ? { key: { contains: input.query.replace(/^#/, "").toLocaleLowerCase("id-ID"), mode: "insensitive" } } : {}) }, include: { _count: { select: { links: { where: linkScope } } } } });
       return tags.sort((a, b) => b._count.links - a._count.links || a.name.localeCompare(b.name)).slice(0, 20).map((tag) => ({ name: tag.name, count: tag._count.links }));
     },
 
     async listNotesForItem(input: WorkSectionReadContext & { projectId: string; entryId: string }) {
       return (await reads.listProjectNotes({ ...input, entryId: input.entryId, limit: 100 })).notes;
+    },
+  };
+
+  // ── Who shares the book, and what leaves it ───────────────────────────
+
+  /** Only a PIC (never an override holder or the Platform Owner) decides who else is in the book. */
+  async function requirePicOf(tx: TxClient, input: ProjectInput) {
+    const actorId = requireCommand(input, P.projectRead);
+    const access = await getProjectAccess(tx, { grants: input.grants, actorId, projectId: input.projectId });
+    if (!access.isDesigner && !access.isDrafter) throw new AppError("FORBIDDEN", "PERMISSION_DENIED", "Only the project's designer or drafter can change who shares its book.");
+    return actorId;
+  }
+
+  const book = {
+    /** The people a PIC invited, for the book's readers (PICs and members) only. */
+    async listBookMembers(input: WorkSectionReadContext & { projectId: string }) {
+      requireRead(input.grants);
+      await requireBookAccess(db, input);
+      const rows = await db.sfBookMember.findMany({ where: { project_id: input.projectId }, orderBy: [{ invited_at: "asc" }, { id: "asc" }] });
+      const people = new Map((await ports.people.resolve(rows.map((row) => row.user_id))).map((person) => [person.id, person]));
+      return rows.map((row) => ({ id: row.id, userId: row.user_id, displayName: people.get(row.user_id)?.displayName ?? "Deleted user", active: people.get(row.user_id)?.active ?? false, invitedById: row.invited_by_id, invitedByName: row.invited_by_name, invitedAt: row.invited_at }));
+    },
+
+    /** PIC-only. The person must be an active StudioFlow user and not already a PIC of this project. Adding twice is a no-op. */
+    async addBookMember(input: ProjectInput & { userId: string }) {
+      const holders = await ports.people.listHolders(P.access);
+      if (!holders.some((person) => person.id === input.userId)) throw invalid("BOOK_MEMBER_NOT_ELIGIBLE", "Choose an active StudioFlow user.");
+      const person = holders.find((holder) => holder.id === input.userId)!;
+      return runTransaction(async (tx) => {
+        await lockProject(tx, input.projectId);
+        const actorId = await requirePicOf(tx, input);
+        const project = await loadWritableProject(tx, input.projectId);
+        if (project.pic_designer_id === input.userId || project.pic_drafter_id === input.userId) throw invalid("BOOK_MEMBER_IS_PIC", "The designer and drafter already have the book.");
+        const existing = await tx.sfBookMember.findUnique({ where: { project_id_user_id: { project_id: input.projectId, user_id: input.userId } }, select: { id: true } });
+        if (existing) return { memberId: existing.id, added: false as const };
+        const created = await tx.sfBookMember.create({ data: { id: randomUUID(), project_id: input.projectId, user_id: input.userId, invited_by_id: actorId, invited_by_name: input.actor.label, invited_at: nowOf(ports) }, select: { id: true } });
+        await audit(tx, input.actor, "book-member", "added", created.id, { projectId: input.projectId, userId: input.userId, userName: person.displayName });
+        return { memberId: created.id, added: true as const };
+      });
+    },
+
+    /** PIC-only. Always possible, even on an archived or completed project, so a book can be closed to someone at any time. */
+    async removeBookMember(input: ProjectInput & { userId: string }) {
+      return runTransaction(async (tx) => {
+        await lockProject(tx, input.projectId);
+        await requirePicOf(tx, input);
+        const member = await tx.sfBookMember.findUnique({ where: { project_id_user_id: { project_id: input.projectId, user_id: input.userId } }, select: { id: true } });
+        if (!member) throw notFound("book member");
+        await tx.sfBookMember.delete({ where: { id: member.id } });
+        const [person] = await ports.people.resolve([input.userId]);
+        await audit(tx, input.actor, "book-member", "removed", member.id, { projectId: input.projectId, userId: input.userId, userName: person?.displayName ?? null });
+        return { memberId: member.id };
+      });
+    },
+
+    /**
+     * "Use in schedule" on a note image (moved here from Ideas, WO-SF-BOOK-01): a book reader who may also edit the
+     * Schedule copies the image into the project as a new item or an extra option. The note is never changed.
+     */
+    async useNoteImageInSchedule(input: ProjectInput & { operationId?: string; phaseId?: string | null; imageId: string; target: ExternalScheduleTarget; option: ExternalScheduleOption }) {
+      const schedule = createScheduleService(db, ports);
+      const actorId = await schedule.writer.requireAccess(input);
+      await requireBookAccess(db, { grants: input.grants, actorId, projectId: input.projectId });
+      const image = await readNoteImageObject(db, { grants: input.grants, actorId, projectId: input.projectId, phaseId: input.phaseId, imageId: input.imageId });
+      return placeExternalImageInSchedule(db, ports, schedule, {
+        grants: input.grants, actor: input.actor, projectId: input.projectId, operationId: input.operationId ?? randomUUID(),
+        target: input.target, option: input.option, source: { key: image.key, contentType: image.contentType }, metadata: { source: "phase-note-image" },
+      });
     },
   };
 
@@ -810,13 +918,15 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
       const body = optionalText(input.body, PHASE_NOTE_MAX) ?? "";
       if (!body) throw invalid("PHASE_NOTE_EMPTY", "Write something.");
       return runTransaction(async (tx) => {
-        const phase = await writablePhase(tx, input);
+        await writableScope(tx, input, input.phaseId, { workflowRecord: Boolean(input.answeredIterationId) });
+        const phase = await tx.sfPhase.findUnique({ where: { id: input.phaseId }, select: { id: true, project_id: true } });
+        if (!phase || phase.project_id !== input.projectId) throw notFound("phase");
         const answer = input.answeredIterationId ? await answerLabels(tx, { ...input, answeredIterationId: input.answeredIterationId }) : null;
         const card = await insertWorkspaceCard(tx, ports, {
           projectId: phase.project_id, phaseId: phase.id, ...(answer ? { iterationId: answer.iterationId, workflowRecord: true } : {}),
           body, origin: answer || input.clientFeedback ? "CLIENT_ANSWER" : "NOTE", actor: input.actor, at: nowOf(ports),
         });
-        const replyToId = await validateReply(tx, phase.project_id, input.replyToId);
+        const replyToId = await validateReply(tx, input, input.replyToId);
         if (replyToId) await tx.sfWorkspaceCard.update({ where: { id: card.id }, data: { reply_to_id: replyToId } });
         await syncTags(tx, card.id, phase.project_id, input.tags);
         await syncItemLinks(tx, card.id, phase.project_id, input.itemEntryIds);
@@ -838,15 +948,16 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     },
 
     /** Every phase's pinned cards, for the project card's pinned-notes dialog. Text only; images open on the phase page. */
-    async listStarredPhaseNotes(input: ReadContext & { projectId: string }) {
+    async listStarredPhaseNotes(input: WorkSectionReadContext & { projectId: string }) {
       requireRead(input.grants);
+      const { canReadBook } = await requireWorkSectionAccess(db, input);
       const phases = await db.sfPhase.findMany({
         where: { project_id: input.projectId },
         orderBy: { order_index: "asc" },
         select: {
           id: true, name_snapshot: true, prefix_snapshot: true,
           iteration_kinds_snapshot: true,
-          workspace_cards: { where: { is_pinned: true }, orderBy: [{ created_at: "asc" }, { id: "asc" }], select: { id: true, body: true, kind: true, file_name: true, created_at: true, author_name: true, iteration: { select: { major: true, name: true } } } },
+          workspace_cards: { where: { is_pinned: true, ...(canReadBook ? {} : { workflow_record: true }) }, orderBy: [{ created_at: "asc" }, { id: "asc" }], select: { id: true, body: true, kind: true, file_name: true, created_at: true, author_name: true, iteration: { select: { major: true, name: true } } } },
         },
       });
       return phases.map((phase) => {
@@ -864,9 +975,9 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
   };
 
   /** A phase's cards, oldest first (the newest sit next to the composer), each with its round label. */
-  async function readPhaseNotes(phaseId: string, prefix: string, kinds: readonly string[]) {
+  async function readPhaseNotes(phaseId: string, prefix: string, kinds: readonly string[], canReadBook: boolean) {
     const rows = await db.sfWorkspaceCard.findMany({
-      where: { phase_id: phaseId },
+      where: { phase_id: phaseId, ...(canReadBook ? {} : { workflow_record: true }) },
       orderBy: [{ created_at: "asc" }, { id: "asc" }],
       include: { iteration: { select: { id: true, major: true, name: true } } },
     });
@@ -890,7 +1001,7 @@ export function createWorkspaceService(db: Db, ports: StudioFlowPorts) {
     })));
   }
 
-  return { workspace: { ...cards, ...threads, ...reads }, phaseNotes, readPhaseNotes };
+  return { workspace: { ...cards, ...threads, ...reads, ...book }, phaseNotes, readPhaseNotes };
 }
 
 export type WorkspaceService = ReturnType<typeof createWorkspaceService>["workspace"];

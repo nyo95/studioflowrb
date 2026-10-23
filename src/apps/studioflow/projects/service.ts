@@ -17,6 +17,7 @@ import { phaseSkipReason } from "../domain/phase-display";
 import { iterationShortName, waitingDays, type PhaseStatus } from "../domain/phase";
 import {
   P,
+  bookMemberFact,
   conflict,
   getProjectAccess,
   hasPermission,
@@ -34,6 +35,7 @@ import {
   requireProjectAccess,
   requireRead,
   requiredText,
+  visibleBookCardsWhere,
   writeAudit,
   type CommandContext,
   type Db,
@@ -401,10 +403,10 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
         db.sfProject.findMany({
           where: {
             archived_at: null,
-            ...(!search && !canManage ? { OR: [{ pic_designer_id: input.actorId }, { pic_drafter_id: input.actorId }] } : {}),
+            ...(!search && !canManage ? { OR: [{ pic_designer_id: input.actorId }, { pic_drafter_id: input.actorId }, { book_members: { some: { user_id: input.actorId } } }] } : {}),
             ...(search ? { AND: [
               { OR: [{ name: { contains: search, mode: "insensitive" as const } }, { client: { name: { contains: search, mode: "insensitive" as const } } }] },
-              ...(canManage ? [] : [{ OR: [{ pic_designer_id: input.actorId }, { pic_drafter_id: input.actorId }] }]),
+              ...(canManage ? [] : [{ OR: [{ pic_designer_id: input.actorId }, { pic_drafter_id: input.actorId }, { book_members: { some: { user_id: input.actorId } } }] }]),
             ] } : {}),
           },
           orderBy: [{ priority: "asc" }, { name: "asc" }],
@@ -784,7 +786,7 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
       if (input.projectIds.length === 0) return new Map<string, ReturnType<typeof projectAccessFromFacts>>();
       const projects = await db.sfProject.findMany({
         where: { id: { in: input.projectIds } },
-        select: { id: true, status: true, pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } } },
+        select: { id: true, status: true, pic_designer_id: true, pic_drafter_id: true, phases: { select: { id: true, seat_snapshot: true } }, book_members: bookMemberFact(input.actor.userId) },
       });
       return new Map(projects.map((project) => [project.id, projectAccessFromFacts(project, { grants: input.grants, actorId: input.actor.userId! })]));
     },
@@ -800,7 +802,8 @@ export function createProjectService(db: Db, ports: StudioFlowPorts) {
           client: { select: { id: true, name: true } },
           phases: { orderBy: { order_index: "asc" }, include: {
             revisions: { orderBy: { major: "desc" }, select: { id: true, major: true, name: true, status: true, sent_at: true, visit_date: true, created_at: true } },
-            _count: { select: { workspace_cards: { where: { is_pinned: true } } } },
+            // A pinned note counts only when the caller may read it: workflow records, or the book of a project they read.
+            _count: { select: { workspace_cards: { where: { is_pinned: true, ...(input.actorId ? visibleBookCardsWhere(input.actorId) : { workflow_record: true }) } } } },
             events: { where: { to_state: "DONE", undone_at: null }, orderBy: { occurred_at: "desc" }, take: 1, select: { auto_created: true } },
           } },
         },

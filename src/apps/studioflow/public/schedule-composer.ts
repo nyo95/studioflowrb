@@ -16,6 +16,7 @@ import {
   hasPermission,
   loadWritableProject,
   P,
+  bookMemberFact,
   projectAccessFromFacts,
   requireCommand,
   requireProjectAccess,
@@ -445,10 +446,10 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
       const actorId = actorIdOf(ctx);
       const manager = hasPermission(ctx.grants, P.projectManage);
       const projects = await db.sfProject.findMany({
-        where: { archived_at: null, ...(manager ? {} : { OR: [{ pic_designer_id: actorId }, { pic_drafter_id: actorId }] }) },
+        where: { archived_at: null, ...(manager ? {} : { OR: [{ pic_designer_id: actorId }, { pic_drafter_id: actorId }, { book_members: { some: { user_id: actorId } } }] }) },
         orderBy: { name: "asc" },
         take: LIMITS.projects,
-        select: { id: true, name: true, status: true, archived_at: true, pic_designer_id: true, pic_drafter_id: true },
+        select: { id: true, name: true, status: true, archived_at: true, pic_designer_id: true, pic_drafter_id: true, book_members: bookMemberFact(actorId) },
       });
       return projects
         .filter((project) => projectAccessFromFacts({ ...project, phases: [] }, { grants: ctx.grants, actorId }).canSeeWorkSections)

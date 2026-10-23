@@ -155,20 +155,6 @@ export async function saveNoteImageToIdeasAction(input: { projectId: string; pha
   });
 }
 
-const NoteUseInput = z.strictObject({ ...NoteImageRef, operationId: Id, target: UseInput.shape.target, option: UseInput.shape.option });
-
-/** "Use in schedule" straight from a phase-note image, in the note's own project. */
-export async function applyNoteImageToScheduleAction(input: z.infer<typeof NoteUseInput>): Promise<ActionResult<{ projectId: string; entryId: string; optionId: string; code: string; label: string }>> {
-  return runSafeAction(async () => {
-    await requireModuleEnabled("ideas");
-    const ctx = await context();
-    const data = parse(NoteUseInput, input);
-    const result = await ideas.useNoteImageInSchedule({ ...ctx, ...data });
-    refresh(data.projectId);
-    return result;
-  });
-}
-
 /** "Add to moodboard" on a card: a copy becomes a slide of the project Moodboard board. */
 export async function addIdeaToMoodboardAction(input: { cardId: string; projectId: string }): Promise<ActionResult<{ boardId: string; slideId: string; created: boolean }>> {
   return runSafeAction(async () => {

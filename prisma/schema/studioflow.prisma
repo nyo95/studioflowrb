@@ -161,6 +161,7 @@ model SfProject {
   workspace_cards    SfWorkspaceCard[]
   workspace_threads  SfWorkspaceThread[]
   note_tags          SfNoteTag[]
+  book_members       SfBookMember[]
 
   @@index([status, archived_at])
   @@index([pic_designer_id])
@@ -923,5 +924,23 @@ model SfExternalSchedulePlacement {
   @@index([project_id, created_at])
   @@index([option_id])
   @@map("sf_external_schedule_placement")
+  @@schema("studioflow")
+}
+
+/// A person a PIC invited to read and write one project's book (WO-SF-BOOK-01). The user is a plain id, never a relation.
+model SfBookMember {
+  id              String   @id @default(uuid())
+  project_id      String
+  user_id         String
+  invited_by_id   String
+  /// Snapshot, so the name survives the inviter being renamed or removed.
+  invited_by_name String
+  invited_at      DateTime @default(now())
+
+  project SfProject @relation(fields: [project_id], references: [id], onDelete: Cascade)
+
+  @@unique([project_id, user_id])
+  @@index([user_id])
+  @@map("sf_book_member")
   @@schema("studioflow")
 }

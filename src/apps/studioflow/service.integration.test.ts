@@ -916,7 +916,7 @@ describe("WO-BE-01 backend regressions", () => {
     const first = await sf.phases.postPhaseNote({ ...as(designer), projectId, phaseId: phase.id, body: "- Warmer palette\n- Keep the marble", clientFeedback: true });
     clock = new Date(clock.getTime() + 60_000);
     const second = await sf.phases.postPhaseNote({ ...as(designer), projectId, phaseId: phase.id, body: "Supplier called back" });
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: designer.id, projectId, phaseId: phase.id });
     assert.deepEqual(detail.notes.map((note) => [note.id, note.body, note.clientFeedback, note.starred, note.iterationId, note.iterationLabel, note.authorName]), [
       [first.noteId, "- Warmer palette\n- Keep the marble", true, false, detail.currentIteration!.id, detail.currentIteration!.shortName, designer.actor.label],
       [second.noteId, "Supplier called back", false, false, detail.currentIteration!.id, detail.currentIteration!.shortName, designer.actor.label],
@@ -3376,7 +3376,7 @@ describe("WO-SF-ITER-01 screens support (Lead)", () => {
     const warm = await sf.phases.postPhaseNote({ ...as(designer), projectId, phaseId: moodboard.id, body: "Client prefers warm tones" });
     await sf.phases.postPhaseNote({ ...as(designer), projectId, phaseId: moodboard.id, body: "Not starred" });
     await sf.workspace.setWorkspaceCardFlags({ ...as(designer), projectId, cardId: warm.noteId, pinned: true, version: await noteVersion(warm.noteId) });
-    const starred = await sf.phases.listStarredPhaseNotes({ grants: ALL, projectId });
+    const starred = await sf.phases.listStarredPhaseNotes({ grants: ALL, actorId: designer.id, projectId });
     assert.deepEqual(starred.filter((item) => item.notes.length).map((item) => [item.phaseName, item.notes.map((note) => note.body)]), [["Moodboard", ["Client prefers warm tones"]]]);
   });
 });
@@ -3642,7 +3642,8 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
     const asViewer = { ...as(viewer, [P.access, P.projectRead]), projectId, phaseId: phase.id };
     await rejectsWith(sf.phases.postPhaseNote({ ...asViewer, body: "x" }), "PERMISSION_DENIED");
     await rejectsWith(sf.phases.postPhaseImage({ ...asViewer, file: png() }), "PERMISSION_DENIED");
-    await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...asViewer, cardId: noteId, pinned: true, version: await noteVersion(noteId) }), "PERMISSION_DENIED");
+    // A private note is not even visible to someone outside the book: it answers like a missing one.
+    await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...asViewer, cardId: noteId, pinned: true, version: await noteVersion(noteId) }), "PHASE_NOTE_NOT_FOUND");
     // The drafter has no seat on the Moodboard phase.
     await rejectsWith(sf.workspace.deleteWorkspaceCard({ ...as(drafter, DRAFTER_GRANTS), projectId, cardId: noteId, version: await noteVersion(noteId) }), "PERMISSION_DENIED");
     await rejectsWith(sf.phases.postPhaseImage({ ...as(drafter, DRAFTER_GRANTS), projectId, phaseId: phase.id, file: png() }), "PERMISSION_DENIED");
@@ -3676,13 +3677,13 @@ describe("WO-SF-NOTEFEED-01 phase notes as messages", () => {
     const two = await sf.phases.postPhaseImage({ ...base, file: jpeg() });
     const noteId = one.imageId;
     await sf.workspace.setWorkspaceCardFlags({ ...base, cardId: noteId, pinned: true, version: await noteVersion(noteId) });
-    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: phase.id });
+    const detail = await sf.phases.getPhaseDetail({ grants: ALL, actorId: designer.id, projectId, phaseId: phase.id });
     const shape = (images: ReadonlyArray<{ id: string; url: string | null; contentType: string; bytes: number }>) => images.map((image) => [image.id, image.contentType, image.bytes, image.url?.startsWith("https://storage.invalid/")]);
     const byType = (rows: unknown[][]) => rows.sort((x, y) => String(x[1]).localeCompare(String(y[1])));
     assert.deepEqual(byType(detail.notes.flatMap((note) => shape(note.images))), [[two.imageId, "image/jpeg", 8, true], [one.imageId, "image/png", PNG.byteLength, true]]);
-    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all" })).find((c) => c.id === projectId)!;
+    const card = (await sf.projects.listProjectCards({ grants: ALL, filter: "all", actorId: designer.id })).find((c) => c.id === projectId)!;
     assert.equal(card.phases.find((p) => p.id === phase.id)!.starred_notes, 1);
-    const starred = await sf.phases.listStarredPhaseNotes({ grants: ALL, projectId });
+    const starred = await sf.phases.listStarredPhaseNotes({ grants: ALL, actorId: designer.id, projectId });
     assert.deepEqual(starred.find((item) => item.phaseId === phase.id)!.notes.map((note) => [note.id, note.imageCount]), [[noteId, 1]]);
     const leaked = JSON.stringify([detail, card, starred]);
     for (const key of storage.objects.keys()) assert.equal(leaked.includes(key), false, "a storage key leaked into a read");
@@ -3860,7 +3861,7 @@ describe("WO-SF-IDEAS-01 personal Ideas board", () => {
     assert.match(card.note ?? "", /Note source/);
     assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "ideas.card.created", entity_id: card.id } }), 1);
 
-    const placed = await ideas.useNoteImageInSchedule({ ...base, imageId: image.id, target: { kind: "new-item", section: "MATERIAL", category: "Stone" }, option: { productName: "From the notes" } });
+    const placed = await sf.workspace.useNoteImageInSchedule({ ...base, imageId: image.id, target: { kind: "new-item", section: "MATERIAL", category: "Stone" }, option: { productName: "From the notes" } });
     const option = await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: placed.optionId } });
     assert.ok(option.image_key && option.image_key !== image.storage_key && option.image_key.startsWith(`studioflow/schedule/${projectId}/`));
     assert.deepEqual(bytesOf(option.image_key), bytesOf(image.storage_key));
@@ -4034,10 +4035,17 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     assert.equal((await sf.workspace.searchNoteItems({ grants: readGrants, projectId, query: "palette" }))[0]?.entryId, entry.entryId, "Schedule-derived search retains its read-only contract");
 
     const manager = await seedUser("Workspace read manager", [...readGrants, P.projectManage]);
+    // A manager who is not a PIC sees the project but not its private book (WO-SF-BOOK-01).
+    const managerRead = { grants: [...readGrants, P.projectManage], actorId: manager.id, projectId };
+    assert.equal((await sf.workspace.readWorkspace(managerRead)).length, 0);
+    assert.equal((await sf.workspace.listWorkspaceThreads(managerRead)).length, 0);
+    assert.equal((await sf.workspace.listProjectNotes(managerRead)).notes.length, 0);
+    assert.deepEqual(await sf.workspace.listNoteTags(managerRead), []);
+    assert.deepEqual(await sf.workspace.listNotesForItem({ ...managerRead, entryId: entry.entryId }), []);
+    assert.equal((await sf.phases.getPhaseDetail({ ...managerRead, phaseId: moodboard.id })).notes.length, 0);
     for (const allowed of [
       { grants: readGrants, actorId: designer.id, projectId },
       { grants: readGrants, actorId: drafter.id, projectId },
-      { grants: [...readGrants, P.projectManage], actorId: manager.id, projectId },
     ]) {
       assert.equal((await sf.workspace.readWorkspace(allowed)).length, 2);
       assert.equal((await sf.workspace.listWorkspaceThreads(allowed)).length, 1);
@@ -4079,7 +4087,7 @@ describe("WO-SF-WORKSPACE-01 project Workspace", () => {
     const { cardId } = await sf.workspace.createWorkspaceCard({ ...base, phaseId: moodboard.id, body: "Palette" });
     await sf.workspace.createWorkspaceCard({ ...base, body: "General" });
     assert.deepEqual((await sf.workspace.readWorkspace({ grants: ALL, actorId: designer.id, projectId, phaseId: moodboard.id })).map((card) => card.id), [cardId]);
-    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, actorId: MANAGER_READER, projectId, phaseId: moodboard.id })).notes.length, 1, "the phase notes feed shows only its own cards");
+    assert.equal((await sf.phases.getPhaseDetail({ grants: ALL, actorId: designer.id, projectId, phaseId: moodboard.id })).notes.length, 1, "the phase notes feed shows only its own cards");
 
     let version = (await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } })).version;
     ({ version } = await sf.workspace.setWorkspaceCardPhase({ ...base, cardId, phaseId: cd.id, version }));
@@ -4711,9 +4719,10 @@ describe("WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A", () => {
     // Canonical phase transition rights derive from the same project PIC assignment as document rights.
     // A phase-work grant alone is not that assignment; inventing a phase-only PIC would change the policy.
     for (const ctx of [as(unassigned, grants), as(viewer, [P.access, P.projectRead])]) {
-      await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...ctx, projectId, cardId, body: "Denied", version: starred.version, itemEntryIds: [] }), "PERMISSION_DENIED");
-      await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...ctx, projectId, cardId, pinned: false, version: starred.version }), "PERMISSION_DENIED");
-      await rejectsWith(sf.workspace.deleteWorkspaceCard({ ...ctx, projectId, cardId, version: starred.version }), "PERMISSION_DENIED");
+      // Outside the book a private note answers like a missing one.
+      await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...ctx, projectId, cardId, body: "Denied", version: starred.version, itemEntryIds: [] }), "PHASE_NOTE_NOT_FOUND");
+      await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...ctx, projectId, cardId, pinned: false, version: starred.version }), "PHASE_NOTE_NOT_FOUND");
+      await rejectsWith(sf.workspace.deleteWorkspaceCard({ ...ctx, projectId, cardId, version: starred.version }), "PHASE_NOTE_NOT_FOUND");
     }
     const moodboard = await phaseOf(projectId, "moodboard");
     const labelled = await sf.phases.postPhaseNote({ ...as(designer), projectId, phaseId: moodboard.id, body: "Designer phase" });
@@ -4760,5 +4769,237 @@ describe("WO-SF-NOTES-PRESENTATION-IMAGE-01 slice A", () => {
     const after = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: cardId } });
     assert.deepEqual([after.body, after.version], ["Board has an explicit association", saved.version], "failed link validation rolls the text/version back too");
     assert.deepEqual((await testDb.prisma.sfNoteItemLink.findMany({ where: { card_id: cardId } })).map((link) => link.entry_id), [entries[1]!.id]);
+  });
+});
+
+describe("WO-SF-BOOK-01 the private Project book", () => {
+  afterEach(() => storage.objects.clear());
+
+  const MEMBER_GRANTS = [P.access, P.projectRead, P.phaseWork];
+  const OVERRIDE_GRANTS = [P.access, P.projectRead, P.phaseWork, P.projectManage, P.projectOverride, P.scheduleManage, P.presentationManage, P.ideasManage];
+
+  async function setup(name = "Book project") {
+    const { projectId } = await newProject(name);
+    const moodboard = await phaseOf(projectId, "moodboard");
+    const manager = await seedUser("Mona Manager", OVERRIDE_GRANTS);
+    const member = await seedUser("Mia Member", MEMBER_GRANTS);
+    const outsider = await seedUser("Omar Outsider", MEMBER_GRANTS);
+    const ctx = (user: typeof designer, grants: readonly string[]) => ({ ...as(user, grants), projectId });
+    const read = (user: typeof designer, grants: readonly string[]) => ({ grants, actorId: user.id, projectId });
+    return { projectId, moodboard, manager, member, outsider, ctx, read, pic: ctx(designer, ALL) };
+  }
+
+  /** A client answer written by the phase step: the project's official history. */
+  async function recordAnswer(projectId: string, phaseId: string, note: string) {
+    const round = await openIteration(phaseId);
+    await sf.phases.sendIteration({ ...as(designer), projectId, phaseId, iterationId: round.id });
+    await sf.phases.recordClientAnswer({ ...as(designer), projectId, phaseId, iterationId: round.id, note });
+    return testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { project_id: projectId, workflow_record: true } });
+  }
+
+  it("lets the designer and the drafter read and write every card, and keeps managers and the owner out of the book", async () => {
+    const { projectId, moodboard, manager, outsider, pic, read } = await setup();
+    const note = await sf.workspace.createWorkspaceCard({ ...pic, body: "Private idea", tags: ["secret"] });
+    const image = await sf.workspace.createWorkspaceImage({ ...pic, file: png() });
+    const thread = await sf.workspace.postThreadMessage({ ...pic, phaseId: moodboard.id, thread: { x: 5, y: 5 }, body: "Private thread" });
+    const answer = await recordAnswer(projectId, moodboard.id, "Client wants warmer");
+
+    // PICs see everything and the drafter writes the unlabelled book as today.
+    assert.equal((await sf.workspace.listProjectNotes({ ...read(drafter, DRAFTER_GRANTS) })).notes.length, 4);
+    await sf.workspace.updateWorkspaceCardText({ ...pic, cardId: note.cardId, body: "Edited", version: await noteVersion(note.cardId), itemEntryIds: [] });
+    assert.ok((await sf.workspace.createWorkspaceCard({ ...as(drafter, DRAFTER_GRANTS), projectId, body: "Drafter note" })).cardId);
+
+    // Someone with no part in the project cannot open it at all.
+    for (const call of [() => sf.workspace.readWorkspace(read(outsider, MEMBER_GRANTS)), () => sf.workspace.listProjectNotes(read(outsider, MEMBER_GRANTS)), () => sf.workspace.listNoteTags(read(outsider, MEMBER_GRANTS)), () => sf.workspace.listWorkspaceThreads(read(outsider, MEMBER_GRANTS))]) await rejectsWith(call(), "PERMISSION_DENIED");
+
+    // Override manager and the owner (every grant, neither a PIC nor a member) see workflow records only.
+    const owner = await seedUser("Olivia Owner", ALL);
+    for (const who of [{ user: manager, grants: OVERRIDE_GRANTS }, { user: owner, grants: ALL }]) {
+      const r = read(who.user, who.grants);
+      assert.deepEqual((await sf.workspace.readWorkspace(r)).map((card) => card.id), [answer.id]);
+      assert.deepEqual((await sf.workspace.listProjectNotes({ ...r, limit: 100 })).notes.map((card) => card.id), [answer.id]);
+      assert.deepEqual((await sf.workspace.listProjectNotes({ ...r, inThreads: true })).notes, []);
+      assert.deepEqual((await sf.workspace.listProjectNotes({ ...r, threadId: thread.threadId })).notes, []);
+      assert.deepEqual(await sf.workspace.listNoteTags(r), []);
+      assert.deepEqual(await sf.workspace.listWorkspaceThreads(r), []);
+      assert.deepEqual((await sf.phases.getPhaseDetail({ ...r, phaseId: moodboard.id })).notes.map((card) => card.id), [answer.id]);
+      assert.deepEqual((await sf.phases.listStarredPhaseNotes(r)).flatMap((phase) => phase.notes), []);
+      // A private card, its image and its thread answer exactly like a missing card.
+      const mine = { ...as(who.user, who.grants), projectId };
+      await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...mine, cardId: note.cardId, body: "x", version: 1, itemEntryIds: [] }), "PHASE_NOTE_NOT_FOUND");
+      await rejectsWith(sf.workspace.deleteWorkspaceCard({ ...mine, cardId: image.cardId, version: 1 }), "PHASE_NOTE_NOT_FOUND");
+      await rejectsWith(sf.workspace.setNoteTags({ ...mine, cardId: note.cardId, tags: ["x"], version: 1 }), "PHASE_NOTE_NOT_FOUND");
+      await rejectsWith(sf.workspace.setWorkspaceCardFlags({ ...mine, cardId: note.cardId, pinned: true, version: 1 }), "PHASE_NOTE_NOT_FOUND");
+      await rejectsWith(sf.workspace.placeWorkspaceItems({ ...mine, cards: [{ id: note.cardId, x: 1, y: 1, w: 200 }] }), "PHASE_NOTE_NOT_FOUND");
+      await rejectsWith(sf.workspace.setWorkspaceCardPhase({ ...mine, cardId: note.cardId, phaseId: null, version: 1 }), "PHASE_NOTE_NOT_FOUND");
+      // Every new write is refused.
+      await rejectsWith(sf.workspace.createWorkspaceCard({ ...mine, body: "intrude" }), "PERMISSION_DENIED");
+      await rejectsWith(sf.workspace.createWorkspaceCard({ ...mine, phaseId: moodboard.id, body: "intrude" }), "PERMISSION_DENIED");
+      await rejectsWith(sf.workspace.createWorkspaceImage({ ...mine, file: png() }), "PERMISSION_DENIED");
+      await rejectsWith(sf.workspace.createWorkspaceFile({ ...mine, file: { body: new TextEncoder().encode("a,b"), name: "x.csv" } }), "PERMISSION_DENIED");
+      await rejectsWith(sf.workspace.postThreadMessage({ ...mine, phaseId: moodboard.id, thread: { threadId: thread.threadId }, body: "x" }), "PERMISSION_DENIED");
+      await rejectsWith(sf.phases.postPhaseNote({ ...mine, phaseId: moodboard.id, body: "x" }), "PERMISSION_DENIED");
+      await rejectsWith(sf.workspace.moveThread({ ...mine, threadId: thread.threadId, version: 1, x: 1, y: 1 }), "PERMISSION_DENIED");
+      // A private card's id cannot be probed through a reply target.
+      await rejectsWith(sf.phases.postPhaseNote({ ...mine, phaseId: moodboard.id, body: "r", answeredIterationId: answer.iteration_id!, replyToId: note.cardId }), "NOTE_REPLY_INVALID");
+    }
+    assert.equal([...storage.objects.keys()].filter((key) => key.startsWith("studioflow/")).length, 1, "refused writes stored no object");
+  });
+
+  it("keeps workflow records readable by everyone who sees the work sections, and the replies under them from leaking private cards", async () => {
+    const { projectId, moodboard, manager, pic, read } = await setup();
+    const secret = await sf.workspace.createWorkspaceCard({ ...pic, phaseId: moodboard.id, body: "Hidden budget thought" });
+    const answer = await recordAnswer(projectId, moodboard.id, "Official answer");
+    await testDb.prisma.sfWorkspaceCard.update({ where: { id: answer.id }, data: { reply_to_id: secret.cardId } });
+    const asManager = read(manager, OVERRIDE_GRANTS);
+    const [view] = await sf.workspace.readWorkspace(asManager);
+    assert.equal(view!.id, answer.id);
+    assert.equal(view!.body, "Official answer");
+    assert.equal(view!.replyTo, null, "the answer's reply excerpt is the private card's, so it is withheld");
+    assert.equal(JSON.stringify(await sf.workspace.readWorkspace(asManager)).includes("Hidden budget"), false);
+    assert.equal((await sf.workspace.readWorkspace(read(designer, ALL))).find((card) => card.id === answer.id)!.replyTo?.excerpt, "Hidden budget thought");
+    // The star on a workflow record shows to the manager, and the project card counts it.
+    await testDb.prisma.sfWorkspaceCard.update({ where: { id: answer.id }, data: { is_pinned: true } });
+    await testDb.prisma.sfWorkspaceCard.update({ where: { id: secret.cardId }, data: { is_pinned: true } });
+    assert.deepEqual((await sf.phases.listStarredPhaseNotes(asManager)).flatMap((phase) => phase.notes.map((note) => note.id)), [answer.id]);
+    const card = (await sf.projects.listProjectCards({ grants: OVERRIDE_GRANTS, filter: "all", actorId: manager.id })).find((item) => item.id === projectId)!;
+    assert.equal(card.phases.find((phase) => phase.id === moodboard.id)!.starred_notes, 1);
+    const ownCard = (await sf.projects.listProjectCards({ grants: ALL, filter: "all", actorId: designer.id })).find((item) => item.id === projectId)!;
+    assert.equal(ownCard.phases.find((phase) => phase.id === moodboard.id)!.starred_notes, 2);
+  });
+
+  it("serves a private note image to Presentation and Ideas only for book readers, and a workflow image to anyone with the work sections", async () => {
+    const { manager, pic, projectId } = await setup();
+    const bridge = createStudioFlowPresentationBridge(testDb.prisma);
+    const image = await sf.workspace.createWorkspaceImage({ ...pic, file: png() });
+    const asManager = { ...as(manager, OVERRIDE_GRANTS), projectId, imageId: image.cardId };
+    await assert.rejects(bridge.readWorkspaceImageSource(asManager), (error: unknown) => error instanceof AppError && error.code === "NOTE_IMAGE_NOT_FOUND" && error.kind === "NOT_FOUND");
+    await rejectsWith(ideas.saveNoteImageToIdeas(asManager), "PERMISSION_DENIED");
+    assert.ok((await bridge.readWorkspaceImageSource({ ...as(designer), projectId, imageId: image.cardId })).key);
+    await testDb.prisma.sfWorkspaceCard.update({ where: { id: image.cardId }, data: { workflow_record: true } });
+    assert.ok((await bridge.readWorkspaceImageSource(asManager)).key, "a workflow image stays readable");
+  });
+
+  it("lets only a PIC add and remove book members, audits both, and refuses inactive, non-StudioFlow and PIC users", async () => {
+    const { projectId, manager, member, outsider, ctx } = await setup();
+    const picCtx = ctx(designer, ALL);
+    await rejectsWith(sf.workspace.addBookMember({ ...ctx(manager, OVERRIDE_GRANTS), userId: member.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.workspace.addBookMember({ ...ctx(member, MEMBER_GRANTS), userId: member.id }), "PERMISSION_DENIED");
+    const noAccess = await seedUser("No StudioFlow", []);
+    await rejectsWith(sf.workspace.addBookMember({ ...picCtx, userId: noAccess.id }), "BOOK_MEMBER_NOT_ELIGIBLE");
+    const disabled = await seedUser("Left Studio", MEMBER_GRANTS);
+    await testDb.prisma.user.update({ where: { id: disabled.id }, data: { status: "DISABLED" } });
+    await rejectsWith(sf.workspace.addBookMember({ ...picCtx, userId: disabled.id }), "BOOK_MEMBER_NOT_ELIGIBLE");
+    await rejectsWith(sf.workspace.addBookMember({ ...picCtx, userId: drafter.id }), "BOOK_MEMBER_IS_PIC");
+
+    assert.equal((await sf.workspace.addBookMember({ ...picCtx, userId: member.id })).added, true);
+    assert.equal((await sf.workspace.addBookMember({ ...ctx(drafter, DRAFTER_GRANTS), userId: member.id })).added, false, "adding twice is a no-op");
+    assert.equal(await testDb.prisma.sfBookMember.count({ where: { project_id: projectId } }), 1);
+    const row = await testDb.prisma.sfBookMember.findFirstOrThrow({ where: { project_id: projectId } });
+    assert.deepEqual([row.user_id, row.invited_by_id, row.invited_by_name], [member.id, designer.id, designer.actor.label]);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.book-member.added" } }), 1);
+
+    const listed = await sf.workspace.listBookMembers({ grants: MEMBER_GRANTS, actorId: member.id, projectId });
+    assert.deepEqual(listed.map((item) => [item.userId, item.displayName, item.invitedByName]), [[member.id, "Mia Member", designer.actor.label]]);
+    await rejectsWith(sf.workspace.listBookMembers({ grants: OVERRIDE_GRANTS, actorId: manager.id, projectId }), "PERMISSION_DENIED");
+    await rejectsWith(sf.workspace.removeBookMember({ ...ctx(manager, OVERRIDE_GRANTS), userId: member.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.workspace.removeBookMember({ ...ctx(member, MEMBER_GRANTS), userId: member.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.workspace.removeBookMember({ ...picCtx, userId: outsider.id }), "BOOK_MEMBER_NOT_FOUND");
+    await sf.workspace.removeBookMember({ ...picCtx, userId: member.id });
+    assert.equal(await testDb.prisma.sfBookMember.count({ where: { project_id: projectId } }), 0);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.book-member.removed" } }), 1);
+  });
+
+  it("gives an invited member the book and the project page, nothing to edit, and takes it away on removal", async () => {
+    const { projectId, moodboard, member, pic, ctx, read } = await setup();
+    const secret = await sf.workspace.createWorkspaceCard({ ...pic, body: "Shared with Mia" });
+    const mr = read(member, MEMBER_GRANTS);
+    await rejectsWith(sf.workspace.readWorkspace(mr), "PERMISSION_DENIED");
+    await rejectsWith(sf.phases.getPhaseDetail({ ...mr, phaseId: moodboard.id }), "PERMISSION_DENIED");
+    await sf.workspace.addBookMember({ ...pic, userId: member.id });
+
+    const access = await sf.projects.getAccess({ grants: MEMBER_GRANTS, actor: member.actor, projectId });
+    assert.deepEqual([access.canSeeWorkSections, access.canReadBook, access.isBookMember, access.canEditProject, access.canEditDocuments], [true, true, true, false, false]);
+    assert.equal(access.phases.some((phase) => phase.canTransition || phase.canEditContent), false);
+    assert.equal((await sf.projects.listAccess({ grants: MEMBER_GRANTS, actor: member.actor, projectIds: [projectId] })).get(projectId)!.canSeeWorkSections, true);
+    assert.equal((await sf.phases.getPhaseDetail({ ...mr, phaseId: moodboard.id })).id, moodboard.id);
+    assert.equal((await sf.workspace.readWorkspace(mr)).length, 1);
+    assert.equal((await sf.workspace.listBookMembers(mr)).length, 1);
+    assert.equal((await sf.projects.quickSearch({ ...mr, search: "" })).projects.some((item) => item.id === projectId), true);
+
+    // The member writes the book, labelled or not, and works on the PIC's cards.
+    const mine = ctx(member, MEMBER_GRANTS);
+    const written = await sf.workspace.createWorkspaceCard({ ...mine, body: "From Mia", tags: ["mia"] });
+    const labelled = await sf.workspace.createWorkspaceCard({ ...mine, phaseId: moodboard.id, body: "Mia, phase" });
+    await sf.workspace.createWorkspaceImage({ ...mine, file: png() });
+    await sf.workspace.updateWorkspaceCardText({ ...mine, cardId: secret.cardId, body: "Mia edited", version: await noteVersion(secret.cardId), itemEntryIds: [] });
+    await sf.workspace.setWorkspaceCardFlags({ ...mine, cardId: written.cardId, pinned: true, version: await noteVersion(written.cardId) });
+    await sf.phases.postPhaseNote({ ...mine, phaseId: moodboard.id, body: "Mia phase note" });
+    await sf.workspace.deleteWorkspaceCard({ ...mine, cardId: labelled.cardId, version: await noteVersion(labelled.cardId) });
+
+    // No phase, schedule, project or presentation edits.
+    const round = await openIteration(moodboard.id);
+    await rejectsWith(sf.phases.sendIteration({ ...mine, phaseId: moodboard.id, iterationId: round.id }), "PERMISSION_DENIED");
+    await rejectsWith(sf.schedule.createEntry({ ...ctx(member, [...MEMBER_GRANTS, P.scheduleManage]), section: "MATERIAL", category: "Paint", snapshot: { productName: "x" } }), "PERMISSION_DENIED");
+    const bridge = createStudioFlowPresentationBridge(testDb.prisma);
+    await rejectsWith(bridge.requireProjectDocumentWrite(ctx(member, [...MEMBER_GRANTS, P.presentationManage])), "PERMISSION_DENIED");
+
+    // Removed members lose it on the next request.
+    await sf.workspace.removeBookMember({ ...pic, userId: member.id });
+    await rejectsWith(sf.workspace.readWorkspace(mr), "PERMISSION_DENIED");
+    await rejectsWith(sf.workspace.createWorkspaceCard({ ...mine, body: "late" }), "PERMISSION_DENIED");
+    await rejectsWith(sf.workspace.updateWorkspaceCardText({ ...mine, cardId: secret.cardId, body: "late", version: await noteVersion(secret.cardId), itemEntryIds: [] }), "PHASE_NOTE_NOT_FOUND");
+    assert.equal((await sf.projects.getAccess({ grants: MEMBER_GRANTS, actor: member.actor, projectId })).canSeeWorkSections, false);
+  });
+
+  it("keeps a member's writes behind the project's state, like the PICs'", async () => {
+    const { projectId, member, pic, ctx } = await setup();
+    await sf.workspace.addBookMember({ ...pic, userId: member.id });
+    const mine = ctx(member, MEMBER_GRANTS);
+    for (const [status, archived_at, code] of [["COMPLETED", null, "PROJECT_COMPLETED"], ["ACTIVE", clock, "PROJECT_ARCHIVED"], ["ON_HOLD", null, "PROJECT_NOT_ACTIVE"]] as const) {
+      await testDb.prisma.sfProject.update({ where: { id: projectId }, data: { status, archived_at } });
+      await rejectsWith(sf.workspace.createWorkspaceCard({ ...mine, body: "x" }), code);
+    }
+  });
+
+  it("applies the same reader rule to the list predicate and to the access policy", async () => {
+    const { projectId, member, manager, outsider, pic } = await setup();
+    await sf.workspace.addBookMember({ ...pic, userId: member.id });
+    await sf.workspace.createWorkspaceCard({ ...pic, body: "Private" });
+    const secret = await testDb.prisma.sfWorkspaceCard.findFirstOrThrow({ where: { project_id: projectId } });
+    const { visibleBookCardsWhere } = await import("./shared");
+    for (const [user, grants] of [[designer, ALL], [drafter, DRAFTER_GRANTS], [member, MEMBER_GRANTS], [manager, OVERRIDE_GRANTS], [outsider, MEMBER_GRANTS]] as const) {
+      const access = await sf.projects.getAccess({ grants, actor: user.actor, projectId });
+      const visible = await testDb.prisma.sfWorkspaceCard.count({ where: { id: secret.id, ...visibleBookCardsWhere(user.id) } });
+      assert.equal(visible === 1, access.canReadBook, `${user.actor.label}: list predicate matches canReadBook`);
+    }
+  });
+
+  it("moves 'Use in schedule' for a note image into StudioFlow: PIC with Schedule edit, once per operation, no Ideas module involved", async () => {
+    const { projectId, member, manager, outsider, pic } = await setup();
+    await sf.workspace.addBookMember({ ...pic, userId: member.id });
+    const image = await sf.workspace.createWorkspaceImage({ ...pic, file: png() });
+    const stored = await testDb.prisma.sfWorkspaceCard.findUniqueOrThrow({ where: { id: image.cardId } });
+    const use = { ...pic, operationId: randomUUID(), imageId: image.cardId, target: { kind: "new-item" as const, section: "MATERIAL", category: "Stone" }, option: { productName: "From the book" } };
+
+    const placed = await sf.workspace.useNoteImageInSchedule(use);
+    const option = await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: placed.optionId } });
+    assert.ok(option.image_key && option.image_key !== stored.storage_key && option.image_key.startsWith(`studioflow/schedule/${projectId}/`));
+    assert.equal(option.is_final, false);
+    assert.deepEqual(await sf.workspace.useNoteImageInSchedule(use), placed, "a retry answers with the first result");
+    assert.equal(await testDb.prisma.sfScheduleOption.count(), 1);
+    assert.equal(await testDb.prisma.sfIdeaUsage.count(), 0);
+    const extra = await sf.workspace.useNoteImageInSchedule({ ...use, operationId: randomUUID(), target: { kind: "option" as const, entryId: placed.entryId }, option: { productName: "Second take" } });
+    assert.equal(extra.entryId, placed.entryId);
+    assert.ok(storage.objects.has(stored.storage_key!), "the note keeps its image");
+
+    // A member without the Schedule edit rule, a non-reader with Schedule rights, and a stranger are all refused.
+    await rejectsWith(sf.workspace.useNoteImageInSchedule({ ...use, ...as(member, [...MEMBER_GRANTS, P.scheduleManage]), operationId: randomUUID() }), "PERMISSION_DENIED");
+    await rejectsWith(sf.workspace.useNoteImageInSchedule({ ...use, ...as(manager, OVERRIDE_GRANTS), operationId: randomUUID() }), "PERMISSION_DENIED");
+    await rejectsWith(sf.workspace.useNoteImageInSchedule({ ...use, ...as(outsider, [...MEMBER_GRANTS, P.scheduleManage]), operationId: randomUUID() }), "PERMISSION_DENIED");
+    // A foreign project's image id is not reachable.
+    const other = await newProject("Other book");
+    await rejectsWith(sf.workspace.useNoteImageInSchedule({ ...use, projectId: other.projectId, operationId: randomUUID() }), "NOTE_IMAGE_NOT_FOUND");
+    assert.equal(await testDb.prisma.sfScheduleOption.count(), 2);
   });
 });
