@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.219 | 2026-10-23 | ui(studioflow): Type and Initials type share the Schedule List width; Phase 1 data cleanup (Lead)
+
+- **List:** Type and Initials type are the same kind of fact (one stands in for the other), so they now split the free width equally instead of Type taking it all; Material type and Ex are wider so "BY CONTRACTOR" fits on one line, Location a little wider.
+- **Data (owner-approved, kantor dev database, no code):** project 2026-536 Sociolla SBZ The Breeze BSD Phase 2. The Schedule Assistant batch of 2026-10-23 06:38 WIB had read the RAD-team columns of the source PDF (KEPERLUAN SAMPEL, STATUS MATERIAL) as spec lines and Contact, and blanked some Types. Through the schedule service (42 audited `option-updated` rows, `via: owner-approved-cleanup`) on the 42 Phase 1 items: "(old)" in Notes became "From Phase 1"; the "(sumber)" spec lines were removed (PT-07 keeps "Material type: TEXTURE PAINT" in Notes); Contact cleared (the PDF's CONTACT column is empty); Type restored per the PDF for ACR-01/02/03 (CLEAR, MILKY WHITE, WHITE; Color cleared), CT-01 (30X30) and PT-01 (EMULSION PAINT); Brand "CUSTOM PRINT" cleared on HT-02/HT-03 (Type stays CUSTOM PRINT). All 42 stay final; codes, photos and other items unchanged.
+- **Follow-up candidate:** the Assistant guardrails that would have prevented this (never replace a settled Type with "-", never turn source columns into spec lines or Contact without asking).
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, schedule regression tests; cleanup verified by a second dry run (0 changes left) and a read-back (42 Phase 1, 42 final, no "(sumber)", no "(old)").
+
 ## R9.218 | 2026-10-23 | ui(masterdata): archiving a SKU's last price offers to archive the SKU with it (Lead)
 
 - **Review of R9.217 (Codex):** PASS. One Brand rule for every schedule create/edit path, typed Brands kept, inactive Brand ids still refused; the Assistant resolves an exact Master Data name or keeps the typed name with `SCHEDULE_BRAND_NOT_IN_MASTER_DATA` and suggestions; schedule-assistant 1.4.0, bridge 1.5.0.

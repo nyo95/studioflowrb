@@ -228,3 +228,10 @@ describe("WO-SF-SCHEDULE-MARKS-01 hide and highlight", () => {
     assert.match(printPage, /const entries = includeHidden \? allEntries : allEntries\.filter\(\(entry\) => !entry\.hidden\);/);
   });
 });
+
+describe("Type and Initials type share the List width", () => {
+  it("gives both columns the same flexible width", () => {
+    assert.match(scheduleBoard, /<span className="min-w-40 flex-1 basis-0">\{sortHead\("type", "Type"\)\}<\/span>/);
+    assert.match(scheduleBoard, /<span className="min-w-40 flex-1 basis-0">\{sortHead\("initials", "Initials type"\)\}<\/span>/);
+  });
+});

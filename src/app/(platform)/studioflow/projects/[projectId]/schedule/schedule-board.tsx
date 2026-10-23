@@ -1047,16 +1047,17 @@ export function ScheduleBoard({
                 ) : (
                   // Columns follow the studio's Google Sheet (WO-SF-SCHEDULE-SHEET-01). The heading row stays
                   // put while the rows scroll; narrow screens scroll the whole list sideways.
-                  <div className={`grid ${showContact ? "min-w-[1160px]" : "min-w-[1028px]"}`}>
+                  <div className={`grid ${showContact ? "min-w-[1240px]" : "min-w-[1100px]"}`}>
                     <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-surface px-(--ui-section-px) py-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary">
                       {selecting ? <span className="w-5 shrink-0" /> : null}
                       <span className="w-16 shrink-0">{sortHead("code", "Code")}</span>
-                      <span className="w-24 shrink-0">{sortHead("category", section === "MATERIAL" ? "Material type" : "Category")}</span>
-                      <span className="w-24 shrink-0">{sortHead("brand", "Ex")}</span>
-                      <span className="min-w-0 flex-1">{sortHead("type", "Type")}</span>
-                      <span className="w-32 shrink-0">{sortHead("initials", "Initials type")}</span>
+                      <span className="w-28 shrink-0">{sortHead("category", section === "MATERIAL" ? "Material type" : "Category")}</span>
+                      <span className="w-32 shrink-0">{sortHead("brand", "Ex")}</span>
+                      {/* Type and Initials type are the same kind of fact (one replaces the other), so they share the width equally. */}
+                      <span className="min-w-40 flex-1 basis-0">{sortHead("type", "Type")}</span>
+                      <span className="min-w-40 flex-1 basis-0">{sortHead("initials", "Initials type")}</span>
                       <span className="w-11 shrink-0">Image</span>
-                      <span className="w-40 shrink-0">{sortHead("location", "Location")}</span>
+                      <span className="w-44 shrink-0">{sortHead("location", "Location")}</span>
                       {showContact ? <span className="w-32 shrink-0">{sortHead("contact", "Contact")}</span> : null}
                       {section === "FIXTURE" ? <span className="w-20 shrink-0 text-right">{sortHead("qty", "Qty")}</span> : null}
                       <span className="w-28 shrink-0">{sortHead("status", "Status")}</span>
@@ -1118,14 +1119,14 @@ export function ScheduleBoard({
                                 {selecting ? <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => toggleSelected(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} /> : null}
                                 <button type="button" onClick={() => (selecting ? toggleSelected(entry.id) : openEntry(entry.id))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                                   <span className="w-16 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
-                                  <span className="w-24 shrink-0 line-clamp-2 text-sm text-ink-secondary">{entry.category}</span>
-                                  <span className="w-24 shrink-0 line-clamp-2 text-sm text-ink-secondary">{shown?.brandName ?? ""}</span>
-                                  <span className="min-w-0 flex-1 line-clamp-2 text-sm font-medium text-ink">
+                                  <span className="w-28 shrink-0 line-clamp-2 text-sm text-ink-secondary">{entry.category}</span>
+                                  <span className="w-32 shrink-0 line-clamp-2 text-sm text-ink-secondary">{shown?.brandName ?? ""}</span>
+                                  <span className="min-w-40 flex-1 basis-0 line-clamp-2 text-sm font-medium text-ink">
                                     {shown ? shown.productName : <span className="font-normal italic text-ink-tertiary">Reserved — no product yet</span>}
                                   </span>
-                                  <span className="w-32 shrink-0 line-clamp-2 text-sm text-ink-secondary">{shown ? initialsOf(shown) : ""}</span>
+                                  <span className="min-w-40 flex-1 basis-0 line-clamp-2 text-sm text-ink-secondary">{shown ? initialsOf(shown) : ""}</span>
                                   <Thumb url={shown?.imageUrl ?? null} alt={shown ? shown.productName : `${entry.code} has no photo`} />
-                                  <span className="w-40 shrink-0 line-clamp-2 text-sm text-ink-secondary" title={entry.location ?? undefined}>{entry.location ?? ""}</span>
+                                  <span className="w-44 shrink-0 line-clamp-2 text-sm text-ink-secondary" title={entry.location ?? undefined}>{entry.location ?? ""}</span>
                                   {showContact ? <span className="w-32 shrink-0 line-clamp-2 text-sm text-ink-secondary" title={shown?.contact ?? undefined}>{shown?.contact ?? ""}</span> : null}
                                   {section === "FIXTURE" ? <span className="w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span> : null}
                                   <span className="flex w-28 shrink-0 flex-wrap gap-1">{entryBadges(entry).map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span>
