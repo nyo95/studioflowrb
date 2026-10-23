@@ -235,3 +235,11 @@ describe("Type and Initials type share the List width", () => {
     assert.match(scheduleBoard, /<span className="min-w-40 flex-1 basis-0">\{sortHead\("initials", "Initials type"\)\}<\/span>/);
   });
 });
+
+describe("Contact is offered from the Brand's Master Data contacts", () => {
+  it("loads the chosen Brand's contacts and keeps typed text as its own choice", () => {
+    assert.match(scheduleBoard, /listScheduleBrandContactsAction\(\{ projectId, brandId \}\)/);
+    assert.match(scheduleBoard, /<CreatableSearch\s+label="Contact"/);
+    assert.match(scheduleBoard, /\[\{ id: draft\.contact, label: draft\.contact \}, \.\.\.fromMasterData\]/);
+  });
+});

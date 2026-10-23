@@ -5,7 +5,7 @@ Scope: a schedule option's Contact is suggested from the Brand's Master Data con
 Module(s): `masterdata` (new public read `listBrandContacts`), `studioflow` (schedule read, action, then inspector UI).
 Target revision: plan R9.220; backend (Codex) R9.222; UI (Lead) R9.223.
 Risk: low-medium - a new cross-module read of contact phone numbers; no schema change.
-Status: READY for Executor (R9.222).
+Status: DONE - backend R9.222 (Codex, PASS), UI R9.223 (Lead); owner browser check owed.
 Priority: P2
 Owner: Product Owner (decision 2026-10-23: Contact from Master Data when present, with override; format "Andi (Sales) - 0813412457877")
 Last updated: 2026-10-23

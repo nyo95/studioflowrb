@@ -81,6 +81,7 @@ import {
   deleteScheduleEntryAction,
   deleteScheduleOptionAction,
   importScheduleCsvAction,
+  listScheduleBrandContactsAction,
   scheduleImportTemplateAction,
   markScheduleFinalAction,
   moveScheduleEntryAction,
@@ -1612,6 +1613,25 @@ function EntryPanelContent({
     updateDraft(isKnownBrandId(next) ? { brandId: next, brandName: "" } : { brandId: "", brandName: next });
   };
 
+  // The chosen Master Data Brand's contacts, offered as "Name (Title) - phone" (WO-SF-SCHEDULE-CONTACT-MD-01).
+  // Picking one copies its text; anything typed is kept as typed, and nothing is filled in on its own.
+  const [brandContacts, setBrandContacts] = useState<{ brandId: string; options: CreatableSearchOption[] } | null>(null);
+  useEffect(() => {
+    const brandId = draft.brandId;
+    if (!brandId) return;
+    let cancelled = false;
+    void listScheduleBrandContactsAction({ projectId, brandId }).then((result) => {
+      if (cancelled || !result.ok) return;
+      setBrandContacts({ brandId, options: result.data.map((contact) => ({ id: contact.label, label: contact.label, description: contact.vendorName })) });
+    });
+    return () => { cancelled = true; };
+  }, [projectId, draft.brandId]);
+  const fromMasterData = brandContacts && brandContacts.brandId === draft.brandId ? brandContacts.options : [];
+  // A typed contact (or one saved earlier) is shown as its own choice, the way a typed Brand is.
+  const contactOptions: CreatableSearchOption[] = draft.contact && !fromMasterData.some((option) => option.id === draft.contact)
+    ? [{ id: draft.contact, label: draft.contact }, ...fromMasterData]
+    : fromMasterData;
+
   // Unchecking everything is a real choice (photo, code and title only), not a
   // reset — `null` is the reset, and "Use default" is how it is reached.
   // Ticking is never blocked by the field being empty: ticking is how a field starts being filled in.
@@ -1775,18 +1795,23 @@ function EntryPanelContent({
           />
         </div>
         {/* Where the product is bought; internal, so it is never on the card or in print. */}
-        <label className="grid gap-0.5">
+        <div className="grid gap-0.5">
           <span className="text-[11px] uppercase tracking-[0.06em] text-ink-tertiary">Contact</span>
-          <input
-            aria-label="Contact"
+          <CreatableSearch
+            label="Contact"
+            options={contactOptions}
             value={draft.contact}
-            onChange={(event) => updateDraft({ contact: event.target.value })}
+            onValueChange={(next) => updateDraft({ contact: next.slice(0, 160) })}
+            onCreate={(text) => text}
+            createLabel={(text) => `Use "${text}"`}
+            placeholder={fromMasterData.length ? "Choose a contact or type one" : "Name (Title) - phone"}
+            searchPlaceholder="Search or type a contact…"
+            emptyLabel={draft.brandId ? "No contacts for this Brand in Master Data" : "Type a contact"}
+            allowClear
             disabled={disabled}
-            maxLength={160}
-            placeholder="Shop or supplier"
-            className="-ml-1.5 h-8 w-[calc(100%+0.375rem)] rounded-[6px] border border-transparent bg-transparent px-1.5 text-sm text-ink placeholder:text-ink-tertiary hover:border-line-subtle focus:border-line-focus focus:bg-surface focus:outline-none"
+            className="-ml-1.5 w-[calc(100%+0.375rem)] min-w-0 !h-8 !min-h-8 !border-transparent !bg-transparent !px-1.5 !text-sm"
           />
-        </label>
+        </div>
         <div className="mt-auto pt-1">
           {!isNew && selected?.isFinal ? (
             <div className="flex min-h-8 items-center gap-2 rounded-action bg-success-surface px-2.5 text-sm font-semibold text-success">

@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.223 | 2026-10-23 | ui(studioflow): Schedule Contact offers the Brand's Master Data contacts (Lead)
+
+- **Review of R9.222 (Codex):** PASS. Master Data `listBrandContacts` (brand representatives, then owner-vendor and supplier contacts, primary first, archived vendors out, at most 20), StudioFlow `formatScheduleContact`, `listBrandContactChoices` behind project detail access, `listScheduleBrandContactsAction`; 1,333/1,333 in the Executor's run.
+- **Change:** the inspector's Contact is now a searchable choice like Brand. With a Master Data Brand chosen it lists that Brand's contacts as `Name (Title) - phone` with the vendor name underneath; picking one copies the text. Anything typed is kept as typed ("Use ..."), a saved or typed contact shows as its own choice, and nothing is filled in on its own.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, schedule regression tests. Browser check is the owner's on :3001.
+
 ## R9.222 | 2026-10-23 | feat(studioflow): offer Brand contacts for schedule snapshots (Codex Executor)
 
 - **Scope:** Master Data exposes up to 20 contacts for an active Brand through its public read: Brand representatives first, then general owner and supplier contacts, primary first within each group. Archived vendors and unrelated contacts are excluded; only contact id, name, title, first phone, vendor and ordering flags cross the boundary.
