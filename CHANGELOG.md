@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.232 | 2026-10-23 | fix(studioflow): a removed highlight no longer stays until reload; Enter saves the inspector (Lead)
+
+- **Owner report:** removing a highlight sometimes left the colour on screen until the page was reloaded.
+- **Cause:** every schedule command refreshed the page twice - the action's own response (it revalidates the project) and a separate `router.refresh()`; with two changes close together, the older refresh could land after the newer data and paint the old colour back.
+- **Fix:** `useCommand.run` takes `{ refresh: false }` for actions that revalidate themselves; Hide/Unhide and Highlight use it, and they now show at once (an optimistic mark per item, dropped when the command settles). Other commands are unchanged.
+- **Owner request:** Enter in a one-line field of the inspector (Type, specs, Location, Qty, extra lines) saves like the Save button; Notes keeps Enter for a new line and the Brand/Contact search lists keep it for choosing.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, eslint, full test suite 1,347/1,347 (new: single refresh for marks, Enter rules).
+
 ## R9.231 | 2026-10-23 | ui(studioflow): Board is the pre-print view; card fields are chosen per card there (Lead)
 
 - **Owner decision:** the inspector is for filling in data only; which fields a card shows is decided where the print is laid out, per card, as in legacy. The Board becomes that pre-print view; List stays the default.

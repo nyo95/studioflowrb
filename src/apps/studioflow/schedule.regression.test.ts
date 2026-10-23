@@ -279,3 +279,20 @@ describe("Request sample from a row's menu", () => {
     assert.match(scheduleBoard, /<InlineSampleRequest projectId=\{projectId\} option=\{sampleTarget\.option\}/);
   });
 });
+
+describe("Hide and highlight never leave a stale mark (R9.232)", () => {
+  const command = readFileSync("src/app/(platform)/studioflow/_components/use-command.ts", "utf8");
+  it("shows the mark at once and lets the action's own response be the only refresh", () => {
+    assert.match(command, /if \(options\.refresh !== false\) router\.refresh\(\);/);
+    assert.match(scheduleBoard, /overrideMarks\(entryIds, \{ highlight \}\);\s+await run\("mark-highlight", [\s\S]*?\{ refresh: false \}\);\s+overrideMarks\(entryIds, null\);/);
+    assert.match(scheduleBoard, /overrideMarks\(entryIds, \{ hidden \}\);\s+const ok = await run\("mark-hidden", [\s\S]*?\{ refresh: false \}\);\s+overrideMarks\(entryIds, null\);/);
+  });
+});
+
+describe("Enter saves the inspector from a one-line field", () => {
+  it("saves on Enter except in Notes and in the Brand/Contact search lists", () => {
+    assert.match(scheduleBoard, /if \(event\.key !== "Enter" \|\| event\.shiftKey \|\| event\.nativeEvent\.isComposing \|\| target\.tagName !== "INPUT"\) return;/);
+    assert.match(scheduleBoard, /if \(!event\.currentTarget\.contains\(target\) \|\| target\.getAttribute\("role"\) === "combobox"/);
+    assert.match(scheduleBoard, /if \(!canEdit \|\| savePending \|\| !isDirty \|\| optionNeedsType\) return;/);
+  });
+});

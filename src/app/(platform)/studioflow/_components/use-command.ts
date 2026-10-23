@@ -26,7 +26,11 @@ export function useCommand() {
   }, []);
 
   const run = useCallback(
-    (key: string, command: () => Promise<Result>, onSuccess?: (data: unknown) => void) =>
+    /**
+     * `refresh: false` is for an action that revalidates the page itself: its own response already carries the new
+     * data, and a second refresh racing it can land later with older data (R9.232, a removed highlight that stayed).
+     */
+    (key: string, command: () => Promise<Result>, onSuccess?: (data: unknown) => void, options: { refresh?: boolean } = {}) =>
       new Promise<boolean>((resolve) => {
         track(key, 1);
         setError(null);
@@ -39,7 +43,7 @@ export function useCommand() {
               return;
             }
             onSuccess?.(result.data);
-            router.refresh();
+            if (options.refresh !== false) router.refresh();
             resolve(true);
           } catch {
             setError("The action could not be completed. Please try again.");

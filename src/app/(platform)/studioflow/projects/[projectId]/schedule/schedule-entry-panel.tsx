@@ -463,7 +463,19 @@ export function EntryPanelContent({
         </div>
       ) : null}
 
-      <div className={`grid min-h-0 flex-1 content-start gap-5 overflow-y-auto overscroll-contain px-4 pt-4 ${canEdit ? "pb-4" : "pb-6"}`}>
+      <div
+        className={`grid min-h-0 flex-1 content-start gap-5 overflow-y-auto overscroll-contain px-4 pt-4 ${canEdit ? "pb-4" : "pb-6"}`}
+        onKeyDown={(event) => {
+          // Enter in a one-line field saves, like the Save button (owner, 2026-10-23). Notes keeps Enter for a new
+          // line, and the Brand/Contact search lists (rendered elsewhere, in a portal) keep it for picking a choice.
+          const target = event.target as HTMLElement;
+          if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing || target.tagName !== "INPUT") return;
+          if (!event.currentTarget.contains(target) || target.getAttribute("role") === "combobox" || target.closest("[role='listbox'], [cmdk-root]")) return;
+          if (!canEdit || savePending || !isDirty || optionNeedsType) return;
+          event.preventDefault();
+          void saveAll().catch((error) => setSaveError(error instanceof Error ? error.message : "Could not save."));
+        }}
+      >
         {reuse ? <InlineReuse projectId={projectId} entry={entry} command={command} onClose={() => setReuse(false)} /> : null}
 
         {entry.options.length === 0 && !isNew ? (

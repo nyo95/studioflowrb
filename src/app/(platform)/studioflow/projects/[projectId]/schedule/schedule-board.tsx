@@ -79,7 +79,7 @@ import { BLANK, type Brand, type CategoryChoice, entryBadges, entryMatchesFilter
 export function ScheduleBoard({
   initialOpenId = null,
   projectId,
-  entries,
+  entries: serverEntries,
   brands,
   categoryChoices,
   canEdit,
@@ -100,9 +100,28 @@ export function ScheduleBoard({
   const command = useCommand();
   const { run, error } = command;
   const confirm = useConfirm();
-  const [section, setSection] = useState<Section>(() => entries.find((entry) => entry.id === initialOpenId)?.section ?? (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
+  const [section, setSection] = useState<Section>(() => serverEntries.find((entry) => entry.id === initialOpenId)?.section ?? (serverEntries.some((e) => e.section === "MATERIAL") || !serverEntries.length ? "MATERIAL" : "FIXTURE"));
   const [viewMode, setViewMode] = useState<"list" | "board">("list"); // List is the default view (owner, 2026-10-23)
   const [filter, setFilter] = useState<ScheduleFilter>("all");
+  // Hide and highlight show at once, before the server answers; each mark is dropped again once its command settles
+  // and the page carries the saved value (R9.232).
+  const [markOverrides, setMarkOverrides] = useState<ReadonlyMap<string, { hidden?: boolean; highlight?: ScheduleHighlight | null }>>(() => new Map());
+  const entries = useMemo(
+    () => (markOverrides.size === 0 ? serverEntries : serverEntries.map((entry) => {
+      const mark = markOverrides.get(entry.id);
+      return mark ? { ...entry, ...mark } : entry;
+    })),
+    [serverEntries, markOverrides],
+  );
+  const overrideMarks = (ids: readonly string[], mark: { hidden?: boolean; highlight?: ScheduleHighlight | null } | null) =>
+    setMarkOverrides((current) => {
+      const next = new Map(current);
+      for (const id of ids) {
+        if (mark) next.set(id, { ...next.get(id), ...mark });
+        else next.delete(id);
+      }
+      return next;
+    });
   const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const scrolledInitial = useRef(false);
   useEffect(() => {
@@ -208,13 +227,19 @@ export function ScheduleBoard({
   };
   const setHidden = async (rows: readonly ScheduleEntryView[], hidden: boolean) => {
     const entryIds = rows.map((row) => row.id);
-    const ok = await run("mark-hidden", () => setScheduleEntriesHiddenAction({ projectId, entryIds, hidden }));
+    overrideMarks(entryIds, { hidden });
+    const ok = await run("mark-hidden", () => setScheduleEntriesHiddenAction({ projectId, entryIds, hidden }), undefined, { refresh: false });
+    overrideMarks(entryIds, null);
     if (!ok) return;
     const what = rows.length === 1 ? rows[0].code : `${rows.length} items`;
     setNotice(hidden ? `${what} hidden. Choose "Show hidden" to see ${rows.length === 1 ? "it" : "them"} again.` : `${what} shown again.`);
   };
-  const setHighlight = (rows: readonly ScheduleEntryView[], highlight: ScheduleHighlight | null) =>
-    void run("mark-highlight", () => setScheduleEntriesHighlightAction({ projectId, entryIds: rows.map((row) => row.id), highlight }));
+  const setHighlight = async (rows: readonly ScheduleEntryView[], highlight: ScheduleHighlight | null) => {
+    const entryIds = rows.map((row) => row.id);
+    overrideMarks(entryIds, { highlight });
+    await run("mark-highlight", () => setScheduleEntriesHighlightAction({ projectId, entryIds, highlight }), undefined, { refresh: false });
+    overrideMarks(entryIds, null);
+  };
   /** Hide / Unhide and Highlight for one or several items; empty for a viewer who cannot edit. */
   const markItems = (rows: readonly ScheduleEntryView[]): RowActionItem[] => {
     if (!canEdit || rows.length === 0) return [];
