@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.227 | 2026-10-23 | ui(studioflow): suggest linking a typed Brand to its Master Data Brand (Lead)
+
+- **Owner decision:** a Brand typed before it existed in Master Data ("Singres Mosaic") should be offered a link once Master Data has it ("Singres"), never switched on its own.
+- **Matcher:** `brandLinkCandidates` (StudioFlow domain) - same name first, then a typed name that starts with the Brand name and a space or dash, then a Brand that starts with the typed name; longer Brand names first; at most three; never inside a word.
+- **Inspector:** under a typed Brand, `Not in Master Data · Link to "Singres"`; clicking puts the Master Data Brand in the draft (saved with Save like any edit), which also brings its contacts to Contact.
+- **List and selection:** the Ex filter has "Not in Master Data (typed)"; a selection whose items share one typed Brand offers `Link N items to "…"`, one ordinary option update per item.
+- **Plan:** `docs/apps/studioflow/WO-SF-SCHEDULE-BRAND-LINK-01.md` (UI only, no backend change).
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, full eslint, matcher unit tests and schedule regression tests 45/45, full test suite 1,341/1,341.
+
 ## R9.226 | 2026-10-23 | ui(masterdata): sample request queue shows the schedule item's photo and code (Lead)
 
 - **Owner request:** when a sample is requested, show the schedule item it came from.

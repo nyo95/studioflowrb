@@ -13,6 +13,7 @@ import {
   SCHEDULE_EXTRA_MAX,
   SCHEDULE_EXTRA_VALUE_MAX,
   SCHEDULE_HIGHLIGHTS,
+  brandLinkCandidates,
   SCHEDULE_SECTION_LABEL as SECTION_LABEL,
   cardFieldLabel,
   cardFieldValuesOf,
@@ -248,6 +249,8 @@ type ListFilterKey = "category" | "brand" | "location" | "contact";
 const LIST_FILTER_LABEL: Record<ListFilterKey, string> = { category: "Material type", brand: "Ex", location: "Location", contact: "Contact" };
 const NO_LIST_FILTERS: Record<ListFilterKey, string> = { category: "ALL", brand: "ALL", location: "ALL", contact: "ALL" };
 const BLANK = "__blank__";
+/** Ex filter value: options whose Brand was typed rather than chosen from Master Data. */
+const TYPED_BRAND = "__typed_brand__";
 
 /** The text a List column shows for one row: what it sorts and filters on. */
 function listCellText(entry: ScheduleEntryView, key: ListSortKey | ListFilterKey): string {
@@ -744,6 +747,30 @@ export function ScheduleBoard({
       },
     ];
   };
+  /** One typed Brand shared by every selected item, offered as a link to each Master Data candidate. */
+  const brandLinksFor = (rows: readonly ScheduleEntryView[]): RowActionItem[] => {
+    if (!canEdit || rows.length === 0) return [];
+    const options = rows.map((row) => shownOptionOf(row));
+    if (options.some((option) => !option || option.brandId || !option.brandName)) return [];
+    const typed = new Set(options.map((option) => option!.brandName!.trim().toLocaleLowerCase("id-ID")));
+    if (typed.size !== 1) return [];
+    return brandLinkCandidates(options[0]!.brandName, brands).map((brand) => ({
+      label: `Link ${rows.length === 1 ? rows[0].code : `${rows.length} items`} to "${brand.name}"`,
+      onSelect: () => void linkBrand(rows, brand),
+    }));
+  };
+  const linkBrand = async (rows: readonly ScheduleEntryView[], brand: Brand) => {
+    const ok = await run("link-brand", async () => {
+      for (const row of rows) {
+        const option = shownOptionOf(row);
+        if (!option) continue;
+        const result = await updateScheduleOptionAction({ projectId, optionId: option.id, snapshot: toSnapshot({ ...productFromOption(option), brandId: brand.id, brandName: "" }) });
+        if (!result.ok) return result;
+      }
+      return { ok: true as const, data: null };
+    });
+    if (ok) setNotice(`${rows.length === 1 ? rows[0].code : `${rows.length} items`} now use the Master Data Brand "${brand.name}".`);
+  };
   const copyItems = (entry: ScheduleEntryView): RowActionItem[] => [
     { label: "Copy row", icon: <Copy className="h-3.5 w-3.5" />, separatorBefore: true, onSelect: () => void copyRows([entry]) },
     ...(shownOptionOf(entry)?.imageUrl && canWriteClipboardImage() ? [{ label: "Copy image", icon: <ImageIcon className="h-3.5 w-3.5" />, onSelect: () => void copyImage(entry) }] : []),
@@ -753,6 +780,7 @@ export function ScheduleBoard({
   const listGroups = useMemo(() => {
     const keep = (entry: ScheduleEntryView) => (Object.keys(listFilters) as ListFilterKey[]).every((key) => {
       const wanted = listFilters[key];
+      if (wanted === TYPED_BRAND) { const shown = shownOptionOf(entry); return !!shown && !shown.brandId && !!shown.brandName; }
       return wanted === "ALL" || (listCellText(entry, key) || BLANK) === wanted;
     });
     const filtered = groups.map((group) => ({ ...group, rows: group.rows.filter(keep) })).filter((group) => group.rows.length > 0);
@@ -768,7 +796,7 @@ export function ScheduleBoard({
   const listFilterOptions = (key: ListFilterKey) => {
     const values = [...new Set(sectionEntries.map((entry) => listCellText(entry, key) || BLANK))]
       .sort((a, b) => (a === BLANK ? 1 : b === BLANK ? -1 : a.localeCompare(b, "id-ID", { numeric: true })));
-    return [{ id: "ALL", label: "All" }, ...values.map((value) => ({ id: value, label: value === BLANK ? "(blank)" : value }))];
+    return [{ id: "ALL", label: "All" }, ...(key === "brand" ? [{ id: TYPED_BRAND, label: "Not in Master Data (typed)" }] : []), ...values.map((value) => ({ id: value, label: value === BLANK ? "(blank)" : value }))];
   };
   const sortHead = (key: ListSortKey, label: string) => (
     <SortToggle
@@ -1184,6 +1212,7 @@ export function ScheduleBoard({
               onDelete={() => void removeSelected()}
               onCopy={() => void copyRows(visibleEntries.filter((entry) => selectedIds.has(entry.id)))}
               marks={markItems(visibleEntries.filter((entry) => selectedIds.has(entry.id)))}
+              brandLinks={brandLinksFor(visibleEntries.filter((entry) => selectedIds.has(entry.id)))}
               deleting={command.pendingKeys.includes("bulk-delete")}
             />
           ) : (
@@ -1613,6 +1642,9 @@ function EntryPanelContent({
     updateDraft(isKnownBrandId(next) ? { brandId: next, brandName: "" } : { brandId: "", brandName: next });
   };
 
+  // A typed Brand that now exists in Master Data is offered as a link, never switched on its own (WO-SF-SCHEDULE-BRAND-LINK-01).
+  const linkCandidates = draft.brandId ? [] : brandLinkCandidates(draft.brandName, brands);
+
   // The chosen Master Data Brand's contacts, offered as "Name (Title) - phone" (WO-SF-SCHEDULE-CONTACT-MD-01).
   // Picking one copies its text; anything typed is kept as typed, and nothing is filled in on its own.
   const [brandContacts, setBrandContacts] = useState<{ brandId: string; options: CreatableSearchOption[] } | null>(null);
@@ -1793,6 +1825,16 @@ function EntryPanelContent({
             disabled={disabled}
             className="-ml-1.5 w-[calc(100%+0.375rem)] min-w-0 !h-8 !min-h-8 !border-transparent !bg-transparent !px-1.5 !text-sm"
           />
+          {linkCandidates.length && !disabled ? (
+            <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-ink-tertiary">
+              Not in Master Data ·
+              {linkCandidates.map((brand) => (
+                <button key={brand.id} type="button" onClick={() => updateDraft({ brandId: brand.id, brandName: "" })} className="font-medium text-ink underline underline-offset-2 hover:text-ink-secondary">
+                  Link to &ldquo;{brand.name}&rdquo;
+                </button>
+              ))}
+            </span>
+          ) : null}
         </div>
         {/* Where the product is bought; internal, so it is never on the card or in print. */}
         <div className="grid gap-0.5">
@@ -2043,7 +2085,7 @@ function DockedEntryPanel({
 }
 
 /** The inspector while several items are ticked: what is picked, and what can be done with all of them at once. */
-function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, onCopy, marks, deleting }: { picked: readonly ScheduleEntryView[]; total: number; allPicked: boolean; onToggleAll: () => void; onClear: () => void; onDelete: () => void; onCopy: () => void; marks: readonly RowActionItem[]; deleting: boolean }) {
+function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, onCopy, marks, brandLinks, deleting }: { picked: readonly ScheduleEntryView[]; total: number; allPicked: boolean; onToggleAll: () => void; onClear: () => void; onDelete: () => void; onCopy: () => void; marks: readonly RowActionItem[]; brandLinks: readonly RowActionItem[]; deleting: boolean }) {
   const count = picked.length;
   const items = `${count} item${count === 1 ? "" : "s"}`;
   return (
@@ -2066,6 +2108,15 @@ function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, o
             );
           })}
         </ul>
+        {brandLinks.length ? (
+          <div className="grid gap-2 rounded-control border border-line-subtle p-3">
+            <Text size="sm" weight="semibold">Brand not in Master Data</Text>
+            <Text size="sm" tone="secondary">These items share a typed Brand that now exists in Master Data. Linking uses the Master Data Brand and its contacts.</Text>
+            <div className="flex flex-wrap gap-1.5">
+              {brandLinks.map((link) => <Button key={link.label} size="sm" variant="secondary" onClick={link.onSelect}>{link.label}</Button>)}
+            </div>
+          </div>
+        ) : null}
         {marks.length ? (
           <div className="grid gap-2 rounded-control border border-line-subtle p-3">
             <Text size="sm" weight="semibold">Hide or highlight</Text>

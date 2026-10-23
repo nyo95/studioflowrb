@@ -243,3 +243,12 @@ describe("Contact is offered from the Brand's Master Data contacts", () => {
     assert.match(scheduleBoard, /\[\{ id: draft\.contact, label: draft\.contact \}, \.\.\.fromMasterData\]/);
   });
 });
+
+describe("a typed Brand is offered a link to Master Data, never switched on its own", () => {
+  it("suggests in the inspector, filters typed Brands, and links a selection in one go", () => {
+    assert.match(scheduleBoard, /const linkCandidates = draft\.brandId \? \[\] : brandLinkCandidates\(draft\.brandName, brands\);/);
+    assert.match(scheduleBoard, /onClick=\{\(\) => updateDraft\(\{ brandId: brand\.id, brandName: "" \}\)\}/);
+    assert.match(scheduleBoard, /label: "Not in Master Data \(typed\)"/);
+    assert.match(scheduleBoard, /brandLinks=\{brandLinksFor\(/);
+  });
+});

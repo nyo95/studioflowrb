@@ -33,6 +33,27 @@ export const SCHEDULE_EXTRA_VALUE_MAX = 300;
 /** One free-form specification line the studio added to an option, e.g. "Abrasion class" / "PEI IV". */
 export type ScheduleExtraField = { label: string; value: string };
 
+/**
+ * Master Data Brands a typed Brand may mean, for a "link it" suggestion (never applied on its own; WO-SF-SCHEDULE-BRAND-LINK-01).
+ * Same name first; then a typed name that starts with the Brand name and a space or dash ("Singres Mosaic" -> "Singres");
+ * then a Brand name that starts with the typed name and a space. Longer Brand names rank first; at most three.
+ */
+export function brandLinkCandidates<T extends { id: string; name: string }>(typed: string | null | undefined, brands: readonly T[]): T[] {
+  const name = (typed ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
+  if (!name) return [];
+  const ranked: Array<{ brand: T; rank: number; length: number }> = [];
+  for (const brand of brands) {
+    const candidate = brand.name.trim().replace(/\s+/g, " ").toLocaleLowerCase("id-ID");
+    if (!candidate) continue;
+    const rank = candidate === name ? 0
+      : name.startsWith(`${candidate} `) || name.startsWith(`${candidate}-`) ? 1
+        : candidate.startsWith(`${name} `) ? 2
+          : -1;
+    if (rank >= 0) ranked.push({ brand, rank, length: candidate.length });
+  }
+  return ranked.sort((a, b) => a.rank - b.rank || b.length - a.length).slice(0, 3).map((entry) => entry.brand);
+}
+
 /** Contact is copied into an option as text; subsequent Master Data edits do not change it. */
 export function formatScheduleContact(input: { personName: string; jobTitle: string | null; phone: string | null }): string {
   const name = input.personName.trim();
