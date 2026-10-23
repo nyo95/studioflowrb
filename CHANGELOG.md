@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.213 | 2026-10-23 | feat(studioflow): add shared schedule item marks (Codex Executor)
+
+- **Scope:** schedule items now store `hidden` (default false) and an optional highlight from the approved yellow, green, blue, red, purple palette. Schedule reads expose both marks while retaining hidden items; new entries start unmarked, and sheet re-import preserves existing marks.
+- **Commands:** bulk hide/unhide and highlight/clear accept 1–500 item IDs, check schedule edit rights and project ownership before writing, refuse archived projects and invalid colours, skip unchanged items, and audit each changed item. Two server actions validate UUID selections and refresh the project schedule.
+- **Migration/dependencies:** one additive Prisma migration applied to the kantor rebuild dev and test databases (`studioflow_rebuild`, `studioflow_rebuild_test`); Prisma client regenerated. No dependency added.
+- **Checks:** StudioFlow focused tests 258/258 and server-action focused tests 11/11 passed. High-tier full verification and production build are recorded in the final Executor handoff.
+- **Limitations:** menus, filters, progress and print behavior remain Lead work for R9.214. The pre-existing untracked `.next-verify/` build output remains local.
+
 ## R9.212 | 2026-10-23 | plan(studioflow): hide and highlight Product Schedule items (Lead)
 
 - **Plan:** `WO-SF-SCHEDULE-MARKS-01` - items can be hidden and given one of five highlight colours, shared for everyone through the database, set one at a time or for a selection. Hidden items leave the progress count; Print / PDF asks each time whether to include them (owner, 2026-10-23).

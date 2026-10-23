@@ -6,7 +6,7 @@ import { fullBlockers, todoBlockers } from "./blockers";
 import { iterationChoices, nextIterationKind } from "./iteration-kinds";
 import { buildMomSnapshot, isPermutation, momSnapshotImageKeys, momSnapshotsEqual, moveId, parseMomSnapshot } from "./mom";
 import { REVISION_RETENTION, nextRevisionNumber, revisionsToPrune, versionLabel } from "./revisions";
-import { DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, compareOptionLabels, fallbackPrefix, lowestFreeNumber, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, parseTypedScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
+import { DEFAULT_SCHEDULE_MATERIAL_CATEGORIES, SCHEDULE_HIGHLIGHTS, compareOptionLabels, fallbackPrefix, lowestFreeNumber, nextOptionLabel, normalizeScheduleCategory, optionLabel, optionLabelIndex, parseLegacyScheduleCsv, parseLegacyScheduleSheet, parseScheduleCode, parseTypedScheduleCode, scheduleCode, scheduleSearchKey } from "./schedule";
 import {
   buildTree,
   canTickChecklistItem,
@@ -219,6 +219,9 @@ describe("schedule rules", () => {
 });
 
 describe("schedule labels and legacy sheet", () => {
+  it("keeps the approved highlight palette in display order", () => {
+    assert.deepEqual([...SCHEDULE_HIGHLIGHTS], ["yellow", "green", "blue", "red", "purple"]);
+  });
   it("never reuses a label and orders AA after Z", () => {
     assert.equal(optionLabelIndex("A"), 0);
     assert.equal(optionLabelIndex("AA"), 26);

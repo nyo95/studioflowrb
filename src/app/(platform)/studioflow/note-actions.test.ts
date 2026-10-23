@@ -8,6 +8,7 @@ import { z } from "zod";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { AppError } from "@platform/core/errors";
 import { validationError } from "@platform/core/validation";
+import { SCHEDULE_HIGHLIGHTS } from "@/apps/studioflow/domain/schedule";
 
 const projectId = randomUUID();
 const noteId = randomUUID();
@@ -44,6 +45,7 @@ function loadActions(failure?: AppError) {
     "@platform/core/errors": { AppError },
     "@platform/core/modules": { requireModuleEnabled: async () => { moduleChecks++; if (!boardEnabled) throw new AppError("CONFLICT", "MODULE_DISABLED", "Board is disabled."); } },
     "@platform/core/validation": { validationError },
+    "@/apps/studioflow/domain/schedule": { SCHEDULE_HIGHLIGHTS },
     "@/apps/studioflow/shared": { P: { projectManage: "studioflow.project.manage" }, requireCommand: () => undefined },
     "@/apps/presentation/public/lifecycle": {},
     "@/apps/ideas/public/lifecycle": {},

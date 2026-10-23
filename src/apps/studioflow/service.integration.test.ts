@@ -1463,6 +1463,60 @@ describe("SF-R2 MOM", () => {
 });
 
 describe("SF-R3 Product Schedule", () => {
+  it("sets shared item marks in bulk, skips unchanged rows, and audits each change", async () => {
+    const { projectId } = await newProject();
+    const one = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    const two = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    const three = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    const list = async () => sf.schedule.listSchedule({ grants: DRAFTER_GRANTS, projectId });
+    assert.deepEqual((await list()).map((row) => [row.hidden, row.highlight]), [[false, null], [false, null], [false, null]]);
+
+    assert.deepEqual(await sf.schedule.setEntriesHidden({ ...as(designer), projectId, entryIds: [one.entryId], hidden: true }), { changed: 1 });
+    assert.deepEqual(await sf.schedule.setEntriesHidden({ ...as(designer), projectId, entryIds: [one.entryId, two.entryId, two.entryId], hidden: true }), { changed: 1 });
+    assert.deepEqual(await sf.schedule.setEntriesHidden({ ...as(designer), projectId, entryIds: [one.entryId, two.entryId], hidden: true }), { changed: 0 });
+    assert.deepEqual((await list()).map((row) => row.hidden), [true, true, false], "hidden rows remain in the shared read");
+    assert.deepEqual(await sf.schedule.setEntriesHidden({ ...as(designer), projectId, entryIds: [one.entryId, two.entryId], hidden: false }), { changed: 2 });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.schedule.entry-hidden" } }), 2);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.schedule.entry-unhidden" } }), 2);
+
+    assert.deepEqual(await sf.schedule.setEntriesHighlight({ ...as(designer), projectId, entryIds: [one.entryId], highlight: "yellow" }), { changed: 1 });
+    assert.deepEqual(await sf.schedule.setEntriesHighlight({ ...as(designer), projectId, entryIds: [one.entryId, two.entryId, three.entryId], highlight: "yellow" }), { changed: 2 });
+    assert.deepEqual(await sf.schedule.setEntriesHighlight({ ...as(designer), projectId, entryIds: [one.entryId, two.entryId], highlight: "yellow" }), { changed: 0 });
+    assert.deepEqual((await list()).map((row) => row.highlight), ["yellow", "yellow", "yellow"]);
+    assert.deepEqual(await sf.schedule.setEntriesHighlight({ ...as(designer), projectId, entryIds: [one.entryId, two.entryId], highlight: null }), { changed: 2 });
+    const events = await testDb.prisma.auditEvent.findMany({ where: { action: "studioflow.schedule.entry-highlighted" } });
+    assert.equal(events.length, 5);
+    assert.ok(events.some((event) => {
+      const change = event.changes as { highlight?: { from?: string; to?: string | null } };
+      return change.highlight?.from === "yellow" && change.highlight.to === null;
+    }));
+  });
+
+  it("refuses invalid mark selections and preserves every row on error", async () => {
+    const { projectId } = await newProject();
+    const own = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });
+    const other = await newProject("Other marks");
+    const foreign = await sf.schedule.createEntry({ ...as(designer), projectId: other.projectId, section: "MATERIAL", category: "Paint" });
+    for (const method of ["setEntriesHidden", "setEntriesHighlight"] as const) {
+      const run = (entryIds: string[]) => method === "setEntriesHidden"
+        ? sf.schedule.setEntriesHidden({ ...as(designer), projectId, entryIds, hidden: true })
+        : sf.schedule.setEntriesHighlight({ ...as(designer), projectId, entryIds, highlight: "blue" });
+      await rejectsWith(run([]), "SCHEDULE_ENTRY_SELECTION_INVALID");
+      await rejectsWith(run([own.entryId, foreign.entryId]), "SCHEDULE_ITEM_NOT_FOUND");
+      await rejectsWith(run([own.entryId, randomUUID()]), "SCHEDULE_ITEM_NOT_FOUND");
+    }
+    await rejectsWith(sf.schedule.setEntriesHighlight({ ...as(designer), projectId, entryIds: [own.entryId], highlight: "orange" }), "SCHEDULE_HIGHLIGHT_INVALID");
+    assert.deepEqual((await sf.schedule.listSchedule({ grants: ALL, projectId }))[0].hidden, false);
+    assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId }))[0].highlight, null);
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: { in: ["studioflow.schedule.entry-hidden", "studioflow.schedule.entry-highlighted"] } } }), 0);
+
+    await assert.rejects(sf.schedule.setEntriesHidden({ ...as(drafter, DRAFTER_GRANTS), projectId, entryIds: [own.entryId], hidden: true }), (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN");
+    await assert.rejects(sf.schedule.setEntriesHighlight({ ...as(drafter, DRAFTER_GRANTS), projectId, entryIds: [own.entryId], highlight: "red" }), (error: unknown) => error instanceof AppError && error.kind === "FORBIDDEN");
+    await sf.projects.archiveProject({ ...as(designer), projectId, reason: "Done" });
+    await rejectsWith(sf.schedule.setEntriesHidden({ ...as(designer), projectId, entryIds: [own.entryId], hidden: true }), "PROJECT_ARCHIVED");
+    await rejectsWith(sf.schedule.setEntriesHighlight({ ...as(designer), projectId, entryIds: [own.entryId], highlight: "red" }), "PROJECT_ARCHIVED");
+  });
+
   it("creates entries as proposals with stable codes; only Set as final decides, and deciding can be undone", async () => {
     const { projectId } = await newProject();
     await sf.schedule.upsertPrefix({ ...as(designer), section: "MATERIAL", category: "Paint", prefix: "PT" });
@@ -2006,6 +2060,8 @@ describe("SF-R3 Product Schedule", () => {
     const optionId = (await sf.schedule.listSchedule({ grants: ALL, projectId }))[0].options[0].id;
     await sf.schedule.setOptionImage({ ...as(designer), projectId, optionId, file: png() });
     await sf.schedule.markFinal({ ...as(designer), projectId, optionId });
+    await sf.schedule.setEntriesHidden({ ...as(designer), projectId, entryIds: [existing.entryId], hidden: true });
+    await sf.schedule.setEntriesHighlight({ ...as(designer), projectId, entryIds: [existing.entryId], highlight: "purple" });
     const photoKey = (await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: optionId } })).image_key;
     assert.ok(photoKey);
 
@@ -2018,6 +2074,8 @@ describe("SF-R3 Product Schedule", () => {
     ].join("\n");
     assert.deepEqual(await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: sheet }), { created: 2, updated: 1 });
     const rows = await sf.schedule.listSchedule({ grants: ALL, projectId, section: "MATERIAL" });
+    assert.deepEqual(rows.filter((row) => row.id === existing.entryId).map((row) => [row.hidden, row.highlight]), [[true, "purple"]], "re-import keeps both item marks");
+    assert.ok(rows.filter((row) => row.id !== existing.entryId).every((row) => row.hidden === false && row.highlight === null), "new imported items start unmarked");
     const pt = rows.find((row) => row.id === existing.entryId)!.options[0];
     assert.deepEqual(
       [pt.productName, pt.brandName, pt.color, pt.finishing, pt.dimension, pt.extra, pt.isFinal],
@@ -2029,6 +2087,8 @@ describe("SF-R3 Product Schedule", () => {
     assert.deepEqual(rows.filter((row) => row.category === "Floor Tile").map((row) => [row.code, row.options[0].productName, row.options[0].isFinal]), [["FL-01", "dBasic", false], ["FL-03", "Granitio", false]], "sheet codes are kept, gap and all; imported rows are proposals");
 
     assert.deepEqual(await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: sheet }), { created: 0, updated: 3 }, "importing the same sheet again finds the same rows");
+    const afterImport = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.id === existing.entryId)!;
+    assert.deepEqual([afterImport.hidden, afterImport.highlight], [true, "purple"]);
     assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).length, 3, "no duplicates");
     // The photo test after this one expects an empty store.
     await sf.schedule.deleteEntry({ ...as(designer), projectId, entryId: existing.entryId });

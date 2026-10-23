@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { it } from "node:test";
 import ts from "typescript";
@@ -6,11 +7,14 @@ import { z } from "zod";
 import { runSafeAction, type ActionResult } from "@platform/core/actions";
 import { AppError } from "@platform/core/errors";
 import { validationError } from "@platform/core/validation";
+import { SCHEDULE_HIGHLIGHTS } from "@/apps/studioflow/domain/schedule";
 
 type Summary = { projectsPurged: number };
 type Actions = {
   runAssetCleanupAction?: (limit?: unknown) => Promise<ActionResult<Summary>>;
   getAssetCleanupPreviewAction?: () => Promise<ActionResult<{ eligibleProjects: number; retentionDays: number }>>;
+  setScheduleEntriesHiddenAction?: (input: unknown) => Promise<ActionResult<unknown>>;
+  setScheduleEntriesHighlightAction?: (input: unknown) => Promise<ActionResult<unknown>>;
 };
 
 /** Executes the real StudioFlow action module with only its framework and runtime edges replaced. */
@@ -20,6 +24,7 @@ function loadActions(grants = ["studioflow.access", "studioflow.project.manage"]
   const cleanupCalls: Array<{ limit: number; userId: string }> = [];
   const previewCalls: string[] = [];
   const retryCalls: number[] = [];
+  const markCalls: Array<{ kind: string; input: Record<string, unknown> }> = [];
   const revalidated: Array<[string, string | undefined]> = [];
   const ctx = { principal: { userId: "user-1", displayName: "Owner" }, grants };
   const dependencies: Record<string, unknown> = {
@@ -30,6 +35,7 @@ function loadActions(grants = ["studioflow.access", "studioflow.project.manage"]
     "@platform/core/errors": { AppError },
     "@platform/core/modules": { requireModuleEnabled: async () => undefined },
     "@platform/core/validation": { validationError },
+    "@/apps/studioflow/domain/schedule": { SCHEDULE_HIGHLIGHTS },
     "@/apps/studioflow/shared": {
       P: { projectManage: "studioflow.project.manage" },
       requireCommand: (input: { grants: string[] }, permission: string) => {
@@ -40,6 +46,10 @@ function loadActions(grants = ["studioflow.access", "studioflow.project.manage"]
     "@/apps/ideas/public/lifecycle": { removeScheduleOptionUsage: async () => ({ count: 0 }) },
     "@/apps/studioflow/runtime": {
       studioFlow: {
+        schedule: {
+          setEntriesHidden: async (input: Record<string, unknown>) => { markCalls.push({ kind: "hidden", input }); return { changed: 1 }; },
+          setEntriesHighlight: async (input: Record<string, unknown>) => { markCalls.push({ kind: "highlight", input }); return { changed: 1 }; },
+        },
         projects: {
           runAssetCleanup: async (input: { limit: number; userId: string }) => { cleanupCalls.push({ limit: input.limit, userId: input.userId }); return { projectsPurged: 2 }; },
           previewAssetCleanup: async (input: { userId: string }) => { previewCalls.push(input.userId); return { eligibleProjects: 3, retentionDays: 90 }; },
@@ -52,8 +62,26 @@ function loadActions(grants = ["studioflow.access", "studioflow.project.manage"]
     assert.ok(id in dependencies, `unexpected dependency: ${id}`);
     return dependencies[id];
   }, exports);
-  return { exports, cleanupCalls, previewCalls, retryCalls, revalidated };
+  return { exports, cleanupCalls, previewCalls, retryCalls, markCalls, revalidated };
 }
+
+it("schedule mark actions validate selection and palette before calling the service", async () => {
+  const { exports, markCalls, revalidated } = loadActions();
+  const projectId = randomUUID();
+  const entryId = randomUUID();
+  for (const entryIds of [[], ["not-a-uuid"], Array.from({ length: 501 }, () => entryId)]) {
+    assert.equal((await exports.setScheduleEntriesHiddenAction!({ projectId, entryIds, hidden: true })).ok, false);
+  }
+  assert.equal((await exports.setScheduleEntriesHighlightAction!({ projectId, entryIds: [entryId], highlight: "orange" })).ok, false);
+  assert.equal(markCalls.length, 0);
+  assert.deepEqual(await exports.setScheduleEntriesHiddenAction!({ projectId, entryIds: [entryId], hidden: true }), { ok: true, data: { changed: 1 } });
+  assert.deepEqual(await exports.setScheduleEntriesHighlightAction!({ projectId, entryIds: [entryId], highlight: null }), { ok: true, data: { changed: 1 } });
+  assert.deepEqual(markCalls.map((call) => call.kind), ["hidden", "highlight"]);
+  assert.deepEqual(revalidated, [
+    [`/studioflow/projects/${projectId}`, "layout"],
+    [`/studioflow/projects/${projectId}`, "layout"],
+  ]);
+});
 
 it("runAssetCleanupAction rejects a limit outside 1 to 100 before touching the service, and defaults to 25", async () => {
   const { exports, cleanupCalls, revalidated } = loadActions();

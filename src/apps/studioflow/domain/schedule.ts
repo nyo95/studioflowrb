@@ -1,6 +1,9 @@
 export const SCHEDULE_SECTIONS = ["MATERIAL", "FIXTURE"] as const;
 export type ScheduleSection = (typeof SCHEDULE_SECTIONS)[number];
 
+export const SCHEDULE_HIGHLIGHTS = ["yellow", "green", "blue", "red", "purple"] as const;
+export type ScheduleHighlight = (typeof SCHEDULE_HIGHLIGHTS)[number];
+
 /** One photo per option; prepared (cropped JPEG) upload stays under the server-action body limit. */
 export const SCHEDULE_IMAGE_BYTES = 3 * 1024 * 1024;
 
@@ -131,6 +134,8 @@ export type ScheduleEntryView = {
   section: ScheduleSection;
   category: string;
   code: string;
+  hidden: boolean;
+  highlight: ScheduleHighlight | null;
   /** The number the next new entry of this code group will get (the group never reuses a number it has handed out). */
   nextNumber: number;
   qty: string | null;

@@ -9,6 +9,7 @@ import { AppError } from "@platform/core/errors";
 import { requireModuleEnabled } from "@platform/core/modules";
 import { validationError } from "@platform/core/validation";
 import { studioFlow } from "@/apps/studioflow/runtime";
+import { SCHEDULE_HIGHLIGHTS } from "@/apps/studioflow/domain/schedule";
 import { P, requireCommand } from "@/apps/studioflow/shared";
 import { clearScheduleEntryLink, purgeArchivedProjectAssets, retryPresentationAssetCleanup } from "@/apps/presentation/public/lifecycle";
 import { removeScheduleOptionUsage } from "@/apps/ideas/public/lifecycle";
@@ -901,6 +902,28 @@ export async function updateScheduleEntryAction(input: z.infer<typeof ScheduleEn
     const ctx = await context();
     const data = parse(ScheduleEntryUpdate, input);
     const result = await studioFlow.schedule.updateEntry({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleEntriesHidden = z.strictObject({ projectId: Id, entryIds: z.array(Id).min(1).max(500), hidden: z.boolean() });
+export async function setScheduleEntriesHiddenAction(input: z.infer<typeof ScheduleEntriesHidden>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntriesHidden, input);
+    const result = await studioFlow.schedule.setEntriesHidden({ ...ctx, ...data });
+    refreshSchedule(data.projectId);
+    return result;
+  });
+}
+
+const ScheduleEntriesHighlight = z.strictObject({ projectId: Id, entryIds: z.array(Id).min(1).max(500), highlight: z.enum(SCHEDULE_HIGHLIGHTS).nullable() });
+export async function setScheduleEntriesHighlightAction(input: z.infer<typeof ScheduleEntriesHighlight>): Promise<ActionResult<unknown>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleEntriesHighlight, input);
+    const result = await studioFlow.schedule.setEntriesHighlight({ ...ctx, ...data });
     refreshSchedule(data.projectId);
     return result;
   });

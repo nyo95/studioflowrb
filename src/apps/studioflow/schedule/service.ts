@@ -7,6 +7,7 @@ import { buildImportTemplate, parseCsvText, readTabularGrid, type FileResult, ty
 import { STUDIOFLOW_IMAGE_TYPES, sniffImage } from "../domain/images";
 import {
   SCHEDULE_IMAGE_BYTES,
+  SCHEDULE_HIGHLIGHTS,
   SCHEDULE_SECTIONS,
   compareOptionLabels,
   orderedScheduleOptions,
@@ -25,6 +26,7 @@ import {
   scheduleCode,
   similarScheduleCategories,
   type ScheduleSection,
+  type ScheduleHighlight,
 } from "../domain/schedule";
 import {
   P,
@@ -251,6 +253,16 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     if (!entry || entry.project_id !== projectId) throw scopeError();
     if (write) await loadWritableProject(tx, projectId);
     return entry;
+  }
+
+  async function loadSelectedEntries(tx: TxClient, projectId: string, entryIds: string[]) {
+    if (entryIds.length < 1 || entryIds.length > 500) throw invalid("SCHEDULE_ENTRY_SELECTION_INVALID", "Choose 1 to 500 schedule items.");
+    const ids = [...new Set(entryIds)];
+    await loadWritableProject(tx, projectId);
+    const rows = await tx.sfScheduleEntry.findMany({ where: { id: { in: ids }, project_id: projectId } });
+    if (rows.length !== ids.length) throw scopeError();
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    return ids.map((id) => byId.get(id)!);
   }
 
   async function loadOption(tx: TxClient, projectId: string, optionId: string, write: boolean) {
@@ -558,6 +570,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         prefix: entry.prefix,
         increment: entry.increment,
         code: scheduleCode(entry.prefix, entry.increment),
+        hidden: entry.hidden,
+        highlight: entry.highlight as ScheduleHighlight | null,
         nextNumber: nextByGroup.get(`${entry.section}:${entry.prefix}`) ?? 1,
         qty: entry.qty?.toString() ?? null,
         unit: entry.unit,
@@ -800,6 +814,48 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       return runTransaction(async (tx) => {
         const updated = await writer.updateEntry(tx, input);
         return { entryId: updated.entryId };
+      });
+    },
+
+    async setEntriesHidden(input: CommandContext & { projectId: string; entryIds: string[]; hidden: boolean }) {
+      await requireScheduleCommand(input);
+      return runTransaction(async (tx) => {
+        const entries = await loadSelectedEntries(tx, input.projectId, input.entryIds);
+        let changed = 0;
+        for (const entry of entries) {
+          if (entry.hidden === input.hidden) continue;
+          await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { hidden: input.hidden } });
+          await writeAudit(ports, tx, {
+            action: input.hidden ? "studioflow.schedule.entry-hidden" : "studioflow.schedule.entry-unhidden",
+            entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor,
+            changes: { hidden: { from: entry.hidden, to: input.hidden } },
+            metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) },
+          });
+          changed += 1;
+        }
+        return { changed };
+      });
+    },
+
+    async setEntriesHighlight(input: CommandContext & { projectId: string; entryIds: string[]; highlight: string | null }) {
+      await requireScheduleCommand(input);
+      if (input.highlight !== null && !(SCHEDULE_HIGHLIGHTS as readonly string[]).includes(input.highlight)) {
+        throw invalid("SCHEDULE_HIGHLIGHT_INVALID", "Choose a valid highlight colour.");
+      }
+      return runTransaction(async (tx) => {
+        const entries = await loadSelectedEntries(tx, input.projectId, input.entryIds);
+        let changed = 0;
+        for (const entry of entries) {
+          if (entry.highlight === input.highlight) continue;
+          await tx.sfScheduleEntry.update({ where: { id: entry.id }, data: { highlight: input.highlight } });
+          await writeAudit(ports, tx, {
+            action: "studioflow.schedule.entry-highlighted", entityType: ENTRY_ENTITY, entityId: entry.id, actor: input.actor,
+            changes: { highlight: { from: entry.highlight, to: input.highlight } },
+            metadata: { projectId: input.projectId, code: scheduleCode(entry.prefix, entry.increment) },
+          });
+          changed += 1;
+        }
+        return { changed };
       });
     },
 
