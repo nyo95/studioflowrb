@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.239 | 2026-10-23 | plan(studioflow): Project book decision, DESIGN.md v2.1 and WO-SF-BOOK-01 (Lead)
+
+- **Owner decision:** Notes become a private Project book per project (to-dos, client feedback, material tries, discussion, free notes; no phase bookkeeping), Ideas is removed, the Workspace board retired, SketchUp sends material tries; the owner approved the v2 mockup and the design amendments.
+- **Change:** new `docs/apps/studioflow/PROJECT-BOOK-DECISION.md` (11 locked decisions, program of slices). `DESIGN.md` amended: "materials shown large" (§1), §6.2 canvas = Project book and stage strip as overview, new §6.3 Project book page with Material tile, Typed composer and Progress ring. `UI_ENGINE.md` lists the three patterns as deferred candidates. `MODULES-DECISION.md` 2026-10-23b withdrawn. `PLAN.md` is READY `WO-SF-BOOK-01` (privacy, invited members, note-image Use in schedule into StudioFlow; Codex R9.240, Lead R9.241). `BACKLOG.md`: program entry; SketchUp rev 2 marked for revision.
+- **Migration/dependencies:** none in this revision (BOOK-01 plans one additive table).
+- **Checks:** docs only; `git diff --check`.
+
 ## R9.238 | 2026-10-23 | plan(platform): supersede WO-PLATFORM-MODULE-USER-ACCESS-01 (Lead)
 
 - **Owner decision:** Ideas is to be removed, not gated per user; Notes become a private Project book (PIC + invited; managers and the Platform Owner do not read it), the note-image "Use in schedule" moves to StudioFlow for Notes holders, and SketchUp sends material candidates to Notes before they are promoted to the Schedule.

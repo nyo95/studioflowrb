@@ -1,88 +1,95 @@
 # Active Plan
 
-Plan ID: WO-PLATFORM-MODULE-USER-ACCESS-01
-Scope: Ideas Board becomes usable only by the users the Developer lists (D11 widened, 2026-10-23b).
-Module(s): platform `core/modules` (EXTEND), `ideas` (gate wiring); StudioFlow shell/nav and note-image actions (consumers).
-Target revision: plan R9.237 (Lead); backend + minimal wiring (Codex) R9.238; console wording and UI review (Lead) R9.239.
-Risk: medium - an authorization gate on every Ideas entry point; a missed caller leaks the feature, an over-broad
-gate breaks background cleanup. Escalate (BLOCKED) if any Ideas entry point cannot reach the user id, or if gating
-would require changing a StudioFlow or Presentation internal.
-Status: SUPERSEDED (owner 2026-10-23: remove Ideas entirely; Notes become the private Project book). Do not execute. Replacement plan pending owner acceptance of the Project book mockup.
+Plan ID: WO-SF-BOOK-01
+Scope: The Project book becomes private to the project's PICs and invited members (workflow records excepted), and
+the note-image "Use in schedule" moves from Ideas into StudioFlow.
+Module(s): `studioflow` (workspace/notes service, project access policy, new member table, actions); `ideas` (its
+note-image schedule path removed); `presentation` bridge read of note images (consumer).
+Target revision: plan R9.239 (Lead); backend + minimal wiring (Codex) R9.240; UI (Lead) R9.241.
+Risk: high - narrows read access on existing data and widens project-page access for invited members; a missed
+read path leaks private notes, an over-narrow one hides the official client answers from managers. Escalate
+(BLOCKED) if any notes read path cannot tell a workflow record from an ordinary card, or if invited-member access
+would need a change to RBAC roles.
+Status: READY
 Priority: P1
-Owner: Product Owner (decision 2026-10-23: Ideas and Workspace board stay off for the office; Ideas on only for listed users, like the Schedule Assistant and SketchUp)
+Owner: Product Owner (decisions 2026-10-23, `docs/apps/studioflow/PROJECT-BOOK-DECISION.md` 5, 6, 8)
 Last updated: 2026-10-23
 
-Previous plan: `WO-SF-SAMPLE-PHOTO-01` DONE (R9.225, R9.226); owner browser check owed.
+Previous plan: `WO-PLATFORM-MODULE-USER-ACCESS-01` SUPERSEDED in R9.238 (not built).
 
 ## Locked Decisions
 
-1. `IDEAS_MODULE_MANIFEST` gains `developerAccess: true`. Nothing else in the manifest changes.
-2. EXTEND `@platform/core/modules` with one canonical per-user check for UI modules, e.g.
-   `usableModuleIds(db, userId)` (enabled ids minus `developerAccess` modules the user is not listed for) and
-   `requireModuleUsable(db, userId, moduleId)` (`MODULE_DISABLED` when off; the existing
-   `INTEGRATION_ACCESS_DENIED`-style FORBIDDEN when not listed). Reuse the `platform.integration_access` table and
-   `hasIntegrationModuleAccess`; no new table, no migration, no new permission. Modules without `developerAccess`
-   behave exactly as today.
-3. "Usable" = enabled AND listed AND the existing RBAC permission (`studioflow.ideas.manage`). The list adds no right.
-4. For a person who is not listed, Ideas behaves exactly as when the module is off: no "Ideas" nav link, `/studioflow/ideas`
-   is notFound, the note-image "Save to Ideas" and "Use in schedule" buttons and Ideas' "Add to moodboard" are hidden,
-   and every Ideas server action refuses. (The note-image "Use in schedule" lives in Ideas today; it goes with Ideas.)
-5. Not gated: `removeScheduleOptionUsage`, asset-cleanup retries, and any other system/background path invoked by
-   StudioFlow through the ideas bridge. Only a person's use is gated.
-6. The Developer console's existing per-user list renders every `developerAccess` module, so Ideas appears there
-   with no Executor UI work. Its heading wording ("AI & Plugin Access") is the Lead's R9.239.
-7. Workspace board (`workspace-board`) is untouched: it stays a global On/Off module and stays Off.
-8. Integration token scopes (`integrations/index.ts`) keep their behavior; refactoring them onto the new helper is
-   allowed only if it is a pure move with their tests unchanged.
-
-## Contract
-
-- Server: every call site that today uses `requireModuleEnabled("ideas")` (all of `src/apps/ideas/actions.ts`) or
-  `isModuleEnabled("ideas")` (`src/apps/ideas/ui/page.tsx`) switches to the per-user check with the signed-in user.
-- Shell: the module ids passed to `StudioFlowNav` (`src/app/(platform)/layout.tsx`) and to `StudioFlowModuleState`
-  (`src/app/(platform)/studioflow/layout.tsx`, read by `useStudioFlowModuleEnabled` in `round-labels.tsx`) become the
-  per-user usable ids. Presentation and other non-gated modules must read exactly as before.
-- Minimal wiring only; no new screens, copy or layout.
+1. **Book reader** = the project's `pic_designer_id`, `pic_drafter_id`, or a book member of that project. Nothing
+   else qualifies: not `projectManage`/`projectOverride`, not the Platform Owner. Put it in the single access
+   policy (`projectAccessFromFacts` / `ProjectAccess`, e.g. `canReadBook`), not per call site.
+2. **Workflow-record exception:** a card with `workflow_record = true` (client answer, site visit written by a
+   phase step) stays readable by everyone with today's `canSeeWorkSections`. Every other card (and its replies,
+   tags, item links, thread, image/file object and signed URL) needs book reader.
+3. Every notes/workspace read and write path applies 1-2: `readWorkspace`, `listWorkspaceThreads`,
+   `listProjectNotes` (all filters), `listNoteTags`, `listNotesForItem` (the Schedule side), `listStarredPhaseNotes`,
+   thread/card/image/file writes, tag and item-link writes, the note image/file object read, and the Presentation
+   bridge's note-image read. A non-reader asking for a private card gets the same NOT_FOUND as a missing card.
+   `searchNoteItems` (Schedule item lookup) is unchanged. Phase-step writers (`recordClientAnswer`, site visits)
+   keep working for whoever may run the step today.
+4. **Book members:** new `studioflow` table (project id, user id, invited by id + name snapshot, invited at; unique
+   per project+user; cascade with the project; user as a plain id). Only a PIC adds or removes; only an ACTIVE user
+   with StudioFlow access may be added; a PIC is never stored as a member. Both changes are audited. Additive
+   migration only; no data backfill.
+5. **Member project access:** a member passes project-detail and work-section reads for that project (the page head,
+   stage strip, the book) as if assigned, but gains no edit: `canEditProject`, `canEditDocuments`, phase
+   `canTransition`/`canEditContent`, Schedule, MOM and Presentation writes stay as today for them. The project list
+   may show the project to a member.
+6. **Use in schedule from a note image** becomes a StudioFlow operation (workspace service + action): book reader
+   AND the existing Schedule-edit rule; it creates the item or extra option exactly as the Ideas path does today
+   (same copy semantics, idempotency key, refusals). The Ideas service's `useNoteImageInSchedule` and its action
+   are removed; `saveNoteImageToIdeas` stays (removed later in WO-SF-BOOK-06) but now also requires book reader.
+7. No UI design work: minimal wiring only (the note-image button calls the new action; a temporary plain list to
+   add/remove members may be exposed through an action without a screen). The Lead builds the screens in R9.241.
 
 ## Non-goals
 
-No change to Workspace board, Presentation, Schedule, RBAC roles, the console layout, or module On/Off semantics.
-No licence/entitlement mechanism (D-section "not licensing" stands).
+No to-do, feedback, material-try, discussion or Ideas-removal work (BOOK-02..06). No change to phases, Schedule
+rules, roles or the Workspace board module state.
 
 ## Acceptance Criteria
 
-1. Ideas On, user A listed with `ideas.manage`: nav link, page, all actions, note-image buttons work as today.
-2. Ideas On, user B not listed (even Platform Owner): no link, page 404, note-image Ideas buttons hidden, every Ideas
-   action refuses with FORBIDDEN; B's Presentation, Schedule and notes unchanged.
-3. Ideas Off: everyone as today (MODULE_DISABLED / hidden).
-4. Listed but without `ideas.manage`: refused as today.
-5. Deleting a Schedule option still cleans its Ideas usage when the deleting user is not listed (background path).
-6. Revoking A in the console takes effect on A's next request (no cache that outlives the request).
+1. PIC designer and PIC drafter read and write all cards of their project as today.
+2. A Studio Manager with override and the Platform Owner, not PIC and not member: see only workflow records in
+   notes lists, item notes and the phase view; a private card id, its image URL and its Presentation import answer
+   NOT_FOUND; every notes write is refused.
+3. Invited member: reads and writes the book, opens the project page, cannot change phases, Schedule, MOM or
+   Presentation; removed member loses access on the next request.
+4. Only a PIC can add/remove members; inactive or non-StudioFlow users refused; audit rows written.
+5. Note-image "Use in schedule" works for a PIC with Schedule edit, refused for a member without it and for a
+   non-reader, and no longer depends on the Ideas module being on.
+6. Existing phase steps (client answer, site visit) still post their workflow records and remain visible to managers.
 
 ## Verification (Executor, before commit)
 
-- `npm run typecheck`, `npm run lint`, boundary scan (`npm run check:boundaries` or the repo's equivalent).
-- Unit + integration: `src/platform/core/modules/*`, `src/app/module-gates.integration.test.ts` (extend with listed /
-  not listed / Platform Owner-not-listed / revoked cases), ideas tests, `note-actions.test.ts`,
-  `asset-cleanup-actions.test.ts`, integration-access tests. Per-command timeout 10 min.
-- `npm run build` (shell/layout changed). Database only on the disposable rebuild test target.
-- Safe checkpoint if interrupted: manifest flag + core helper + its tests committed as a whole only; never commit a
-  state where the flag is set but a caller still uses the global check.
+- `npm run typecheck`, `npm run lint`, boundary scan, `npx prisma validate` + migration generated and applied on the
+  disposable rebuild test database only.
+- Integration tests (new, real database): access matrix PIC / member / override manager / Platform Owner / outsider
+  for every path in decision 3; workflow-record visibility; member add/remove + audit; note-image Use in schedule
+  allowed/refused cases and idempotent retry.
+- Existing suites: `src/apps/studioflow/**` integration, `note-actions.test.ts`, `asset-cleanup-actions.test.ts`,
+  `module-gates.integration.test.ts`, ideas and presentation tests. Per-command timeout 10 min.
+- `npm run build`.
+- Safe checkpoint: migration + access policy + tests may be committed only together; never commit a state where
+  a read path is unguarded.
 
-## Reviewer Acceptance (Lead, after R9.238)
+## Reviewer Acceptance (Lead, after R9.240)
 
-Browser on an isolated server: Developer console lists Ideas; with a listed and a non-listed account walk criteria
-1, 2 and 6. Lead R9.239: console heading wording; confirm nothing visible changed for non-gated modules.
+Browser on an isolated server with three accounts (PIC, override manager, invited member) walking criteria 1-6;
+then the Lead's R9.241 UI (members list in the book panel header, the moved Use in schedule button).
 
 ## Executor Prompt
 
-SUPERSEDED: do not run the prompt below.
-
 ```text
-Role: BACKEND EXECUTOR. Read AGENTS.md, docs/agent/EXECUTOR.md and PLAN.md (WO-PLATFORM-MODULE-USER-ACCESS-01),
-plus docs/apps/platform/MODULES-DECISION.md amendment 2026-10-23b. Location: ask the owner rumah/kantor (cloud: use a
-disposable in-container PostgreSQL). Implement the whole plan: Ideas manifest developerAccess, one canonical per-user
-module check in @platform/core/modules, every Ideas entry point and the StudioFlow shell switched to it, background
-paths ungated; tests per Verification; changelog R9.238. No console/UI design work (Lead R9.239). Commit locally as
-R9.238 (no push) and return the Planner/Reviewer prompt with outcome, commit, checks, limitations and dirty files.
+Role: BACKEND EXECUTOR. Read AGENTS.md, docs/agent/EXECUTOR.md, PLAN.md (WO-SF-BOOK-01) and
+docs/apps/studioflow/PROJECT-BOOK-DECISION.md. Location: ask the owner rumah/kantor (cloud: disposable
+in-container PostgreSQL). Implement the whole plan: book-reader policy in the single StudioFlow access policy,
+workflow-record exception, every notes read/write path guarded, book member table (additive migration) with audited
+PIC-only add/remove, member read-only project access, note-image Use in schedule moved from Ideas into StudioFlow.
+Tests and checks per Verification; changelog R9.240. No screen design (Lead R9.241). Commit locally as R9.240
+(no push) and return the Planner/Reviewer prompt with outcome, commit, checks, limitations and dirty files.
 ```

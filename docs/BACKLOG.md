@@ -106,7 +106,7 @@ Order matters; each item is its own Work Order.
   text) on note images; a free-layout canvas was judged too big for now.
 - [ ] [UNVERIFIED] Token page on My preferences (R8.465): create (secret shown once, copy button),
   the list with Active/Expired/Revoked, Revoke; needs a user whose role has `platform.integration.manage`.
-- [ ] [PLANNED][P2] SketchUp plugin, rev 2 (owner 2026-10-22): the Schedule allocates every code, materials link to
+- [ ] [PLANNED][P2] SketchUp plugin, rev 2 (owner 2026-10-22; **to be revised by WO-SKETCHUP-04: materials go to the Project book as tries first, the code is allocated on promote, owner 2026-10-23**): the Schedule allocates every code, materials link to
   the schedule item (not the code), the model never overwrites the Schedule, Wall Finish Labels stay independent,
   plugin source moves to `tools/sketchup-plugin/`. Plan: `docs/apps/sketchup/WO-SKETCHUP-01.md` (Stage 0 Lead,
   1a Executor, 1b Lead; Stage 2 model-check report is an outline). Rev 1 (legacy push sync, merge queue,
@@ -244,6 +244,7 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
 
 ## StudioFlow
 
+- [ ] [PLANNED][P1] **Project book (Notes v3), owner 2026-10-23** (`apps/studioflow/PROJECT-BOOK-DECISION.md`, DESIGN.md §6.2/§6.3): private book per project (PIC + invited; workflow records stay visible to managers), write-once feedback that answers the round, to-dos with "My tasks", material tries replacing Ideas (promote to Schedule), discussion with `@person`, Ideas removed, Workspace board retired, SketchUp sends tries. Slices WO-SF-BOOK-01 (READY, R9.239) … BOOK-06, WO-SKETCHUP-04, plus the Lead's UI Engine patterns and screens.
 - [ ] [UNVERIFIED] R9.176 look-alike categories: Schedule → "+ New category", type "HPL" → "Mungkin maksud Anda: High Pressure Laminate PL" appears first and picking it codes PL-xx; typing a really new name still creates it. Import a sheet with "HPL/Plastic Laminate" → stops with the suggestion; tick "Kategori baru di file ini memang dimaksudkan" → imports. Sociolla SBZ HPL items now read PL-01…07 and the homogeneous tiles HT-01…03.
 - [ ] [UNVERIFIED][P1] **Studio Manager Deliverable deletion corrected in R9.143.** A non-PIC Manager may remove a current phase file; upload stays PIC-scoped and no other phase edit authority is widened. Direct service authorization coverage passes; independent browser confirmation is pending in `BROWSER-ACCEPTANCE-BACKLOG.md`.
 - [ ] [UNVERIFIED][P1] **Deliverables: one private file per phase and centralized project view implemented in R9.139/R9.141.** A new upload replaces the prior phase file; storage retains no versions, Final state or expiry state. The project tab lists phase files centrally, while the phase sidebar contains Requirements only. R9.161 moved the automated upload/replace/confirmed-delete/refusal browser journey to the Deliverables tab and it passes; R9.162 enforces assignment on the Deliverable read itself and hides Upload on phases without an open iteration. Owner acceptance on real data remains in `BROWSER-ACCEPTANCE-BACKLOG.md`.

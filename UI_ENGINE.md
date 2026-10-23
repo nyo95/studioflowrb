@@ -939,6 +939,7 @@ This stage includes a real login page, authenticated app launcher, user director
 |---|---|
 | `WorkspaceShell`, `SplitPane` | first approved StudioFlow/BQ workspace requiring the layout |
 | `ReorderHandle` | first persisted manual-order workflow with keyboard requirements |
+| `MaterialTile`, `TypedComposer`, `ProgressRing` (DESIGN.md §6.3, owner 2026-10-23) | the Project book UI slice; `MaterialTile` reuses `ImageGallery`/`ZoomableImage` for the large view and `ColorSwatch` for a colour-only try, `TypedComposer` reuses the rich-text editor and its token plugin for `@`/`#`, `ProgressRing` uses the phase-mark tokens |
 
 Deferred patterns may remain in design prose as routing memory. They are not required for the active closure gate and should not remain public implementation without a real approved consumer.
 

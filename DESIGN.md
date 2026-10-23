@@ -15,6 +15,12 @@ remains only for sections inside panels, dialogs and drawers.
 **Amended 2026-10-14 (R9.54):** §6.2 record workspace — fixed frame, owner-asked
 direction, mockup stage, not built.
 
+**Amended 2026-10-23 (R9.239, owner-approved):** §1 "materials shown large", §6.2
+canvas = Project book and panel = discussion + phase files, new §6.3 Project
+book page and three shared patterns (material tile, typed composer, progress
+ring). Mockup (v2 artboards): https://claude.ai/artifact/5sChwEHLG1ta1wmzTpDcBS.
+Mockup stage, not built.
+
 ## 0. What changed from v1
 
 Owner direction (2026-10-06): an **Apple / Linear** feel — quiet, minimal, more
@@ -55,6 +61,10 @@ manner:
 - one sans family for everything, with weight and size carrying the hierarchy;
 - depth only for what floats (menus, dialogs, the pill bar, drawers);
 - status colour only when meaning is functional;
+- **materials shown large** (owner, 2026-10-23): material photos, swatches and
+  renders are the product's content and carry its character. Show them at real
+  size in image-forward tiles (§6.3) while the chrome stays quiet; character
+  never comes from a new accent colour, gradient wash or decoration;
 - every screen answers "where am I" and "what needs me" before anything else.
 
 All apps must feel like one product. Do not create a separate visual language per app.
@@ -286,12 +296,15 @@ AppShell (rail + top bar)                      fixed
 Rules:
 - **One primary action per record state**, at the right end of the stage strip
   (e.g. Send to client). It is not repeated in the canvas or the panel.
-- **What the canvas holds is a module choice, not a user choice** (owner,
-  2026-10-14). With the Workspace module off (the default) the canvas is Notes;
-  with it switched on by the Developer (§ MODULES-DECISION) the canvas is the
-  Workspace board. Users see no Notes/Workspace switch. Filters belong to the
-  canvas content that uses them.
-- **The detail panel** (requirements, files, details of the chosen stage) is
+- **The canvas is the Project book** (owner, 2026-10-23, §6.3; supersedes the
+  2026-10-14 Notes/Workspace module choice). The free Workspace board is
+  retired. Filters belong to the canvas content that uses them.
+- **The stage strip is an overview** (owner, 2026-10-23): the five phases as
+  phase-mark bars (the current one filled to its progress) and the one primary
+  action. Phase status changes come from what is written in the Project book
+  (a client's feedback answers the open round) or from Home, not from opening
+  a phase. The phase tab ("Phases") becomes "Project".
+- **The detail panel** (Project book: discussion and phase files; requirements and stage details where still needed) is
   320px on the right, follows the chosen stage, and collapses to a button in
   the canvas toolbar. Below `1280px` it starts collapsed; below `840px` it
   opens as a full-width `Drawer`.
@@ -304,7 +317,32 @@ Rules:
   in reading order (stage strip, canvas, panel), keeping §12's rules.
 - Ordinary list, settings and form pages keep the normal §6 structure.
 
-## 7. Tables
+## 6.3 Project book page (owner, 2026-10-23; mockup stage)
+
+The StudioFlow project's main tab. One page per project: the §6.2 head and
+stage strip, then the canvas and the detail panel.
+
+- **Canvas, top to bottom:** the open client round as one block ("Client asked
+  · 3D R2"): a progress ring, its points as checkable rows each carrying who and
+  when, then the person's other open to-dos in one line; **Material tries** as an
+  image-forward grid; quieter free notes; the **typed composer** pinned to the
+  canvas bottom.
+- **Detail panel:** Discussion (threads attached to a to-do, a client point or a
+  material try; `@person`, `#schedule-code`), then Phase files (the former
+  Deliverables tab). The panel names who can read the book.
+- **Home** answers "what needs me" across projects: up to four stat cards
+  (§6.1), project cards (the latest material try as the image, phase-mark bars,
+  one next-step button) and **My tasks** grouped Late / This week / Mentions.
+
+Shared patterns this page introduces (UI Engine, `patterns/`; see UI_ENGINE.md
+§19 Deferred candidates for activation):
+
+| Pattern | What it is | Rules |
+|---|---|---|
+| **Material tile** | Image-forward tile, 4:5, `--ui-radius-card`; caption below (name, one meta line) | A code chip (mono, graphite pill) once it is in the Schedule; a source chip (e.g. SketchUp) on the image; Promote / Discard appear on hover and focus, always reachable by keyboard. No text over the photo except chips. |
+| **Typed composer** | One input with a pill radio group of kinds (Note / To-do / Client said / Material try) | Pinned to the canvas bottom with `--ui-shadow-float`; the placeholder states what the chosen kind does; `@` people and `#` schedule codes in every kind. |
+| **Progress ring** | 40px ring, 4px stroke, track `--ui-border-subtle`, fill the active phase mark | Only for "n of m handled"; always paired with that text; never a percentage alone. |
+
 
 Tables are first-class UI in Master Data and BQ.
 
