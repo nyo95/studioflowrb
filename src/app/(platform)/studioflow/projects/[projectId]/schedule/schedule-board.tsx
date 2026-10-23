@@ -1722,9 +1722,10 @@ function EntryPanelContent({
 
   const hero = (
     <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3.5">
+      {/* The photo fills the height of the fields beside it (never shorter than 4:5), so no empty band opens under it. */}
       <div className="relative">
         {isNew ? (
-          <button type="button" onClick={() => setNewPhotoOpen((value) => !value)} aria-expanded={newPhotoOpen} className="grid aspect-[4/5] w-full place-content-center justify-items-center gap-1.5 rounded-control border border-dashed border-line-strong bg-surface-muted text-xs text-ink-secondary hover:border-line-focus">
+          <button type="button" onClick={() => setNewPhotoOpen((value) => !value)} aria-expanded={newPhotoOpen} className="grid h-full min-h-35 w-full place-content-center justify-items-center gap-1.5 rounded-control border border-dashed border-line-strong bg-surface-muted text-xs text-ink-secondary hover:border-line-focus">
             {preparedNewPhoto ? <Check aria-hidden="true" className="h-5 w-5 text-success" /> : <ImageIcon aria-hidden="true" className="h-5 w-5" />}
             {preparedNewPhoto ? "Photo ready" : "Add photo"}
           </button>
@@ -1733,14 +1734,14 @@ function EntryPanelContent({
             align="start"
             items={photoMenu(selected)}
             trigger={
-              <button type="button" {...photoIntake.target} aria-label={`Photo of option ${selected.label}`} title="Choose a photo or a colour, or drop / paste one (Ctrl+V)" className={`relative block w-full rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus ${photoIntake.active ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}>
-                <Thumb url={selected.imageUrl} alt={selected.productName} className="aspect-[4/5] !h-auto w-full !rounded-control" />
+              <button type="button" {...photoIntake.target} aria-label={`Photo of option ${selected.label}`} title="Choose a photo or a colour, or drop / paste one (Ctrl+V)" className={`relative block h-full w-full rounded-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus ${photoIntake.active ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}>
+                <Thumb url={selected.imageUrl} alt={selected.productName} className="!h-full min-h-35 w-full !rounded-control" />
                 <span className="pointer-events-none absolute bottom-1.5 left-1.5 inline-flex items-center gap-1 rounded-full bg-surface/95 px-2 py-0.5 text-[11px] font-medium text-ink">{selected.imageUrl ? "Photo" : "Add photo"}<ChevronDown aria-hidden="true" className="h-3 w-3" /></span>
               </button>
             }
           />
         ) : (
-          <Thumb url={selected?.imageUrl ?? null} alt={selected?.productName ?? "No photo"} className="aspect-[4/5] !h-auto w-full !rounded-control" />
+          <Thumb url={selected?.imageUrl ?? null} alt={selected?.productName ?? "No photo"} className="!h-full min-h-35 w-full !rounded-control" />
         )}
       </div>
       <div className="flex min-w-0 flex-col gap-1.5">

@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.221 | 2026-10-23 | ui(studioflow): inspector photo fills the height beside it (Lead)
+
+- **Owner report:** since Contact joined Type and Brand, the fields beside the inspector photo are taller than the 4:5 photo, leaving an empty band under it.
+- **Change:** the photo (and the "Add photo" placeholder of a new item) now stretches to the height of the fields beside it, never shorter than 4:5; the image keeps its cover crop.
+- **Numbering:** WO-SF-SCHEDULE-CONTACT-MD-01 moves to backend R9.222 (Codex) and UI R9.223 (Lead); PLAN.md and the work order are updated.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, schedule regression tests 40/40. Browser check is the owner's on :3001.
+
 ## R9.220 | 2026-10-23 | plan(studioflow): Schedule Contact suggested from Master Data (Lead)
 
 - **Owner decision:** Contact comes from Master Data when the Brand has contacts there, with free override; format `Andi (Sales) - 0813412457877`.
