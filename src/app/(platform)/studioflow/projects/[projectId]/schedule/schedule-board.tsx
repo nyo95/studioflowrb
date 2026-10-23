@@ -631,6 +631,8 @@ export function ScheduleBoard({
   const [autoPhotoOptionId, setAutoPhotoOptionId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
   const [printAsk, setPrintAsk] = useState(false);
+  /** Request sample from a row's menu, for the option the row shows (the final one, else the active one). */
+  const [sampleTarget, setSampleTarget] = useState<{ code: string; option: ScheduleOptionView } | null>(null);
   const openPrint = (includeHidden: boolean) => {
     setPrintAsk(false);
     window.open(`${STUDIOFLOW_ROUTES.projectSchedulePrint(projectId)}${includeHidden ? "?hidden=include" : ""}`, "_blank", "noopener");
@@ -770,6 +772,12 @@ export function ScheduleBoard({
       return { ok: true as const, data: null };
     });
     if (ok) setNotice(`${rows.length === 1 ? rows[0].code : `${rows.length} items`} now use the Master Data Brand "${brand.name}".`);
+  };
+  const sampleItems = (entry: ScheduleEntryView): RowActionItem[] => {
+    const option = shownOptionOf(entry);
+    if (!canEdit || !option) return [];
+    const asked = option.sampleRequest?.status === "REQUESTED";
+    return [{ label: asked ? "Ask for the sample again" : "Request sample", icon: <Package className="h-3.5 w-3.5" />, separatorBefore: true, onSelect: () => setSampleTarget({ code: entry.code, option }) }];
   };
   const copyItems = (entry: ScheduleEntryView): RowActionItem[] => [
     { label: "Copy row", icon: <Copy className="h-3.5 w-3.5" />, separatorBefore: true, onSelect: () => void copyRows([entry]) },
@@ -1066,7 +1074,7 @@ export function ScheduleBoard({
                     section={section}
                     onReorder={reorderGroup}
                     onDelete={(entry) => void removeEntry(entry)}
-                    menuItems={(entry) => [...copyItems(entry), ...markItems([entry])]}
+                    menuItems={(entry) => [...copyItems(entry), ...sampleItems(entry), ...markItems([entry])]}
                     categoryChoices={categoryChoices}
                     openId={openId}
                     selecting={selecting}
@@ -1117,6 +1125,7 @@ export function ScheduleBoard({
                             const rowItems = !selecting ? [
                               { label: "Open", onSelect: () => openEntry(entry.id) },
                               ...copyItems(entry),
+                              ...sampleItems(entry),
                               ...markItems([entry]),
                               ...(canManageTemplates && templateSourceOf(entry)
                                 ? [{ label: "Save as template item", separatorBefore: true, onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
@@ -1227,6 +1236,11 @@ export function ScheduleBoard({
 
       {dialog === "add" ? (
         <AddItemDrawer projectId={projectId} section={section} categoriesBySection={categoriesBySection} categoryChoices={categoryChoices} brands={brands} command={command} confirm={confirm.confirm} onClose={() => setDialog(null)} />
+      ) : null}
+      {sampleTarget ? (
+        <Dialog open onOpenChange={(open) => { if (!open) setSampleTarget(null); }} title={`Request sample · ${sampleTarget.code} option ${sampleTarget.option.label}`} size="sm">
+          <InlineSampleRequest projectId={projectId} option={sampleTarget.option} command={command} onClose={() => setSampleTarget(null)} />
+        </Dialog>
       ) : null}
       <Dialog
         open={printAsk}

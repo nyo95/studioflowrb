@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.228 | 2026-10-23 | ui(studioflow): Request sample from a schedule row's menu (Lead)
+
+- **Owner request:** right-click should also request a sample, for the option the row shows.
+- **Change:** List rows (right-click and ...) and Board cards (right-click) offer "Request sample" for the shown option (the final one, else the active one), or "Ask for the sample again" while one is waiting. It opens the same request form as the inspector (supplier and note optional) in a small dialog; Master Data is told as before.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, schedule regression tests 43/43. Browser check is the owner's on :3001.
+
 ## R9.227 | 2026-10-23 | ui(studioflow): suggest linking a typed Brand to its Master Data Brand (Lead)
 
 - **Owner decision:** a Brand typed before it existed in Master Data ("Singres Mosaic") should be offered a link once Master Data has it ("Singres"), never switched on its own.

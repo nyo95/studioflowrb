@@ -210,7 +210,7 @@ describe("WO-SF-SCHEDULE-MARKS-01 hide and highlight", () => {
     assert.match(scheduleBoard, /label: allHidden \? "Unhide" : "Hide"/);
     assert.match(scheduleBoard, /label: "Highlight",[\s\S]*?items: \[/);
     assert.match(scheduleBoard, /\.\.\.markItems\(\[entry\]\),/);
-    assert.match(scheduleBoard, /menuItems=\{\(entry\) => \[\.\.\.copyItems\(entry\), \.\.\.markItems\(\[entry\]\)\]\}/);
+    assert.match(scheduleBoard, /menuItems=\{\(entry\) => \[\.\.\.copyItems\(entry\), \.\.\.sampleItems\(entry\), \.\.\.markItems\(\[entry\]\)\]\}/);
     assert.match(scheduleBoard, /marks=\{markItems\(/);
   });
   it("keeps hidden items out of the counts and progress, with a visibility and a colour filter", () => {
@@ -250,5 +250,14 @@ describe("a typed Brand is offered a link to Master Data, never switched on its 
     assert.match(scheduleBoard, /onClick=\{\(\) => updateDraft\(\{ brandId: brand\.id, brandName: "" \}\)\}/);
     assert.match(scheduleBoard, /label: "Not in Master Data \(typed\)"/);
     assert.match(scheduleBoard, /brandLinks=\{brandLinksFor\(/);
+  });
+});
+
+describe("Request sample from a row's menu", () => {
+  it("offers it on List rows and Board cards for the option the row shows", () => {
+    assert.match(scheduleBoard, /label: asked \? "Ask for the sample again" : "Request sample"/);
+    assert.match(scheduleBoard, /\.\.\.copyItems\(entry\),\s+\.\.\.sampleItems\(entry\),/);
+    assert.match(scheduleBoard, /menuItems=\{\(entry\) => \[\.\.\.copyItems\(entry\), \.\.\.sampleItems\(entry\), \.\.\.markItems\(\[entry\]\)\]\}/);
+    assert.match(scheduleBoard, /<InlineSampleRequest projectId=\{projectId\} option=\{sampleTarget\.option\}/);
   });
 });
