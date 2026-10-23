@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.212 | 2026-10-23 | plan(studioflow): hide and highlight Product Schedule items (Lead)
+
+- **Plan:** `WO-SF-SCHEDULE-MARKS-01` - items can be hidden and given one of five highlight colours, shared for everyone through the database, set one at a time or for a selection. Hidden items leave the progress count; Print / PDF asks each time whether to include them (owner, 2026-10-23).
+- **Split:** storage, commands, actions and tests by Codex (R9.213); menus, filters, colours, progress and print by the Lead (R9.214).
+- **Migration/dependencies:** none in this revision (planned for R9.213).
+- **Checks:** docs only.
+
 ## R9.211 | 2026-10-23 | ui(studioflow): Board cards show the Type or the Initials type, then the active fields (Lead)
 
 - **Owner request:** the Board is a viewer, not the print. A card's title is the Type; while an item has no real Type yet (empty, a placeholder such as "-" / "TBA", or the import's "Imported"), the title is its Initials type (Color, Pattern, Finishing). The two are never shown together.
