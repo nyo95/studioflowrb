@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.229 | 2026-10-23 | refactor(studioflow): split the Product Schedule screen into files, no behaviour change (Lead)
+
+- **Owner request:** after the health check, split the 2,331-line `schedule-board.tsx`, the largest and most-changed file in the app (38 changes this month), without changing what the screen does.
+- **Split (code moved verbatim, top-level pieces exported):** `schedule-board.tsx` (744 lines: the screen and the List), `schedule-shared.tsx` (types, List and filter helpers, marks, badges, thumbnails, product draft helpers), `schedule-board-view.tsx` (Board), `schedule-entry-panel.tsx` (inspector), `schedule-add-item.tsx` (Add item), `schedule-reuse.tsx` (past-project search), `schedule-dialogs.tsx` (selection panel, Move and Import dialogs). The shared file depends on no sibling; only the screen file imports the others.
+- **Tests:** the schedule regression checks read the screen's files as one source; the two Board-only checks read the Board file.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, eslint, schedule regression 43/43, full test suite 1,342/1,342, production build (`NEXT_DIST_DIR=.next-verify`) passed.
+
 ## R9.228 | 2026-10-23 | ui(studioflow): Request sample from a schedule row's menu (Lead)
 
 - **Owner request:** right-click should also request a sample, for the option the row shows.

@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, it } from "node:test";
 
-const scheduleBoard = readFileSync("src/app/(platform)/studioflow/projects/[projectId]/schedule/schedule-board.tsx", "utf8");
+// The Schedule screen is split over several files (R9.229); these checks read them as one source.
+const SCHEDULE_DIR = "src/app/(platform)/studioflow/projects/[projectId]/schedule";
+const scheduleBoard = ["schedule-board", "schedule-shared", "schedule-board-view", "schedule-entry-panel", "schedule-add-item", "schedule-dialogs", "schedule-reuse"]
+  .map((name) => readFileSync(`${SCHEDULE_DIR}/${name}.tsx`, "utf8"))
+  .join("\n");
 const serviceTs = readFileSync("src/apps/studioflow/schedule/service.ts", "utf8");
 const actionsTs = readFileSync("src/app/(platform)/studioflow/actions.ts", "utf8");
 const settingsView = readFileSync("src/app/(platform)/studioflow/settings/schedule/schedule-templates-view.tsx", "utf8");
@@ -51,12 +55,12 @@ describe("WO-SF-SCHED-RELAYOUT-01 board structure", () => {
     assert.match(scheduleBoard, /snapshot: value \? \{ productName: value \} : null/);
   });
   it("board cards use sibling photo and body buttons", () => {
-    const board = scheduleBoard.slice(scheduleBoard.indexOf("function BoardView"), scheduleBoard.indexOf("export function ScheduleBoard"));
+    const board = readFileSync(`${SCHEDULE_DIR}/schedule-board-view.tsx`, "utf8");
     assert.match(board, /<article[\s\S]*?<button type="button"[\s\S]*?<\/button>[\s\S]*?<button type="button"/);
     assert.doesNotMatch(board, /role="button"/);
   });
   it("removes sample actions from board cards", () => {
-    const board = scheduleBoard.slice(scheduleBoard.indexOf("function BoardView"), scheduleBoard.indexOf("export function ScheduleBoard"));
+    const board = readFileSync(`${SCHEDULE_DIR}/schedule-board-view.tsx`, "utf8");
     assert.doesNotMatch(board, />Request sample</);
     assert.doesNotMatch(board, />Mark received</);
   });
