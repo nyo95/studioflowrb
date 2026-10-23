@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.238 | 2026-10-23 | plan(platform): supersede WO-PLATFORM-MODULE-USER-ACCESS-01 (Lead)
+
+- **Owner decision:** Ideas is to be removed, not gated per user; Notes become a private Project book (PIC + invited; managers and the Platform Owner do not read it), the note-image "Use in schedule" moves to StudioFlow for Notes holders, and SketchUp sends material candidates to Notes before they are promoted to the Schedule.
+- **Change:** `PLAN.md` marked SUPERSEDED with its Executor prompt disabled. The `MODULES-DECISION.md` amendment 2026-10-23b (D11 widened to Ideas) is moot and will be revised with the replacement plan. A Project book mockup (single integrated Project page, phase strip, feedback-driven phase status, Home "My tasks") awaits owner review.
+- **Migration/dependencies:** none.
+- **Checks:** docs only; `git diff --check`.
+
 ## R9.237 | 2026-10-23 | plan(platform): Ideas usable only by Developer-listed users (Lead)
 
 - **Owner decision:** Ideas and the Workspace board stay off for the office ("still in development"); Ideas may be switched on only for the users the Developer lists, as the Schedule Assistant and SketchUp already are.

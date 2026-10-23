@@ -7,7 +7,7 @@ Target revision: plan R9.237 (Lead); backend + minimal wiring (Codex) R9.238; co
 Risk: medium - an authorization gate on every Ideas entry point; a missed caller leaks the feature, an over-broad
 gate breaks background cleanup. Escalate (BLOCKED) if any Ideas entry point cannot reach the user id, or if gating
 would require changing a StudioFlow or Presentation internal.
-Status: READY
+Status: SUPERSEDED (owner 2026-10-23: remove Ideas entirely; Notes become the private Project book). Do not execute. Replacement plan pending owner acceptance of the Project book mockup.
 Priority: P1
 Owner: Product Owner (decision 2026-10-23: Ideas and Workspace board stay off for the office; Ideas on only for listed users, like the Schedule Assistant and SketchUp)
 Last updated: 2026-10-23
@@ -75,6 +75,8 @@ Browser on an isolated server: Developer console lists Ideas; with a listed and 
 1, 2 and 6. Lead R9.239: console heading wording; confirm nothing visible changed for non-gated modules.
 
 ## Executor Prompt
+
+SUPERSEDED: do not run the prompt below.
 
 ```text
 Role: BACKEND EXECUTOR. Read AGENTS.md, docs/agent/EXECUTOR.md and PLAN.md (WO-PLATFORM-MODULE-USER-ACCESS-01),
