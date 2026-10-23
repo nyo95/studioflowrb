@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.205 | 2026-10-23 | feat(studioflow): store schedule Contact separately (Codex Executor)
+
+- **Scope:** Product Schedule options and template items now carry an optional Contact (up to 160 characters). It flows through option creation/editing, reuse, template creation/editing/apply, search, and one plain inspector input.
+- **Imports:** the Google Sheets import accepts `MATERIAL TYPE`, puts Contact in its field, uses `INITIALS TYPE` as Type when Type is blank, and keeps the initials note only when both are supplied. The simple CSV/XLSX import and its template accept Contact.
+- **Migration/dependencies:** one additive Prisma migration moves labeled Contact lines from existing option notes into Contact, leaves other notes lines, clears empty notes, and updates search keys. Applied to both kantor rebuild databases (`studioflow_rebuild`, `studioflow_rebuild_test`); Prisma client regenerated. No new dependency.
+- **Checks:** high-tier verification passed: 1,302/1,302 tests, typecheck, lint, boundary and legacy-runtime scans, production build, and whitespace checks. Migration fixture covers a Contact line among other notes, empty notes, and an already populated Contact. The existing `.next-verify/` build output was excluded from lint scanning.
+- **Limitations:** Lead still owns List/inspector presentation and independent acceptance in R9.206; schedule composer/MCP, board card, and print were not changed. The pre-existing untracked `.next-verify/` remains locally.
+
 ## R9.204 | 2026-10-23 | plan(studioflow): Product Schedule list matches the studio sheet (Lead)
 
 - **Review:** R9.202 and R9.203 (Codex) accepted PASS after diff review, typecheck and focused lint; browser left to the owner.

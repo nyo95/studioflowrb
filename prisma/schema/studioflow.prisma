@@ -776,6 +776,7 @@ model SfScheduleTemplateItem {
   pattern              String?
   finishing            String?
   dimension            String?
+  contact              String?
   notes                String?
   /** Free-form spec lines as `[{label, value}]`, copied into the option on apply. */
   extra                Json                        @default("[]")
@@ -844,6 +845,7 @@ model SfScheduleOption {
   pattern      String?
   finishing    String?
   dimension    String?
+  contact      String?
   notes        String?
   /** Free-form spec lines as `[{label, value}]`; the typed columns above stay the home of the fields every card carries. */
   extra        Json                   @default("[]")

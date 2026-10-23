@@ -37,6 +37,7 @@ export type ScheduleSnapshotInput = {
   pattern?: string | null;
   finishing?: string | null;
   dimension?: string | null;
+  contact?: string | null;
   extra?: readonly ScheduleExtraField[] | null;
 };
 
@@ -115,6 +116,7 @@ export type ScheduleOptionView = {
   pattern: string | null;
   finishing: string | null;
   dimension: string | null;
+  contact: string | null;
   notes: string | null;
   /** Free-form spec lines beyond the typed columns. */
   extra: ScheduleExtraField[];
@@ -408,7 +410,7 @@ export function parseScheduleCode(code: string): { prefix: string; increment: nu
  * query matches an empty key.
  */
 export function scheduleSearchKey(input: ScheduleSnapshotInput): string {
-  if (isSpecPlaceholder(input.brandName) && isSpecPlaceholder(input.productName)) return "";
+  if (isSpecPlaceholder(input.brandName) && isSpecPlaceholder(input.productName) && !input.contact?.trim()) return "";
   return [
     input.brandName,
     input.productName,
@@ -416,6 +418,7 @@ export function scheduleSearchKey(input: ScheduleSnapshotInput): string {
     input.pattern,
     input.finishing,
     input.dimension,
+    input.contact,
     ...(input.extra ?? []).flatMap((field) => [field.label, field.value]),
   ]
     .map((part) => (part ?? "").trim().toLocaleLowerCase("id-ID"))
@@ -479,10 +482,10 @@ const header = (value: string) => value.replace(/^\uFEFF/, "").trim().toLowerCas
  */
 export function parseLegacyScheduleSheet(grid: string[][], section: ScheduleSection): LegacySheetRow[] | null {
   const records = cleanGrid(grid);
-  const required = section === "MATERIAL" ? ["product category", "ex", "type"] : ["ex", "type"];
   const headerIndex = records.findIndex((r) => {
     const cells = r.map(header);
-    return cells[0] === "code" && required.every((name) => cells.includes(name));
+    return cells[0] === "code" && cells.includes("ex") && cells.includes("type")
+      && (section !== "MATERIAL" || cells.includes("product category") || cells.includes("material type"));
   });
   if (headerIndex === -1) return null;
   const keys = records[headerIndex].map(header);
@@ -500,7 +503,7 @@ export function parseLegacyScheduleSheet(grid: string[][], section: ScheduleSect
     if (!code) continue;
     rows.push({
       code,
-      category: section === "MATERIAL" ? cell("product category", "product_category") : cell("category", "product category"),
+      category: section === "MATERIAL" ? cell("product category", "material type", "product_category") : cell("category", "product category"),
       brand: cell("ex"),
       product: cell("type"),
       initialsType: cell("initials type", "initials_type"),

@@ -8,7 +8,7 @@ import nextConfig from "eslint-config-next";
 const config = [
   ...nextConfig,
   {
-    ignores: ["node_modules/**", ".next/**", ".next-e2e/**", "e2e/.tmp/**", "out/**", "src/generated/**"],
+    ignores: ["node_modules/**", ".next/**", ".next-e2e/**", ".next-verify/**", "e2e/.tmp/**", "out/**", "src/generated/**"],
   },
 ];
 

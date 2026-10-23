@@ -933,11 +933,12 @@ type ProductDraft = {
   finishing: string;
   dimension: string;
   pattern: string;
+  contact: string;
   notes: string;
   extra: ScheduleExtraField[];
 };
 
-const EMPTY_PRODUCT: ProductDraft = { brandId: "", brandName: "", productName: "", color: "", finishing: "", dimension: "", pattern: "", notes: "", extra: [] };
+const EMPTY_PRODUCT: ProductDraft = { brandId: "", brandName: "", productName: "", color: "", finishing: "", dimension: "", pattern: "", contact: "", notes: "", extra: [] };
 
 function productFromOption(option: ScheduleOptionView): ProductDraft {
   return {
@@ -948,6 +949,7 @@ function productFromOption(option: ScheduleOptionView): ProductDraft {
     finishing: option.finishing ?? "",
     dimension: option.dimension ?? "",
     pattern: option.pattern ?? "",
+    contact: option.contact ?? "",
     notes: option.notes ?? "",
     extra: option.extra.map((field) => ({ ...field })),
   };
@@ -963,6 +965,7 @@ function toSnapshot(draft: ProductDraft) {
     finishing: text(draft.finishing),
     pattern: text(draft.pattern),
     dimension: text(draft.dimension),
+    contact: text(draft.contact),
     notes: text(draft.notes),
     extra: draft.extra.map((field) => ({ label: field.label.trim(), value: field.value.trim() })).filter((field) => field.label && field.value),
   };
@@ -1585,6 +1588,10 @@ function EntryPanelContent({
                 </label>
               ))}
               {itemRows}
+              <label className={ROW}>
+                <span className={ROW_LABEL}>Contact</span>
+                <input aria-label="Contact" value={draft.contact} onChange={(event) => updateDraft({ contact: event.target.value })} disabled={disabled} maxLength={160} className={ROW_INPUT} />
+              </label>
               {draft.extra.map((extra, index) => {
                 const key = extraFieldKey(extra.label);
                 const setExtra = (patch: Partial<ScheduleExtraField>) => updateDraft({ extra: draft.extra.map((field, position) => (position === index ? { ...field, ...patch } : field)) });

@@ -62,7 +62,7 @@ const SIGNED_URL_SECONDS = 15 * 60;
 export type ScheduleImageUpload = { body: Uint8Array; contentType: string };
 
 /** Fields a patch may send; `null` clears an optional field, an omitted field keeps its value. */
-export type OptionPatch = Partial<Pick<SnapshotInput, "brandId" | "productName" | "color" | "pattern" | "finishing" | "dimension" | "notes" | "extra">>;
+export type OptionPatch = Partial<Pick<SnapshotInput, "brandId" | "productName" | "color" | "pattern" | "finishing" | "dimension" | "contact" | "notes" | "extra">>;
 
 /** Template item fields an operator may edit; the photo is managed by its own command. */
 export type TemplateItemInput = {
@@ -106,6 +106,7 @@ function templateItemData(snapshot: ReturnType<typeof cleanSnapshot>) {
     pattern: snapshot.pattern,
     finishing: snapshot.finishing,
     dimension: snapshot.dimension,
+    contact: snapshot.contact,
     notes: snapshot.notes,
     extra: snapshot.extra,
     image_key: snapshot.imageKey,
@@ -136,6 +137,7 @@ const SIMPLE_IMPORT_COLUMNS: TableColumn[] = [
   { key: "qty", header: "Qty", type: "number", example: "12", note: "Fixture items only." },
   { key: "unit", header: "Unit", example: "m2" },
   { key: "location", header: "Location", example: "Lobby" },
+  { key: "contact", header: "Contact", example: "SOCIOLLA (old)" },
   { key: "notes", header: "Notes" },
 ];
 
@@ -422,6 +424,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
         pattern: text("pattern", option.pattern),
         finishing: text("finishing", option.finishing),
         dimension: text("dimension", option.dimension),
+        contact: text("contact", option.contact),
         notes: text("notes", option.notes),
         extra: sent("extra") ? input.patch.extra ?? [] : normalizeExtraFields(option.extra),
       };
@@ -503,6 +506,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           pattern: source.pattern,
           finishing: source.finishing,
           dimension: source.dimension,
+          contact: source.contact,
           notes: source.notes,
           extra: normalizeExtraFields(source.extra),
           image_key: source.image_key,
@@ -573,6 +577,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           pattern: option.pattern,
           finishing: option.finishing,
           dimension: option.dimension,
+          contact: option.contact,
           notes: option.notes,
           extra: normalizeExtraFields(option.extra),
           imageUrl: option.image_key ? urls.get(option.image_key) ?? null : null,
@@ -717,6 +722,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           pattern: source.pattern,
           finishing: source.finishing,
           dimension: source.dimension,
+          contact: source.contact,
           notes: source.notes,
           extra: normalizeExtraFields(source.extra),
           imageKey: source.image_key,
@@ -1138,11 +1144,10 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
           for (const row of sheet) {
             const code = parseScheduleCode(row.code);
             const notes = [
-              row.initialsType ? `Initials type: ${row.initialsType}` : null,
-              row.contact ? `Contact: ${row.contact}` : null,
+              row.initialsType && row.product ? `Initials type: ${row.initialsType}` : null,
               row.imageUrl ? `Image: ${row.imageUrl}` : null,
             ].filter(Boolean).join("\n") || null;
-            const snapshot: SnapshotInput = { brandName: row.brand, productName: row.product || "Imported", notes };
+            const snapshot: SnapshotInput = { brandName: row.brand, productName: row.product || row.initialsType || "Imported", contact: row.contact, notes };
             // Qty and unit belong to Fixture only, as everywhere else.
             const quantities = {
               ...(section === "FIXTURE" && row.qty !== null ? { qty: decimalText(row.qty.replace(",", ".")) } : {}),
@@ -1162,7 +1167,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
                 const merged = cleanSnapshot({
                   brandId: brandChanged ? null : target.brand_id,
                   brandName: row.brand ?? target.brand_name,
-                  productName: row.product ?? target.product_name,
+                  productName: row.product ?? row.initialsType ?? target.product_name,
+                  contact: row.contact ?? target.contact,
                   color: target.color,
                   pattern: target.pattern,
                   finishing: target.finishing,
@@ -1243,6 +1249,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
               pattern: row.pattern || row.motif || row.catalog_motif || null,
               finishing: row.finishing || row.catalog_finishing || null,
               dimension: row.dimension || row.dimensi || null,
+              contact: row.contact || null,
               notes: row.notes || row.note || null,
             },
           });

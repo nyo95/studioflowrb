@@ -252,12 +252,14 @@ describe("schedule labels and legacy sheet", () => {
     assert.deepEqual(rows, [{ code: "PT-01", category: "Paint", brand: "Dulux", product: "Easy Clean, Matt", initialsType: "EC", imageUrl: null, location: "Bedroom", contact: "Budi, 0812", qty: null, unit: "pail" }]);
     assert.equal(parseLegacyScheduleSheet(parseCsvText("category,brand,product\nTile,Roman,Granitio"), "MATERIAL"), null);
     assert.equal(parseLegacyScheduleSheet(parseCsvText("Code,Ex,Type\nLF-01,Cellini,Aria"), "MATERIAL"), null, "Material sheets need a Product Category column");
+    assert.equal(parseLegacyScheduleSheet(parseCsvText("Code,Material Type,Ex,Type,Initials Type,Contact\nPT-02,Paint,Dulux,,Pink,SOCIOLLA"), "MATERIAL")?.[0]?.category, "Paint");
     assert.equal(parseLegacyScheduleSheet(parseCsvText("Code,Ex,Type,Qty\nLF-01,Cellini,Aria,4"), "FIXTURE")?.[0]?.qty, "4");
   });
 
   it("includes pattern in scheduleSearchKey", () => {
     assert.equal(scheduleSearchKey({ productName: "x", pattern: "Woodgrain" }), "x | woodgrain");
     assert.equal(scheduleSearchKey({ productName: "TACO", brandName: "BRAND", pattern: "Solid" }), "brand | taco | solid");
+    assert.equal(scheduleSearchKey({ productName: "Paint", contact: "  SOCIOLLA (old) " }), "paint | sociolla (old)");
   });
 
   it("normalizes pattern in search key with empty and whitespace", () => {

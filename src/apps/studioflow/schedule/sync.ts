@@ -24,6 +24,7 @@ export type SnapshotInput = {
   pattern?: string | null;
   finishing?: string | null;
   dimension?: string | null;
+  contact?: string | null;
   notes?: string | null;
   extra?: readonly ScheduleExtraField[] | null;
   imageKey?: string | null;
@@ -46,6 +47,7 @@ function buildSnapshot(input: SnapshotInput, productName: string) {
   const pattern = optionalText(input.pattern, 160);
   const finishing = optionalText(input.finishing, 160);
   const dimension = optionalText(input.dimension, 160);
+  const contact = optionalText(input.contact, 160);
   const notes = optionalText(input.notes, 2000);
   const imageKey = optionalText(input.imageKey, 500);
   const extra = normalizeExtraFields(input.extra ?? []);
@@ -57,10 +59,11 @@ function buildSnapshot(input: SnapshotInput, productName: string) {
     pattern,
     finishing,
     dimension,
+    contact,
     notes,
     extra,
     imageKey,
-    searchKey: scheduleSearchKey({ brandName, productName, color, pattern, finishing, dimension, extra }),
+    searchKey: scheduleSearchKey({ brandName, productName, color, pattern, finishing, dimension, contact, extra }),
   };
 }
 
@@ -73,6 +76,7 @@ export function optionData(snapshot: ReturnType<typeof cleanSnapshot>) {
     pattern: snapshot.pattern,
     finishing: snapshot.finishing,
     dimension: snapshot.dimension,
+    contact: snapshot.contact,
     notes: snapshot.notes,
     extra: snapshot.extra,
     image_key: snapshot.imageKey,
@@ -214,6 +218,7 @@ export async function seedScheduleFromTemplates(tx: TxClient, projectId: string)
         pattern: item.pattern,
         finishing: item.finishing,
         dimension: item.dimension,
+        contact: item.contact,
         notes: item.notes,
         extra: normalizeExtraFields(item.extra),
         imageKey: item.image_key,

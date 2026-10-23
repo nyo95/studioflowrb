@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { after, afterEach, before, beforeEach, describe, it, mock } from "node:test";
 
 import { createAuditEventWriter } from "@platform/core/audit/persistence";
@@ -1730,12 +1731,12 @@ describe("SF-R3 Product Schedule", () => {
 
   it("imports the plain schedule layout from an .xlsx exactly like the CSV, and offers a template", async () => {
     const { projectId } = await newProject("Xlsx import");
-    const columns = [{ key: "category", header: "Category" }, { key: "brand", header: "Brand" }, { key: "product", header: "Product" }, { key: "qty", header: "Qty" }, { key: "unit", header: "Unit" }, { key: "location", header: "Location" }];
-    const rows = [{ category: "Tile", brand: "Roman", product: "Granitio", qty: "12", unit: "m2", location: "Lobby" }];
+    const columns = [{ key: "category", header: "Category" }, { key: "brand", header: "Brand" }, { key: "product", header: "Product" }, { key: "qty", header: "Qty" }, { key: "unit", header: "Unit" }, { key: "location", header: "Location" }, { key: "contact", header: "Contact" }];
+    const rows = [{ category: "Tile", brand: "Roman", product: "Granitio", qty: "12", unit: "m2", location: "Lobby", contact: "Toko Roman" }];
     const xlsx = await exportTable({ format: "xlsx", filename: "schedule", columns, rows });
     const imported = await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", file: { name: xlsx.filename, data: xlsx.data } });
     assert.equal(imported.created, 1);
-    assert.ok((await sf.schedule.listSchedule({ grants: ALL, projectId, section: "MATERIAL" })).some((row) => row.options[0].productName === "Granitio"));
+    assert.ok((await sf.schedule.listSchedule({ grants: ALL, projectId, section: "MATERIAL" })).some((row) => row.options[0].productName === "Granitio" && row.options[0].contact === "Toko Roman"));
     await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", file: { name: "notes.txt", data: Buffer.from("x") } }), "TABULAR_FILE_TYPE");
     for (const format of ["xlsx", "csv"] as const) {
       const template = await sf.schedule.importTemplate({ ...as(designer), projectId, format });
@@ -1862,6 +1863,22 @@ describe("SF-R3 Product Schedule", () => {
     assert.equal(editedRow.options[0].color, "Grey");
   });
 
+  it("copies Contact through templates, option reuse, and save as template", async () => {
+    const template = await sf.schedule.createTemplateItem({ ...as(designer), section: "MATERIAL", category: "Paint", snapshot: { productName: "Easy Clean", contact: "Toko Awal" } });
+    assert.equal((await sf.schedule.listTemplates({ grants: ALL }))[0].items[0].contact, "Toko Awal");
+    await sf.schedule.updateTemplateItem({ ...as(designer), templateItemId: template.templateItemId, snapshot: { productName: "Easy Clean", contact: "Toko Baru" } });
+    const source = await newProject("Source contact");
+    const sourceRow = (await sf.schedule.listSchedule({ grants: ALL, projectId: source.projectId })).find((row) => row.category === "Paint")!;
+    assert.equal(sourceRow.options[0].contact, "Toko Baru", "new project seeding copies Contact");
+    const other = await newProject("Other contact");
+    const target = await sf.schedule.createEntry({ ...as(designer), projectId: other.projectId, section: "MATERIAL", category: "Tile" });
+    await sf.schedule.copyReusableOption({ ...as(designer), projectId: other.projectId, entryId: target.entryId, sourceOptionId: sourceRow.options[0].id });
+    const copied = (await sf.schedule.listSchedule({ grants: ALL, projectId: other.projectId })).find((row) => row.id === target.entryId)!.options[0];
+    assert.equal(copied.contact, "Toko Baru");
+    const saved = await sf.schedule.saveEntryAsTemplate({ ...as(designer), projectId: other.projectId, entryId: target.entryId });
+    assert.equal((await testDb.prisma.sfScheduleTemplateItem.findUniqueOrThrow({ where: { id: saved.templateItemId } })).contact, "Toko Baru");
+  });
+
   it("enforces permissions, project scope, and archive read-only", async () => {
     const { projectId } = await newProject();
     const other = await newProject("Other");
@@ -1930,7 +1947,9 @@ describe("SF-R3 Product Schedule", () => {
     const rows = await sf.schedule.listSchedule({ grants: ALL, projectId, section: "MATERIAL" });
     const pt = rows.find((row) => row.id === existing.entryId)!;
     assert.deepEqual([pt.code, pt.options[0].productName, pt.options[0].brandName, pt.location, pt.qty], ["PT-01", "Easy Clean", "Dulux", "Bedroom", null]);
-    assert.match(pt.options[0].notes ?? "", /Contact: Budi 0812/);
+    assert.equal(pt.options[0].contact, "Budi 0812");
+    assert.doesNotMatch(pt.options[0].notes ?? "", /Contact:/i);
+    assert.match(pt.options[0].notes ?? "", /Initials type: EC/);
     assert.deepEqual(rows.filter((row) => row.category === "Floor Tile").map((row) => row.code), ["FL-01", "FL-02"], "a new category keeps the sheet prefix");
 
     await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: "Code,Product Category,Ex,Type\nZZ-01,,Brand,Thing" }), "SCHEDULE_CSV_CATEGORY");
@@ -1939,6 +1958,37 @@ describe("SF-R3 Product Schedule", () => {
     await testDb.prisma.sfSchedulePrefix.create({ data: { section: "MATERIAL", category: "Tile Wall", category_key: "TILE WALL", prefix: "FL" } });
     await rejectsWith(sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: "Code,Product Category,Ex,Type\nFL-09,,Brand,Thing" }), "SCHEDULE_CSV_CATEGORY");
     assert.equal((await sf.schedule.listSchedule({ grants: ALL, projectId })).length, 3, "a failed import writes nothing");
+  });
+
+  it("imports Material Type, uses Initials Type for a blank Type, and keeps Contact searchable", async () => {
+    const { projectId } = await newProject();
+    const sheet = [
+      "Code,Material Type,Ex,Type,Initials Type,Image,Location,Contact",
+      "PT-02,Paint,Dulux,,Pink,,Bedroom,SOCIOLLA (old)",
+      "PT-03,Paint,Dulux,Easy Clean,Matte,,Lobby,Toko Baru",
+    ].join("\n");
+    assert.deepEqual(await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: sheet }), { created: 2, updated: 0 });
+    const rows = await sf.schedule.listSchedule({ grants: ALL, projectId });
+    const pink = rows.find((row) => row.code === "PT-02")!.options[0];
+    assert.deepEqual([pink.productName, pink.contact, pink.notes], ["Pink", "SOCIOLLA (old)", null]);
+    const exact = rows.find((row) => row.code === "PT-03")!.options[0];
+    assert.deepEqual([exact.productName, exact.contact, exact.notes], ["Easy Clean", "Toko Baru", "Initials type: Matte"]);
+    const hits = await sf.schedule.searchReusableOptions({ grants: ALL, projectId: (await newProject("Other")).projectId, query: "sociolla" });
+    assert.ok(hits.some((hit) => hit.optionId === pink.id));
+  });
+
+  it("moves labeled Contact lines from old option notes and keeps other lines", async () => {
+    const { projectId } = await newProject();
+    const first = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Old paint", notes: "Initials type: pink\n  cOnTaCt:  SOCIOLLA (old)  \nImage: legacy.jpg" } });
+    const second = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Other paint", notes: "Contact: Toko Dua" } });
+    const retained = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint", snapshot: { productName: "Already set", contact: "Current shop", notes: "Contact: Old shop" } });
+    const migration = readFileSync("prisma/migrations/20261023120000_sf_schedule_contact/migration.sql", "utf8");
+    await testDb.prisma.$executeRawUnsafe(migration.slice(migration.indexOf("-- Data move:")));
+    const option = async (entryId: string) => testDb.prisma.sfScheduleOption.findFirstOrThrow({ where: { entry_id: entryId } });
+    assert.deepEqual([(await option(first.entryId)).contact, (await option(first.entryId)).notes], ["SOCIOLLA (old)", "Initials type: pink\nImage: legacy.jpg"]);
+    assert.match((await option(first.entryId)).search_key, /sociolla \(old\)/);
+    assert.deepEqual([(await option(second.entryId)).contact, (await option(second.entryId)).notes], ["Toko Dua", null]);
+    assert.deepEqual([(await option(retained.entryId)).contact, (await option(retained.entryId)).notes], ["Current shop", "Contact: Old shop"]);
   });
 
   it("re-imports a sheet without wiping specs, photo or decision, and keeps the sheet's own codes", async () => {

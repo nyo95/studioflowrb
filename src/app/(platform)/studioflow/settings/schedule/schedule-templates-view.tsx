@@ -49,6 +49,7 @@ type ScheduleTemplate = {
     pattern: string | null;
     finishing: string | null;
     dimension: string | null;
+    contact: string | null;
     notes: string | null;
     extra: unknown;
     is_active: boolean;
@@ -261,6 +262,7 @@ function TemplateItemDialog({
       pattern: nullable(draft.pattern),
       finishing: nullable(draft.finishing),
       dimension: nullable(draft.dimension),
+      contact: item?.contact ?? null,
       notes: nullable(draft.notes),
       extra: draft.extra.map((field) => ({ label: field.label.trim(), value: field.value.trim() })).filter((field) => field.label && field.value),
     };
