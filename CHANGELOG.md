@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.220 | 2026-10-23 | plan(studioflow): Schedule Contact suggested from Master Data (Lead)
+
+- **Owner decision:** Contact comes from Master Data when the Brand has contacts there, with free override; format `Andi (Sales) - 0813412457877`.
+- **Plan:** `WO-SF-SCHEDULE-CONTACT-MD-01` - a new Master Data public read of a Brand's contacts (brand representatives first, then owner-vendor and supplier contacts), a StudioFlow formatter, read and action (Codex R9.221); the inspector's Contact becomes a searchable choice with free typing (Lead R9.222). Contact stays a text snapshot; no schema change, no auto-fill.
+- **Migration/dependencies:** none.
+- **Checks:** docs only.
+
 ## R9.219 | 2026-10-23 | ui(studioflow): Type and Initials type share the Schedule List width; Phase 1 data cleanup (Lead)
 
 - **List:** Type and Initials type are the same kind of fact (one stands in for the other), so they now split the free width equally instead of Type taking it all; Material type and Ex are wider so "BY CONTRACTOR" fits on one line, Location a little wider.
