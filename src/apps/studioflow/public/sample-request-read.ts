@@ -1,8 +1,11 @@
 import type { PrismaClient } from "@/generated/prisma/client";
+import type { ObjectStorage } from "@platform/core/storage";
+
+import { scheduleCode } from "../domain/schedule";
 
 /**
- * What other apps may know about a physical-sample request. Facts only: no storage keys, no images,
- * no schedule internals. Master Data reads this to build its own working queue;
+ * What other apps may know about a physical-sample request. Facts only: no storage keys and no schedule
+ * internals. The one image form allowed is a short-lived signed read URL of the option's photo (WO-SF-SAMPLE-PHOTO-01). Master Data reads this to build its own working queue;
  * refusal is relayed separately through StudioFlow's narrow command.
  */
 export type SampleRequestRead = {
@@ -24,9 +27,14 @@ export type SampleRequestRead = {
     pattern: string | null;
     finishing: string | null;
     dimension: string | null;
+    /** The schedule item's code, e.g. "CT-02". */
+    entryCode: string;
+    /** Signed read URL of the option's photo, valid for 15 minutes; null without a photo or when it cannot be signed. */
+    imageUrl: string | null;
   };
 };
 
+const SIGNED_URL_SECONDS = 15 * 60;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 200;
 const MAX_IDS = 100;
@@ -51,7 +59,8 @@ const SELECT = {
       pattern: true,
       finishing: true,
       dimension: true,
-      entry: { select: { project: { select: { id: true, name: true, archived_at: true } } } },
+      image_key: true,
+      entry: { select: { prefix: true, increment: true, project: { select: { id: true, name: true, archived_at: true } } } },
     },
   },
 } as const;
@@ -65,11 +74,12 @@ type Row = Awaited<ReturnType<PrismaClient["sfScheduleSampleRequest"]["findMany"
     pattern: string | null;
     finishing: string | null;
     dimension: string | null;
-    entry: { project: { id: string; name: string; archived_at: Date | null } };
+    image_key: string | null;
+    entry: { prefix: string; increment: number; project: { id: string; name: string; archived_at: Date | null } };
   };
 };
 
-function toRead(row: Row): SampleRequestRead {
+function toRead(row: Row, imageUrl: string | null): SampleRequestRead {
   const { option } = row;
   return {
     id: row.id,
@@ -90,12 +100,24 @@ function toRead(row: Row): SampleRequestRead {
       pattern: option.pattern,
       finishing: option.finishing,
       dimension: option.dimension,
+      entryCode: scheduleCode(option.entry.prefix, option.entry.increment),
+      imageUrl,
     },
   };
 }
 
 /** Read-only StudioFlow contract for sample requests. Callers authorize; this port carries no user context. */
-export function createStudioFlowSampleRequestRead(db: PrismaClient) {
+export function createStudioFlowSampleRequestRead(db: PrismaClient, ports: { storage?: Pick<ObjectStorage, "createSignedReadUrl"> } = {}) {
+  /** A photo that cannot be signed (missing file, storage down) is left out rather than failing the queue. */
+  const sign = async (key: string | null): Promise<string | null> => {
+    if (!key || !ports.storage) return null;
+    try {
+      return await ports.storage.createSignedReadUrl(key, SIGNED_URL_SECONDS);
+    } catch {
+      return null;
+    }
+  };
+  const toReads = (rows: Row[]) => Promise.all(rows.map(async (row) => toRead(row, await sign(row.option.image_key))));
   return {
     /** Number of requests still waiting for their physical sample. */
     async countPendingSampleRequests(): Promise<number> {
@@ -112,7 +134,7 @@ export function createStudioFlowSampleRequestRead(db: PrismaClient) {
         take: limit,
         select: SELECT,
       });
-      return (rows as Row[]).map(toRead);
+      return toReads(rows as Row[]);
     },
 
     /** Specific requests in any state, so a consumer can validate the ones it was asked to act on. */
@@ -120,7 +142,7 @@ export function createStudioFlowSampleRequestRead(db: PrismaClient) {
       const unique = [...new Set(ids)].slice(0, MAX_IDS);
       if (unique.length === 0) return [];
       const rows = await db.sfScheduleSampleRequest.findMany({ where: { id: { in: unique } }, select: SELECT });
-      return (rows as Row[]).map(toRead);
+      return toReads(rows as Row[]);
     },
   };
 }

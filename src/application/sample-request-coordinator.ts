@@ -41,7 +41,8 @@ export type SampleQueueRow = {
   state: "NEW" | SampleRequestIntakeStatus;
   /** StudioFlow's own view: the physical sample may already be in the designer's hands. Null if it can no longer be read. */
   sourceStatus: "REQUESTED" | "RECEIVED" | "DECLINED" | null;
-  product: { name: string; brandName: string | null; color: string | null; pattern: string | null; finishing: string | null; dimension: string | null };
+  /** `entryCode` and `imageUrl` come from StudioFlow's live request; both are null when only the intake snapshot is readable. */
+  product: { name: string; brandName: string | null; color: string | null; pattern: string | null; finishing: string | null; dimension: string | null; entryCode: string | null; imageUrl: string | null };
   project: { id: string; name: string };
   requestedFrom: string;
   note: string | null;
@@ -59,7 +60,7 @@ function fromRequest(request: SampleRequestRead, intake: SampleRequestIntakeRead
     sourceRequestId: request.id,
     state: intake ? intake.status : "NEW",
     sourceStatus: request.status,
-    product: { name: request.option.productName, brandName: request.option.brandName, color: request.option.color, pattern: request.option.pattern, finishing: request.option.finishing, dimension: request.option.dimension },
+    product: { name: request.option.productName, brandName: request.option.brandName, color: request.option.color, pattern: request.option.pattern, finishing: request.option.finishing, dimension: request.option.dimension, entryCode: request.option.entryCode, imageUrl: request.option.imageUrl },
     project: { id: request.project.id, name: request.project.name },
     requestedFrom: request.requestedFrom,
     note: request.note,
@@ -74,7 +75,7 @@ function fromIntake(intake: SampleRequestIntakeRead, source: SampleRequestRead |
     sourceRequestId: intake.sourceRequestId,
     state: intake.status,
     sourceStatus: source?.status ?? null,
-    product: { name: intake.productName, brandName: intake.brandName, color: intake.color, pattern: intake.pattern, finishing: intake.finishing, dimension: intake.dimension },
+    product: { name: intake.productName, brandName: intake.brandName, color: intake.color, pattern: intake.pattern, finishing: intake.finishing, dimension: intake.dimension, entryCode: source?.option.entryCode ?? null, imageUrl: source?.option.imageUrl ?? null },
     project: { id: intake.sourceProjectId, name: intake.sourceProjectName },
     requestedFrom: intake.requestedFrom,
     note: intake.requestNote,

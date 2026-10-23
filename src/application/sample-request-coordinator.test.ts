@@ -15,7 +15,7 @@ function request(id: string, over: Partial<SampleRequestRead> = {}): SampleReque
   return {
     id, status: "REQUESTED", requestedAt: new Date("2026-09-10T03:00:00Z"), requestedBy: { id: "designer-1", name: "Dina" },
     requestedFrom: "Toko Kayu", note: "swatch", receivedAt: null, declinedAt: null, declineReason: null, project: { id: "p1", name: "2026-506 Test", archived: false },
-    option: { id: `option-${id}`, productName: `Product ${id}`, brandName: "Brand", color: "Oak", pattern: null, finishing: null, dimension: null }, ...over,
+    option: { id: `option-${id}`, productName: `Product ${id}`, brandName: "Brand", color: "Oak", pattern: null, finishing: null, dimension: null, entryCode: "CT-02", imageUrl: null }, ...over,
   };
 }
 
@@ -87,6 +87,14 @@ describe("sample request coordinator", () => {
     assert.equal(rows[0].intake, null);
   });
 
+  it("carries the schedule item's code and signed photo from StudioFlow, for new and taken requests alike", async () => {
+    const photo = "/api/platform/assets/private?key=k&expires=1&token=t";
+    const pending = [request("new", { option: { ...request("new").option, imageUrl: photo } }), request("taken", { option: { ...request("taken").option, imageUrl: photo } })];
+    const { coordinator } = setup({ pending, sources: pending, intakes: [intake("taken", "IN_PROGRESS")] });
+    const rows = await coordinator.listQueue({ grants: STAFF_GRANTS });
+    assert.deepEqual(rows.map((row) => [row.product.entryCode, row.product.imageUrl]), [["CT-02", photo], ["CT-02", photo]]);
+  });
+
   it("keeps a request Master Data is still working even after StudioFlow stops listing it as pending", async () => {
     const { coordinator, calls } = setup({ pending: [], sources: [request("gone", { status: "RECEIVED" })], intakes: [intake("gone", "IN_PROGRESS")] });
     const rows = await coordinator.listQueue({ grants: STAFF_GRANTS });
@@ -100,6 +108,7 @@ describe("sample request coordinator", () => {
     assert.deepEqual(await coordinator.listQueue({ grants: STAFF_GRANTS }), []);
     const rows = await coordinator.listQueue({ grants: STAFF_GRANTS, includeFinished: true });
     assert.deepEqual(rows.map((row) => [row.sourceRequestId, row.state, row.sourceStatus]), [["newer", "DECLINED", null], ["old", "PRICED", null]]);
+    assert.deepEqual(rows.map((row) => [row.product.entryCode, row.product.imageUrl]), [[null, null], [null, null]], "no photo without a readable source");
   });
 
   it("takes a pending request by copying its facts from StudioFlow, never from the caller", async () => {

@@ -1467,18 +1467,20 @@ describe("SF-R3 Product Schedule", () => {
     const { projectId } = await newProject("Contact choices");
     const other = await newProject("Other contact project");
     const outsider = await seedUser("Outside", ALL);
-    const vendor = await testDb.prisma.vendor.create({ data: { name: "Contact Vendor", slug: `contact-${randomUUID()}` } });
-    const brand = await testDb.prisma.brand.create({ data: { name: "Contact Brand", slug: `brand-${randomUUID()}`, owner_vendor_id: vendor.id } });
+    // Master Data rows are not truncated between StudioFlow runs, and vendor/brand names are unique: name them per run.
+    const run = randomUUID().slice(0, 8);
+    const vendor = await testDb.prisma.vendor.create({ data: { name: `Contact Vendor ${run}`, slug: `contact-${randomUUID()}` } });
+    const brand = await testDb.prisma.brand.create({ data: { name: `Contact Brand ${run}`, slug: `brand-${randomUUID()}`, owner_vendor_id: vendor.id } });
     const contact = await testDb.prisma.vendorContact.create({ data: { vendor_id: vendor.id, brand_id: brand.id, person_name: " Andi ", job_title: " Sales ", phone: " 0812 ", is_primary: true } });
     const read = (actorId: string, grants: readonly string[], selectedProjectId = projectId, brandId: string | null = brand.id) => sf.schedule.listBrandContactChoices({ actorId, grants, projectId: selectedProjectId, brandId });
 
-    assert.deepEqual(await read(designer.id, DRAFTER_GRANTS), [{ id: contact.id, label: "Andi (Sales) - 0812", vendorName: "Contact Vendor", forBrand: true }]);
+    assert.deepEqual(await read(designer.id, DRAFTER_GRANTS), [{ id: contact.id, label: "Andi (Sales) - 0812", vendorName: `Contact Vendor ${run}`, forBrand: true }]);
     assert.deepEqual(await read(designer.id, DRAFTER_GRANTS, projectId, null), []);
     await rejectsWith(read(designer.id, DRAFTER_GRANTS.filter((grant) => grant !== P.projectRead)), "PERMISSION_DENIED");
     await rejectsWith(read(outsider.id, DRAFTER_GRANTS), "PERMISSION_DENIED");
     assert.equal((await read(outsider.id, ALL)).length, 1, "a Studio Manager may read an unassigned project");
     await rejectsWith(read(designer.id, ALL, randomUUID()), "PROJECT_NOT_FOUND");
-    assert.deepEqual(await read(designer.id, ALL, other.projectId, brand.id), [{ id: contact.id, label: "Andi (Sales) - 0812", vendorName: "Contact Vendor", forBrand: true }]);
+    assert.deepEqual(await read(designer.id, ALL, other.projectId, brand.id), [{ id: contact.id, label: "Andi (Sales) - 0812", vendorName: `Contact Vendor ${run}`, forBrand: true }]);
   });
 
   it("sets shared item marks in bulk, skips unchanged rows, and audits each change", async () => {
@@ -2889,11 +2891,27 @@ describe("Sample-request read contract (StudioFlow public)", () => {
     assert.deepEqual(rows.map((row) => row.id), [older.requestId, newer.requestId]);
     const [first] = rows;
     assert.deepEqual(Object.keys(first).sort(), ["declineReason", "declinedAt", "id", "note", "option", "project", "receivedAt", "requestedAt", "requestedBy", "requestedFrom", "status"]);
-    assert.deepEqual(Object.keys(first.option).sort(), ["brandName", "color", "dimension", "finishing", "id", "pattern", "productName"]);
+    assert.deepEqual(Object.keys(first.option).sort(), ["brandName", "color", "dimension", "entryCode", "finishing", "id", "imageUrl", "pattern", "productName"]);
+    assert.equal(first.option.imageUrl, null, "no storage port, no photo");
+    assert.match(first.option.entryCode, /^[A-Z]+-\d{2}$/);
     assert.equal(first.project.name.includes("Older"), true);
     assert.equal(first.project.archived, false);
     assert.deepEqual(first.requestedBy, { id: designer.id, name: "Dina Designer" });
     assert.equal(first.option.productName, "Product Older");
+    assert.equal(JSON.stringify(rows).includes("secret/"), false, "no storage key leaves StudioFlow");
+  });
+
+  it("signs the option photo for 15 minutes, never exposes the key, and leaves out a photo it cannot sign", async () => {
+    const signed: Array<[string, number]> = [];
+    const storage = { async createSignedReadUrl(key: string, seconds: number) { signed.push([key, seconds]); if (key.includes("Broken")) throw new Error("missing"); return `/api/platform/assets/private?token=${signed.length}`; } };
+    const read = createStudioFlowSampleRequestRead(testDb.prisma, { storage });
+    const ok = await requestFixture("Photo", "2026-09-10T03:00:00Z");
+    const broken = await requestFixture("Broken", "2026-09-11T03:00:00Z");
+    const rows = await read.getSampleRequests([ok.requestId, broken.requestId]);
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    assert.match(byId.get(ok.requestId)?.option.imageUrl ?? "", /^\/api\/platform\/assets\/private\?token=/);
+    assert.equal(byId.get(broken.requestId)?.option.imageUrl, null);
+    assert.ok(signed.every(([, seconds]) => seconds === 15 * 60));
     assert.equal(JSON.stringify(rows).includes("secret/"), false, "no storage key leaves StudioFlow");
   });
 

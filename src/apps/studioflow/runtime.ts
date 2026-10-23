@@ -17,5 +17,5 @@ export const studioFlow = createStudioFlowService(prisma, {
 });
 
 /** Read-only sample-request contract for other apps; the shell hands it to the sample-request coordinator. */
-export const studioFlowSampleRequestRead = createStudioFlowSampleRequestRead(prisma);
+export const studioFlowSampleRequestRead = createStudioFlowSampleRequestRead(prisma, { storage: objectStorage });
 export const studioFlowSampleRequestCommand = createStudioFlowSampleRequestCommand(prisma, { auditWriter, runTransaction, people: peopleDirectory, storage: objectStorage, notificationWriter, masterData: createMasterDataPublicRead(prisma) });

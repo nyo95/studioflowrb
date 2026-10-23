@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.225 | 2026-10-23 | feat(studioflow): sample requests carry the schedule item's photo and code (Lead, Executor lane taken over by owner instruction)
+
+- **Owner:** "takeover aja semua" - the Lead implements the Executor scope of WO-SF-SAMPLE-PHOTO-01 itself.
+- **Read contract:** `SampleRequestRead.option` gains `entryCode` (e.g. `CT-02`) and `imageUrl`, a 15-minute signed read URL of the option's photo; null without a photo, without a storage port, or when signing fails. The storage key still never leaves StudioFlow; the contract comment says the signed URL is the only image form allowed. The runtime passes the object storage in.
+- **Coordinator:** `SampleQueueRow.product` carries `entryCode` and `imageUrl` from the live StudioFlow request; both are null when only Master Data's intake snapshot is readable.
+- **Test repair:** the R9.222 contact-choices integration test created a vendor and a Brand with fixed names; Master Data tables are not truncated between StudioFlow runs, so a second run hit the unique name. Names are now per run.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, boundary check, studioflow service integration and coordinator tests 251/251 (new: signing, unsignable photo, pass-through, no photo without a source).
+
 ## R9.224 | 2026-10-23 | plan(studioflow): sample requests show the schedule item's photo and code (Lead)
 
 - **Owner request:** when a sample is requested, the Master Data queue should show the picture of the schedule item it came from, when there is one.
