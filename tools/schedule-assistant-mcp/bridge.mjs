@@ -44,8 +44,8 @@ const text = (/** @type {number} */ max) => z.string().max(max);
 const optionalText = (/** @type {number} */ max) => text(max).nullable().optional();
 const id = z.string().uuid();
 const option = z.object({
-  brandId: id.nullable().optional().describe("An active Master Data Brand id from search_brands. Omit or null for no Brand."),
-  brandName: optionalText(160).describe("Only when the brief names a Brand you could not find: StudioFlow answers with suggestions. Never stored."),
+  brandId: id.nullable().optional().describe("Optional active Master Data Brand id from search_brands. A typed brandName can be used without one."),
+  brandName: optionalText(160).describe("A typed Brand: an exact Master Data name resolves to its id; otherwise the typed name is kept with a preview warning."),
   productName: text(200).describe("The product designation (\"Type\")."),
   color: optionalText(160),
   pattern: optionalText(160),
@@ -128,9 +128,9 @@ const projectId = id.describe("A project id from list_projects.");
 export const INTERVIEW_STEPS = [
   "1. Confirm the project: call list_projects; if the user's words match more than one project, or none, ask which one. Never guess.",
   "2. Ask what the user wants: apply the studio templates or not, which categories and items, any Brand or product the client already chose.",
-  "3. Ask for missing facts before previewing: quantity and unit for Fixture items (Material items have none); a Brand that search_brands cannot find (offer its suggestions or leaving it empty); which existing item an extra option belongs to.",
+  "3. Ask for missing facts before previewing: quantity and unit for Fixture items (Material items have none); the Brand name the client gave, if any (a typed name is allowed without Master Data); which existing item an extra option belongs to.",
   "4. Summarise the plan in plain words and ask whether to prepare the preview.",
-  "5. Call preview_schedule_changes, show the result (codes, labels, Brands, every issue and warning), and wait for an explicit yes. A SCHEDULE_CATEGORY_SIMILAR warning means a new category looks like a studio one (for example HPL vs High Pressure Laminate, prefix PL): ask which is meant and preview again with the studio name unless the user really wants the new category.",
+  "5. Call preview_schedule_changes, show the result (codes, labels, Brands, every issue and warning), and wait for an explicit yes. For SCHEDULE_BRAND_NOT_IN_MASTER_DATA, ask whether to use a suggested Brand or keep the typed name, then preview again with that choice; if the user keeps it, show the warning but do not ask the same choice again. A SCHEDULE_CATEGORY_SIMILAR warning means a new category looks like a studio one (for example HPL vs High Pressure Laminate, prefix PL): ask which is meant and preview again with the studio name unless the user really wants the new category.",
   "6. Only then call apply_schedule_changes with that preview's operationId, digest and operations, and show the read-back.",
   "Photos: attach a picture only when the user gave it in this conversation (set_option_image with its file path). For every SCHEDULE_OPTION_NO_IMAGE warning, ask the user for a photo; if there is none, ask whether a colour placeholder should be used and which colour (propose a #RRGGBB and wait for confirmation, never choose it yourself), then preview again. Say when a photo replaces an existing one.",
   "Final decisions (finalize_option) are the client's choice and lock the other options of an item. Use them only when the user names exactly which options are final; list every item code and option you will finalize, say which options become not used, and ask about the final decisions on their own, even if the request already mentioned them. Never infer a final decision. They are applied only after StudioFlow's own confirmation dialog.",
@@ -235,7 +235,7 @@ export function createBridge(options) {
   /** @param {ApiResult} response */
   const forward = (response) => (response.ok ? result(response.body.data) : failure(response));
 
-  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.4.0" }, { instructions: INSTRUCTIONS });
+  const server = new McpServer({ name: "studioflow-schedule-assistant", version: "1.5.0" }, { instructions: INSTRUCTIONS });
 
   /**
    * Layer 2: every valid preview this bridge process returned, by its operationId. Apply accepts only these, for the
@@ -287,7 +287,7 @@ export function createBridge(options) {
   }, async (args) => forward(await call(`projects/${encodeURIComponent(args.projectId)}/context`)));
 
   server.registerTool("search_brands", {
-    description: "Search active Master Data Brands by name. Use the returned id as option.brandId.",
+    description: "Search active Master Data Brands by name. Use a returned id as option.brandId when chosen, or send a typed brandName without an id.",
     inputSchema: { query: text(80).min(2) },
     annotations: read,
   }, async (args) => forward(await call(`brands?q=${encodeURIComponent(args.query)}`)));
@@ -299,7 +299,7 @@ export function createBridge(options) {
   }, async (args) => forward(await call(`projects/${encodeURIComponent(args.projectId)}/reusable-options?q=${encodeURIComponent(args.query)}${args.section ? `&section=${args.section}` : ""}`)));
 
   server.registerTool("preview_schedule_changes", {
-    description: "Validate a complete batch and show exactly what StudioFlow would create or change (codes, option labels, categories, Brands, photos). Writes nothing. Photos are read from their file paths now and locked to this preview. Call it only after the interview (project confirmed, plan summarised and agreed). Returns every problem at once, or an operationId and digest to apply this exact preview after the user approves it.",
+    description: "Validate a complete batch and show exactly what StudioFlow would create or change (codes, option labels, categories, Brands, photos). A typed Brand resolves on an exact Master Data name or warns with suggestions while keeping the typed name. Writes nothing. Photos are read from their file paths now and locked to this preview. Call it only after the interview (project confirmed, plan summarised and agreed). Returns every problem at once, or an operationId and digest to apply this exact preview after the user approves it.",
     inputSchema: { projectId, operations },
     annotations: read,
   }, async (args) => {

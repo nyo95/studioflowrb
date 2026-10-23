@@ -13,7 +13,12 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { ElicitRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
-import { approvalMessage, readConfig, readImage, withImages } from "../bridge.mjs";
+import { approvalMessage, INTERVIEW_STEPS, readConfig, readImage, withImages } from "../bridge.mjs";
+
+it("instructs the assistant to confirm an unmatched typed Brand and preview again", () => {
+  assert.match(INTERVIEW_STEPS.join(" "), /SCHEDULE_BRAND_NOT_IN_MASTER_DATA/);
+  assert.match(INTERVIEW_STEPS.join(" "), /keep the typed name, then preview again/);
+});
 
 const SERVER = fileURLToPath(new URL("../server.mjs", import.meta.url));
 const TOKEN = `sfk_${"a".repeat(12)}_${"B".repeat(43)}`;

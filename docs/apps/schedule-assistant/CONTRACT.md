@@ -68,12 +68,17 @@ up to four photos as base64 (`images: { <sha256>: <base64> }`).
 | `set_option_color` | `optionId` or `entryRef`, `hex` (`#RRGGBB`) | a colour placeholder: StudioFlow draws a 400×500 PNG and stores it as the option photo; otherwise like `set_option_image` |
 
 `option = { brandId?, brandName?, productName, color?, pattern?, finishing?, dimension?,
-notes?, extra? }`. `brandId` must be an active Master Data Brand; `brandName` is only a
-hint from the brief and always produces `SCHEDULE_BRAND_NOT_FOUND` with up to five
-suggestions. No Master Data write, photo removal, delete, un-finalize, sample, card field,
+notes?, extra? }`. `brandId`, when sent, must be an active Master Data Brand; an unknown or
+inactive id blocks with `SCHEDULE_BRAND_NOT_FOUND`. Without an id, a typed `brandName` resolves
+to exactly one active Master Data Brand with the same trimmed, case-insensitive name; the result
+includes its id and `brandResolvedFromName: true`. Otherwise the typed name is kept with a
+`SCHEDULE_BRAND_NOT_IN_MASTER_DATA` preview warning and up to five suggestions. The assistant
+asks whether to use a suggestion or keep the typed name, then previews again. No Master Data write, photo removal, delete, un-finalize, sample, card field,
 reorder, category move or global template/prefix change exists. Final decisions have no
 "all", filter or pattern form: each option is named by id. One photo or colour per option per
 batch.
+
+This Brand behaviour is in schedule-assistant module 1.4.0 and MCP bridge 1.5.0.
 
 Photos (R9.186): apply stores each photo and colour before its writes (put first, record
 after) and removes them when the batch fails; a replaced photo is queued in StudioFlow's asset

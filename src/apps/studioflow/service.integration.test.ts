@@ -1866,6 +1866,24 @@ describe("SF-R3 Product Schedule", () => {
     assert.deepEqual([moved[granite1.entryId], moved[gypsum1.entryId], moved[granite2.entryId]], ["GR-01", "GR-02", "GR-03"], "up/down skips the other category's row");
   });
 
+  it("keeps typed Brands on schedule and template create/edit paths while validating ids", async () => {
+    const { projectId } = await newProject("Typed Brand");
+    const entry = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Glass", snapshot: { productName: "Clear glass", brandName: "  Lalapis  " } });
+    const first = await testDb.prisma.sfScheduleOption.findFirstOrThrow({ where: { entry_id: entry.entryId } });
+    assert.deepEqual([first.brand_id, first.brand_name], [null, "Lalapis"]);
+
+    const created = await sf.schedule.createOption({ ...as(designer), projectId, entryId: entry.entryId, snapshot: { productName: "Tinted glass", brandName: " Glass Shop " } });
+    assert.deepEqual((await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: created.optionId }, select: { brand_id: true, brand_name: true } })), { brand_id: null, brand_name: "Glass Shop" });
+    await sf.schedule.updateOption({ ...as(designer), projectId, optionId: created.optionId, snapshot: { productName: "Tinted glass", brandName: " New Shop " } });
+    assert.equal((await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: created.optionId } })).brand_name, "New Shop");
+
+    const template = await sf.schedule.createTemplateItem({ ...as(designer), section: "MATERIAL", category: "Glass", snapshot: { productName: "Clear glass", brandName: " Template Shop " } });
+    assert.deepEqual((await testDb.prisma.sfScheduleTemplateItem.findUniqueOrThrow({ where: { id: template.templateItemId }, select: { brand_id: true, brand_name: true } })), { brand_id: null, brand_name: "Template Shop" });
+    await sf.schedule.updateTemplateItem({ ...as(designer), templateItemId: template.templateItemId, snapshot: { productName: "Clear glass", brandName: " Edited Shop " } });
+    assert.equal((await testDb.prisma.sfScheduleTemplateItem.findUniqueOrThrow({ where: { id: template.templateItemId } })).brand_name, "Edited Shop");
+    await rejectsWith(sf.schedule.createOption({ ...as(designer), projectId, entryId: entry.entryId, snapshot: { productName: "Invalid", brandId: randomUUID(), brandName: "Lalapis" } }), "SCHEDULE_BRAND_NOT_FOUND");
+  });
+
   it("preserves pattern through template items, seeding, reuse, and search", async () => {
     await sf.schedule.createTemplateItem({
       ...as(designer),

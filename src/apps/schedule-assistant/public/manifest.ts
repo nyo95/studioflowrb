@@ -7,7 +7,7 @@ import type { ModuleManifest } from "@platform/core/modules/manifest";
 export const SCHEDULE_ASSISTANT_MODULE_MANIFEST = Object.freeze({
   id: "schedule-assistant",
   name: "Schedule Assistant",
-  version: "1.3.0",
+  version: "1.4.0",
   kind: "optional",
   parent: "studioflow",
   requires: Object.freeze(["studioflow"]),

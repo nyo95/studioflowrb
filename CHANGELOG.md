@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.217 | 2026-10-23 | fix(studioflow): keep typed Product Schedule Brands (Codex Executor)
+
+- **Scope:** one Brand snapshot rule now preserves typed names on schedule item, option and template creation and editing; Master Data ids still require an active Brand, while edits with the same id retain the stored name.
+- **Assistant contract:** an exact active Master Data name resolves to its id and is identified in the preview result. Other typed names remain usable with `SCHEDULE_BRAND_NOT_IN_MASTER_DATA` and up to five suggestions; unknown or inactive ids remain blocking. The MCP bridge instructions and descriptions, contract and README now explain the choice. Schedule Assistant is 1.4.0; MCP bridge is 1.5.0.
+- **Migration/dependencies:** none. No Master Data writes or UI changes.
+- **Checks:** focused StudioFlow and Assistant integration tests 252/252, MCP bridge tests 22/22; high-tier verification passed (1,326/1,326 tests, typecheck, lint, boundary and legacy scans, production build, whitespace). Server restart recorded in the Executor handoff.
+
 ## R9.216 | 2026-10-23 | plan(studioflow): Product Schedule Brands do not depend on Master Data (Lead)
 
 - **Owner decision:** the Product Schedule is independent; it may take a Brand from Master Data when one exists, but a Brand that is not in Master Data must still be usable (reported when the Assistant refused "Lalapis" for GL-03).

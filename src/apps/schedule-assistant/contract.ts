@@ -11,7 +11,7 @@ const id = z.string().uuid();
 
 export const ScheduleAssistantOptionSchema = z.object({
   brandId: id.nullable().optional(),
-  /** The Brand the brief names, used only to suggest Master Data Brands; never stored. */
+  /** A typed Brand resolves to an exact Master Data name or remains a typed schedule snapshot. */
   brandName: optionalText(160),
   productName: text(200),
   color: optionalText(160),

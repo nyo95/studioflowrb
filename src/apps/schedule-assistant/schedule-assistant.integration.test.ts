@@ -251,7 +251,7 @@ describe("preview", () => {
     assert.deepEqual(await counts(), before);
   });
 
-  it("returns every issue of an invalid batch at once, with indexes and Brand suggestions", async () => {
+  it("returns every blocking issue of an invalid batch at once", async () => {
     const projectId = await newProject("Issues");
     const otherProject = await newProject("Other");
     const foreign = await testDb.prisma.sfScheduleEntry.create({ data: { project_id: otherProject, section: "FIXTURE", category: "Lamp", category_key: "LAMP", prefix: "LA", increment: 1, sort_order: 1 } });
@@ -260,7 +260,7 @@ describe("preview", () => {
     const secret = await tokenFor(designer);
     const before = await counts();
     const result = await preview(secret, projectId, [
-      { op: "create_entry", section: "MATERIAL", category: "Tile", qty: "3", option: { productName: "Granitio", brandName: "Roman" } },
+      { op: "create_entry", section: "MATERIAL", category: "Tile", qty: "3", option: { productName: "Granitio", brandId: randomUUID() } },
       { op: "update_entry", entryId: foreign.id, location: "Lobby" },
       { op: "update_entry", entryId: own.id, location: "Lobby" },
       { op: "update_entry", entryId: own.id, qty: "1.234" },
@@ -269,7 +269,7 @@ describe("preview", () => {
     ]);
     assert.equal(result.status, 200);
     assert.equal(result.body.data.valid, false);
-    const issues = result.body.data.issues as Array<{ index: number; code: string; suggestions?: Array<{ name: string }> }>;
+    const issues = result.body.data.issues as Array<{ index: number; code: string }>;
     assert.deepEqual(issues.map((issue) => [issue.index, issue.code]), [
       [0, "SCHEDULE_QTY_NOT_FOR_MATERIAL"],
       [0, "SCHEDULE_BRAND_NOT_FOUND"],
@@ -279,7 +279,6 @@ describe("preview", () => {
       [4, "SCHEDULE_ENTRY_REF_INVALID"],
       [5, "SCHEDULE_TEMPLATES_FIRST"],
     ]);
-    assert.deepEqual(issues[1].suggestions?.map((suggestion) => suggestion.name), ["Roman Granit"]);
     assert.deepEqual(await counts(), before);
     const shape = await preview(secret, projectId, [{ op: "delete_entry", entryId: own.id }]);
     assert.equal(shape.body.error?.code, "INTEGRATION_BODY_INVALID");
@@ -287,6 +286,45 @@ describe("preview", () => {
 });
 
 describe("apply", () => {
+  it("blocks an inactive Master Data Brand id", async () => {
+    const projectId = await newProject("Inactive Brand");
+    const inactive = await brand("Archived Brand");
+    await testDb.prisma.brand.update({ where: { id: inactive.id }, data: { deleted_at: new Date() } });
+    const secret = await tokenFor(designer);
+    const previewed = (await preview(secret, projectId, [{ op: "create_entry", section: "MATERIAL", category: "Tile", option: { productName: "Tile", brandId: inactive.id } }])).body.data;
+    assert.equal(previewed.valid, false);
+    assert.equal(previewed.issues[0].code, "SCHEDULE_BRAND_NOT_FOUND");
+  });
+
+  it("resolves an exact typed Brand and keeps an unmatched typed Brand after approval", async () => {
+    const projectId = await newProject("Typed Brands");
+    const roman = await brand("Roman Granit");
+    const secret = await tokenFor(designer);
+    const operations = [
+      { op: "create_entry", ref: "stone", section: "MATERIAL", category: "Stone", option: { productName: "Stone A", brandName: " roman granit " } },
+      { op: "create_option", entryRef: "stone", option: { productName: "Stone B", brandName: "Roman" } },
+    ];
+    const previewed = (await preview(secret, projectId, operations)).body.data;
+    assert.equal(previewed.valid, true);
+    assert.deepEqual([previewed.operations[0].brandId, previewed.operations[0].brandResolvedFromName, previewed.operations[0].brandName], [roman.id, true, "Roman Granit"]);
+    assert.deepEqual(previewed.warnings.filter((warning: { code: string }) => warning.code === "SCHEDULE_BRAND_NOT_IN_MASTER_DATA"), [
+      { index: 1, code: "SCHEDULE_BRAND_NOT_IN_MASTER_DATA", message: '"Roman" is not an exact Master Data Brand. Ask whether to use a suggested Brand or keep this typed name, then preview again with that choice.', suggestions: [{ id: roman.id, name: "Roman Granit" }] },
+    ]);
+    const operationId = randomUUID();
+    const applied = await apply(secret, projectId, { operationId, digest: previewed.digest, operations }, operationId);
+    assert.equal(applied.status, 200, JSON.stringify(applied.body));
+    const rows = await testDb.prisma.sfScheduleOption.findMany({ orderBy: { label: "asc" } });
+    assert.deepEqual(rows.map((row) => [row.brand_id, row.brand_name]), [[roman.id, "Roman Granit"], [null, "Roman"]]);
+
+    const patch = [{ op: "update_option", optionId: rows[0].id, patch: { brandName: "Lalapis" } }];
+    const patchPreview = (await preview(secret, projectId, patch)).body.data;
+    assert.equal(patchPreview.valid, true);
+    assert.equal(patchPreview.warnings.some((warning: { code: string }) => warning.code === "SCHEDULE_BRAND_NOT_IN_MASTER_DATA"), true);
+    const patchId = randomUUID();
+    assert.equal((await apply(secret, projectId, { operationId: patchId, digest: patchPreview.digest, operations: patch }, patchId)).status, 200);
+    assert.deepEqual((await testDb.prisma.sfScheduleOption.findUniqueOrThrow({ where: { id: rows[0].id }, select: { brand_id: true, brand_name: true } })), { brand_id: null, brand_name: "Lalapis" });
+  });
+
   it("applies exactly the previewed batch: same codes, never final, Brand snapshot, audited, read back", async () => {
     const projectId = await newProject("Apply");
     const roman = await brand("Roman");

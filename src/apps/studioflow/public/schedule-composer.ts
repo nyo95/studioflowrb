@@ -34,7 +34,7 @@ import {
 
 export type ScheduleComposerOption = {
   brandId?: string | null;
-  /** A Brand named by the brief, only to suggest Master Data Brands; it is never stored. */
+  /** A typed Brand, resolved to an exact Master Data name when possible or stored as typed. */
   brandName?: string | null;
   productName: string;
   color?: string | null;
@@ -92,6 +92,8 @@ export type ScheduleComposerResult = {
   prefix?: string;
   newCategory?: boolean;
   brandName?: string | null;
+  brandId?: string | null;
+  brandResolvedFromName?: boolean;
   changes?: Record<string, { from: unknown; to: unknown }>;
   templatesCreated?: Array<{ code: string; category: string; productName: string | null }>;
 };
@@ -99,6 +101,7 @@ export type ScheduleComposerResult = {
 /** Not blocking: something the user should confirm before applying, e.g. a new category that looks like a studio one. */
 export type ScheduleComposerWarning =
   | { index: number; code: "SCHEDULE_CATEGORY_SIMILAR"; message: string; suggestions: Array<{ category: string; prefix: string | null }> }
+  | { index: number; code: "SCHEDULE_BRAND_NOT_IN_MASTER_DATA"; message: string; suggestions: Array<{ id: string; name: string }> }
   /** WO-SCHEDULE-ASSISTANT-04: an option this batch creates ends without a photo or colour; ask the user first. */
   | { index: number; code: "SCHEDULE_OPTION_NO_IMAGE"; message: string; entryCode?: string; optionLabel?: string };
 
@@ -150,21 +153,23 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
     await loadWritableProject(tx, ctx.projectId);
   }
 
-  async function brandIssue(index: number, op: ScheduleComposerOperation["op"], field: string, option: { brandId?: string | null; brandName?: string | null }): Promise<ScheduleComposerIssue | null> {
+  async function brandIssue(index: number, op: ScheduleComposerOperation["op"], field: string, option: { brandId?: string | null }): Promise<ScheduleComposerIssue | null> {
+    if (!filled(option.brandId) || await ports.masterData.getBrandLibraryRead(option.brandId)) return null;
+    return { index, op, field: `${field}.brandId`, code: "SCHEDULE_BRAND_NOT_FOUND", message: "This Brand is not an active Master Data Brand. Search Brands and choose one, or send a typed Brand name." };
+  }
+
+  async function resolveBrand(option: { brandId?: string | null; brandName?: string | null }) {
     if (filled(option.brandId)) {
-      if (await ports.masterData.getBrandLibraryRead(option.brandId)) return null;
-      return { index, op, field: `${field}.brandId`, code: "SCHEDULE_BRAND_NOT_FOUND", message: "This Brand is not an active Master Data Brand. Search Brands and choose one, or leave the Brand empty." };
+      const read = await ports.masterData.getBrandLibraryRead(option.brandId);
+      if (!read) throw new AppError("VALIDATION", "SCHEDULE_BRAND_NOT_FOUND", "Choose an active Brand.");
+      return { brandId: read.id, brandName: read.name, brandResolvedFromName: false, suggestions: [] as Array<{ id: string; name: string }> };
     }
-    if (!filled(option.brandName)) return null;
-    const matches = await ports.masterData.listBrandLibraryReads({ search: option.brandName.trim() });
-    return {
-      index,
-      op,
-      field: `${field}.brandName`,
-      code: "SCHEDULE_BRAND_NOT_FOUND",
-      message: `"${option.brandName.trim()}" must be chosen from Master Data: send one of the suggested Brand ids, leave the Brand empty, or add the Brand in Master Data first.`,
-      suggestions: matches.slice(0, LIMITS.suggestions).map((brand) => ({ id: brand.id, name: brand.name })),
-    };
+    if (!filled(option.brandName)) return { brandId: null, brandName: null, brandResolvedFromName: false, suggestions: [] as Array<{ id: string; name: string }> };
+    const name = option.brandName.trim();
+    const matches = await ports.masterData.listBrandLibraryReads({ search: name });
+    const exact = matches.filter((brand) => brand.name.trim().toLowerCase() === name.toLowerCase());
+    if (exact.length === 1) return { brandId: exact[0].id, brandName: exact[0].name, brandResolvedFromName: true, suggestions: [] as Array<{ id: string; name: string }> };
+    return { brandId: null, brandName: name, brandResolvedFromName: false, suggestions: matches.slice(0, LIMITS.suggestions).map((brand) => ({ id: brand.id, name: brand.name })) };
   }
 
   function qtyIssues(index: number, op: ScheduleComposerOperation["op"], section: string, input: { qty?: string | null; unit?: string | null }): ScheduleComposerIssue[] {
@@ -284,13 +289,8 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
     return issues;
   }
 
-  async function snapshotOf(option: ScheduleComposerOption): Promise<SnapshotInput> {
-    let brand: { brandId: string | null; brandName: string | null } = { brandId: null, brandName: null };
-    if (filled(option.brandId)) {
-      const read = await ports.masterData.getBrandLibraryRead(option.brandId);
-      if (!read) throw new AppError("VALIDATION", "SCHEDULE_BRAND_NOT_FOUND", "Choose an active Brand.");
-      brand = { brandId: read.id, brandName: read.name };
-    }
+  async function snapshotOf(option: ScheduleComposerOption): Promise<SnapshotInput & { brandResolvedFromName: boolean }> {
+    const brand = await resolveBrand(option);
     return { ...brand, productName: option.productName, color: option.color, pattern: option.pattern, finishing: option.finishing, dimension: option.dimension, notes: option.notes, extra: option.extra ?? [], imageKey: null };
   }
 
@@ -328,7 +328,7 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
             if (operation.ref !== undefined && created.optionId) refOptions.set(operation.ref, created.optionId);
             const facts = await entryFacts(created.entryId);
             const key = `${operation.section}:${normalizeScheduleCategory(operation.category).key}`;
-            results.push({ index, op: operation.op, effect: "create", entryId: created.entryId, entryCode: created.code, optionId: created.optionId ?? undefined, optionLabel: created.label ?? undefined, category: facts.category, prefix: facts.prefix, newCategory: !known.has(key), brandName: snapshot?.brandName ?? null });
+            results.push({ index, op: operation.op, effect: "create", entryId: created.entryId, entryCode: created.code, optionId: created.optionId ?? undefined, optionLabel: created.label ?? undefined, category: facts.category, prefix: facts.prefix, newCategory: !known.has(key), brandName: snapshot?.brandName ?? null, ...(snapshot?.brandResolvedFromName ? { brandId: snapshot.brandId, brandResolvedFromName: true } : {}) });
             known.add(key);
             break;
           }
@@ -349,17 +349,17 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
               : await schedule.writer.reuseOption(tx, { actor: ctx.actor, projectId: ctx.projectId, entryId, sourceOptionId: operation.sourceOptionId, metadata });
             const facts = await entryFacts(created.entryId);
             const brandName = snapshot ? snapshot.brandName : (await tx.sfScheduleOption.findUniqueOrThrow({ where: { id: created.optionId! }, select: { brand_name: true } })).brand_name;
-            results.push({ index, op: operation.op, effect: "create", entryId: created.entryId, entryCode: created.code, optionId: created.optionId ?? undefined, optionLabel: created.label ?? undefined, category: facts.category, prefix: facts.prefix, brandName });
+            results.push({ index, op: operation.op, effect: "create", entryId: created.entryId, entryCode: created.code, optionId: created.optionId ?? undefined, optionLabel: created.label ?? undefined, category: facts.category, prefix: facts.prefix, brandName, ...(snapshot?.brandResolvedFromName ? { brandId: snapshot.brandId, brandResolvedFromName: true } : {}) });
             break;
           }
           case "update_option": {
-            const { brandName: _brief, ...rest } = operation.patch;
-            const patch: OptionPatch = rest;
+            const resolved = operation.patch.brandId !== undefined || operation.patch.brandName !== undefined ? await resolveBrand(operation.patch) : null;
+            const patch: OptionPatch = resolved ? { ...operation.patch, brandId: resolved.brandId, brandName: resolved.brandName } : operation.patch;
             const updated = await schedule.writer.patchOption(tx, { actor: ctx.actor, projectId: ctx.projectId, optionId: operation.optionId, patch, metadata });
             const changed = Object.keys(updated.changes).length > 0;
             const facts = await entryFacts(updated.entryId);
             const brandName = (await tx.sfScheduleOption.findUniqueOrThrow({ where: { id: updated.optionId }, select: { brand_name: true } })).brand_name;
-            results.push({ index, op: operation.op, effect: changed ? "update" : "no_change", entryId: updated.entryId, entryCode: updated.code, optionId: updated.optionId, optionLabel: updated.label, category: facts.category, prefix: facts.prefix, brandName, ...(changed ? { changes: updated.changes } : {}) });
+            results.push({ index, op: operation.op, effect: changed ? "update" : "no_change", entryId: updated.entryId, entryCode: updated.code, optionId: updated.optionId, optionLabel: updated.label, category: facts.category, prefix: facts.prefix, brandName, ...(resolved?.brandResolvedFromName ? { brandId: resolved.brandId, brandResolvedFromName: true } : {}), ...(changed ? { changes: updated.changes } : {}) });
             break;
           }
           case "finalize_option": {
@@ -548,6 +548,18 @@ export function createStudioFlowScheduleComposer(db: PrismaClient, ports: Studio
                   code: "SCHEDULE_CATEGORY_SIMILAR",
                   message: `"${operation.category}" is a new category and would be coded ${result.prefix}; it looks like ${suggestions.map((choice) => `${choice.category}${choice.prefix ? ` (${choice.prefix})` : ""}`).join(" or ")}. Ask the user which one is meant.`,
                   suggestions: suggestions.map(({ category, prefix }) => ({ category, prefix })),
+                });
+              }
+              for (const [index, operation] of ctx.operations.entries()) {
+                const option = operation.op === "create_entry" || operation.op === "create_option" ? operation.option : operation.op === "update_option" ? operation.patch : undefined;
+                if (!option || filled(option.brandId) || !filled(option.brandName)) continue;
+                const brand = await resolveBrand(option);
+                if (brand.brandId) continue;
+                warnings.push({
+                  index,
+                  code: "SCHEDULE_BRAND_NOT_IN_MASTER_DATA",
+                  message: `"${brand.brandName}" is not an exact Master Data Brand. Ask whether to use a suggested Brand or keep this typed name, then preview again with that choice.`,
+                  suggestions: brand.suggestions,
                 });
               }
               // WO-SCHEDULE-ASSISTANT-04: every new option without a photo or colour is a question for the user.

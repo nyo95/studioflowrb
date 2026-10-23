@@ -111,8 +111,10 @@ Keep `"trust": false` so every tool call is confirmed.
 ## How it guards your data
 
 1. **Interview first.** The assistant must confirm the project (and ask when more than
-   one matches), ask what you want, ask for missing facts (Fixture quantities, a Brand
-   that is not in Master Data), summarise the plan, and only then prepare a preview. In
+   one matches), ask what you want, ask for missing facts (Fixture quantities and any
+   Brand the client named), summarise the plan, and only then prepare a preview. A typed
+   Brand can be kept without Master Data; for `SCHEDULE_BRAND_NOT_IN_MASTER_DATA`, ask whether
+   to use a suggested Brand or keep the typed name, then preview again. In
    clients that list MCP prompts, start it with the `susun_jadwal` prompt (for example
    `/mcp__studioflow-schedule__susun_jadwal` in Claude Code).
 2. **Only a preview made here can be applied.** The bridge refuses an apply whose preview

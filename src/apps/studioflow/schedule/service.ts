@@ -64,7 +64,7 @@ const SIGNED_URL_SECONDS = 15 * 60;
 export type ScheduleImageUpload = { body: Uint8Array; contentType: string };
 
 /** Fields a patch may send; `null` clears an optional field, an omitted field keeps its value. */
-export type OptionPatch = Partial<Pick<SnapshotInput, "brandId" | "productName" | "color" | "pattern" | "finishing" | "dimension" | "contact" | "notes" | "extra">>;
+export type OptionPatch = Partial<Pick<SnapshotInput, "brandId" | "brandName" | "productName" | "color" | "pattern" | "finishing" | "dimension" | "contact" | "notes" | "extra">>;
 
 /** Template item fields an operator may edit; the photo is managed by its own command. */
 export type TemplateItemInput = {
@@ -115,9 +115,10 @@ function templateItemData(snapshot: ReturnType<typeof cleanSnapshot>) {
   };
 }
 
-async function brandSnapshot(ports: StudioFlowPorts, brandId?: string | null): Promise<{ brandId: string | null; brandName: string | null }> {
-  const id = optionalText(brandId, 80);
-  if (!id) return { brandId: null, brandName: null };
+async function brandSnapshot(ports: StudioFlowPorts, input: Pick<SnapshotInput, "brandId" | "brandName">, stored?: { brandId: string | null; brandName: string | null }): Promise<{ brandId: string | null; brandName: string | null }> {
+  const id = optionalText(input.brandId, 80);
+  if (!id) return { brandId: null, brandName: optionalText(input.brandName, 160) };
+  if (stored?.brandId === id) return stored;
   const brand = await ports.masterData.getBrandLibraryRead(id);
   if (!brand) throw invalid("SCHEDULE_BRAND_NOT_FOUND", "Choose an active Brand.");
   return { brandId: brand.id, brandName: brand.name };
@@ -399,11 +400,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
      */
     async updateOption(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; optionId: string; snapshot: SnapshotInput; metadata?: Record<string, unknown> }) {
       const option = await loadOption(tx, input.projectId, input.optionId, true);
-      const brand = input.snapshot.brandId && input.snapshot.brandId === option.brand_id
-        ? { brandId: option.brand_id, brandName: option.brand_name }
-        : input.snapshot.brandId
-          ? await brandSnapshot(ports, input.snapshot.brandId)
-          : { brandId: null, brandName: input.snapshot.brandName ?? null };
+      const brand = await brandSnapshot(ports, input.snapshot, { brandId: option.brand_id, brandName: option.brand_name });
       const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: option.image_key });
       const next = optionData(snapshot);
       const changes: Record<string, { from: unknown; to: unknown }> = {};
@@ -427,10 +424,10 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
     async patchOption(tx: TxClient, input: { actor: CommandContext["actor"]; projectId: string; optionId: string; patch: OptionPatch; metadata?: Record<string, unknown> }) {
       const option = await loadOption(tx, input.projectId, input.optionId, false);
       const sent = (key: keyof OptionPatch) => input.patch[key] !== undefined;
-      const text = (key: Exclude<keyof OptionPatch, "brandId" | "extra">, stored: string | null) => (sent(key) ? (input.patch[key] as string | null) : stored);
+      const text = (key: Exclude<keyof OptionPatch, "brandId" | "brandName" | "extra">, stored: string | null) => (sent(key) ? (input.patch[key] as string | null) : stored);
       const snapshot: SnapshotInput = {
-        brandId: sent("brandId") ? input.patch.brandId ?? null : option.brand_id,
-        brandName: sent("brandId") ? null : option.brand_name,
+        brandId: sent("brandId") ? input.patch.brandId ?? null : sent("brandName") ? null : option.brand_id,
+        brandName: sent("brandName") ? input.patch.brandName ?? null : sent("brandId") ? null : option.brand_name,
         productName: text("productName", option.product_name) ?? "",
         color: text("color", option.color),
         pattern: text("pattern", option.pattern),
@@ -664,7 +661,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.settingsManage);
       const section = sectionOf(input.section);
       const category = categoryOf(input.category);
-      const brand = await brandSnapshot(ports, input.snapshot.brandId);
+      const brand = await brandSnapshot(ports, input.snapshot);
       const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: null }, { requireProductName: false });
       return runTransaction(async (tx) => {
         const item = await insertTemplateItem(tx, {
@@ -686,11 +683,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       requireCommand(input, P.settingsManage);
       const current = await db.sfScheduleTemplateItem.findUnique({ where: { id: input.templateItemId } });
       if (!current) throw notFound("schedule template");
-      const brand = input.snapshot.brandId && input.snapshot.brandId === current.brand_id
-        ? { brandId: current.brand_id, brandName: current.brand_name }
-        : input.snapshot.brandId
-          ? await brandSnapshot(ports, input.snapshot.brandId)
-          : { brandId: null, brandName: input.snapshot.brandName ?? null };
+      const brand = await brandSnapshot(ports, input.snapshot, { brandId: current.brand_id, brandName: current.brand_name });
       const snapshot = cleanSnapshot({ ...input.snapshot, ...brand, imageKey: current.image_key }, { requireProductName: false });
       const next = {
         ...templateItemData(snapshot),
@@ -802,7 +795,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       await requireScheduleCommand(input);
       sectionOf(input.section);
       categoryOf(input.category);
-      const brand = input.snapshot ? await brandSnapshot(ports, input.snapshot.brandId) : { brandId: null, brandName: null };
+      const brand = input.snapshot ? await brandSnapshot(ports, input.snapshot) : { brandId: null, brandName: null };
       return runTransaction(async (tx) => {
         const created = await writer.createEntry(tx, { ...input, snapshot: input.snapshot ? { ...input.snapshot, ...brand, imageKey: null } : null });
         return { entryId: created.entryId };
@@ -966,7 +959,7 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
 
     async createOption(input: CommandContext & { projectId: string; entryId: string; snapshot: SnapshotInput }) {
       await requireScheduleCommand(input);
-      const brand = await brandSnapshot(ports, input.snapshot.brandId);
+      const brand = await brandSnapshot(ports, input.snapshot);
       const snapshot = { ...input.snapshot, ...brand, imageKey: null };
       cleanSnapshot(snapshot);
       return runTransaction(async (tx) => {
