@@ -1,8 +1,8 @@
 # Project book (Notes v3) — Decision Record
 
 Status: ACCEPTED (owner, 2026-10-23; recorded by the Lead in R9.239).
-Scope: StudioFlow project notes, client feedback, to-dos, material tries, discussion, the Ideas module and the
-Workspace board. UI direction: `DESIGN.md` §6.2 and §6.3; mockup https://claude.ai/artifact/5sChwEHLG1ta1wmzTpDcBS
+Scope: StudioFlow project notes, client feedback, to-dos, material tries, discussion, the Ideas module (switched
+off) and the Workspace board. UI direction: `DESIGN.md` §6.2 and §6.3; mockup https://claude.ai/artifact/5sChwEHLG1ta1wmzTpDcBS
 (v2 artboards).
 
 ## Why
@@ -31,18 +31,27 @@ own working tools.
 6. **An invited member** may open that project's page (head, stage strip, the book) and read and write the book;
    the invitation grants no phase, schedule, MOM or presentation edit. Invitations are audited and removable by a
    PIC.
-7. **Material tries** replace Ideas: per project, image-first, status try / promoted / discarded. **Promote** creates
+7. **Material tries** take over Ideas' role: per project, image-first, status try / promoted / discarded. **Promote** creates
    the Schedule item or option (it gets its code only then). SketchUp sends materials here first (the SketchUp
    contract, WO-SKETCHUP-02/03, is revised accordingly before it is built further).
 8. **"Use in schedule" on a note image** moves out of Ideas into StudioFlow, for book readers who may edit the
    Schedule.
 9. **Discussion** threads attach to a to-do, a feedback point or a material try. `@person` notifies through the
    existing in-app notifications; `#code` keeps linking Schedule items.
-10. **Ideas is removed** from the product: back up its data first, then drop its module, schema, actions and the
-    "Save to Ideas" / "Add to moodboard from Ideas" entry points.
+10. **Ideas is switched off, not removed** (owner, 2026-10-23, amended the same day): the Developer turns the
+    `ideas` module Off; its data, schema and code stay untouched, and every Ideas entry point behaves as it does
+    for a module that is Off. Deleting it is a later, separate owner decision once the Project book has proven
+    itself.
 11. **Not a new module.** The Project book is the rework of existing StudioFlow Notes and Checklist, which live in
     the `studioflow` schema and are bound to phases and the Schedule; it stays inside StudioFlow (EXTEND), recorded
     here as the deliberate exception to "every new capability is born as a module".
+
+## Branch (owner, 2026-10-23)
+
+All Project book work happens on the branch **`feat/project-book`**, cut from `main` at R9.235 (the version the
+owner runs). `main` receives nothing from this program until the owner has tried the branch and explicitly asks for
+the merge. Revisions on the branch continue the ledger (R9.236 onward); every Executor and Lead session checks out
+`feat/project-book`, commits there, and pushes only that branch when the owner asks.
 
 ## Program (one Work Order each; backend by Codex, then the Lead's UI)
 
@@ -53,6 +62,6 @@ own working tools.
 | WO-SF-BOOK-03 | Feedback composer: points, point → to-do, handled count; round answered from the book | planned |
 | WO-SF-BOOK-04 | Material tries: kind, status, promote to Schedule, discard | planned |
 | WO-SF-BOOK-05 | Discussion anchors and `@person` notifications | planned |
-| WO-SF-BOOK-06 | Remove Ideas (backup, drop, entry points) and retire the Workspace board | planned |
+| WO-SF-BOOK-06 | Ideas Off (verify every entry point hides; no deletion) and retire the Workspace board | planned |
 | WO-SKETCHUP-04 | SketchUp sends materials as tries; promote allocates the code | planned |
 | Lead UI | UI Engine `MaterialTile`, `TypedComposer`, `ProgressRing`; the Project page and Home per §6.3, one UI revision after each backend slice | planned |

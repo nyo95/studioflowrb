@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.240 | 2026-10-23 | plan(studioflow): Project book on its own branch; Ideas switched off, not deleted (Lead)
+
+- **Owner decision:** all Project book work happens on `feat/project-book`, cut from `main` at R9.235 (the running version); `main` gets it only when the owner asks after trying the branch. Ideas is switched off by the Developer, not deleted.
+- **Change:** R9.236-R9.239 moved from local `main` to `feat/project-book` (they were never pushed; `main` is back at R9.235). `PROJECT-BOOK-DECISION.md` gains "Branch" and amends decision 10 and BOOK-06; `PLAN.md` targets Codex R9.241 / Lead R9.242 on the branch with a cloud Executor prompt; `BACKLOG.md` entry updated.
+- **Migration/dependencies:** none.
+- **Checks:** docs only; `git diff --check`.
+
 ## R9.239 | 2026-10-23 | plan(studioflow): Project book decision, DESIGN.md v2.1 and WO-SF-BOOK-01 (Lead)
 
 - **Owner decision:** Notes become a private Project book per project (to-dos, client feedback, material tries, discussion, free notes; no phase bookkeeping), Ideas is removed, the Workspace board retired, SketchUp sends material tries; the owner approved the v2 mockup and the design amendments.
