@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.236 | 2026-10-23 | docs(backlog): record the Schedule service split rule and raise backup/restore to P1 (Lead)
+
+- **Owner decision:** after the Lead reviewed an external refactor audit of R9.235, the owner asked to record both outcomes.
+- **Change:** `docs/BACKLOG.md` gains a `[CLEANUP][P2]` entry to split `schedule/service.ts` by responsibility only when touched, keeping its public surface and rules, leaving the Schedule Composer alone until its acceptance closes, and requiring measurement before any performance refactor. PostgreSQL/file-storage backup with a restore drill moves out of the P3 hardening entry into its own `[PLANNED][P1]` entry, with installation/hand-over docs.
+- **Migration/dependencies:** none. No code changed.
+- **Checks:** docs only; `git diff --check`.
+
 ## R9.235 | 2026-10-23 | ui(studioflow): the List row open in the inspector has its own mark (Lead)
 
 - **Owner report:** after editing GL-04's Location and pressing Enter, the row stayed gray "like a selection or highlight" until reload.

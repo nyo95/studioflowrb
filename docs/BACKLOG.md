@@ -140,8 +140,13 @@ Order matters; each item is its own Work Order.
   test dependency, which needs an owner decision.
 - [ ] [PLANNED][P3] Platform hardening from the 2026-10-02 external audit,
   owner call: a required CI (typecheck, boundaries, tests, build) once a remote
-  runs it; PostgreSQL and file-storage backup with a restore drill on a clean
-  machine; split `phases/service.ts` by responsibility.
+  runs it; split `phases/service.ts` by responsibility. (Backup/restore moved to
+  its own P1 entry below, owner 2026-10-23.)
+- [ ] [PLANNED][P1] **Backup and restore with a drill (owner, 2026-10-23,
+  raised from the P3 hardening entry).** PostgreSQL plus file-storage backup and
+  a restore drill on a clean machine, with installation and hand-over
+  documentation. Reason: hand-over/sale value outweighs tidying working code;
+  WO-DEVELOPER-02's pre-upgrade backup should reuse it, not duplicate it.
 - [ ] [PLANNED] Personal start page (owner approved, 2026-10-06): `UserPreference.start_page`
   is stored and validated but nothing applies it and My preferences does not
   offer it. Theme shipped in R8.374.
@@ -246,6 +251,7 @@ State on 2026-10-14 (audit and redesign, Lead + Executor; commits R8.543, R8.545
 
 - [ ] [UNVERIFIED][P1] **Notes/Workspace assignment-read correction implemented in R9.134; independent browser acceptance remains.** The service now requires caller identity and reuses `requireWorkSectionAccess` before reading cards, threads, tags, item-linked notes or signing asset URLs; server actions/components propagate the authenticated user. Real disposable-database regressions pass for an outsider refusal and retained Designer, Drafter and manager access, while Schedule-derived `searchNoteItems` remains readable. Focused StudioFlow integration passed 226/226 and action transport passed 7/7. After the BQ fixture correction in R9.135, the full high gate passed all 1,235 tests, typecheck/lint, boundary scans, Prisma generation and production build. Close after independent affected-flow browser review.
 
+- [ ] [CLEANUP][P2] Split `schedule/service.ts` (~1,330 lines; one `createScheduleService` factory, 6 callers) by responsibility (item/option, codes and ordering, samples/photos) **only when a bug or feature already touches it**, one slice at a time. Keep the factory's public surface and every business rule unchanged. Do not touch `public/schedule-composer.ts` (MCP preview/validate/apply, transaction and validation order) until WO-SCHEDULE-ASSISTANT-01/02 acceptance closes. Schedule UI files (board, entry panel) stay as split in R9.229. No performance refactor without measurement first (100–300 items: open time, inspector save, query count, row-select rerender). Source: external audit reviewed by the Lead, 2026-10-23.
 - [ ] [CLEANUP][P3] Copy drift seen in the R9.87 walk: the phase More menu still says "Round history (N)" beside "iteration" everywhere else; the Notes stale-edit refusal says "Someone changed this **card**" for a note; a Supervision phase with no open visit shows "Current iteration · Prepare this iteration, then send it to the client."; after the last phase is closed the phase bar falls back to Moodboard's state.
 - [ ] [PLANNED] Owner decision: R8.249 built a per-person **start page** preference and a **Storage usage** report (backend `storageUsage` in `@platform/runtime`), but neither has a screen (the Storage action was removed as unused). Decide whether to add them to My preferences / Platform settings or remove the backend.
 
