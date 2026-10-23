@@ -15,6 +15,8 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+
+import { titleCaseWords } from "@platform/utilities/text-case";
 import {
   SCHEDULE_CARD_FIELD_LABEL as CARD_FIELD_LABEL,
   SCHEDULE_EXTRA_LABEL_MAX,
@@ -304,11 +306,18 @@ export function EntryPanelContent({
     : sample.status === "RECEIVED" ? `Sample received${sample.receivedNote ? `: ${sample.receivedNote}` : ""}`
     : `Sample declined${sample.declineReason ? `: ${sample.declineReason}` : ""}`;
 
-  const specRows: Array<{ key: string; label: string; value: string; placeholder: string; maxLength: number; onChange: (value: string) => void }> = [
-    { key: "color", label: CARD_FIELD_LABEL.color, value: draft.color, placeholder: "Add", maxLength: 160, onChange: (value) => updateDraft({ color: value }) },
-    { key: "pattern", label: CARD_FIELD_LABEL.pattern, value: draft.pattern, placeholder: "Add", maxLength: 160, onChange: (value) => updateDraft({ pattern: value }) },
-    { key: "finishing", label: CARD_FIELD_LABEL.finishing, value: draft.finishing, placeholder: "Add", maxLength: 160, onChange: (value) => updateDraft({ finishing: value }) },
-    { key: "dimension", label: "Size", value: draft.dimension, placeholder: "e.g. 60 × 60 cm", maxLength: 160, onChange: (value) => updateDraft({ dimension: value }) },
+  // Names and descriptions get Title Case when the field is left (owner, 2026-10-23; the studio's text-case rule of
+  // 2026-10-01): the first letter of each word is raised and the rest kept, so codes such as "90RR 41/258" survive.
+  // Size, Qty/Unit and Notes keep what was typed.
+  const titled = (value: string, apply: (next: string) => void) => {
+    const next = titleCaseWords(value);
+    if (next !== value) apply(next);
+  };
+  const specRows: Array<{ key: string; label: string; value: string; placeholder: string; maxLength: number; titleCase: boolean; onChange: (value: string) => void }> = [
+    { key: "color", label: CARD_FIELD_LABEL.color, value: draft.color, placeholder: "Add", maxLength: 160, titleCase: true, onChange: (value) => updateDraft({ color: value }) },
+    { key: "pattern", label: CARD_FIELD_LABEL.pattern, value: draft.pattern, placeholder: "Add", maxLength: 160, titleCase: true, onChange: (value) => updateDraft({ pattern: value }) },
+    { key: "finishing", label: CARD_FIELD_LABEL.finishing, value: draft.finishing, placeholder: "Add", maxLength: 160, titleCase: true, onChange: (value) => updateDraft({ finishing: value }) },
+    { key: "dimension", label: "Size", value: draft.dimension, placeholder: "e.g. 60 × 60 cm", maxLength: 160, titleCase: false, onChange: (value) => updateDraft({ dimension: value }) },
   ];
   const ROW = "flex min-h-9 items-center gap-2 border-t border-line-subtle";
   const ROW_LABEL = "w-20 shrink-0 text-xs text-ink-secondary";
@@ -319,7 +328,7 @@ export function EntryPanelContent({
     <>
       <label className={ROW}>
         <span className={ROW_LABEL}>Location</span>
-        <input value={fields.location} onChange={(event) => setFields({ ...fields, location: event.target.value })} disabled={disabled} maxLength={160} placeholder="Where it goes" className={ROW_INPUT} />
+        <input value={fields.location} onChange={(event) => setFields({ ...fields, location: event.target.value })} onBlur={() => titled(fields.location, (location) => setFields({ ...fields, location }))} disabled={disabled} maxLength={160} placeholder="Where it goes" className={ROW_INPUT} />
       </label>
       {/* Qty only for Fixture — a Material line is specified, not counted (owner decision 2026-09-23). */}
       {entry.section === "FIXTURE" ? (
@@ -363,6 +372,7 @@ export function EntryPanelContent({
             aria-label="Type"
             value={draft.productName}
             onChange={(event) => updateDraft({ productName: event.target.value })}
+            onBlur={() => titled(draft.productName, (productName) => updateDraft({ productName }))}
             disabled={disabled}
             maxLength={200}
             placeholder="e.g. Nude Pro - ATS 1132 M"
@@ -376,7 +386,7 @@ export function EntryPanelContent({
             options={brandSearchOptions}
             value={draft.brandId || draft.brandName}
             onValueChange={handleBrandChange}
-            onCreate={(text) => text}
+            onCreate={(text) => titleCaseWords(text)}
             createLabel={(text) => `Use "${text}" (not in Master Data)`}
             placeholder="Search or type a brand"
             searchPlaceholder="Search brands…"
@@ -404,7 +414,7 @@ export function EntryPanelContent({
             options={contactOptions}
             value={draft.contact}
             onValueChange={(next) => updateDraft({ contact: next.slice(0, 160) })}
-            onCreate={(text) => text}
+            onCreate={(text) => titleCaseWords(text)}
             createLabel={(text) => `Use "${text}"`}
             placeholder={fromMasterData.length ? "Choose a contact or type one" : "Name (Title) - phone"}
             searchPlaceholder="Search or type a contact…"
@@ -526,7 +536,7 @@ export function EntryPanelContent({
               {specRows.map((row) => (
                 <label key={row.key} className={ROW}>
                   <span className={ROW_LABEL}>{row.label}</span>
-                  <input value={row.value} onChange={(event) => row.onChange(event.target.value)} disabled={disabled} maxLength={row.maxLength} placeholder={row.placeholder} className={ROW_INPUT} />
+                  <input value={row.value} onChange={(event) => row.onChange(event.target.value)} onBlur={() => { if (row.titleCase) titled(row.value, row.onChange); }} disabled={disabled} maxLength={row.maxLength} placeholder={row.placeholder} className={ROW_INPUT} />
                 </label>
               ))}
               {itemRows}
@@ -534,8 +544,8 @@ export function EntryPanelContent({
                 const setExtra = (patch: Partial<ScheduleExtraField>) => updateDraft({ extra: draft.extra.map((field, position) => (position === index ? { ...field, ...patch } : field)) });
                 return (
                   <div key={index} className={ROW}>
-                    <input aria-label={`Spec label ${index + 1}`} value={extra.label} onChange={(event) => setExtra({ label: event.target.value })} disabled={disabled} maxLength={SCHEDULE_EXTRA_LABEL_MAX} placeholder="Label" className={`${ROW_INPUT} !flex-none w-20 !px-0 text-xs !text-ink-secondary`} />
-                    <input aria-label={extra.label || `Spec value ${index + 1}`} value={extra.value} onChange={(event) => setExtra({ value: event.target.value })} disabled={disabled} maxLength={SCHEDULE_EXTRA_VALUE_MAX} placeholder="Value" className={ROW_INPUT} />
+                    <input aria-label={`Spec label ${index + 1}`} value={extra.label} onChange={(event) => setExtra({ label: event.target.value })} onBlur={() => titled(extra.label, (label) => setExtra({ label }))} disabled={disabled} maxLength={SCHEDULE_EXTRA_LABEL_MAX} placeholder="Label" className={`${ROW_INPUT} !flex-none w-20 !px-0 text-xs !text-ink-secondary`} />
+                    <input aria-label={extra.label || `Spec value ${index + 1}`} value={extra.value} onChange={(event) => setExtra({ value: event.target.value })} onBlur={() => titled(extra.value, (value) => setExtra({ value }))} disabled={disabled} maxLength={SCHEDULE_EXTRA_VALUE_MAX} placeholder="Value" className={ROW_INPUT} />
                     <IconButton size="sm" variant="ghost" label={`Remove ${extra.label || `spec ${index + 1}`}`} icon={<X aria-hidden="true" />} disabled={disabled} onClick={() => updateDraft({ extra: draft.extra.filter((_, position) => position !== index) })} className="!h-7 !min-h-7 !w-7" />
                   </div>
                 );

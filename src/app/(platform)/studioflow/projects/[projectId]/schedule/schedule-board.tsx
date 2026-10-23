@@ -659,7 +659,7 @@ export function ScheduleBoard({
                                   listDrag.end();
                                 }}
                                 style={rowHighlightStyle(entry.highlight)}
-                                className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${entry.hidden ? "opacity-55" : ""} ${canEdit && listManual ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
+                                className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${selecting && selectedIds.has(entry.id) ? "outline-2 outline-offset-[-2px] outline-line-focus" : ""} ${entry.hidden ? "opacity-55" : ""} ${canEdit && listManual ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
                               >
                                 {selecting ? <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => toggleSelected(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} /> : null}
                                 <button type="button" onClick={() => (selecting ? toggleSelected(entry.id) : openEntry(entry.id))} className="flex min-w-0 flex-1 items-center gap-3 text-left">

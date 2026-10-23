@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.233 | 2026-10-23 | ui(studioflow): Title Case on schedule names and descriptions; selected List rows outlined (Lead)
+
+- **Owner request:** every word starts with a capital ("Beige muda" -> "Beige Muda"), following the studio's text-case rule of 2026-10-01 (names and titles in Title Case, applied when the field is left; codes, notes and units untouched).
+- **Change:** the inspector and Add item apply `titleCaseWords` (first letter of each word raised, the rest kept, so "90RR 41/258" and "SLS - 151" survive) when leaving Type, Color, Pattern, Finishing, Location and extra spec labels and values; a typed Brand or Contact gets it when chosen. Size, Qty/Unit and Notes keep what was typed. It only tidies the draft; nothing is written until Save. Existing data is not rewritten.
+- **Owner report:** while selecting, a highlighted (gray) row looked the same as a selected one. Selected List rows now carry an outline that shows over any highlight.
+- **Tests:** the "no blur writes" check now asserts that no server action runs on blur; the typed-Brand check expects Title Case.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, eslint, schedule regression 49/49, full suite run (2 intent-changed checks updated).
+
 ## R9.232 | 2026-10-23 | fix(studioflow): a removed highlight no longer stays until reload; Enter saves the inspector (Lead)
 
 - **Owner report:** removing a highlight sometimes left the colour on screen until the page was reloaded.

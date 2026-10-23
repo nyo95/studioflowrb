@@ -2,6 +2,8 @@
 
 import { History } from "lucide-react";
 import { useState } from "react";
+
+import { titleCaseWords } from "@platform/utilities/text-case";
 import { specLine, type ScheduleExtraField } from "@/apps/studioflow/domain/schedule";
 import {
   Button,
@@ -153,7 +155,7 @@ export function AddItemDrawer({ projectId, section, categoriesBySection, categor
             <Text weight="semibold">Item details</Text>
             <Text size="sm" tone="tertiary">The product, photo and notes come from the past project. Edit them on the card after saving.</Text>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Location"><Input value={qty.location} onChange={(event) => setQty({ ...qty, location: event.target.value })} maxLength={160} /></Field>
+              <Field label="Location"><Input textCase="title" value={qty.location} onChange={(event) => setQty({ ...qty, location: event.target.value })} maxLength={160} /></Field>
               {isFixture ? <Field label="Qty and unit"><div className="grid grid-cols-2 gap-2"><Input aria-label="Qty" inputMode="decimal" value={qty.qty} onChange={(event) => setQty({ ...qty, qty: event.target.value })} maxLength={20} /><Input aria-label="Unit" value={qty.unit} onChange={(event) => setQty({ ...qty, unit: event.target.value })} maxLength={40} placeholder="Unit" /></div></Field> : null}
             </div>
           </div>
@@ -161,13 +163,13 @@ export function AddItemDrawer({ projectId, section, categoriesBySection, categor
         <div className="grid gap-3 border-t border-line-subtle pt-4">
           <Text weight="semibold">Product</Text>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Type"><Input value={product.productName} onChange={setProductField("productName")} maxLength={200} placeholder="Type, or leave every product field empty to reserve" /></Field>
-            <Field label="Brand"><CreatableSearch label="Brand" options={brandOptions} value={product.brandId || product.brandName} onValueChange={(next) => setProduct(brands.some((brand) => brand.id === next) ? { ...product, brandId: next, brandName: "" } : { ...product, brandId: "", brandName: next })} onCreate={(text) => text} createLabel={(text) => `Use "${text}" (not in Master Data)`} placeholder="Pick or type a brand" searchPlaceholder="Search brands…" emptyLabel="No brands found" allowClear className="w-full" /></Field>
-            <Field label="Color"><Input value={product.color} onChange={setProductField("color")} maxLength={160} /></Field>
-            <Field label="Pattern"><Input value={product.pattern} onChange={setProductField("pattern")} maxLength={160} /></Field>
-            <Field label="Finishing"><Input value={product.finishing} onChange={setProductField("finishing")} maxLength={160} /></Field>
+            <Field label="Type"><Input textCase="title" value={product.productName} onChange={setProductField("productName")} maxLength={200} placeholder="Type, or leave every product field empty to reserve" /></Field>
+            <Field label="Brand"><CreatableSearch label="Brand" options={brandOptions} value={product.brandId || product.brandName} onValueChange={(next) => setProduct(brands.some((brand) => brand.id === next) ? { ...product, brandId: next, brandName: "" } : { ...product, brandId: "", brandName: next })} onCreate={(text) => titleCaseWords(text)} createLabel={(text) => `Use "${text}" (not in Master Data)`} placeholder="Pick or type a brand" searchPlaceholder="Search brands…" emptyLabel="No brands found" allowClear className="w-full" /></Field>
+            <Field label="Color"><Input textCase="title" value={product.color} onChange={setProductField("color")} maxLength={160} /></Field>
+            <Field label="Pattern"><Input textCase="title" value={product.pattern} onChange={setProductField("pattern")} maxLength={160} /></Field>
+            <Field label="Finishing"><Input textCase="title" value={product.finishing} onChange={setProductField("finishing")} maxLength={160} /></Field>
             <Field label="Size"><Input value={product.dimension} onChange={setProductField("dimension")} maxLength={160} /></Field>
-            <Field label="Location"><Input value={qty.location} onChange={(event) => setQty({ ...qty, location: event.target.value })} maxLength={160} /></Field>
+            <Field label="Location"><Input textCase="title" value={qty.location} onChange={(event) => setQty({ ...qty, location: event.target.value })} maxLength={160} /></Field>
             {isFixture ? <Field label="Qty"><div className="grid grid-cols-2 gap-2"><Input aria-label="Qty" inputMode="decimal" value={qty.qty} onChange={(event) => setQty({ ...qty, qty: event.target.value })} maxLength={20} /><Input aria-label="Unit" value={qty.unit} onChange={(event) => setQty({ ...qty, unit: event.target.value })} maxLength={40} placeholder="Unit" /></div></Field> : null}
           </div>
           <ExtraFieldsEditor value={product.extra} onChange={(extra) => setProduct({ ...product, extra })} />

@@ -108,7 +108,8 @@ describe("WO-SF-SCHED-RELAYOUT-01 one drawer editor", () => {
     assert.match(scheduleBoard, /onClick=\{discardDraft\}/);
     assert.match(scheduleBoard, /onClick=\{\(\) => void saveAll\(\)/);
     const panel = scheduleBoard.slice(scheduleBoard.indexOf("function EntryPanelContent"), scheduleBoard.indexOf("function EntryDrawer"));
-    assert.doesNotMatch(panel, /onBlur=/);
+    // Leaving a field may tidy the draft (Title Case, R9.233) but never writes: no server action runs on blur.
+    for (const handler of panel.match(/onBlur=\{[^\n]*/g) ?? []) assert.doesNotMatch(handler, /Action\(|\brun\(/, handler);
   });
   it("prompts before close, navigation and section changes", () => {
     assert.match(scheduleBoard, /const askDiscard = async/);
@@ -133,7 +134,7 @@ describe("Schedule field rules survive the relayout", () => {
   });
   it("Brand remains one CreatableSearch with no Master Data write", () => {
     assert.match(scheduleBoard, /<CreatableSearch/);
-    assert.match(scheduleBoard, /onCreate=\{\(text\) => text\}/);
+    assert.match(scheduleBoard, /onCreate=\{\(text\) => titleCaseWords\(text\)\}/, "a typed Brand is kept as typed, in Title Case");
     assert.doesNotMatch(scheduleBoard, /masterData\.(create|insert|upsert)/i);
   });
   it("Notes still uses SimpleTextEditor", () => {
@@ -294,5 +295,19 @@ describe("Enter saves the inspector from a one-line field", () => {
     assert.match(scheduleBoard, /if \(event\.key !== "Enter" \|\| event\.shiftKey \|\| event\.nativeEvent\.isComposing \|\| target\.tagName !== "INPUT"\) return;/);
     assert.match(scheduleBoard, /if \(!event\.currentTarget\.contains\(target\) \|\| target\.getAttribute\("role"\) === "combobox"/);
     assert.match(scheduleBoard, /if \(!canEdit \|\| savePending \|\| !isDirty \|\| optionNeedsType\) return;/);
+  });
+});
+
+describe("Title Case on names and descriptions; selected rows stand out", () => {
+  it("raises the first letter of each word when a name or description field is left, not Size, Qty or Notes", () => {
+    assert.match(scheduleBoard, /onBlur=\{\(\) => titled\(draft\.productName,/);
+    assert.match(scheduleBoard, /key: "color",[^\n]*titleCase: true/);
+    assert.match(scheduleBoard, /key: "dimension",[^\n]*titleCase: false/);
+    assert.match(scheduleBoard, /onBlur=\{\(\) => titled\(fields\.location,/);
+    assert.match(scheduleBoard, /onCreate=\{\(text\) => titleCaseWords\(text\)\}/);
+    assert.match(scheduleBoard, /<Input textCase="title" value=\{product\.productName\}/);
+  });
+  it("outlines a selected List row so it shows even on a highlighted row", () => {
+    assert.match(scheduleBoard, /\$\{selecting && selectedIds\.has\(entry\.id\) \? "outline-2 outline-offset-\[-2px\] outline-line-focus" : ""\}/);
   });
 });
