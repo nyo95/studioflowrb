@@ -184,3 +184,12 @@ describe("List is the default view with the Board's right-click menu", () => {
     assert.match(scheduleBoard, /<RowActionMenu label=\{`Actions for \$\{entry\.code\}`\} pending=\{busy\} items=\{rowItems\} \/>/);
   });
 });
+
+describe("Copy for the studio sheet", () => {
+  it("copies rows in the sheet's column order with an empty IMAGE cell, and photos separately", () => {
+    assert.match(scheduleBoard, /const row = \[entry\.code, entry\.category, shown\?\.brandName \?\? "", shown\?\.productName \?\? "", shown \? initialsOf\(shown\) : "", "", entry\.location \?\? "", shown\?\.contact \?\? ""\];/);
+    assert.match(scheduleBoard, /label: "Copy row"/);
+    assert.match(scheduleBoard, /label: "Copy image"/);
+    assert.match(scheduleBoard, /onCopy=\{\(\) => void copyRows\(/);
+  });
+});

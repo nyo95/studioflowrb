@@ -1,4 +1,5 @@
 export * from "./actions";
+export * from "./clipboard";
 export * from "./copy-button";
 export * from "./combobox";
 export * from "./creatable-multi-select";

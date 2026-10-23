@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.210 | 2026-10-23 | feat(studioflow): copy Product Schedule rows and photos for the studio sheet (Lead)
+
+- **Owner request:** the studio still keeps its Google Sheet by hand alongside the app; copying an item should drop straight into it, photo included.
+- **Rows:** "Copy row" in each List row's ... and right-click menu, plus "Copy N items" for a selection (inspector panel and the narrow bulk bar), copies tab-separated text in the sheet's column order: CODE, MATERIAL TYPE, EX, TYPE, INITIALS TYPE, IMAGE, LOCATION, CONTACT (Fixture adds QTY, UNIT). The IMAGE cell is left empty.
+- **Photos:** a spreadsheet cannot fetch the app's private, short-lived photo links, so "Copy image" copies the photo itself (as PNG) to paste into that IMAGE cell. It needs https or localhost; the item only appears where the browser allows it.
+- **UI Engine:** new shared `writeClipboardText` (falls back to the legacy copy command on plain-http addresses), `writeClipboardImage`, `canWriteClipboardImage` and `toSpreadsheetText`; `CopyButton` now uses `writeClipboardText`.
+- **Access:** copying needs no edit right; the row menu now also shows Open and Copy to read-only viewers.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, eslint (UI Engine + schedule board), boundary check, UI Engine, clipboard and schedule regression tests 96/96. Browser paste into Google Sheets is the owner's check.
+
 ## R9.209 | 2026-10-23 | ui(studioflow): Product Schedule opens on List, rows right-click like the Board (Lead)
 
 - **Owner request:** the Schedule opens on List by default (Board stays one click away), and right-clicking a List row opens the item's action menu instead of the browser menu, as on Board cards.

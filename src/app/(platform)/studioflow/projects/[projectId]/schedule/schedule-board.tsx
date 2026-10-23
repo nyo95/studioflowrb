@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, ChevronRight, ClipboardPaste, Eye, EyeOff, History, ImageIcon, LayoutGrid, Package, Palette, Plus, Printer, Search, SquareCheck, Trash2, Upload, X } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Check, ChevronDown, ChevronRight, ClipboardPaste, Copy, Eye, EyeOff, History, ImageIcon, LayoutGrid, Package, Palette, Plus, Printer, Search, SquareCheck, Trash2, Upload, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -53,6 +53,10 @@ import {
   Select,
   SimpleTextEditor,
   SortToggle,
+  canWriteClipboardImage,
+  toSpreadsheetText,
+  writeClipboardImage,
+  writeClipboardText,
   TableFilters,
   Text,
   type SortDirection,
@@ -252,6 +256,17 @@ function listCellText(entry: ScheduleEntryView, key: ListSortKey | ListFilterKey
     case "qty": return entry.qty ?? "";
     case "status": return entryBadges(entry)[0]?.label ?? "";
   }
+}
+
+/**
+ * One item as a row of the studio's Google Sheet: CODE, MATERIAL TYPE, EX, TYPE, INITIALS TYPE, IMAGE, LOCATION,
+ * CONTACT (Fixture adds QTY and UNIT). The IMAGE cell stays empty: the sheet cannot fetch a private photo, so the
+ * photo is copied on its own and pasted into that cell.
+ */
+function sheetRowOf(entry: ScheduleEntryView): string[] {
+  const shown = shownOptionOf(entry);
+  const row = [entry.code, entry.category, shown?.brandName ?? "", shown?.productName ?? "", shown ? initialsOf(shown) : "", "", entry.location ?? "", shown?.contact ?? ""];
+  return entry.section === "FIXTURE" ? [...row, entry.qty ?? "", entry.unit ?? ""] : row;
 }
 
 /** The sheet's "Initials type": the rough description (colour, pattern, finishing) used before the exact product is known. */
@@ -602,6 +617,27 @@ export function ScheduleBoard({
     if (!next.delete(category)) next.add(category);
     return next;
   });
+  // Copy for the studio's Google Sheet, which is still kept by hand alongside the app (owner, 2026-10-23).
+  const copyRows = async (rows: readonly ScheduleEntryView[]) => {
+    try {
+      await writeClipboardText(toSpreadsheetText(rows.map(sheetRowOf)));
+      setNotice(rows.length === 1
+        ? `${rows[0].code} copied. Paste it into the sheet; paste the photo into IMAGE with Copy image.`
+        : `${rows.length} rows copied. Paste them into the sheet; photos are copied one at a time with Copy image.`);
+    } catch {
+      setNotice("Could not copy. Allow clipboard access for this site and try again.");
+    }
+  };
+  const copyImage = async (entry: ScheduleEntryView) => {
+    const url = shownOptionOf(entry)?.imageUrl;
+    if (!url) return;
+    try {
+      await writeClipboardImage(url);
+      setNotice(`Photo of ${entry.code} copied. Click its IMAGE cell in the sheet and paste.`);
+    } catch (copyError) {
+      setNotice(copyError instanceof Error ? copyError.message : "Could not copy the photo.");
+    }
+  };
   const listFiltered = Object.values(listFilters).some((value) => value !== "ALL");
   const listManual = filter === "all" && listSort === null && !listFiltered;
   const listGroups = useMemo(() => {
@@ -837,6 +873,7 @@ export function ScheduleBoard({
             <span className="font-medium text-ink" role="status">{pickedIds.length} selected</span>
             <Button size="sm" variant="ghost" onClick={toggleAllVisible}>{allPicked ? "Clear selection" : `Select all ${visibleEntries.length}`}</Button>
           </div>
+          <Button size="sm" variant="ghost" leadingIcon={<Copy className="h-3.5 w-3.5" />} disabled={pickedIds.length === 0} onClick={() => void copyRows(visibleEntries.filter((entry) => selectedIds.has(entry.id)))}>Copy rows</Button>
           <Button size="sm" variant="danger" leadingIcon={<Trash2 className="h-3.5 w-3.5" />} disabled={pickedIds.length === 0} pending={command.pendingKeys.includes("bulk-delete")} onClick={() => void removeSelected()}>Delete{pickedIds.length ? ` ${pickedIds.length}` : ""}</Button>
         </div>
       ) : null}
@@ -913,10 +950,12 @@ export function ScheduleBoard({
                             const shown = shownOptionOf(entry);
                             const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
                             // One action list for the row's … menu and its right-click menu, as on the Board.
-                            const rowItems = (canEdit || canManageTemplates) && !selecting ? [
+                            const rowItems = !selecting ? [
                               { label: "Open", onSelect: () => openEntry(entry.id) },
+                              { label: "Copy row", icon: <Copy className="h-3.5 w-3.5" />, separatorBefore: true, onSelect: () => void copyRows([entry]) },
+                              ...(shown?.imageUrl && canWriteClipboardImage() ? [{ label: "Copy image", icon: <ImageIcon className="h-3.5 w-3.5" />, onSelect: () => void copyImage(entry) }] : []),
                               ...(canManageTemplates && templateSourceOf(entry)
-                                ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
+                                ? [{ label: "Save as template item", separatorBefore: true, onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
                                 : []),
                               ...(canEdit ? [
                                 { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: !listManual || index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
@@ -1006,6 +1045,7 @@ export function ScheduleBoard({
               onToggleAll={toggleAllVisible}
               onClear={() => setSelectedIds(new Set())}
               onDelete={() => void removeSelected()}
+              onCopy={() => void copyRows(visibleEntries.filter((entry) => selectedIds.has(entry.id)))}
               deleting={command.pendingKeys.includes("bulk-delete")}
             />
           ) : (
@@ -1830,7 +1870,7 @@ function DockedEntryPanel({
 }
 
 /** The inspector while several items are ticked: what is picked, and what can be done with all of them at once. */
-function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, deleting }: { picked: readonly ScheduleEntryView[]; total: number; allPicked: boolean; onToggleAll: () => void; onClear: () => void; onDelete: () => void; deleting: boolean }) {
+function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, onCopy, deleting }: { picked: readonly ScheduleEntryView[]; total: number; allPicked: boolean; onToggleAll: () => void; onClear: () => void; onDelete: () => void; onCopy: () => void; deleting: boolean }) {
   const count = picked.length;
   const items = `${count} item${count === 1 ? "" : "s"}`;
   return (
@@ -1853,6 +1893,11 @@ function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, d
             );
           })}
         </ul>
+        <div className="grid gap-2 rounded-control border border-line-subtle p-3">
+          <Text size="sm" weight="semibold">Copy for the sheet</Text>
+          <Text size="sm" tone="secondary">Rows come in the sheet&apos;s column order, ready to paste. Photos are copied one at a time from each row&apos;s menu.</Text>
+          <Button size="sm" variant="secondary" className="justify-self-start" leadingIcon={<Copy className="h-3.5 w-3.5" />} onClick={onCopy}>Copy {items}</Button>
+        </div>
         <div className="grid gap-2 rounded-control border border-danger-line bg-danger-surface p-3">
           <Text size="sm" weight="semibold" className="text-danger">Delete {items}</Text>
           <Text size="sm" tone="secondary">Each item and all its options are removed. Their codes are left empty; other codes do not shift.</Text>

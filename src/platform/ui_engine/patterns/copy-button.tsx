@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, Copy } from "lucide-react";
 
 import { IconButton } from "../primitives/actions";
+import { writeClipboardText } from "./clipboard";
 
 export type CopyButtonProps = {
   /** The text value to copy to the clipboard. */
@@ -36,7 +37,7 @@ export function CopyButton({
   async function handleClick() {
     if (resetTimer.current) clearTimeout(resetTimer.current);
     try {
-      await navigator.clipboard.writeText(value);
+      await writeClipboardText(value);
       setState("success");
     } catch {
       setState("failure");

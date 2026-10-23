@@ -886,7 +886,7 @@ describe("UI Engine foundation", () => {
       new URL("./patterns/copy-button.tsx", import.meta.url),
       "utf8",
     );
-    assert.match(source, /await navigator\.clipboard\.writeText/);
+    assert.match(source, /await writeClipboardText\(value\)/);
   });
 
   it("CopyButton source handles clipboard failure", () => {
