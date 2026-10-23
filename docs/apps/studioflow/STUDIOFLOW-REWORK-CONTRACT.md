@@ -873,9 +873,11 @@ addressed as `x:<slug-of-label>`. Type and the photo always render.
 canonical field order, never in the order the boxes were ticked, so unticking
 and re-ticking a field never moves its row to the bottom of the card.
 
-Edited from the entry panel via `schedule.manage`, project-scoped like every
-other schedule write; the panel states whether the entry is on the default or
-on a custom choice, and "Use default" writes `null`. An empty row (a chosen
+Edited **on the Board, the pre-print view** (owner, 2026-10-23, legacy's
+per-card "Card fields" popover): each card's hover button "Card fields" and its
+right-click "Card fields…" open the choice, and "Use default" writes `null`;
+`schedule.manage`, project-scoped like every other schedule write. The entry
+panel and Add item no longer carry card-field controls; they only record data. An empty row (a chosen
 field the option has not filled in) is not rendered **on the card** — but
 ticking a field's checkbox is never refused for being empty; see §11.10.
 
@@ -918,9 +920,8 @@ navigation and the item menu. The options row selects A/B/C, identifies Final
 and Not used, creates the next unsaved option, or opens past-project search.
 The selected option form keeps Type, Brand, Color, Pattern, Finishing, Size,
 Location, Fixture Qty/Unit, extra specification lines and Notes editable at
-all times. An eye control changes only whether that field captions the card;
-it never clears or disables the value. Type and photo always show, and "Use
-default" restores `card_fields = null`.
+all times. It has no card-field controls (owner, 2026-10-23): which fields a
+card shows is chosen on the Board (§11.8). Type and photo always show.
 
 Every edit is a local draft. Nothing in the item/spec/card-field draft writes
 until **Save**; **Discard** restores the saved values. Closing the drawer,

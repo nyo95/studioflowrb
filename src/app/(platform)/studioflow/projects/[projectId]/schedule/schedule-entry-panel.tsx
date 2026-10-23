@@ -22,10 +22,8 @@ import {
   SCHEDULE_EXTRA_VALUE_MAX,
   brandLinkCandidates,
   SCHEDULE_SECTION_LABEL as SECTION_LABEL,
-  extraFieldKey,
   finalOf,
   nextOptionLabel,
-  resolveCardFields,
   shownOptionOf,
   templateSourceOf,
   type ScheduleEntryView,
@@ -58,7 +56,6 @@ import {
   saveScheduleEntryAsTemplateAction,
   setScheduleOptionImageAction,
   updateScheduleEntryAction,
-  updateScheduleEntryCardFieldsAction,
   unmarkScheduleFinalAction,
   updateScheduleOptionAction,
 } from "../../../actions";
@@ -137,9 +134,8 @@ export function EntryPanelContent({
   // Owner decision 2026-09-24: nothing auto-saves per field. `baseline` is what is persisted for the item-level
   // pieces; `optionBaseline` holds what was last saved per option (props catch up after the refresh);
   // `drafts` holds only the options the person has touched.
-  const [baseline, setBaseline] = useState(() => ({ fields: { qty: entry.qty ?? "", unit: entry.unit ?? "", location: entry.location ?? "" }, cardFields: entry.cardFields }));
+  const [baseline, setBaseline] = useState(() => ({ fields: { qty: entry.qty ?? "", unit: entry.unit ?? "", location: entry.location ?? "" } }));
   const [fields, setFields] = useState(baseline.fields);
-  const [cardFieldsDraft, setCardFieldsDraft] = useState<string[] | null>(baseline.cardFields);
   const [drafts, setDrafts] = useState<Record<string, ProductDraft>>({});
   const [optionBaseline, setOptionBaseline] = useState<Record<string, ProductDraft>>({});
 
@@ -147,18 +143,13 @@ export function EntryPanelContent({
   const draftKey = selectedId === "new" ? "new" : selected?.id ?? "new";
   const draft = drafts[draftKey] ?? baselineOfOption(selected);
   const updateDraft = (patch: Partial<ProductDraft>) => setDrafts((current) => ({ ...current, [draftKey]: { ...(current[draftKey] ?? baselineOfOption(selected)), ...patch } }));
-  const extraChoices = draft.extra.map((field) => ({ key: extraFieldKey(field.label), label: field.label }));
-  const extraKeys = extraChoices.map((extra) => extra.key);
-
-  const displayCardFields = resolveCardFields(cardFieldsDraft, extraKeys);
   const dirtyOptionKeys = Object.keys(drafts).filter((key) => {
     const option = entry.options.find((row) => row.id === key) ?? null;
     if (key !== "new" && !option) return false; // the option was deleted meanwhile
     return JSON.stringify(drafts[key]) !== JSON.stringify(baselineOfOption(option));
   });
   const fieldsChanged = fields.qty !== baseline.fields.qty || fields.unit !== baseline.fields.unit || fields.location !== baseline.fields.location;
-  const cardFieldsChanged = JSON.stringify(resolveCardFields(cardFieldsDraft, extraKeys)) !== JSON.stringify(resolveCardFields(baseline.cardFields, extraKeys));
-  const isDirty = dirtyOptionKeys.length > 0 || fieldsChanged || cardFieldsChanged || preparedNewPhoto !== null;
+  const isDirty = dirtyOptionKeys.length > 0 || fieldsChanged || preparedNewPhoto !== null;
   // Tell the dialog wrapper whether it's safe to close without confirming —
   // a ref write in the parent, not a state update.
   useEffect(() => { onDirtyChange?.(isDirty); }, [isDirty, onDirtyChange]);
@@ -167,9 +158,8 @@ export function EntryPanelContent({
 
   const entryFieldsKey = `${entry.id}-fields`;
   const optionFieldsKey = `${entry.id}-option-fields`;
-  const cardFieldsKey = `${entry.id}-card-fields`;
   const newPhotoKey = `${entry.id}-new-option-photo`;
-  const savePending = isPending(entryFieldsKey) || isPending(optionFieldsKey) || isPending(cardFieldsKey) || isPending(newPhotoKey);
+  const savePending = isPending(entryFieldsKey) || isPending(optionFieldsKey) || isPending(newPhotoKey);
 
   const saveAll = async () => {
     setSaveError(null);
@@ -201,17 +191,12 @@ export function EntryPanelContent({
       }));
       if (!ok) return;
     }
-    if (cardFieldsChanged) {
-      const ok = await run(cardFieldsKey, () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entry.id, fields: cardFieldsDraft === null ? null : [...cardFieldsDraft] }));
-      if (!ok) return;
-    }
-    setBaseline({ fields, cardFields: cardFieldsDraft });
+    setBaseline({ fields });
   };
   const discardDraft = () => {
     setFields(baseline.fields);
     setDrafts({});
     setPreparedNewPhoto(null);
-    setCardFieldsDraft(baseline.cardFields);
     setSaveError(null);
   };
 
@@ -255,12 +240,6 @@ export function EntryPanelContent({
     ? [{ id: draft.contact, label: draft.contact }, ...fromMasterData]
     : fromMasterData;
 
-  // Unchecking everything is a real choice (photo, code and title only), not a
-  // reset — `null` is the reset, and "Use default" is how it is reached.
-  // Ticking is never blocked by the field being empty: ticking is how a field starts being filled in.
-  const toggleCardField = (field: string) =>
-    setCardFieldsDraft(displayCardFields.includes(field) ? displayCardFields.filter((key) => key !== field) : [...displayCardFields, field]);
-
   const removePhoto = async (option: ScheduleOptionView) => {
     const ok = await confirm({
       title: `Remove the photo of option ${option.label}?`,
@@ -291,16 +270,8 @@ export function EntryPanelContent({
     if (ok) await run(`${entry.id}-opt-${option.id}`, () => deleteScheduleOptionAction({ projectId, optionId: option.id }));
   };
 
-  // ── What is on the card, and how full it is ──
+  // The panel only records data; which fields a card shows is chosen on the Board, the pre-print view (owner, 2026-10-23).
   const disabled = !canEdit || savePending;
-  const visibilityAction = (key: string, label: string) => {
-    const on = displayCardFields.includes(key);
-    return (
-      <button type="button" aria-label={on ? `Hide ${label} from card` : `Show ${label} on card`} title={on ? "Shown on the card and in print" : "Hidden on the card"} aria-pressed={on} disabled={disabled} onClick={() => toggleCardField(key)} className="grid h-7 w-7 shrink-0 place-items-center rounded-full hover:bg-surface-muted focus-visible:outline-2 focus-visible:outline-line-focus disabled:opacity-50">
-        <span aria-hidden="true" className={`h-2.5 w-2.5 rounded-full border-[1.5px] ${on ? "border-action bg-action" : "border-line-strong bg-transparent"}`} />
-      </button>
-    );
-  };
   const busyKey = selected ? `${entry.id}-opt-${selected.id}` : "";
   const isNew = selectedId === "new";
   const startNewOption = () => { setSelectedId("new"); setDrafts((current) => ({ ...current, new: current.new ?? EMPTY_PRODUCT })); setReuse(false); setPhotoFor(null); setSampleFor(null); setNewPhotoOpen(false); };
@@ -349,7 +320,6 @@ export function EntryPanelContent({
       <label className={ROW}>
         <span className={ROW_LABEL}>Location</span>
         <input value={fields.location} onChange={(event) => setFields({ ...fields, location: event.target.value })} disabled={disabled} maxLength={160} placeholder="Where it goes" className={ROW_INPUT} />
-        {visibilityAction("location", "Location")}
       </label>
       {/* Qty only for Fixture — a Material line is specified, not counted (owner decision 2026-09-23). */}
       {entry.section === "FIXTURE" ? (
@@ -357,7 +327,6 @@ export function EntryPanelContent({
           <span className={ROW_LABEL}>Qty</span>
           <input aria-label="Qty" inputMode="decimal" value={fields.qty} onChange={(event) => setFields({ ...fields, qty: event.target.value })} disabled={disabled} maxLength={20} placeholder="0" className={`${ROW_INPUT} !flex-none w-20`} />
           <input aria-label="Unit" value={fields.unit} onChange={(event) => setFields({ ...fields, unit: event.target.value })} disabled={disabled} maxLength={40} placeholder="Unit" className={ROW_INPUT} />
-          {visibilityAction("qty", "Qty")}
         </div>
       ) : null}
     </>
@@ -401,7 +370,7 @@ export function EntryPanelContent({
           />
         </label>
         <div className="grid gap-0.5">
-          <span className="flex items-center justify-between text-[11px] uppercase tracking-[0.06em] text-ink-tertiary">Brand{visibilityAction("brand", "Brand")}</span>
+          <span className="flex items-center justify-between text-[11px] uppercase tracking-[0.06em] text-ink-tertiary">Brand</span>
           <CreatableSearch
             label="Brand"
             options={brandSearchOptions}
@@ -537,31 +506,24 @@ export function EntryPanelContent({
               </div>
             ) : null}
 
-            {/* Specs: one column of rows; the dot at the end puts the field on the card and in print. */}
+            {/* Specs: one column of rows. */}
             <div className="grid">
-              <div className="flex items-center justify-between gap-2 pb-1.5">
+              <div className="pb-1.5">
                 <Text size="sm" weight="semibold">Specs</Text>
-                <span className="flex items-center gap-1.5 text-[11px] text-ink-tertiary">
-                  <span aria-hidden="true" className="h-2 w-2 rounded-full bg-action" />on card &amp; print
-                  {canEdit && cardFieldsDraft !== null ? <button type="button" disabled={savePending} onClick={() => setCardFieldsDraft(null)} className="ml-1 underline underline-offset-2 hover:text-ink">Use default</button> : null}
-                </span>
               </div>
               {specRows.map((row) => (
                 <label key={row.key} className={ROW}>
                   <span className={ROW_LABEL}>{row.label}</span>
                   <input value={row.value} onChange={(event) => row.onChange(event.target.value)} disabled={disabled} maxLength={row.maxLength} placeholder={row.placeholder} className={ROW_INPUT} />
-                  {visibilityAction(row.key, row.label)}
                 </label>
               ))}
               {itemRows}
               {draft.extra.map((extra, index) => {
-                const key = extraFieldKey(extra.label);
                 const setExtra = (patch: Partial<ScheduleExtraField>) => updateDraft({ extra: draft.extra.map((field, position) => (position === index ? { ...field, ...patch } : field)) });
                 return (
                   <div key={index} className={ROW}>
                     <input aria-label={`Spec label ${index + 1}`} value={extra.label} onChange={(event) => setExtra({ label: event.target.value })} disabled={disabled} maxLength={SCHEDULE_EXTRA_LABEL_MAX} placeholder="Label" className={`${ROW_INPUT} !flex-none w-20 !px-0 text-xs !text-ink-secondary`} />
                     <input aria-label={extra.label || `Spec value ${index + 1}`} value={extra.value} onChange={(event) => setExtra({ value: event.target.value })} disabled={disabled} maxLength={SCHEDULE_EXTRA_VALUE_MAX} placeholder="Value" className={ROW_INPUT} />
-                    {extra.label.trim() ? visibilityAction(key, extra.label) : <span className="w-7 shrink-0" />}
                     <IconButton size="sm" variant="ghost" label={`Remove ${extra.label || `spec ${index + 1}`}`} icon={<X aria-hidden="true" />} disabled={disabled} onClick={() => updateDraft({ extra: draft.extra.filter((_, position) => position !== index) })} className="!h-7 !min-h-7 !w-7" />
                   </div>
                 );
@@ -572,7 +534,7 @@ export function EntryPanelContent({
             </div>
 
             <div className="grid gap-1">
-              <div className="flex items-center justify-between"><Text size="sm" weight="semibold">Notes</Text>{visibilityAction("notes", "Notes")}</div>
+              <Text size="sm" weight="semibold">Notes</Text>
               <SimpleTextEditor value={draft.notes} onChange={(event) => updateDraft({ notes: event.target.value })} disabled={disabled} maxLength={2000} rows={2} />
             </div>
           </>

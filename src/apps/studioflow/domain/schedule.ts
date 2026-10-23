@@ -54,6 +54,20 @@ export function brandLinkCandidates<T extends { id: string; name: string }>(type
   return ranked.sort((a, b) => a.rank - b.rank || b.length - a.length).slice(0, 3).map((entry) => entry.brand);
 }
 
+/** The fields that make up a schedule option's Initials type (the rough description before the exact product is known). */
+export const SCHEDULE_INITIALS_FIELDS = ["color", "pattern", "finishing"] as const;
+
+/**
+ * A schedule card's title, the same on the Board and in print: the Type, or the Initials type (Color · Pattern ·
+ * Finishing) while there is no real Type yet (empty, a placeholder such as "-" or "TBA", or the import's "Imported").
+ * `fromInitials` tells a card not to repeat those fields under a title made of them.
+ */
+export function scheduleCardTitle(option: Pick<ScheduleOptionView, "productName" | "color" | "pattern" | "finishing">): { title: string; fromInitials: boolean } {
+  if (!isSpecPlaceholder(option.productName) && option.productName !== "Imported") return { title: option.productName, fromInitials: false };
+  const initials = [option.color, option.pattern, option.finishing].filter(Boolean).join(" · ");
+  return initials ? { title: initials, fromInitials: true } : { title: option.productName, fromInitials: false };
+}
+
 /** Contact is copied into an option as text; subsequent Master Data edits do not change it. */
 export function formatScheduleContact(input: { personName: string; jobTitle: string | null; phone: string | null }): string {
   const name = input.personName.trim();

@@ -344,3 +344,13 @@ describe("MOM snapshots", () => {
     assert.equal(parseMomSnapshot({ ...legacy, items: [{ ...legacy.items[0], listStyle: "ROMAN" }] }), null);
   });
 });
+
+describe("scheduleCardTitle", () => {
+  it("uses the Type, and the Initials type only while there is no real Type", async () => {
+    const { scheduleCardTitle } = await import("./schedule");
+    assert.deepEqual(scheduleCardTitle({ productName: "Dulux Heart's Desire", color: "Pink", pattern: null, finishing: null }), { title: "Dulux Heart's Desire", fromInitials: false });
+    assert.deepEqual(scheduleCardTitle({ productName: "-", color: "Pink", pattern: "Kayu", finishing: null }), { title: "Pink · Kayu", fromInitials: true });
+    assert.deepEqual(scheduleCardTitle({ productName: "Imported", color: null, pattern: null, finishing: "Matte" }), { title: "Matte", fromInitials: true });
+    assert.deepEqual(scheduleCardTitle({ productName: "-", color: null, pattern: null, finishing: null }), { title: "-", fromInitials: false });
+  });
+});

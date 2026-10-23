@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, ImageIcon, Plus } from "lucide-react";
+import { ImageIcon, Plus } from "lucide-react";
 import { useState, type DragEvent, type ReactNode } from "react";
 import {
   finalOf,
@@ -18,7 +18,6 @@ import {
   Field,
   FormActions,
   ImageWorkspace,
-  IconButton,
   InlineError,
   Input,
   Text,
@@ -428,13 +427,4 @@ export function toSnapshot(draft: ProductDraft) {
 
 export function Footer({ children }: { children: ReactNode }) {
   return <div className="flex flex-wrap justify-end gap-2">{children}</div>;
-}
-
-export function VisibilityField({ label, visible, onToggle, disabled, children, always = false }: { label: string; visible: boolean; onToggle: () => void; disabled: boolean; children: ReactNode; always?: boolean }) {
-  return (
-    <div className="grid grid-cols-[minmax(0,1fr)_2rem] items-end gap-2">
-      <div className="grid gap-1"><Text size="sm" weight="semibold">{label}</Text>{children}</div>
-      {always ? <span className="mb-1 grid h-8 place-items-center text-xs text-ink-tertiary">Always</span> : <IconButton size="sm" variant="ghost" label={visible ? `Hide ${label} from card` : `Show ${label} on card`} icon={visible ? <Eye aria-hidden="true" /> : <EyeOff aria-hidden="true" />} disabled={disabled} onClick={onToggle} className="mb-0.5" />}
-    </div>
-  );
 }

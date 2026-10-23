@@ -1,8 +1,8 @@
 "use client";
 
-import { Eye, EyeOff, History } from "lucide-react";
+import { History } from "lucide-react";
 import { useState } from "react";
-import { extraFieldKey, resolveCardFields, specLine, type ScheduleExtraField } from "@/apps/studioflow/domain/schedule";
+import { specLine, type ScheduleExtraField } from "@/apps/studioflow/domain/schedule";
 import {
   Button,
   CreatableSearch,
@@ -10,7 +10,6 @@ import {
   Field,
   FilterChip,
   ImageWorkspace,
-  IconButton,
   InlineError,
   Input,
   SimpleTextEditor,
@@ -23,11 +22,10 @@ import {
   createScheduleEntryAction,
   createScheduleOptionAction,
   setScheduleOptionImageAction,
-  updateScheduleEntryCardFieldsAction,
-} from "../../../actions";
+  } from "../../../actions";
 import { ExtraFieldsEditor } from "../../../_components/extra-fields-editor";
 import { ReuseSearch } from "./schedule-reuse";
-import { type Brand, type CategoryChoice, categoryGroups, type Command, EMPTY_PRODUCT, Footer, PHOTO_ASPECT, type ProductDraft, type ReuseHit, type Section, toSnapshot, VisibilityField } from "./schedule-shared";
+import { type Brand, type CategoryChoice, categoryGroups, type Command, EMPTY_PRODUCT, Footer, PHOTO_ASPECT, type ProductDraft, type ReuseHit, type Section, toSnapshot } from "./schedule-shared";
 
 export function AddItemDrawer({ projectId, section, categoriesBySection, categoryChoices, brands, command, confirm, onClose }: { projectId: string; section: Section; categoriesBySection: Record<Section, string[]>; categoryChoices: readonly CategoryChoice[]; brands: readonly Brand[]; command: Command; confirm: ReturnType<typeof useConfirm>["confirm"]; onClose: () => void }) {
   const [targetSection, setTargetSection] = useState<Section>(section);
@@ -42,7 +40,6 @@ export function AddItemDrawer({ projectId, section, categoriesBySection, categor
   };
   const [product, setProduct] = useState<ProductDraft>(EMPTY_PRODUCT);
   const [qty, setQty] = useState({ qty: "", unit: "", location: "" });
-  const [cardFields, setCardFields] = useState<string[] | null>(null);
   const [preparedPhoto, setPreparedPhoto] = useState<File | null>(null);
   // A product picked from another project: Save copies it whole (photo and notes included), so the product fields give way to a summary.
   const [reuseHit, setReuseHit] = useState<ReuseHit | null>(null);
@@ -56,19 +53,15 @@ export function AddItemDrawer({ projectId, section, categoriesBySection, categor
     setCategory(hit.category);
     setProduct(EMPTY_PRODUCT);
     setPreparedPhoto(null);
-    setCardFields(null);
     setReuseHit(hit);
     setSearchingPast(false);
   };
-  const extraKeys = product.extra.map((field) => extraFieldKey(field.label));
-  const displayed = resolveCardFields(cardFields, extraKeys);
-  const toggle = (key: string) => setCardFields(displayed.includes(key) ? displayed.filter((field) => field !== key) : [...displayed, key]);
   const setProductField = (key: keyof ProductDraft) => (event: { target: { value: string } }) => setProduct({ ...product, [key]: event.target.value });
   const brandOptions: CreatableSearchOption[] = [
     ...brands.map((brand) => ({ id: brand.id, label: brand.name })),
     ...(!product.brandId && product.brandName.trim() ? [{ id: product.brandName, label: product.brandName, description: "Typed — not in Master Data" }] : []),
   ];
-  const isDirty = targetSection !== section || category !== (categoriesBySection[section][0] ?? "") || hasProduct || Object.values(qty).some(Boolean) || cardFields !== null || preparedPhoto !== null;
+  const isDirty = targetSection !== section || category !== (categoriesBySection[section][0] ?? "") || hasProduct || Object.values(qty).some(Boolean) || preparedPhoto !== null;
 
   const requestClose = async () => {
     if (isDirty) {
@@ -98,10 +91,6 @@ export function AddItemDrawer({ projectId, section, categoriesBySection, categor
     } else if (hasProduct) {
       const optionOk = await command.run("add-item-option", () => createScheduleOptionAction({ projectId, entryId: entryId!, snapshot: toSnapshot(product) }), (data) => { if (data && typeof data === "object" && "optionId" in data && typeof data.optionId === "string") optionId = data.optionId; });
       if (!optionOk) return;
-    }
-    if (cardFields !== null) {
-      const fieldsOk = await command.run("add-item-fields", () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entryId!, fields: cardFields }));
-      if (!fieldsOk) return;
     }
     if (preparedPhoto && optionId) {
       const form = new FormData(); form.set("projectId", projectId); form.set("optionId", optionId); form.set("file", preparedPhoto);
@@ -170,21 +159,19 @@ export function AddItemDrawer({ projectId, section, categoriesBySection, categor
           </div>
         ) : (
         <div className="grid gap-3 border-t border-line-subtle pt-4">
-          <Text weight="semibold">Product and card fields</Text>
-          <Text size="sm" tone="tertiary">The eye controls what appears on the card. Hidden fields stay editable.</Text>
+          <Text weight="semibold">Product</Text>
           <div className="grid gap-3 sm:grid-cols-2">
-            <VisibilityField label="Type" visible onToggle={() => {}} disabled={pending} always><Input value={product.productName} onChange={setProductField("productName")} maxLength={200} placeholder="Type, or leave every product field empty to reserve" /></VisibilityField>
-            <VisibilityField label="Brand" visible={displayed.includes("brand")} onToggle={() => toggle("brand")} disabled={pending}><CreatableSearch label="Brand" options={brandOptions} value={product.brandId || product.brandName} onValueChange={(next) => setProduct(brands.some((brand) => brand.id === next) ? { ...product, brandId: next, brandName: "" } : { ...product, brandId: "", brandName: next })} onCreate={(text) => text} createLabel={(text) => `Use "${text}" (not in Master Data)`} placeholder="Pick or type a brand" searchPlaceholder="Search brands…" emptyLabel="No brands found" allowClear className="w-full" /></VisibilityField>
-            <VisibilityField label="Color" visible={displayed.includes("color")} onToggle={() => toggle("color")} disabled={pending}><Input value={product.color} onChange={setProductField("color")} maxLength={160} /></VisibilityField>
-            <VisibilityField label="Pattern" visible={displayed.includes("pattern")} onToggle={() => toggle("pattern")} disabled={pending}><Input value={product.pattern} onChange={setProductField("pattern")} maxLength={160} /></VisibilityField>
-            <VisibilityField label="Finishing" visible={displayed.includes("finishing")} onToggle={() => toggle("finishing")} disabled={pending}><Input value={product.finishing} onChange={setProductField("finishing")} maxLength={160} /></VisibilityField>
-            <VisibilityField label="Size" visible={displayed.includes("dimension")} onToggle={() => toggle("dimension")} disabled={pending}><Input value={product.dimension} onChange={setProductField("dimension")} maxLength={160} /></VisibilityField>
-            <VisibilityField label="Location" visible={displayed.includes("location")} onToggle={() => toggle("location")} disabled={pending}><Input value={qty.location} onChange={(event) => setQty({ ...qty, location: event.target.value })} maxLength={160} /></VisibilityField>
-            {isFixture ? <VisibilityField label="Qty" visible={displayed.includes("qty")} onToggle={() => toggle("qty")} disabled={pending}><div className="grid grid-cols-2 gap-2"><Input aria-label="Qty" inputMode="decimal" value={qty.qty} onChange={(event) => setQty({ ...qty, qty: event.target.value })} maxLength={20} /><Input aria-label="Unit" value={qty.unit} onChange={(event) => setQty({ ...qty, unit: event.target.value })} maxLength={40} placeholder="Unit" /></div></VisibilityField> : null}
+            <Field label="Type"><Input value={product.productName} onChange={setProductField("productName")} maxLength={200} placeholder="Type, or leave every product field empty to reserve" /></Field>
+            <Field label="Brand"><CreatableSearch label="Brand" options={brandOptions} value={product.brandId || product.brandName} onValueChange={(next) => setProduct(brands.some((brand) => brand.id === next) ? { ...product, brandId: next, brandName: "" } : { ...product, brandId: "", brandName: next })} onCreate={(text) => text} createLabel={(text) => `Use "${text}" (not in Master Data)`} placeholder="Pick or type a brand" searchPlaceholder="Search brands…" emptyLabel="No brands found" allowClear className="w-full" /></Field>
+            <Field label="Color"><Input value={product.color} onChange={setProductField("color")} maxLength={160} /></Field>
+            <Field label="Pattern"><Input value={product.pattern} onChange={setProductField("pattern")} maxLength={160} /></Field>
+            <Field label="Finishing"><Input value={product.finishing} onChange={setProductField("finishing")} maxLength={160} /></Field>
+            <Field label="Size"><Input value={product.dimension} onChange={setProductField("dimension")} maxLength={160} /></Field>
+            <Field label="Location"><Input value={qty.location} onChange={(event) => setQty({ ...qty, location: event.target.value })} maxLength={160} /></Field>
+            {isFixture ? <Field label="Qty"><div className="grid grid-cols-2 gap-2"><Input aria-label="Qty" inputMode="decimal" value={qty.qty} onChange={(event) => setQty({ ...qty, qty: event.target.value })} maxLength={20} /><Input aria-label="Unit" value={qty.unit} onChange={(event) => setQty({ ...qty, unit: event.target.value })} maxLength={40} placeholder="Unit" /></div></Field> : null}
           </div>
           <ExtraFieldsEditor value={product.extra} onChange={(extra) => setProduct({ ...product, extra })} />
-          <div className="grid grid-cols-[minmax(0,1fr)_2rem] items-start gap-2"><Field label="Notes"><SimpleTextEditor value={product.notes} onChange={(event) => setProduct({ ...product, notes: event.target.value })} maxLength={2000} rows={3} /></Field><IconButton size="sm" variant="ghost" label={displayed.includes("notes") ? "Hide Notes from card" : "Show Notes on card"} icon={displayed.includes("notes") ? <Eye aria-hidden="true" /> : <EyeOff aria-hidden="true" />} onClick={() => toggle("notes")} className="mt-6" /></div>
-          {cardFields !== null ? <Button size="sm" variant="ghost" className="justify-self-start" onClick={() => setCardFields(null)}>Use default</Button> : null}
+          <Field label="Notes"><SimpleTextEditor value={product.notes} onChange={(event) => setProduct({ ...product, notes: event.target.value })} maxLength={2000} rows={3} /></Field>
           <div className="grid gap-2"><Text weight="semibold">Photo</Text><ImageWorkspace label="Schedule option photo" aspect={PHOTO_ASPECT} maxDimension={1600} outputType="image/jpeg" allowColor onPrepared={setPreparedPhoto} disabled={pending} />{preparedPhoto ? <Text size="sm" tone="secondary">Photo ready: {preparedPhoto.name}</Text> : null}</div>
         </div>
         )}

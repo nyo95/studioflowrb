@@ -1,5 +1,16 @@
 # Changelog
 
+## R9.231 | 2026-10-23 | ui(studioflow): Board is the pre-print view; card fields are chosen per card there (Lead)
+
+- **Owner decision:** the inspector is for filling in data only; which fields a card shows is decided where the print is laid out, per card, as in legacy. The Board becomes that pre-print view; List stays the default.
+- **Legacy evidence (read-only):** `D:\Misc\ProjectsHUB\studioflow` at `c4b0c466d9c3cf2c1a98ef4da393231c1ce12a27` (branch `main`, 21 uncommitted working-tree entries not read); `src/extensions/sketchup/components/CatalogBoard.tsx` was itself the printed sheet, with a per-card no-print "Card fields" popover (checkboxes + "Use project default") and no field controls in its forms.
+- **Inspector and Add item:** the card-field dots, "on card & print", "Use default" and the Add item eye toggles are gone; both only record data. A new item starts on the default card fields.
+- **Board:** each card has a "Card fields" button on hover (and "Card fields…" on right-click) opening a checklist of Brand, Color, Pattern, Finishing, Size, Location, Qty (Fixture), Notes and the option's extra spec lines, with "Use default"; it saves the item's card fields as before (no schema change).
+- **One title rule for Board and print:** `scheduleCardTitle` (domain) - the Type, or the Initials type while there is no real Type; fields that make up an Initials title are not repeated. This replaces R9.211's rule of always hiding Color/Pattern/Finishing under a Type: a field chosen for the card now always shows, on the Board and in print.
+- **Docs:** contract §11.8 and §11.10 updated.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, full eslint, schedule regression + domain tests 77/77, full test suite 1,345/1,345.
+
 ## R9.230 | 2026-10-23 | ui(studioflow): gray highlight for schedule items; Phase 1 items of 2026-536 marked gray (Lead)
 
 - **Owner request:** mark the 42 Phase 1 items imported from the PDF of project 2026-536 with a gray (or red) highlight; gray chosen as "old / done".

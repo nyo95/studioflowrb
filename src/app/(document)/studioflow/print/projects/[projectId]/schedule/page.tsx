@@ -6,11 +6,13 @@ import { AppError } from "@platform/core/errors";
 import { formatInstant } from "@platform/utilities/date";
 import {
   SCHEDULE_SECTION_LABEL,
+  SCHEDULE_INITIALS_FIELDS,
   SCHEDULE_SECTIONS,
   cardFieldLabel,
   cardFieldValuesOf,
   effectiveCardFields,
   extraChoicesOf,
+  scheduleCardTitle,
   shownOptionOf,
   type ScheduleEntryView,
 } from "@/apps/studioflow/domain/schedule";
@@ -103,7 +105,11 @@ export default async function SchedulePrintPage({
                       const shown = shownOptionOf(entry);
                       const extras = extraChoicesOf(entry);
                       const fieldValue = cardFieldValuesOf(entry);
-                      const details = effectiveCardFields(entry).map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as const);
+                      // Same title rule as the Board, the pre-print view: Type, or Initials type while there is no Type.
+                      const heading = shown ? scheduleCardTitle(shown) : null;
+                      const details = effectiveCardFields(entry)
+                        .filter((key) => !(heading?.fromInitials && (SCHEDULE_INITIALS_FIELDS as readonly string[]).includes(key)))
+                        .map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as const);
                       return (
                         <DocumentBlock key={entry.id} className="border border-neutral-300 p-2">
                           <div className="relative mb-2 aspect-[4/5] w-full overflow-hidden bg-neutral-100">
@@ -114,7 +120,7 @@ export default async function SchedulePrintPage({
                             ) : null}
                             <span className="absolute right-1 top-1 bg-white/90 px-1 font-mono text-[9px] font-bold">{entry.code}</span>
                           </div>
-                            <p className="text-xs font-semibold uppercase leading-tight">{shown?.productName}</p>
+                            <p className="text-xs font-semibold uppercase leading-tight">{heading?.title}</p>
                           <div className="mt-1 grid gap-0.5">
                             {details.map(([label, value]) => (value ? (
                               <div key={label} className="flex justify-between gap-2 text-[10px]">

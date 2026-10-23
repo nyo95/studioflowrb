@@ -1,27 +1,85 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, ListChecks } from "lucide-react";
+import { useState } from "react";
+
 import {
+  SCHEDULE_CARD_FIELD_LABEL,
+  SCHEDULE_INITIALS_FIELDS,
   cardFieldLabel,
   cardFieldValuesOf,
   effectiveCardFields,
   extraChoicesOf,
+  scheduleCardTitle,
   shownOptionOf,
   type ScheduleEntryView,
 } from "@/apps/studioflow/domain/schedule";
 import {
   Badge,
+  Button,
   Checkbox,
+  Dialog,
+  Text,
   GroupHeader,
   ContextActionMenu,
   type RowActionItem,
   } from "@/platform/ui_engine";
-import { cardHighlightStyle, type CategoryChoice, type Command, entryBadges, hasTypeOf, INITIALS_FIELDS, initialsOf, NewCategoryInline, QuickAddTile, type ScheduleFilter, type Section, useRowDrag } from "./schedule-shared";
+import { updateScheduleEntryCardFieldsAction } from "../../../actions";
+import { cardHighlightStyle, type CategoryChoice, type Command, entryBadges, Footer, NewCategoryInline, QuickAddTile, type ScheduleFilter, type Section, useRowDrag } from "./schedule-shared";
 
 // ── Board view ─────────────────────────────────────────────────────────────
 
 /** Card fields whose value names itself, so the board joins them into one line without labels. */
 export const SPEC_LINE_FIELDS: ReadonlySet<string> = new Set(["color", "pattern", "finishing", "dimension", "qty"]);
+const INITIALS_FIELDS: ReadonlySet<string> = new Set(SCHEDULE_INITIALS_FIELDS);
+
+/**
+ * Which fields one card shows, chosen on the Board because the Board is the pre-print view (owner, 2026-10-23; legacy's
+ * per-card "Card fields" popover). Saving writes the item's card fields; "Use default" goes back to the studio default.
+ */
+function CardFieldsDialog({ projectId, entry, command, onClose }: { projectId: string; entry: ScheduleEntryView; command: Command; onClose: () => void }) {
+  const extras = extraChoicesOf(entry);
+  const choices = [
+    ...(Object.keys(SCHEDULE_CARD_FIELD_LABEL) as Array<keyof typeof SCHEDULE_CARD_FIELD_LABEL>)
+      .filter((key) => key !== "qty" || entry.section === "FIXTURE")
+      .map((key) => ({ key: key as string, label: SCHEDULE_CARD_FIELD_LABEL[key] })),
+    ...extras,
+  ];
+  const [picked, setPicked] = useState<string[]>(() => effectiveCardFields(entry));
+  const pendingKey = `${entry.id}-card-fields`;
+  const save = async (fields: string[] | null) => {
+    const ok = await command.run(pendingKey, () => updateScheduleEntryCardFieldsAction({ projectId, entryId: entry.id, fields }));
+    if (ok) onClose();
+  };
+  const pending = command.isPending(pendingKey);
+  return (
+    <Dialog
+      open
+      onOpenChange={(open) => { if (!open && !pending) onClose(); }}
+      title={`Card fields · ${entry.code}`}
+      description="What this card shows on the Board and in print. Photo, code and Type always show."
+      size="sm"
+      dismissible={!pending}
+      footer={<Footer>
+        {entry.cardFields !== null ? <Button variant="ghost" disabled={pending} onClick={() => void save(null)}>Use default</Button> : null}
+        <Button variant="ghost" disabled={pending} onClick={onClose}>Cancel</Button>
+        <Button variant="primary" pending={pending} onClick={() => void save(choices.map((choice) => choice.key).filter((key) => picked.includes(key)))}>Save</Button>
+      </Footer>}
+    >
+      <div className="grid gap-2">
+        {choices.map((choice) => (
+          <Checkbox
+            key={choice.key}
+            checked={picked.includes(choice.key)}
+            onCheckedChange={() => setPicked((current) => (current.includes(choice.key) ? current.filter((key) => key !== choice.key) : [...current, choice.key]))}
+            label={choice.label}
+          />
+        ))}
+        {entry.cardFields === null ? <Text size="sm" tone="tertiary">This card uses the studio default.</Text> : null}
+      </div>
+    </Dialog>
+  );
+}
 
 export function BoardView({
   projectId,
@@ -60,8 +118,10 @@ export function BoardView({
   const { draggingId, dragOverId, start, end, over, leave } = useRowDrag();
   const reorderEnabled = canEdit && filter === "all" && !selecting;
   const pick = (id: string) => (selecting ? onToggle(id) : onOpen(id));
+  const [fieldsFor, setFieldsFor] = useState<ScheduleEntryView | null>(null);
   return (
     <div className="@container grid gap-8 p-(--ui-section-px)">
+      {fieldsFor ? <CardFieldsDialog projectId={projectId} entry={fieldsFor} command={command} onClose={() => setFieldsFor(null)} /> : null}
       {groups.map((group) => (
         <section key={group.category} className="grid gap-3" aria-label={group.category}>
           <GroupHeader title={<span className="inline-flex items-baseline gap-2"><span>{group.category}</span><span className="font-ui-mono font-normal text-ink-tertiary">{group.rows[0]?.code.split("-")[0]}</span></span>} count={group.rows.length} />
@@ -73,10 +133,11 @@ export function BoardView({
               const fields = effectiveCardFields(entry);
               const brand = fields.includes("brand") ? fieldValue.brand : null;
               // Self-describing specs read as one line ("Pink · Texture Paint · Matte"); only fields that need a name keep one.
-              // The Board is a viewer, not the print (owner, 2026-10-23): the title is the Type, or the Initials type
-              // while there is no Type yet, never both; below it only the active card fields, minus the initials.
-              const title = shown ? (hasTypeOf(shown) ? shown.productName : initialsOf(shown) || shown.productName) : null;
-              const spec = fields.filter((key) => SPEC_LINE_FIELDS.has(key) && !INITIALS_FIELDS.has(key)).map((key) => fieldValue[key]).filter(Boolean).join(" · ");
+              // The Board is the pre-print view: the same title as the print (Type, or Initials type while there is no Type),
+              // then the card's chosen fields; fields that already make up an Initials title are not repeated.
+              const heading = shown ? scheduleCardTitle(shown) : null;
+              const title = heading?.title ?? null;
+              const spec = fields.filter((key) => SPEC_LINE_FIELDS.has(key) && !(heading?.fromInitials && INITIALS_FIELDS.has(key))).map((key) => fieldValue[key]).filter(Boolean).join(" · ");
               const details = fields.filter((key) => key !== "brand" && !SPEC_LINE_FIELDS.has(key))
                 .map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as [string, string | null | undefined])
                 .filter(([, value]) => !!value);
@@ -88,6 +149,7 @@ export function BoardView({
                   key={entry.id}
                   items={!selecting ? [
                     { label: "Open", onSelect: () => onOpen(entry.id) },
+                    ...(canEdit ? [{ label: "Card fields…", icon: <ListChecks className="h-3.5 w-3.5" />, onSelect: () => setFieldsFor(entry) }] : []),
                     ...menuItems(entry),
                     ...(canEdit ? [{ label: "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(entry) }] : []),
                   ] : []}
@@ -119,6 +181,15 @@ export function BoardView({
                       {entry.code}
                     </span>
                   </button>
+                  {canEdit && !selecting ? (
+                    <button
+                      type="button"
+                      onClick={() => setFieldsFor(entry)}
+                      className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-action bg-surface/95 px-1.5 py-0.5 text-micro font-medium text-ink opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-line-focus"
+                    >
+                      <ListChecks aria-hidden="true" className="h-3 w-3" />Card fields
+                    </button>
+                  ) : null}
                   {selecting ? (
                     <span className="absolute left-2 top-2 rounded-[4px] bg-surface p-0.5">
                       <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => onToggle(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} />

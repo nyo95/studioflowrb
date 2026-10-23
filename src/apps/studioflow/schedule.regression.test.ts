@@ -129,7 +129,7 @@ describe("Schedule field rules survive the relayout", () => {
   });
   it("Qty remains Fixture-only", () => {
     assert.match(scheduleBoard, /entry\.section === "FIXTURE" \?/);
-    assert.match(scheduleBoard, /visibilityAction\("qty", "Qty"\)/);
+    assert.match(scheduleBoard, /\.filter\(\(key\) => key !== "qty" \|\| entry\.section === "FIXTURE"\)/, "the Card fields picker offers Qty on Fixture cards only");
   });
   it("Brand remains one CreatableSearch with no Master Data write", () => {
     assert.match(scheduleBoard, /<CreatableSearch/);
@@ -201,9 +201,23 @@ describe("Copy for the studio sheet", () => {
 });
 
 describe("Board card is a viewer: Type or Initials type, then active fields", () => {
-  it("titles the card with the Type, or the Initials type while there is no Type, never both", () => {
-    assert.match(scheduleBoard, /const title = shown \? \(hasTypeOf\(shown\) \? shown\.productName : initialsOf\(shown\) \|\| shown\.productName\) : null;/);
-    assert.match(scheduleBoard, /SPEC_LINE_FIELDS\.has\(key\) && !INITIALS_FIELDS\.has\(key\)/);
+  it("titles the card with the Type, or the Initials type while there is no Type, the same on the Board and in print", () => {
+    assert.match(scheduleBoard, /const heading = shown \? scheduleCardTitle\(shown\) : null;/);
+    assert.match(scheduleBoard, /SPEC_LINE_FIELDS\.has\(key\) && !\(heading\?\.fromInitials && INITIALS_FIELDS\.has\(key\)\)/);
+    assert.match(schedulePrint, /const heading = shown \? scheduleCardTitle\(shown\) : null;/);
+    assert.match(schedulePrint, /\{heading\?\.title\}/);
+  });
+});
+
+describe("Board is the pre-print view; the inspector only records data (owner, 2026-10-23)", () => {
+  it("has no card-field dots in the inspector or the Add item drawer", () => {
+    assert.doesNotMatch(scheduleBoard, /visibilityAction|VisibilityField|on card &amp; print|cardFieldsDraft/);
+  });
+  it("chooses card fields per card on the Board, from a hover button and the right-click menu", () => {
+    assert.match(scheduleBoard, /function CardFieldsDialog\(/);
+    assert.match(scheduleBoard, /label: "Card fields…"/);
+    assert.match(scheduleBoard, /updateScheduleEntryCardFieldsAction\(\{ projectId, entryId: entry\.id, fields \}\)/);
+    assert.match(scheduleBoard, />Use default<\/Button>/);
   });
 });
 
