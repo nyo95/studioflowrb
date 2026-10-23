@@ -225,12 +225,16 @@ export function rowHighlightStyle(highlight: ScheduleHighlight | null): CSSPrope
   return highlight ? ({ "--row-highlight": `var(--ui-highlight-${highlight})` } as CSSProperties) : undefined;
 }
 
-/** A List row's background: a highlight tint that deepens on hover and while the row is open, else the plain states. */
+/**
+ * A List row's background. A highlight is a tint with a thin colour edge that deepens on hover. The row open in the
+ * inspector carries a thick dark edge instead (owner, 2026-10-23), so it never reads as a highlight, hover or selection.
+ */
 export function rowHighlightClass(highlight: ScheduleHighlight | null, open: boolean): string {
-  if (!highlight) return open ? "bg-surface-muted" : "hover:bg-surface-muted";
-  return `shadow-[inset_3px_0_0_var(--row-highlight)] ${open
-    ? "bg-[color-mix(in_srgb,var(--row-highlight)_30%,var(--ui-surface))]"
-    : "bg-[color-mix(in_srgb,var(--row-highlight)_14%,var(--ui-surface))] hover:bg-[color-mix(in_srgb,var(--row-highlight)_24%,var(--ui-surface))]"}`;
+  const edge = open ? "shadow-[inset_4px_0_0_var(--color-ink)]" : highlight ? "shadow-[inset_3px_0_0_var(--row-highlight)]" : "";
+  const tint = highlight
+    ? "bg-[color-mix(in_srgb,var(--row-highlight)_14%,var(--ui-surface))] hover:bg-[color-mix(in_srgb,var(--row-highlight)_24%,var(--ui-surface))]"
+    : open ? "bg-[color-mix(in_srgb,var(--color-ink)_3%,var(--ui-surface))]" : "hover:bg-surface-muted";
+  return `${edge} ${tint}`;
 }
 
 /** A Board card's colour frame, set off from the card by a thin gap. */

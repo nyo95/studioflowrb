@@ -293,7 +293,7 @@ describe("Hide and highlight never leave a stale mark (R9.232, R9.234)", () => {
   });
   it("keeps hover and the open row visible on a highlighted row", () => {
     assert.match(shared, /hover:bg-\[color-mix\(in_srgb,var\(--row-highlight\)_24%,var\(--ui-surface\)\)\]/);
-    assert.match(shared, /bg-\[color-mix\(in_srgb,var\(--row-highlight\)_30%,var\(--ui-surface\)\)\]/);
+    assert.match(shared, /const edge = open \? "shadow-\[inset_4px_0_0_var\(--color-ink\)\]"/, "the open row has its own thick dark edge");
     assert.match(scheduleBoard, /\$\{rowHighlightClass\(entry\.highlight, open\?\.id === entry\.id\)\}/);
   });
 });

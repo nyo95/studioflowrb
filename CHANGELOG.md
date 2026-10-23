@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.235 | 2026-10-23 | ui(studioflow): the List row open in the inspector has its own mark (Lead)
+
+- **Owner report:** after editing GL-04's Location and pressing Enter, the row stayed gray "like a selection or highlight" until reload.
+- **Finding:** not a stale value. Enter saves and keeps the inspector open (as the Save button does), and the open row used the same gray as hover, selection and the Gray highlight; a reload closes the inspector, so the gray went away.
+- **Change (owner chose):** the open row carries a thick dark left edge with a very light tint; a highlighted open row keeps its colour tint and shows the dark edge instead of its thin colour edge. Hover, selection and highlights are unchanged.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, eslint, schedule regression tests 50/50.
+
 ## R9.234 | 2026-10-23 | fix(studioflow): highlight and hide marks hold until the page agrees; hover shows on highlighted rows (Lead)
 
 - **Owner report:** after R9.232 a highlight change could still stay stale until reload; and on a gray row, hover showed no change at all.
