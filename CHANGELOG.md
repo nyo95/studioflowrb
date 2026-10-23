@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.216 | 2026-10-23 | plan(studioflow): Product Schedule Brands do not depend on Master Data (Lead)
+
+- **Owner decision:** the Product Schedule is independent; it may take a Brand from Master Data when one exists, but a Brand that is not in Master Data must still be usable (reported when the Assistant refused "Lalapis" for GL-03).
+- **Finding:** in the app a typed Brand is kept on edit but silently dropped when an item, an option or a template item is created (`brandSnapshot` resolves only an id). The Assistant refuses any Brand not chosen from Master Data by design (2026-10-22 rule), now reversed.
+- **Plan:** `WO-SF-SCHEDULE-BRAND-FREE-01` - one Brand rule for every create/edit path; the Assistant resolves an exact Master Data name or keeps the typed name with a warning and suggestions; schedule-assistant 1.4.0. Executor R9.217.
+- **Migration/dependencies:** none.
+- **Checks:** docs only.
+
 ## R9.215 | 2026-10-23 | ui(studioflow): Contact column is optional in the Schedule List and its copy (Lead)
 
 - **Owner:** Contact is rarely used in the studio's sheet; it is asked for sometimes, not usually.

@@ -1,37 +1,39 @@
 # Active Plan
 
-Plan ID: WO-SF-SCHEDULE-MARKS-01; full plan in `docs/apps/studioflow/WO-SF-SCHEDULE-MARKS-01.md`
-Scope: Product Schedule items can be hidden and highlighted (shared for everyone), with filters, bulk actions, progress that skips hidden items, and a print that asks whether hidden items are included.
-Module(s): `studioflow` (Product Schedule).
-Target revision: plan R9.212; backend (Codex) R9.213; UI (Lead) R9.214.
-Risk: low-medium - two additive columns on schedule items and two bulk commands.
-Status: DONE - backend R9.213 (Codex, PASS), UI R9.214 (Lead); owner browser check owed.
+Plan ID: WO-SF-SCHEDULE-BRAND-FREE-01; full plan in `docs/apps/studioflow/WO-SF-SCHEDULE-BRAND-FREE-01.md`
+Scope: Product Schedule Brands do not depend on Master Data: typed Brands survive every create path, and the Schedule Assistant accepts a typed Brand with a warning instead of refusing it.
+Module(s): `studioflow` (schedule service), `schedule-assistant` (composer, MCP bridge, contract; 1.3.0 -> 1.4.0).
+Target revision: plan R9.216; backend (Codex) R9.217.
+Risk: medium - reverses a locked Assistant rule (2026-10-22) and touches three create paths.
+Status: READY for Executor (R9.217).
 Priority: P1
-Owner: Product Owner (decisions 2026-10-23: marks are shared in the database; hidden items leave the progress count; print asks each time whether hidden items are included)
+Owner: Product Owner (decision 2026-10-23: the Product Schedule is independent; it may take a Brand from Master Data when one exists, and a Brand not in Master Data must still be usable)
 Last updated: 2026-10-23
 
-Previous plan: `WO-SF-SCHEDULE-SHEET-01` DONE in R9.205-R9.207 (owner browser check owed), followed by List/Board
-refinements R9.208-R9.211.
+Previous plan: `WO-SF-SCHEDULE-MARKS-01` DONE in R9.213/R9.214 (owner browser check owed). R9.215 made the List's
+Contact column optional.
 
 ## Locked Decisions
 
-See `docs/apps/studioflow/WO-SF-SCHEDULE-MARKS-01.md` "Locked decisions" 1-8.
+See `docs/apps/studioflow/WO-SF-SCHEDULE-BRAND-FREE-01.md` "Locked decisions" 1-6.
 
 ## Acceptance Criteria
 
-As in WO-SF-SCHEDULE-MARKS-01 "Acceptance". Executor verification: typecheck, lint, studioflow unit and
-integration tests, boundary checks, build, migration applied to the selected location's dev and test databases.
-Reviewer (Lead) owns the UI (R9.214) and acceptance; browser checks are the owner's.
+As in WO-SF-SCHEDULE-BRAND-FREE-01 "Acceptance". Executor verification: typecheck, lint, studioflow and
+schedule-assistant unit and integration tests, boundary checks, build. No migration.
+Reviewer (Lead) owns acceptance; browser and MCP checks are the owner's.
 
 ## Executor Prompt
 
 ```text
 Role: BACKEND EXECUTOR. Read AGENTS.md, docs/agent/EXECUTOR.md, PLAN.md and
-docs/apps/studioflow/WO-SF-SCHEDULE-MARKS-01.md. Location: kantor (load .env.kantor, STUDIOFLOW_LOCATION=kantor).
-Implement only the "Executor scope (R9.213)" of WO-SF-SCHEDULE-MARKS-01: hidden + highlight on schedule items
-(one additive migration), SCHEDULE_HIGHLIGHTS in the domain, the two bulk service commands with audit and
-permission checks, the two server actions, view mapping, re-import keeping the marks, tests, changelog R9.213.
-Do not build menus, filters, print or progress changes (Lead R9.214). Apply the migration to the kantor dev and
-test databases after verifying both targets are rebuild-only, restart the :3001 dev server, commit locally as
-R9.213 (no push) and return the Planner/Reviewer prompt with outcome, commit, checks, limitations and dirty files.
+docs/apps/studioflow/WO-SF-SCHEDULE-BRAND-FREE-01.md. Location: kantor (load .env.kantor, STUDIOFLOW_LOCATION=kantor).
+Implement only the "Executor scope (R9.217)": one Brand helper in the schedule service so a typed Brand
+(brandName without brandId) is kept on every create and edit path (createEntry, createOption and
+createTemplateItem drop it today); in the schedule composer, a typed Brand resolves to an exact Master Data
+name match or else is kept with the warning SCHEDULE_BRAND_NOT_IN_MASTER_DATA plus suggestions (an unknown
+brandId stays blocking); update the MCP bridge instructions/descriptions, CONTRACT.md, README and bump
+schedule-assistant to 1.4.0; tests; changelog R9.217. No Master Data writes, no migration, no UI change.
+Restart the :3001 dev server, commit locally as R9.217 (no push) and return the Planner/Reviewer prompt with
+outcome, commit, checks, limitations and dirty files.
 ```
