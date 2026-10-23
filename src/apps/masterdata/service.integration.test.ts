@@ -128,6 +128,49 @@ describe("Name-only Brand creation from pricing", () => {
 });
 
 describe("Supplier and Brand contacts", () => {
+  it("lists Brand representatives before owner and supplier contacts without leaking archived or unrelated vendors", async () => {
+    const db = testDb.prisma;
+    const vendor = async (name: string) => db.vendor.create({ data: { name, slug: `${name.toLowerCase()}-${crypto.randomUUID()}` } });
+    const owner = await vendor("Owner");
+    const supplier = await vendor("Supplier");
+    const archived = await vendor("Archived");
+    const unrelated = await vendor("Unrelated");
+    const brand = await db.brand.create({ data: { name: "Paint", slug: `paint-${crypto.randomUUID()}`, owner_vendor_id: owner.id } });
+    await db.brandSupplier.createMany({ data: [
+      { brand_id: brand.id, vendor_id: owner.id },
+      { brand_id: brand.id, vendor_id: supplier.id },
+      { brand_id: brand.id, vendor_id: archived.id },
+    ] });
+    const contact = async (vendorId: string, personName: string, brandId: string | null, isPrimary = false) => db.vendorContact.create({ data: { vendor_id: vendorId, person_name: personName, brand_id: brandId, is_primary: isPrimary, job_title: "Sales", phone: "0812", email: "private@example.test", notes: "private", extra_phones: ["999"] } });
+    const rep = await contact(unrelated.id, "Zara", brand.id, true);
+    await contact(owner.id, "Andi", brand.id);
+    await contact(owner.id, "Citra", null, true);
+    await contact(supplier.id, "Budi", null, true);
+    await contact(supplier.id, "Doni", null);
+    await contact(archived.id, "Hidden", null);
+    await contact(unrelated.id, "Not Related", null);
+    await db.vendor.update({ where: { id: archived.id }, data: { deleted_at: new Date() } });
+
+    const rows = await publicRead.listBrandContacts(brand.id);
+    assert.deepEqual(rows.map((row) => [row.personName, row.forBrand]), [["Zara", true], ["Andi", true], ["Budi", false], ["Citra", false], ["Doni", false]]);
+    assert.deepEqual(rows[0], { id: rep.id, personName: "Zara", jobTitle: "Sales", phone: "0812", vendorName: "Unrelated", isPrimary: true, forBrand: true });
+    assert.equal(await publicRead.listBrandContacts(crypto.randomUUID()).then((contacts) => contacts.length), 0);
+    await db.brand.update({ where: { id: brand.id }, data: { deleted_at: new Date() } });
+    assert.deepEqual(await publicRead.listBrandContacts(brand.id), []);
+  });
+
+  it("caps the contact read at 20 with Brand-specific contacts taking priority", async () => {
+    const db = testDb.prisma;
+    const vendor = await db.vendor.create({ data: { name: "Many", slug: `many-${crypto.randomUUID()}` } });
+    const brand = await db.brand.create({ data: { name: "Many", slug: `many-brand-${crypto.randomUUID()}`, owner_vendor_id: vendor.id } });
+    await db.vendorContact.createMany({ data: Array.from({ length: 22 }, (_, index) => ({ vendor_id: vendor.id, brand_id: brand.id, person_name: `Rep ${String(index).padStart(2, "0")}` })) });
+    await db.vendorContact.create({ data: { vendor_id: vendor.id, person_name: "General" } });
+    const rows = await publicRead.listBrandContacts(brand.id);
+    assert.equal(rows.length, 20);
+    assert.equal(rows.every((row) => row.forBrand), true);
+    assert.equal(rows.at(-1)?.personName, "Rep 19");
+  });
+
   it("keeps up to three phone numbers per contact and rejects a fourth", async () => {
     const context = await createMaterialContext();
     await service.updateVendor({ grants: GRANTS, actor: ACTOR, vendorId: context.vendorId, name: "Supplier One", contacts: [{ personName: "Sales", phones: [" 0215819089 ", "0812111", "0812222", "0812111"] }] });

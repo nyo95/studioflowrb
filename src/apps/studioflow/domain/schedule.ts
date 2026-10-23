@@ -33,6 +33,14 @@ export const SCHEDULE_EXTRA_VALUE_MAX = 300;
 /** One free-form specification line the studio added to an option, e.g. "Abrasion class" / "PEI IV". */
 export type ScheduleExtraField = { label: string; value: string };
 
+/** Contact is copied into an option as text; subsequent Master Data edits do not change it. */
+export function formatScheduleContact(input: { personName: string; jobTitle: string | null; phone: string | null }): string {
+  const name = input.personName.trim();
+  const title = input.jobTitle?.trim();
+  const phone = input.phone?.trim();
+  return `${name}${title ? ` (${title})` : ""}${phone ? ` - ${phone}` : ""}`.slice(0, 160);
+}
+
 export type ScheduleSnapshotInput = {
   brandName?: string | null;
   productName: string;

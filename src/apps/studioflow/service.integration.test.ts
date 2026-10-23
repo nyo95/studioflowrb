@@ -1463,6 +1463,24 @@ describe("SF-R2 MOM", () => {
 });
 
 describe("SF-R3 Product Schedule", () => {
+  it("offers Brand contact labels only to readers of the selected project", async () => {
+    const { projectId } = await newProject("Contact choices");
+    const other = await newProject("Other contact project");
+    const outsider = await seedUser("Outside", ALL);
+    const vendor = await testDb.prisma.vendor.create({ data: { name: "Contact Vendor", slug: `contact-${randomUUID()}` } });
+    const brand = await testDb.prisma.brand.create({ data: { name: "Contact Brand", slug: `brand-${randomUUID()}`, owner_vendor_id: vendor.id } });
+    const contact = await testDb.prisma.vendorContact.create({ data: { vendor_id: vendor.id, brand_id: brand.id, person_name: " Andi ", job_title: " Sales ", phone: " 0812 ", is_primary: true } });
+    const read = (actorId: string, grants: readonly string[], selectedProjectId = projectId, brandId: string | null = brand.id) => sf.schedule.listBrandContactChoices({ actorId, grants, projectId: selectedProjectId, brandId });
+
+    assert.deepEqual(await read(designer.id, DRAFTER_GRANTS), [{ id: contact.id, label: "Andi (Sales) - 0812", vendorName: "Contact Vendor", forBrand: true }]);
+    assert.deepEqual(await read(designer.id, DRAFTER_GRANTS, projectId, null), []);
+    await rejectsWith(read(designer.id, DRAFTER_GRANTS.filter((grant) => grant !== P.projectRead)), "PERMISSION_DENIED");
+    await rejectsWith(read(outsider.id, DRAFTER_GRANTS), "PERMISSION_DENIED");
+    assert.equal((await read(outsider.id, ALL)).length, 1, "a Studio Manager may read an unassigned project");
+    await rejectsWith(read(designer.id, ALL, randomUUID()), "PROJECT_NOT_FOUND");
+    assert.deepEqual(await read(designer.id, ALL, other.projectId, brand.id), [{ id: contact.id, label: "Andi (Sales) - 0812", vendorName: "Contact Vendor", forBrand: true }]);
+  });
+
   it("sets shared item marks in bulk, skips unchanged rows, and audits each change", async () => {
     const { projectId } = await newProject();
     const one = await sf.schedule.createEntry({ ...as(designer), projectId, section: "MATERIAL", category: "Paint" });

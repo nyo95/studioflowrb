@@ -12,6 +12,7 @@ import {
   compareOptionLabels,
   orderedScheduleOptions,
   fallbackPrefix,
+  formatScheduleContact,
   isPermutation,
   nextOptionLabel,
   isScheduleCardFieldKey,
@@ -39,11 +40,13 @@ import {
   optionalText,
   requireCommand,
   requireProjectAccess,
+  requireProjectDetailAccess,
   requireRead,
   writeAudit,
   type CommandContext,
   type Db,
   type ReadContext,
+  type WorkSectionReadContext,
   type StudioFlowPorts,
   type TxClient,
 } from "../shared";
@@ -628,6 +631,18 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
       requireRead(input.grants);
       const brands = await ports.masterData.listBrandLibraryReads({ search: input.search });
       return brands.map((brand) => ({ id: brand.id, name: brand.name }));
+    },
+
+    async listBrandContactChoices(input: WorkSectionReadContext & { projectId: string; brandId: string | null }) {
+      await requireProjectDetailAccess(db, { grants: input.grants, actorId: input.actorId, projectId: input.projectId });
+      if (!input.brandId) return [];
+      const contacts = await ports.masterData.listBrandContacts(input.brandId);
+      return contacts.map((contact) => ({
+        id: contact.id,
+        label: formatScheduleContact(contact),
+        vendorName: contact.vendorName,
+        forBrand: contact.forBrand,
+      }));
     },
 
     async upsertPrefix(input: CommandContext & { section: string; category: string; prefix: string }) {

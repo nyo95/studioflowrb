@@ -18,6 +18,17 @@ export type BrandLibraryRead = {
   links: Array<{ id: string; kind: string; url: string; label: string | null }>;
 };
 
+/** Bounded contact projection for consumers that keep their own text snapshot. */
+export type BrandContactRead = {
+  id: string;
+  personName: string;
+  jobTitle: string | null;
+  phone: string | null;
+  vendorName: string;
+  isPrimary: boolean;
+  forBrand: boolean;
+};
+
 export type MaterialPriceOption = {
   id: string;
   skuId: string;
@@ -169,6 +180,41 @@ export function createMasterDataPublicRead(db: PrismaClient) {
         hashtags: brand.hashtags,
         links: brand.links,
       };
+    },
+
+    async listBrandContacts(brandId: string): Promise<BrandContactRead[]> {
+      const brand = await db.brand.findUnique({
+        where: { id: brandId },
+        select: { deleted_at: true, owner_vendor_id: true, suppliers: { select: { vendor_id: true } } },
+      });
+      if (!brand || brand.deleted_at) return [];
+
+      const select = {
+        id: true,
+        person_name: true,
+        job_title: true,
+        phone: true,
+        is_primary: true,
+        vendor: { select: { name: true } },
+      } as const;
+      const orderBy = [{ is_primary: "desc" as const }, { person_name: "asc" as const }, { id: "asc" as const }];
+      const representatives = await db.vendorContact.findMany({
+        where: { brand_id: brandId, vendor: { deleted_at: null } },
+        select,
+        orderBy,
+        take: 20,
+      });
+      const vendorIds = [...new Set([brand.owner_vendor_id, ...brand.suppliers.map((supplier) => supplier.vendor_id)].filter((id): id is string => !!id))];
+      const general = representatives.length === 20 || vendorIds.length === 0 ? [] : await db.vendorContact.findMany({
+        where: { brand_id: null, vendor_id: { in: vendorIds }, vendor: { deleted_at: null } },
+        select,
+        orderBy,
+        take: 20 - representatives.length,
+      });
+      return [
+        ...representatives.map((contact) => ({ id: contact.id, personName: contact.person_name, jobTitle: contact.job_title, phone: contact.phone, vendorName: contact.vendor.name, isPrimary: contact.is_primary, forBrand: true })),
+        ...general.map((contact) => ({ id: contact.id, personName: contact.person_name, jobTitle: contact.job_title, phone: contact.phone, vendorName: contact.vendor.name, isPrimary: contact.is_primary, forBrand: false })),
+      ];
     },
 
     async listBrandLibraryReads(filter?: { search?: string; categoryId?: string; hashtag?: string }): Promise<BrandLibraryRead[]> {

@@ -864,6 +864,15 @@ function refreshSchedule(projectId: string) {
 }
 
 const ScheduleSection = z.enum(["MATERIAL", "FIXTURE"]);
+const ScheduleBrandContacts = z.strictObject({ projectId: Id, brandId: Id.nullable() });
+export async function listScheduleBrandContactsAction(input: z.infer<typeof ScheduleBrandContacts>): Promise<ActionResult<Array<{ id: string; label: string; vendorName: string; forBrand: boolean }>>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(ScheduleBrandContacts, input);
+    return studioFlow.schedule.listBrandContactChoices({ grants: ctx.grants, actorId: ctx.userId, ...data });
+  });
+}
+
 const ScheduleSnapshot = z.strictObject({
   brandId: Id.nullish(),
   brandName: z.string().max(160).nullish(),

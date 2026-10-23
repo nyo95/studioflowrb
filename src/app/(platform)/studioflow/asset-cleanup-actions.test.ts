@@ -15,6 +15,7 @@ type Actions = {
   getAssetCleanupPreviewAction?: () => Promise<ActionResult<{ eligibleProjects: number; retentionDays: number }>>;
   setScheduleEntriesHiddenAction?: (input: unknown) => Promise<ActionResult<unknown>>;
   setScheduleEntriesHighlightAction?: (input: unknown) => Promise<ActionResult<unknown>>;
+  listScheduleBrandContactsAction?: (input: unknown) => Promise<ActionResult<unknown>>;
 };
 
 /** Executes the real StudioFlow action module with only its framework and runtime edges replaced. */
@@ -25,6 +26,7 @@ function loadActions(grants = ["studioflow.access", "studioflow.project.manage"]
   const previewCalls: string[] = [];
   const retryCalls: number[] = [];
   const markCalls: Array<{ kind: string; input: Record<string, unknown> }> = [];
+  const contactCalls: Array<Record<string, unknown>> = [];
   const revalidated: Array<[string, string | undefined]> = [];
   const ctx = { principal: { userId: "user-1", displayName: "Owner" }, grants };
   const dependencies: Record<string, unknown> = {
@@ -49,6 +51,7 @@ function loadActions(grants = ["studioflow.access", "studioflow.project.manage"]
         schedule: {
           setEntriesHidden: async (input: Record<string, unknown>) => { markCalls.push({ kind: "hidden", input }); return { changed: 1 }; },
           setEntriesHighlight: async (input: Record<string, unknown>) => { markCalls.push({ kind: "highlight", input }); return { changed: 1 }; },
+          listBrandContactChoices: async (input: Record<string, unknown>) => { contactCalls.push(input); return [{ id: "contact-1", label: "Andi - 0812", vendorName: "Vendor", forBrand: true }]; },
         },
         projects: {
           runAssetCleanup: async (input: { limit: number; userId: string }) => { cleanupCalls.push({ limit: input.limit, userId: input.userId }); return { projectsPurged: 2 }; },
@@ -62,8 +65,21 @@ function loadActions(grants = ["studioflow.access", "studioflow.project.manage"]
     assert.ok(id in dependencies, `unexpected dependency: ${id}`);
     return dependencies[id];
   }, exports);
-  return { exports, cleanupCalls, previewCalls, retryCalls, markCalls, revalidated };
+  return { exports, cleanupCalls, previewCalls, retryCalls, markCalls, contactCalls, revalidated };
 }
+
+it("schedule contact action validates IDs, carries the signed-in reader and does not revalidate", async () => {
+  const { exports, contactCalls, revalidated } = loadActions();
+  const projectId = randomUUID();
+  const brandId = randomUUID();
+  for (const input of [{ projectId: "bad", brandId }, { projectId, brandId: "bad" }, { projectId, brandId, extra: true }]) {
+    assert.equal((await exports.listScheduleBrandContactsAction!(input)).ok, false);
+  }
+  assert.equal(contactCalls.length, 0);
+  assert.deepEqual(await exports.listScheduleBrandContactsAction!({ projectId, brandId }), { ok: true, data: [{ id: "contact-1", label: "Andi - 0812", vendorName: "Vendor", forBrand: true }] });
+  assert.deepEqual(contactCalls, [{ grants: ["studioflow.access", "studioflow.project.manage"], actorId: "user-1", projectId, brandId }]);
+  assert.deepEqual(revalidated, []);
+});
 
 it("schedule mark actions validate selection and palette before calling the service", async () => {
   const { exports, markCalls, revalidated } = loadActions();

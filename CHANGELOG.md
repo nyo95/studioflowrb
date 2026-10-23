@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.222 | 2026-10-23 | feat(studioflow): offer Brand contacts for schedule snapshots (Codex Executor)
+
+- **Scope:** Master Data exposes up to 20 contacts for an active Brand through its public read: Brand representatives first, then general owner and supplier contacts, primary first within each group. Archived vendors and unrelated contacts are excluded; only contact id, name, title, first phone, vendor and ordering flags cross the boundary.
+- **StudioFlow:** schedule readers with access to the selected project can request formatted Contact choices (`Name (Title) - phone`) through the schedule service and server action. Contact remains optional, freely editable text capped at 160 characters; choosing a contact will copy a snapshot. UI wiring belongs to R9.223.
+- **Migration/dependencies:** none. No foreign key, automatic fill or Master Data write.
+- **Checks:** high-tier verification passed: 1,333/1,333 tests, typecheck, lint, boundary and legacy scans, production build and whitespace checks. Targeted new scenarios passed 6/6.
+
 ## R9.221 | 2026-10-23 | ui(studioflow): inspector photo fills the height beside it (Lead)
 
 - **Owner report:** since Contact joined Type and Brand, the fields beside the inspector photo are taller than the 4:5 photo, leaving an empty band under it.
