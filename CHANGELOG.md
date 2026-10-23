@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.204 | 2026-10-23 | plan(studioflow): Product Schedule list matches the studio sheet (Lead)
+
+- **Review:** R9.202 and R9.203 (Codex) accepted PASS after diff review, typecheck and focused lint; browser left to the owner.
+- **Plan:** `WO-SF-SCHEDULE-SHEET-01` - a real Contact field on schedule options and template items (moved out of notes), the legacy sheet import accepts the `MATERIAL TYPE` header and uses Initials type as the type when TYPE is empty, and the List view follows the sheet's columns. Initials type stays a spec summary, not a field (owner, 2026-10-23).
+- **Migration/dependencies:** none in this revision (planned for R9.205).
+- **Checks:** docs only.
+
 ## R9.203 | 2026-10-23 | ui(platform): retire duplicate Modules settings page (Codex, owner-directed UI)
 
 - **Owner decision:** the read-only Modules page in Platform settings is no longer needed because the separate Developer console shows module state and controls.
