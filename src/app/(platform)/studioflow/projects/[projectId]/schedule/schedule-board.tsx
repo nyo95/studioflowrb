@@ -19,6 +19,7 @@ import {
   extraFieldKey,
   extraChoicesOf,
   finalOf,
+  isSpecPlaceholder,
   nextOptionLabel,
   resolveCardFields,
   shownOptionOf,
@@ -269,6 +270,14 @@ function sheetRowOf(entry: ScheduleEntryView): string[] {
   return entry.section === "FIXTURE" ? [...row, entry.qty ?? "", entry.unit ?? ""] : row;
 }
 
+/** The fields that make up the Initials type; a Board card shows them only as its title, when there is no Type yet. */
+const INITIALS_FIELDS: ReadonlySet<string> = new Set(["color", "pattern", "finishing"]);
+
+/** A real Type, not the empty / "-" / "TBA" placeholder or the sheet import's "Imported". */
+function hasTypeOf(option: ScheduleOptionView): boolean {
+  return !isSpecPlaceholder(option.productName) && option.productName !== "Imported";
+}
+
 /** The sheet's "Initials type": the rough description (colour, pattern, finishing) used before the exact product is known. */
 function initialsOf(option: ScheduleOptionView): string {
   return [option.color, option.pattern, option.finishing].filter(Boolean).join(" · ");
@@ -458,7 +467,10 @@ function BoardView({
               const fields = effectiveCardFields(entry);
               const brand = fields.includes("brand") ? fieldValue.brand : null;
               // Self-describing specs read as one line ("Pink · Texture Paint · Matte"); only fields that need a name keep one.
-              const spec = fields.filter((key) => SPEC_LINE_FIELDS.has(key)).map((key) => fieldValue[key]).filter(Boolean).join(" · ");
+              // The Board is a viewer, not the print (owner, 2026-10-23): the title is the Type, or the Initials type
+              // while there is no Type yet, never both; below it only the active card fields, minus the initials.
+              const title = shown ? (hasTypeOf(shown) ? shown.productName : initialsOf(shown) || shown.productName) : null;
+              const spec = fields.filter((key) => SPEC_LINE_FIELDS.has(key) && !INITIALS_FIELDS.has(key)).map((key) => fieldValue[key]).filter(Boolean).join(" · ");
               const details = fields.filter((key) => key !== "brand" && !SPEC_LINE_FIELDS.has(key))
                 .map((key) => [cardFieldLabel(key, extras), fieldValue[key]] as [string, string | null | undefined])
                 .filter(([, value]) => !!value);
@@ -507,8 +519,8 @@ function BoardView({
                   <button type="button" onClick={() => pick(entry.id)} className="grid min-w-0 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
                   {badges.length ? <span className="mb-1 flex flex-wrap gap-1">{badges.map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span> : null}
                   {brand ? <span className="truncate text-micro uppercase tracking-[0.08em] text-ink-tertiary">{brand}</span> : null}
-                  {shown ? (
-                    <span className="line-clamp-2 font-ui-sans text-xs font-semibold uppercase leading-snug text-ink" title={shown.productName}>{shown.productName}</span>
+                  {title ? (
+                    <span className="line-clamp-2 font-ui-sans text-xs font-semibold uppercase leading-snug text-ink" title={title}>{title}</span>
                   ) : (
                     <span className="text-xs italic text-ink-tertiary">Reserved, no product yet</span>
                   )}

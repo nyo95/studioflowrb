@@ -193,3 +193,10 @@ describe("Copy for the studio sheet", () => {
     assert.match(scheduleBoard, /onCopy=\{\(\) => void copyRows\(/);
   });
 });
+
+describe("Board card is a viewer: Type or Initials type, then active fields", () => {
+  it("titles the card with the Type, or the Initials type while there is no Type, never both", () => {
+    assert.match(scheduleBoard, /const title = shown \? \(hasTypeOf\(shown\) \? shown\.productName : initialsOf\(shown\) \|\| shown\.productName\) : null;/);
+    assert.match(scheduleBoard, /SPEC_LINE_FIELDS\.has\(key\) && !INITIALS_FIELDS\.has\(key\)/);
+  });
+});

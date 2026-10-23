@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.211 | 2026-10-23 | ui(studioflow): Board cards show the Type or the Initials type, then the active fields (Lead)
+
+- **Owner request:** the Board is a viewer, not the print. A card's title is the Type; while an item has no real Type yet (empty, a placeholder such as "-" / "TBA", or the import's "Imported"), the title is its Initials type (Color, Pattern, Finishing). The two are never shown together.
+- **Below the title:** only the item's active card fields (Brand, Size, Qty, Location, Notes, extra spec lines), without the colour/pattern/finishing line. Print and the List are unchanged.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, schedule regression tests. Browser check is the owner's on :3001.
+
 ## R9.210 | 2026-10-23 | feat(studioflow): copy Product Schedule rows and photos for the studio sheet (Lead)
 
 - **Owner request:** the studio still keeps its Google Sheet by hand alongside the app; copying an item should drop straight into it, photo included.
