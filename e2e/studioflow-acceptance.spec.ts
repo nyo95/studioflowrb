@@ -107,6 +107,8 @@ test("7.6 a note image can be saved to Ideas, put on the moodboard and used in t
 
 test("8.6 a deleted code is filled again by the next new row", async ({ page }) => {
   await openProject(page, sf.codes, "/schedule");
+  // Quick add and the card buttons live on the Board; List is the default view (R9.209).
+  await page.getByRole("button", { name: "Board", exact: true }).click();
   await page.getByRole("button", { name: /ST-02/ }).first().click();
   await page.getByRole("button", { name: "Actions for ST-02" }).click();
   await page.getByRole("menuitem", { name: /Delete/ }).click();

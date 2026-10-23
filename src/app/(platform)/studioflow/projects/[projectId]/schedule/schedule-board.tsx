@@ -547,7 +547,7 @@ export function ScheduleBoard({
   const { run, error } = command;
   const confirm = useConfirm();
   const [section, setSection] = useState<Section>(() => entries.find((entry) => entry.id === initialOpenId)?.section ?? (entries.some((e) => e.section === "MATERIAL") || !entries.length ? "MATERIAL" : "FIXTURE"));
-  const [viewMode, setViewMode] = useState<"list" | "board">("board");
+  const [viewMode, setViewMode] = useState<"list" | "board">("list"); // List is the default view (owner, 2026-10-23)
   const [filter, setFilter] = useState<ScheduleFilter>("all");
   const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const scrolledInitial = useRef(false);
@@ -912,9 +912,22 @@ export function ScheduleBoard({
                           {group.rows.map((entry, index) => {
                             const shown = shownOptionOf(entry);
                             const busy = command.pendingKeys.some((key) => key.startsWith(entry.id));
+                            // One action list for the row's … menu and its right-click menu, as on the Board.
+                            const rowItems = (canEdit || canManageTemplates) && !selecting ? [
+                              { label: "Open", onSelect: () => openEntry(entry.id) },
+                              ...(canManageTemplates && templateSourceOf(entry)
+                                ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
+                                : []),
+                              ...(canEdit ? [
+                                { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: !listManual || index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
+                                { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: !listManual || index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
+                                { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
+                                { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
+                              ] : []),
+                            ] : [];
                             return (
+                              <ContextActionMenu key={entry.id} items={rowItems}>
                               <li
-                                key={entry.id}
                                 id={`schedule-entry-${entry.id}`}
                                 draggable={canEdit && listManual && !selecting}
                                 onDragStart={listDrag.start(entry.id)}
@@ -943,25 +956,9 @@ export function ScheduleBoard({
                                   {section === "FIXTURE" ? <span className="w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span> : null}
                                   <span className="flex w-28 shrink-0 flex-wrap gap-1">{entryBadges(entry).map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span>
                                 </button>
-                                {(canEdit || canManageTemplates) && !selecting ? (
-                                  <RowActionMenu
-                                    label={`Actions for ${entry.code}`}
-                                    pending={busy}
-                                    items={[
-                                      { label: "Open", onSelect: () => openEntry(entry.id) },
-                                      ...(canManageTemplates && templateSourceOf(entry)
-                                        ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
-                                        : []),
-                                      ...(canEdit ? [
-                                        { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: !listManual || index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
-                                        { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: !listManual || index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
-                                        { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
-                                        { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
-                                      ] : []),
-                                    ]}
-                                  />
-                                ) : null}
+                                {rowItems.length > 0 ? <RowActionMenu label={`Actions for ${entry.code}`} pending={busy} items={rowItems} /> : null}
                               </li>
+                              </ContextActionMenu>
                             );
                           })}
                         </ul>

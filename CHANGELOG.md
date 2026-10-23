@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.209 | 2026-10-23 | ui(studioflow): Product Schedule opens on List, rows right-click like the Board (Lead)
+
+- **Owner request:** the Schedule opens on List by default (Board stays one click away), and right-clicking a List row opens the item's action menu instead of the browser menu, as on Board cards.
+- **Change:** the List row's ... menu and its right-click menu share one action list (Open, Save as template item, Move up/down, Move to category, Delete), so they can never drift apart.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, schedule regression tests 33/33. E2E 8.6 now switches to Board before using quick add (not run in this revision). Browser check is the owner's on :3001.
+
 ## R9.208 | 2026-10-23 | ui(studioflow): Product Schedule List groups collapse and expand (Lead)
 
 - **Owner request:** each category heading in the List (for example SPRAY PAINT 12) folds its rows away and opens them again; "Collapse all / Expand all" sits beside Filters. A group holding the item open in the inspector always stays open.

@@ -176,3 +176,11 @@ describe("List category groups collapse", () => {
     assert.match(scheduleBoard, /<ul hidden=\{collapsed\}/);
   });
 });
+
+describe("List is the default view with the Board's right-click menu", () => {
+  it("opens on List and shares one action list between the row menu and right-click", () => {
+    assert.match(scheduleBoard, /useState<"list" \| "board">\("list"\)/);
+    assert.match(scheduleBoard, /<ContextActionMenu key=\{entry\.id\} items=\{rowItems\}>/);
+    assert.match(scheduleBoard, /<RowActionMenu label=\{`Actions for \$\{entry\.code\}`\} pending=\{busy\} items=\{rowItems\} \/>/);
+  });
+});
