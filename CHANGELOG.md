@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.226 | 2026-10-23 | ui(masterdata): sample request queue shows the schedule item's photo and code (Lead)
+
+- **Owner request:** when a sample is requested, show the schedule item it came from.
+- **Change:** the Master Data sample-request queue shows a small photo and the item code (e.g. `CT-02`) beside the product; the request dialog shows the code in its title and the photo above the details, opening full size on click. A request whose item has no photo shows no empty frame.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, new regression test. Browser check is the owner's on :3001.
+
 ## R9.225 | 2026-10-23 | feat(studioflow): sample requests carry the schedule item's photo and code (Lead, Executor lane taken over by owner instruction)
 
 - **Owner:** "takeover aja semua" - the Lead implements the Executor scope of WO-SF-SAMPLE-PHOTO-01 itself.

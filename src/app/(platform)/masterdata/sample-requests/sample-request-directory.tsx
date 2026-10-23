@@ -254,9 +254,17 @@ export function SampleRequestDirectory({ rows, vendors, skus, units, canPrice, c
               return (
                 <TableRow key={row.sourceRequestId}>
                   <TableCell>
-                    <button type="button" className="border-0 bg-transparent p-0 text-left" onClick={() => setDetail(row)}>
-                      <span className="block font-medium text-ink underline-offset-2 hover:underline">{row.product.name}</span>
-                      {specOf(row) ? <span className="block text-xs text-ink-tertiary">{specOf(row)}</span> : null}
+                    <button type="button" className="flex items-center gap-2.5 border-0 bg-transparent p-0 text-left" onClick={() => setDetail(row)}>
+                      {/* The schedule item's photo (WO-SF-SAMPLE-PHOTO-01): a short-lived signed URL, so no image cache. */}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {row.product.imageUrl ? <img src={row.product.imageUrl} alt="" className="h-12 w-10 shrink-0 rounded-[4px] border border-line-subtle object-cover" /> : null}
+                      <span className="min-w-0">
+                        <span className="block font-medium text-ink underline-offset-2 hover:underline">
+                          {row.product.entryCode ? <span className="mr-1.5 font-ui-mono text-xs font-semibold text-ink-secondary">{row.product.entryCode}</span> : null}
+                          {row.product.name}
+                        </span>
+                        {specOf(row) ? <span className="block text-xs text-ink-tertiary">{specOf(row)}</span> : null}
+                      </span>
                     </button>
                   </TableCell>
                   <TableCell wrap>{row.project.name}</TableCell>
@@ -274,8 +282,14 @@ export function SampleRequestDirectory({ rows, vendors, skus, units, canPrice, c
       )}
 
       {detail ? (
-        <DraftDialog open onOpenChange={(open) => !open && setDetail(null)} title={detail.product.name} description={detail.project.name}>
+        <DraftDialog open onOpenChange={(open) => !open && setDetail(null)} title={detail.product.entryCode ? `${detail.product.entryCode} · ${detail.product.name}` : detail.product.name} description={detail.project.name}>
           <div className="grid gap-3 text-sm">
+            {detail.product.imageUrl ? (
+              <a href={detail.product.imageUrl} target="_blank" rel="noreferrer" title="Open the full photo" className="block justify-self-start overflow-hidden rounded-control border border-line-subtle bg-surface-muted">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={detail.product.imageUrl} alt={`Schedule photo of ${detail.product.name}`} className="max-h-64 w-auto max-w-full object-contain" />
+              </a>
+            ) : null}
             {specOf(detail) ? <Text tone="secondary">{specOf(detail)}</Text> : null}
             {alreadyReceived(detail) ? (
               <InlineError>The designer already marked this sample as received directly in StudioFlow. Confirm it is still needed before pricing it.</InlineError>

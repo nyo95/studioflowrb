@@ -5,7 +5,7 @@ Scope: Master Data's sample-request queue shows the requested schedule item's ph
 Module(s): `studioflow` (sample-request public read), sample-request coordinator, `masterdata` (queue UI).
 Target revision: plan R9.224; backend (Codex) R9.225; UI (Lead) R9.226.
 Risk: low-medium - widens a cross-app read contract that carried no images (signed URL only, never a storage key).
-Status: READY for Executor (R9.225).
+Status: DONE - R9.225 (read + coordinator) and R9.226 (UI), both by the Lead on owner instruction; owner browser check owed.
 Priority: P2
 Owner: Product Owner (decision 2026-10-23: when a sample is requested, show the schedule item's picture if there is one)
 Last updated: 2026-10-23
