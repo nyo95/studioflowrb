@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.237 | 2026-10-23 | plan(platform): Ideas usable only by Developer-listed users (Lead)
+
+- **Owner decision:** Ideas and the Workspace board stay off for the office ("still in development"); Ideas may be switched on only for the users the Developer lists, as the Schedule Assistant and SketchUp already are.
+- **Change:** `MODULES-DECISION.md` amendment 2026-10-23b widens D11 from integration modules to Ideas (enabled + listed + permission; background cleanup never gated). `PLAN.md` is the READY Work Order `WO-PLATFORM-MODULE-USER-ACCESS-01` (Codex R9.238, Lead R9.239).
+- **Migration/dependencies:** none planned (reuses `platform.integration_access`).
+- **Checks:** docs only; `git diff --check`.
+
 ## R9.236 | 2026-10-23 | docs(backlog): record the Schedule service split rule and raise backup/restore to P1 (Lead)
 
 - **Owner decision:** after the Lead reviewed an external refactor audit of R9.235, the owner asked to record both outcomes.

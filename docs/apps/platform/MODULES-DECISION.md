@@ -27,6 +27,13 @@ gate after "enabled": the Developer lists the users who may use them (`platform.
 adds no right. A listed user still passes their own RBAC and project rules on every action. Purpose: everyone can
 use the app by hand, but the owner's normal account does not become a super account just to run AI features.
 
+**Amendment 2026-10-23b (D11 widened).** The same Developer user list also gates **Ideas Board** (owner: Ideas and
+the Workspace board stay off for the office as "still in development"; Ideas may be switched on for listed users
+only). A UI module with `developerAccess` is usable by a person only when it is enabled, they are listed, and they
+hold its permission; for everyone else its menus, buttons and pages behave exactly as when the module is off, and
+its actions refuse. Background work that keeps other modules consistent (cleanup of Schedule option usages, asset
+retries) is not a person's use and is never gated by the list.
+
 ## Why now
 
 Every capability added inside StudioFlow makes a later split more expensive. The
