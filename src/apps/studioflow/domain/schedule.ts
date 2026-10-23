@@ -1,7 +1,7 @@
 export const SCHEDULE_SECTIONS = ["MATERIAL", "FIXTURE"] as const;
 export type ScheduleSection = (typeof SCHEDULE_SECTIONS)[number];
 
-export const SCHEDULE_HIGHLIGHTS = ["yellow", "green", "blue", "red", "purple"] as const;
+export const SCHEDULE_HIGHLIGHTS = ["yellow", "green", "blue", "red", "purple", "gray"] as const;
 export type ScheduleHighlight = (typeof SCHEDULE_HIGHLIGHTS)[number];
 
 /** One photo per option; prepared (cropped JPEG) upload stays under the server-action body limit. */

@@ -220,7 +220,7 @@ describe("schedule rules", () => {
 
 describe("schedule labels and legacy sheet", () => {
   it("keeps the approved highlight palette in display order", () => {
-    assert.deepEqual([...SCHEDULE_HIGHLIGHTS], ["yellow", "green", "blue", "red", "purple"]);
+    assert.deepEqual([...SCHEDULE_HIGHLIGHTS], ["yellow", "green", "blue", "red", "purple", "gray"]);
   });
   it("never reuses a label and orders AA after Z", () => {
     assert.equal(optionLabelIndex("A"), 0);

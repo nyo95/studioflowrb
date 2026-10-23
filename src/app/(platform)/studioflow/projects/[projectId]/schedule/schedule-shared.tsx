@@ -206,7 +206,7 @@ export function sheetRowOf(entry: ScheduleEntryView, withContact: boolean): stri
 export const SHOW_CONTACT_KEY = "studioflow.schedule.showContact";
 
 // ── Hide and highlight marks (WO-SF-SCHEDULE-MARKS-01) ───────────────────────
-export const HIGHLIGHT_LABEL: Record<ScheduleHighlight, string> = { yellow: "Yellow", green: "Green", blue: "Blue", red: "Red", purple: "Purple" };
+export const HIGHLIGHT_LABEL: Record<ScheduleHighlight, string> = { yellow: "Yellow", green: "Green", blue: "Blue", red: "Red", purple: "Purple", gray: "Gray" };
 export type Visibility = "visible" | "all" | "hidden";
 export type HighlightFilter = "ALL" | "any" | ScheduleHighlight;
 

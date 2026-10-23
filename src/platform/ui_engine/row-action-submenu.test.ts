@@ -11,6 +11,6 @@ describe("row action submenus and highlight tokens", () => {
     assert.match(actions, /<ContextMenu\.Sub>[\s\S]*<ContextItems items=\{item\.items\} \/>/);
   });
   it("defines one highlight colour per schedule highlight key", () => {
-    for (const key of ["yellow", "green", "blue", "red", "purple"]) assert.match(tokens, new RegExp(`--ui-highlight-${key}:`));
+    for (const key of ["yellow", "green", "blue", "red", "purple", "gray"]) assert.match(tokens, new RegExp(`--ui-highlight-${key}:`));
   });
 });

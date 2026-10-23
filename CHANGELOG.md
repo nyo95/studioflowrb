@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.230 | 2026-10-23 | ui(studioflow): gray highlight for schedule items; Phase 1 items of 2026-536 marked gray (Lead)
+
+- **Owner request:** mark the 42 Phase 1 items imported from the PDF of project 2026-536 with a gray (or red) highlight; gray chosen as "old / done".
+- **Palette:** `SCHEDULE_HIGHLIGHTS` gains `gray` (last), label "Gray", token `--ui-highlight-gray` (#8A8A86, readable on light and dark). Stored as text like the other keys: no migration; the action's validation follows the domain list.
+- **Data (owner-approved, kantor dev database):** the 42 items whose Notes say "From Phase 1" set to gray through the schedule service (`setEntriesHighlight`, one audited row per item).
+- **Checks:** typecheck, focused eslint, domain + UI Engine + schedule regression tests 76/76.
+
 ## R9.229 | 2026-10-23 | refactor(studioflow): split the Product Schedule screen into files, no behaviour change (Lead)
 
 - **Owner request:** after the health check, split the 2,331-line `schedule-board.tsx`, the largest and most-changed file in the app (38 changes this month), without changing what the screen does.

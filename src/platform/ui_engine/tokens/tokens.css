@@ -91,6 +91,7 @@
   --ui-highlight-blue:   #4A80C4;
   --ui-highlight-red:    #D0574D;
   --ui-highlight-purple: #8C64C4;
+  --ui-highlight-gray:   #8A8A86;
 
   /* ── Table ────────────────────────────────────────────────────────────── */
   --ui-table-header-bg: var(--ui-surface-raised);
