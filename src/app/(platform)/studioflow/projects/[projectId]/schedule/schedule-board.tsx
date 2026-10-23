@@ -52,7 +52,10 @@ import {
   RowActionMenu,
   Select,
   SimpleTextEditor,
+  SortToggle,
+  TableFilters,
   Text,
+  type SortDirection,
   Textarea,
   useConfirm,
   useFileIntake,
@@ -227,6 +230,33 @@ function Thumb({ url, alt, className = "h-14 w-11" }: { url: string | null; alt:
       )}
     </span>
   );
+}
+
+type ListSortKey = "code" | "category" | "brand" | "type" | "initials" | "location" | "contact" | "qty" | "status";
+type ListFilterKey = "category" | "brand" | "location" | "contact";
+const LIST_FILTER_LABEL: Record<ListFilterKey, string> = { category: "Material type", brand: "Ex", location: "Location", contact: "Contact" };
+const NO_LIST_FILTERS: Record<ListFilterKey, string> = { category: "ALL", brand: "ALL", location: "ALL", contact: "ALL" };
+const BLANK = "__blank__";
+
+/** The text a List column shows for one row: what it sorts and filters on. */
+function listCellText(entry: ScheduleEntryView, key: ListSortKey | ListFilterKey): string {
+  const shown = shownOptionOf(entry);
+  switch (key) {
+    case "code": return entry.code;
+    case "category": return entry.category;
+    case "brand": return shown?.brandName ?? "";
+    case "type": return shown?.productName ?? "";
+    case "initials": return shown ? initialsOf(shown) : "";
+    case "location": return entry.location ?? "";
+    case "contact": return shown?.contact ?? "";
+    case "qty": return entry.qty ?? "";
+    case "status": return entryBadges(entry)[0]?.label ?? "";
+  }
+}
+
+/** The sheet's "Initials type": the rough description (colour, pattern, finishing) used before the exact product is known. */
+function initialsOf(option: ScheduleOptionView): string {
+  return [option.color, option.pattern, option.finishing].filter(Boolean).join(" · ");
 }
 
 // ── Drag-reorder state (shared by the board grid and the list rows) ──────────
@@ -561,6 +591,42 @@ export function ScheduleBoard({
     return [...map.entries()].map(([category, rows]) => ({ category, rows }));
   }, [visibleEntries]);
 
+  // List-only sort and per-column filters (owner, 2026-10-23). The studio's manual order stays the default;
+  // reordering is offered only while neither is in use, because a moved row would jump away from where it was dropped.
+  const [listSort, setListSort] = useState<{ key: ListSortKey; direction: SortDirection } | null>(null);
+  const [listFilters, setListFilters] = useState<Record<ListFilterKey, string>>(NO_LIST_FILTERS);
+  const listFiltered = Object.values(listFilters).some((value) => value !== "ALL");
+  const listManual = filter === "all" && listSort === null && !listFiltered;
+  const listGroups = useMemo(() => {
+    const keep = (entry: ScheduleEntryView) => (Object.keys(listFilters) as ListFilterKey[]).every((key) => {
+      const wanted = listFilters[key];
+      return wanted === "ALL" || (listCellText(entry, key) || BLANK) === wanted;
+    });
+    const filtered = groups.map((group) => ({ ...group, rows: group.rows.filter(keep) })).filter((group) => group.rows.length > 0);
+    if (!listSort) return filtered;
+    const sign = listSort.direction === "asc" ? 1 : -1;
+    const compare = (a: string, b: string) => {
+      if (!a !== !b) return a ? -1 : 1; // blanks always last
+      return sign * a.localeCompare(b, "id-ID", { numeric: true, sensitivity: "base" });
+    };
+    if (listSort.key === "category") return [...filtered].sort((a, b) => compare(a.category, b.category));
+    return filtered.map((group) => ({ ...group, rows: [...group.rows].sort((a, b) => compare(listCellText(a, listSort.key), listCellText(b, listSort.key))) }));
+  }, [groups, listFilters, listSort]);
+  const listFilterOptions = (key: ListFilterKey) => {
+    const values = [...new Set(sectionEntries.map((entry) => listCellText(entry, key) || BLANK))]
+      .sort((a, b) => (a === BLANK ? 1 : b === BLANK ? -1 : a.localeCompare(b, "id-ID", { numeric: true })));
+    return [{ id: "ALL", label: "All" }, ...values.map((value) => ({ id: value, label: value === BLANK ? "(blank)" : value }))];
+  };
+  const sortHead = (key: ListSortKey, label: string) => (
+    <SortToggle
+      direction={listSort?.key === key ? listSort.direction : null}
+      onChange={(direction) => setListSort({ key, direction })}
+      label={(direction) => `Sort by ${label}, ${direction === "asc" ? "A to Z" : "Z to A"}`}
+    >
+      {label}
+    </SortToggle>
+  );
+
   const categoriesBySection = useMemo(() => ({
     MATERIAL: [...new Set(entries.filter((e) => e.section === "MATERIAL").map((e) => e.category))],
     FIXTURE: [...new Set(entries.filter((e) => e.section === "FIXTURE").map((e) => e.category))],
@@ -598,6 +664,7 @@ export function ScheduleBoard({
     setOpenId(null);
     setAutoPhotoOptionId(null);
     setFilter("all");
+    setListFilters(NO_LIST_FILTERS);
     setSection(next);
   };
   const navigateEntry = async (id: string) => {
@@ -730,6 +797,26 @@ export function ScheduleBoard({
             <FilterChip selected={filter === "sample"} count={progress.sample} onClick={() => setFilter("sample")}>Sample waiting</FilterChip>
             <FilterChip selected={filter === "empty"} count={progress.empty} onClick={() => setFilter("empty")}>No product yet</FilterChip>
           </div>
+          {viewMode === "list" ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <TableFilters
+                resultLabel={`${listGroups.reduce((total, group) => total + group.rows.length, 0)} of ${progress.all} items`}
+                filters={(Object.keys(LIST_FILTER_LABEL) as ListFilterKey[]).map((key) => ({
+                  id: key,
+                  label: key === "category" && section === "FIXTURE" ? "Category" : LIST_FILTER_LABEL[key],
+                  value: listFilters[key],
+                  defaultValue: "ALL",
+                  options: listFilterOptions(key),
+                  onValueChange: (value: string) => setListFilters((current) => ({ ...current, [key]: value })),
+                }))}
+              />
+              {listSort ? (
+                <FilterChip selected aria-label="Back to the studio order" onClick={() => setListSort(null)}>
+                  Sorted · studio order<X size={12} aria-hidden="true" />
+                </FilterChip>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -745,7 +832,7 @@ export function ScheduleBoard({
       ) : null}
 
       <div className="flex min-w-0 lg:min-h-0 lg:flex-1">
-        <div className="min-w-0 flex-1 lg:overflow-y-auto lg:overscroll-contain">
+        <div className={`min-w-0 flex-1 lg:overscroll-contain ${viewMode === "list" ? "overflow-x-auto lg:overflow-auto" : "lg:overflow-y-auto"}`}>
           {error && !open && !dialog ? <InlineError className="px-(--ui-section-px) pt-2">{error}</InlineError> : null}
           {notice ? <Text size="sm" tone="secondary" role="status" className="px-(--ui-section-px) pt-2">{notice}</Text> : null}
           {groups.length === 0 ? (
@@ -777,17 +864,25 @@ export function ScheduleBoard({
                     onToggle={toggleSelected}
                   />
                 ) : (
-                  <div className="grid">
-                    <div className="hidden items-center gap-3 border-b border-line px-(--ui-section-px) py-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary sm:flex" aria-hidden="true">
+                  // Columns follow the studio's Google Sheet (WO-SF-SCHEDULE-SHEET-01). The heading row stays
+                  // put while the rows scroll; narrow screens scroll the whole list sideways.
+                  <div className="grid min-w-[1160px]">
+                    <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-surface px-(--ui-section-px) py-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary">
                       {selecting ? <span className="w-5 shrink-0" /> : null}
-                      <span className="w-11 shrink-0" />
-                      <span className="w-14 shrink-0">Code</span>
-                      <span className="min-w-0 flex-1">Type</span>
-                      <span className="w-28 shrink-0">Location</span>
-                      <span className="w-20 shrink-0 text-right">Qty</span>
+                      <span className="w-16 shrink-0">{sortHead("code", "Code")}</span>
+                      <span className="w-24 shrink-0">{sortHead("category", section === "MATERIAL" ? "Material type" : "Category")}</span>
+                      <span className="w-24 shrink-0">{sortHead("brand", "Ex")}</span>
+                      <span className="min-w-0 flex-1">{sortHead("type", "Type")}</span>
+                      <span className="w-32 shrink-0">{sortHead("initials", "Initials type")}</span>
+                      <span className="w-11 shrink-0">Image</span>
+                      <span className="w-40 shrink-0">{sortHead("location", "Location")}</span>
+                      <span className="w-32 shrink-0">{sortHead("contact", "Contact")}</span>
+                      {section === "FIXTURE" ? <span className="w-20 shrink-0 text-right">{sortHead("qty", "Qty")}</span> : null}
+                      <span className="w-28 shrink-0">{sortHead("status", "Status")}</span>
                       <span className="w-8 shrink-0" />
                     </div>
-                    {groups.map((group) => (
+                    {listGroups.length === 0 ? <EmptyState title="No items match these filters" description="Clear a column filter to see more items." className="py-10" /> : null}
+                    {listGroups.map((group) => (
                       <section key={group.category} className="border-b border-line-subtle last:border-b-0">
                         <div className="flex items-baseline gap-2 bg-surface-muted px-(--ui-section-px) py-1.5">
                           <h3 className="m-0 text-label text-ink-secondary">{group.category}</h3>
@@ -801,38 +896,32 @@ export function ScheduleBoard({
                               <li
                                 key={entry.id}
                                 id={`schedule-entry-${entry.id}`}
-                                draggable={canEdit && filter === "all" && !selecting}
+                                draggable={canEdit && listManual && !selecting}
                                 onDragStart={listDrag.start(entry.id)}
                                 onDragEnd={listDrag.end}
-                                onDragOver={listDrag.over(entry.id, canEdit && filter === "all")}
+                                onDragOver={listDrag.over(entry.id, canEdit && listManual)}
                                 onDragLeave={listDrag.leave(entry.id)}
                                 onDrop={(event) => {
                                   event.preventDefault();
                                   if (listDrag.draggingId) reorderGroup(group.rows, listDrag.draggingId, entry.id);
                                   listDrag.end();
                                 }}
-                                className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit && filter === "all" ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
+                                className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit && listManual ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
                               >
                                 {selecting ? <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => toggleSelected(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} /> : null}
                                 <button type="button" onClick={() => (selecting ? toggleSelected(entry.id) : openEntry(entry.id))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-                                  <Thumb url={shown?.imageUrl ?? null} alt={shown ? shown.productName : `${entry.code} has no photo`} />
-                                  <span className="w-14 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
-                                  <span className="grid min-w-0 flex-1 gap-0.5">
-                                    {shown ? (
-                                      <>
-                                        <span className="truncate text-sm font-medium text-ink">
-                                          {shown.productName}
-                                          {shown.brandName ? <span className="font-normal text-ink-secondary"> · ex. {shown.brandName}</span> : null}
-                                        </span>
-                                        {specLine(shown) ? <span className="truncate text-xs text-ink-tertiary">{specLine(shown)}</span> : null}
-                                      </>
-                                    ) : (
-                                      <span className="text-sm italic text-ink-tertiary">Reserved — no product yet</span>
-                                    )}
+                                  <span className="w-16 shrink-0 font-ui-mono text-sm font-semibold tabular-nums text-ink">{entry.code}</span>
+                                  <span className="w-24 shrink-0 line-clamp-2 text-sm text-ink-secondary">{entry.category}</span>
+                                  <span className="w-24 shrink-0 line-clamp-2 text-sm text-ink-secondary">{shown?.brandName ?? ""}</span>
+                                  <span className="min-w-0 flex-1 line-clamp-2 text-sm font-medium text-ink">
+                                    {shown ? shown.productName : <span className="font-normal italic text-ink-tertiary">Reserved — no product yet</span>}
                                   </span>
-                                  <span className="hidden w-28 shrink-0 truncate text-sm text-ink-secondary sm:block">{entry.location ?? ""}</span>
-                                  <span className="hidden w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary sm:block">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span>
-                                  {entryBadges(entry).map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}
+                                  <span className="w-32 shrink-0 line-clamp-2 text-sm text-ink-secondary">{shown ? initialsOf(shown) : ""}</span>
+                                  <Thumb url={shown?.imageUrl ?? null} alt={shown ? shown.productName : `${entry.code} has no photo`} />
+                                  <span className="w-40 shrink-0 line-clamp-2 text-sm text-ink-secondary" title={entry.location ?? undefined}>{entry.location ?? ""}</span>
+                                  <span className="w-32 shrink-0 line-clamp-2 text-sm text-ink-secondary" title={shown?.contact ?? undefined}>{shown?.contact ?? ""}</span>
+                                  {section === "FIXTURE" ? <span className="w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span> : null}
+                                  <span className="flex w-28 shrink-0 flex-wrap gap-1">{entryBadges(entry).map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span>
                                 </button>
                                 {(canEdit || canManageTemplates) && !selecting ? (
                                   <RowActionMenu
@@ -844,8 +933,8 @@ export function ScheduleBoard({
                                         ? [{ label: "Save as template item", onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
                                         : []),
                                       ...(canEdit ? [
-                                        { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: filter !== "all" || index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
-                                        { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: filter !== "all" || index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
+                                        { label: "Move up", icon: <ArrowUp className="h-3.5 w-3.5" />, disabled: !listManual || index === 0, separatorBefore: true, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "up" })) },
+                                        { label: "Move down", icon: <ArrowDown className="h-3.5 w-3.5" />, disabled: !listManual || index === group.rows.length - 1, onSelect: () => void run(`${entry.id}-move`, () => moveScheduleEntryAction({ projectId, entryId: entry.id, direction: "down" })) },
                                         { label: "Move to category…", onSelect: () => setDialog({ move: entry }) },
                                         { label: "Delete", danger: true, separatorBefore: true, onSelect: () => void removeEntry(entry) },
                                       ] : []),
@@ -1479,6 +1568,19 @@ function EntryPanelContent({
             className="-ml-1.5 w-[calc(100%+0.375rem)] min-w-0 !h-8 !min-h-8 !border-transparent !bg-transparent !px-1.5 !text-sm"
           />
         </div>
+        {/* Where the product is bought; internal, so it is never on the card or in print. */}
+        <label className="grid gap-0.5">
+          <span className="text-[11px] uppercase tracking-[0.06em] text-ink-tertiary">Contact</span>
+          <input
+            aria-label="Contact"
+            value={draft.contact}
+            onChange={(event) => updateDraft({ contact: event.target.value })}
+            disabled={disabled}
+            maxLength={160}
+            placeholder="Shop or supplier"
+            className="-ml-1.5 h-8 w-[calc(100%+0.375rem)] rounded-[6px] border border-transparent bg-transparent px-1.5 text-sm text-ink placeholder:text-ink-tertiary hover:border-line-subtle focus:border-line-focus focus:bg-surface focus:outline-none"
+          />
+        </label>
         <div className="mt-auto pt-1">
           {!isNew && selected?.isFinal ? (
             <div className="flex min-h-8 items-center gap-2 rounded-action bg-success-surface px-2.5 text-sm font-semibold text-success">
@@ -1588,10 +1690,6 @@ function EntryPanelContent({
                 </label>
               ))}
               {itemRows}
-              <label className={ROW}>
-                <span className={ROW_LABEL}>Contact</span>
-                <input aria-label="Contact" value={draft.contact} onChange={(event) => updateDraft({ contact: event.target.value })} disabled={disabled} maxLength={160} className={ROW_INPUT} />
-              </label>
               {draft.extra.map((extra, index) => {
                 const key = extraFieldKey(extra.label);
                 const setExtra = (patch: Partial<ScheduleExtraField>) => updateDraft({ extra: draft.extra.map((field, position) => (position === index ? { ...field, ...patch } : field)) });

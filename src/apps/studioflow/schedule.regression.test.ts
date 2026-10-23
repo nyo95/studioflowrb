@@ -145,3 +145,26 @@ describe("Schedule field rules survive the relayout", () => {
     assert.match(scheduleDomain, /Pick<ScheduleOptionView, "color" \| "pattern" \| "finishing" \| "dimension">/);
   });
 });
+
+describe("WO-SF-SCHEDULE-SHEET-01 list follows the studio sheet", () => {
+  it("shows the sheet's columns in order under a heading row that stays put", () => {
+    const order = ['"Code"', '"Material type"', '"Ex"', '"Type"', '"Initials type"', ">Image<", '"Location"', '"Contact"', '"Status"'];
+    const head = scheduleBoard.slice(scheduleBoard.indexOf("sticky top-0 z-10 flex items-center"));
+    let at = 0;
+    for (const label of order) {
+      const next = head.indexOf(label, at);
+      assert.ok(next > at, `${label} follows the previous column`);
+      at = next;
+    }
+  });
+  it("sorts and filters the List without breaking the studio's manual order", () => {
+    assert.match(scheduleBoard, /<SortToggle/);
+    assert.match(scheduleBoard, /<TableFilters/);
+    assert.match(scheduleBoard, /const listManual = filter === "all" && listSort === null && !listFiltered;/);
+    assert.match(scheduleBoard, /draggable=\{canEdit && listManual && !selecting\}/);
+  });
+  it("keeps Contact off the card fields and print", () => {
+    assert.doesNotMatch(scheduleDomain, /contact: "Contact"/);
+    assert.doesNotMatch(schedulePrint, /\.contact\b/);
+  });
+});

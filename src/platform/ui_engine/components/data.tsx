@@ -148,6 +148,43 @@ function isIdentifierColumn(props: Record<string, unknown>): boolean {
  * values stays with the app, which knows that a date is not its label and that
  * an amount is not its formatted string.
  */
+/**
+ * The sort affordance of a column heading. `TableHead` renders it inside a real table; a list laid out
+ * as rows of cells (no `<table>`) uses it directly in its own heading row. The app does the comparing.
+ */
+export function SortToggle({
+  direction = null,
+  onChange,
+  label,
+  children,
+}: {
+  direction?: SortDirection | null;
+  onChange?: (direction: SortDirection) => void;
+  label?: (direction: SortDirection) => string;
+  children: ReactNode;
+}) {
+  const next: SortDirection = direction === "asc" ? "desc" : "asc";
+  const Indicator = direction === "asc" ? ChevronUp : direction === "desc" ? ChevronDown : ChevronsUpDown;
+  return (
+    <button
+      type="button"
+      className="group inline-flex cursor-pointer items-center gap-[5px] border-0 bg-[transparent] p-0 font-[inherit] text-[inherit] [letter-spacing:inherit] [text-transform:inherit] focus-visible:rounded-[2px] focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-line-focus"
+      data-active={direction ? true : undefined}
+      aria-label={label?.(next)}
+      onClick={() => onChange?.(next)}
+    >
+      <span>{children}</span>
+      <Indicator
+        aria-hidden="true"
+        className={cx(
+          "h-3.5 w-3.5 shrink-0 transition-opacity duration-[var(--ui-motion-fast)] motion-reduce:transition-none",
+          direction ? "opacity-100" : "opacity-40 group-hover:opacity-85",
+        )}
+      />
+    </button>
+  );
+}
+
 export function TableHead({
   stickyEnd = false,
   align = "start",
@@ -190,28 +227,9 @@ export function TableHead({
     );
   }
 
-  const next: SortDirection = sortDirection === "asc" ? "desc" : "asc";
-  const Indicator = sortDirection === "asc" ? ChevronUp : sortDirection === "desc" ? ChevronDown : ChevronsUpDown;
-
   return (
     <th className={headClasses} data-align={align} scope="col" aria-sort={ariaSort} {...props}>
-      <button
-        type="button"
-        /* Sort control. The engine renders the affordance; the app does the comparing. */
-        className="group inline-flex cursor-pointer items-center gap-[5px] border-0 bg-[transparent] p-0 font-[inherit] text-[inherit] [letter-spacing:inherit] [text-transform:inherit] focus-visible:rounded-[2px] focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-line-focus"
-        data-active={sortDirection ? true : undefined}
-        aria-label={sortLabel?.(next)}
-        onClick={() => onSortChange?.(next)}
-      >
-        <span>{children}</span>
-        <Indicator
-          aria-hidden="true"
-          className={cx(
-            "h-3.5 w-3.5 shrink-0 transition-opacity duration-[var(--ui-motion-fast)] motion-reduce:transition-none",
-            sortDirection ? "opacity-100" : "opacity-40 group-hover:opacity-85",
-          )}
-        />
-      </button>
+      <SortToggle direction={sortDirection} onChange={onSortChange} label={sortLabel}>{children}</SortToggle>
     </th>
   );
 }

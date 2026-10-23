@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.207 | 2026-10-23 | ui(studioflow): Product Schedule List follows the studio sheet, sortable and filterable (Lead)
+
+- **Columns:** Code, Material type (Category for Fixture), Ex, Type, Initials type (Color, Pattern, Finishing summary), Image, Location (two lines, no longer cut short), Contact, Qty for Fixture only, Status. Category group headers stay.
+- **Owner request:** the heading row stays in place while the rows scroll; every text column sorts A to Z or Z to A, and Material type, Ex, Location and Contact filter by value through the shared Filters panel. A "Sorted" chip returns to the studio order. Drag and Move up/down are offered only in the studio order with no column filter, so a moved row never jumps away.
+- **Inspector:** Contact sits under Brand as its own field, outside the Specs block whose dots control card and print; Contact is never printed.
+- **UI Engine:** the sort affordance of `TableHead` is extracted as `SortToggle` (same markup, TableHead now renders it) so a row-based list reuses it instead of a private copy.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, UI Engine and schedule regression tests (89/89, then 31/31 with three new List checks). Browser acceptance is the owner's on the running dev server (:3001).
+- **Limitations:** narrow screens scroll the List sideways and the heading does not stay put there (the page, not the list, scrolls on phones).
+
 ## R9.206 | 2026-10-23 | fix(studioflow): a sheet re-import's Initials type no longer overwrites a settled Type (Lead)
 
 - **Review of R9.205 (Codex):** PASS with this one Lead correction. Contact field, migration notes move, search key, copy paths, both imports and the `MATERIAL TYPE` alias match WO-SF-SCHEDULE-SHEET-01; studioflow integration suite re-run 225/225.

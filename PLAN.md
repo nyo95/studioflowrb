@@ -3,9 +3,9 @@
 Plan ID: WO-SF-SCHEDULE-SHEET-01; full plan in `docs/apps/studioflow/WO-SF-SCHEDULE-SHEET-01.md`
 Scope: Product Schedule gets a real Contact field (moved out of notes), the legacy sheet import accepts the owner's current sheet, and the List view matches the studio's Google Sheet columns.
 Module(s): `studioflow` (Product Schedule).
-Target revision: plan R9.204; backend (Codex) R9.205; list UI (Lead) R9.206.
+Target revision: plan R9.204; backend (Codex) R9.205; Lead correction R9.206; list UI (Lead) R9.207.
 Risk: medium - additive columns plus a data move out of option notes.
-Status: READY for Executor (R9.205).
+Status: DONE - backend R9.205 (Codex, PASS), re-import fix R9.206 (Lead), List UI R9.207 (Lead) with owner-requested fixed heading, sort and column filters; owner browser check owed.
 Priority: P1
 Owner: Product Owner (decisions 2026-10-23: Contact is its own field; Initials type is the rough spec before the product is known and is covered by Color/Pattern/Finishing; Status stays, Qty only for Fixture, category headers stay)
 Last updated: 2026-10-23
