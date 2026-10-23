@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.224 | 2026-10-23 | plan(studioflow): sample requests show the schedule item's photo and code (Lead)
+
+- **Owner request:** when a sample is requested, the Master Data queue should show the picture of the schedule item it came from, when there is one.
+- **Plan:** `WO-SF-SAMPLE-PHOTO-01` - the StudioFlow sample-request read adds a 15-minute signed photo URL and the item code (never a storage key); the coordinator passes them through (Codex R9.225); the request dialog and queue rows show them (Lead R9.226).
+- **Migration/dependencies:** none.
+- **Checks:** docs only.
+
 ## R9.223 | 2026-10-23 | ui(studioflow): Schedule Contact offers the Brand's Master Data contacts (Lead)
 
 - **Review of R9.222 (Codex):** PASS. Master Data `listBrandContacts` (brand representatives, then owner-vendor and supplier contacts, primary first, archived vendors out, at most 20), StudioFlow `formatScheduleContact`, `listBrandContactChoices` behind project detail access, `listScheduleBrandContactsAction`; 1,333/1,333 in the Executor's run.

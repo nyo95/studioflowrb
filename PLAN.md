@@ -1,37 +1,36 @@
 # Active Plan
 
-Plan ID: WO-SF-SCHEDULE-CONTACT-MD-01; full plan in `docs/apps/studioflow/WO-SF-SCHEDULE-CONTACT-MD-01.md`
-Scope: a schedule option's Contact is suggested from the Brand's Master Data contacts as "Name (Title) - phone" and stays freely editable.
-Module(s): `masterdata` (new public read `listBrandContacts`), `studioflow` (schedule read, action, then inspector UI).
-Target revision: plan R9.220; backend (Codex) R9.222; UI (Lead) R9.223.
-Risk: low-medium - a new cross-module read of contact phone numbers; no schema change.
-Status: DONE - backend R9.222 (Codex, PASS), UI R9.223 (Lead); owner browser check owed.
+Plan ID: WO-SF-SAMPLE-PHOTO-01; full plan in `docs/apps/studioflow/WO-SF-SAMPLE-PHOTO-01.md`
+Scope: Master Data's sample-request queue shows the requested schedule item's photo and code.
+Module(s): `studioflow` (sample-request public read), sample-request coordinator, `masterdata` (queue UI).
+Target revision: plan R9.224; backend (Codex) R9.225; UI (Lead) R9.226.
+Risk: low-medium - widens a cross-app read contract that carried no images (signed URL only, never a storage key).
+Status: READY for Executor (R9.225).
 Priority: P2
-Owner: Product Owner (decision 2026-10-23: Contact from Master Data when present, with override; format "Andi (Sales) - 0813412457877")
+Owner: Product Owner (decision 2026-10-23: when a sample is requested, show the schedule item's picture if there is one)
 Last updated: 2026-10-23
 
-Previous plan: `WO-SF-SCHEDULE-BRAND-FREE-01` DONE in R9.217 (PASS in R9.218). R9.219 balanced the List's Type and
-Initials type widths and recorded the owner-approved Phase 1 cleanup of project 2026-536.
+Previous plan: `WO-SF-SCHEDULE-CONTACT-MD-01` DONE in R9.222 (Codex, PASS) and R9.223 (Lead UI); owner browser check owed.
 
 ## Locked Decisions
 
-See `docs/apps/studioflow/WO-SF-SCHEDULE-CONTACT-MD-01.md` "Locked decisions" 1-6.
+See `docs/apps/studioflow/WO-SF-SAMPLE-PHOTO-01.md` "Locked decisions" 1-6.
 
 ## Acceptance Criteria
 
-As in WO-SF-SCHEDULE-CONTACT-MD-01 "Acceptance". Executor verification: typecheck, lint, masterdata and studioflow
-unit and integration tests, boundary checks, build. No migration.
-Reviewer (Lead) owns the UI (R9.223) and acceptance; browser checks are the owner's.
+As in WO-SF-SAMPLE-PHOTO-01 "Acceptance". Executor verification: typecheck, lint, studioflow and masterdata unit and
+integration tests, coordinator tests, boundary checks, build. No migration.
+Reviewer (Lead) owns the UI (R9.226) and acceptance; browser checks are the owner's.
 
 ## Executor Prompt
 
 ```text
 Role: BACKEND EXECUTOR. Read AGENTS.md, docs/agent/EXECUTOR.md, PLAN.md and
-docs/apps/studioflow/WO-SF-SCHEDULE-CONTACT-MD-01.md. Location: kantor (load .env.kantor, STUDIOFLOW_LOCATION=kantor).
-Implement only the "Executor scope (R9.222)": Master Data public read listBrandContacts(brandId) per decision 3;
-StudioFlow formatScheduleContact (domain), schedule service listBrandContactChoices with schedule read and project
-access, and server action listScheduleBrandContactsAction; tests; changelog R9.222. Contact stays a text snapshot:
-no schema change, no foreign key, no auto-fill, no UI change (Lead R9.223). Restart the :3001 dev server, commit
-locally as R9.222 (no push) and return the Planner/Reviewer prompt with outcome, commit, checks, limitations and
-dirty files.
+docs/apps/studioflow/WO-SF-SAMPLE-PHOTO-01.md. Location: kantor (load .env.kantor, STUDIOFLOW_LOCATION=kantor).
+Implement only the "Executor scope (R9.225)": SampleRequestRead.option gains imageUrl (15-minute signed read URL,
+never the storage key; null without a photo or when it cannot be signed) and entryCode; wire the storage port into
+createStudioFlowSampleRequestRead; SampleQueueRow.product carries both through the coordinator; update the contract
+comment; tests; changelog R9.225. No intake snapshot change, no migration, no UI change (Lead R9.226). Restart the
+:3001 dev server, commit locally as R9.225 (no push) and return the Planner/Reviewer prompt with outcome, commit,
+checks, limitations and dirty files.
 ```
