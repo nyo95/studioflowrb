@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.206 | 2026-10-23 | fix(studioflow): a sheet re-import's Initials type no longer overwrites a settled Type (Lead)
+
+- **Review of R9.205 (Codex):** PASS with this one Lead correction. Contact field, migration notes move, search key, copy paths, both imports and the `MATERIAL TYPE` alias match WO-SF-SCHEDULE-SHEET-01; studioflow integration suite re-run 225/225.
+- **Defect:** re-importing a sheet whose TYPE is still blank replaced the product name already settled in the app (for example "Heart's Desire 90RR 41/258") with the rough Initials type ("pink").
+- **Fix:** on re-import, Initials type fills the Type only when the item still carries the import placeholder "Imported"; otherwise the settled Type is kept. New items behave as R9.205.
+- **Migration/dependencies:** none.
+- **Checks:** studioflow service integration tests 225/225 including the new re-import regression; typecheck and focused eslint passed.
+
 ## R9.205 | 2026-10-23 | feat(studioflow): store schedule Contact separately (Codex Executor)
 
 - **Scope:** Product Schedule options and template items now carry an optional Contact (up to 160 characters). It flows through option creation/editing, reuse, template creation/editing/apply, search, and one plain inspector input.

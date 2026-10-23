@@ -1167,7 +1167,8 @@ export function createScheduleService(db: Db, ports: StudioFlowPorts) {
                 const merged = cleanSnapshot({
                   brandId: brandChanged ? null : target.brand_id,
                   brandName: row.brand ?? target.brand_name,
-                  productName: row.product ?? row.initialsType ?? target.product_name,
+                  // Initials are a rough stand-in: they never replace a product name already settled in the app.
+                  productName: row.product ?? (target.product_name === "Imported" ? row.initialsType : null) ?? target.product_name,
                   contact: row.contact ?? target.contact,
                   color: target.color,
                   pattern: target.pattern,

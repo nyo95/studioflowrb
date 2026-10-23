@@ -1975,6 +1975,11 @@ describe("SF-R3 Product Schedule", () => {
     assert.deepEqual([exact.productName, exact.contact, exact.notes], ["Easy Clean", "Toko Baru", "Initials type: Matte"]);
     const hits = await sf.schedule.searchReusableOptions({ grants: ALL, projectId: (await newProject("Other")).projectId, query: "sociolla" });
     assert.ok(hits.some((hit) => hit.optionId === pink.id));
+
+    await sf.schedule.updateOption({ ...as(designer), projectId, optionId: pink.id, snapshot: { productName: "Heart's Desire 90RR 41/258", brandName: "Dulux" } });
+    await sf.schedule.importCsv({ ...as(designer), projectId, section: "MATERIAL", csv: sheet });
+    const again = (await sf.schedule.listSchedule({ grants: ALL, projectId })).find((row) => row.code === "PT-02")!.options[0];
+    assert.equal(again.productName, "Heart's Desire 90RR 41/258", "a re-import's initials do not overwrite a settled Type");
   });
 
   it("moves labeled Contact lines from old option notes and keeps other lines", async () => {
