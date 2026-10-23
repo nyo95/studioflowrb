@@ -281,12 +281,20 @@ describe("Request sample from a row's menu", () => {
   });
 });
 
-describe("Hide and highlight never leave a stale mark (R9.232)", () => {
+describe("Hide and highlight never leave a stale mark (R9.232, R9.234)", () => {
   const command = readFileSync("src/app/(platform)/studioflow/_components/use-command.ts", "utf8");
-  it("shows the mark at once and lets the action's own response be the only refresh", () => {
+  const shared = readFileSync(`${SCHEDULE_DIR}/schedule-shared.tsx`, "utf8");
+  it("shows the mark at once, holds it until the page agrees, and re-fetches at most twice after the write", () => {
     assert.match(command, /if \(options\.refresh !== false\) router\.refresh\(\);/);
-    assert.match(scheduleBoard, /overrideMarks\(entryIds, \{ highlight \}\);\s+await run\("mark-highlight", [\s\S]*?\{ refresh: false \}\);\s+overrideMarks\(entryIds, null\);/);
-    assert.match(scheduleBoard, /overrideMarks\(entryIds, \{ hidden \}\);\s+const ok = await run\("mark-hidden", [\s\S]*?\{ refresh: false \}\);\s+overrideMarks\(entryIds, null\);/);
+    assert.match(scheduleBoard, /overrideMarks\(entryIds, \{ mark: \{ highlight \} \}\);\s+const ok = await run\("mark-highlight", [\s\S]*?\{ refresh: false \}\);\s+overrideMarks\(entryIds, ok \? "settled" : "drop"\);/);
+    assert.match(scheduleBoard, /overrideMarks\(entryIds, \{ mark: \{ hidden \} \}\);\s+const ok = await run\("mark-hidden", [\s\S]*?\{ refresh: false \}\);\s+overrideMarks\(entryIds, ok \? "settled" : "drop"\);/);
+    assert.match(scheduleBoard, /if \(agrees \|\| override\.retries >= 2\) next\.delete\(id\);/);
+    assert.match(scheduleBoard, /if \(refetch\) router\.refresh\(\);/);
+  });
+  it("keeps hover and the open row visible on a highlighted row", () => {
+    assert.match(shared, /hover:bg-\[color-mix\(in_srgb,var\(--row-highlight\)_24%,var\(--ui-surface\)\)\]/);
+    assert.match(shared, /bg-\[color-mix\(in_srgb,var\(--row-highlight\)_30%,var\(--ui-surface\)\)\]/);
+    assert.match(scheduleBoard, /\$\{rowHighlightClass\(entry\.highlight, open\?\.id === entry\.id\)\}/);
   });
 });
 

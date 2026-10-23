@@ -1,7 +1,7 @@
 "use client";
 
 import { ImageIcon, Plus } from "lucide-react";
-import { useState, type DragEvent, type ReactNode } from "react";
+import { useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import {
   finalOf,
   isSpecPlaceholder,
@@ -220,9 +220,17 @@ export function Swatch({ highlight }: { highlight: ScheduleHighlight | null }) {
 }
 
 /** A List row's tint and colour edge. */
-export function rowHighlightStyle(highlight: ScheduleHighlight | null) {
-  if (!highlight) return undefined;
-  return { backgroundColor: `color-mix(in srgb, var(--ui-highlight-${highlight}) 14%, var(--ui-surface))`, boxShadow: `inset 3px 0 0 var(--ui-highlight-${highlight})` };
+export function rowHighlightStyle(highlight: ScheduleHighlight | null): CSSProperties | undefined {
+  // Only the colour travels inline; the tint, edge, hover and open states are classes, so they still show over it.
+  return highlight ? ({ "--row-highlight": `var(--ui-highlight-${highlight})` } as CSSProperties) : undefined;
+}
+
+/** A List row's background: a highlight tint that deepens on hover and while the row is open, else the plain states. */
+export function rowHighlightClass(highlight: ScheduleHighlight | null, open: boolean): string {
+  if (!highlight) return open ? "bg-surface-muted" : "hover:bg-surface-muted";
+  return `shadow-[inset_3px_0_0_var(--row-highlight)] ${open
+    ? "bg-[color-mix(in_srgb,var(--row-highlight)_30%,var(--ui-surface))]"
+    : "bg-[color-mix(in_srgb,var(--row-highlight)_14%,var(--ui-surface))] hover:bg-[color-mix(in_srgb,var(--row-highlight)_24%,var(--ui-surface))]"}`;
 }
 
 /** A Board card's colour frame, set off from the card by a thin gap. */

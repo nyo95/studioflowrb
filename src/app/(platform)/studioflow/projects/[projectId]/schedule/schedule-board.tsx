@@ -74,7 +74,10 @@ import { AddItemDrawer } from "./schedule-add-item";
 import { BoardView } from "./schedule-board-view";
 import { BulkPanel, ImportDialog, MoveDialog } from "./schedule-dialogs";
 import { DockedEntryPanel } from "./schedule-entry-panel";
-import { BLANK, type Brand, type CategoryChoice, entryBadges, entryMatchesFilter, entryMatchesQuery, HIGHLIGHT_LABEL, type HighlightFilter, initialsOf, InlineSampleRequest, LIST_FILTER_LABEL, listCellText, type ListFilterKey, type ListSortKey, NewCategoryInline, NO_LIST_FILTERS, productFromOption, rowHighlightStyle, type ScheduleFilter, scheduleFilterCounts, type Section, sheetRowOf, SHOW_CONTACT_KEY, Swatch, Thumb, toSnapshot, TYPED_BRAND, useRowDrag, type Visibility } from "./schedule-shared";
+import { BLANK, type Brand, type CategoryChoice, entryBadges, entryMatchesFilter, entryMatchesQuery, HIGHLIGHT_LABEL, type HighlightFilter, initialsOf, InlineSampleRequest, LIST_FILTER_LABEL, listCellText, type ListFilterKey, type ListSortKey, NewCategoryInline, NO_LIST_FILTERS, productFromOption, rowHighlightClass, rowHighlightStyle, type ScheduleFilter, scheduleFilterCounts, type Section, sheetRowOf, SHOW_CONTACT_KEY, Swatch, Thumb, toSnapshot, TYPED_BRAND, useRowDrag, type Visibility } from "./schedule-shared";
+
+type Mark = { hidden?: boolean; highlight?: ScheduleHighlight | null };
+type MarkOverride = { mark: Mark; settled: boolean; retries: number };
 
 export function ScheduleBoard({
   initialOpenId = null,
@@ -103,25 +106,48 @@ export function ScheduleBoard({
   const [section, setSection] = useState<Section>(() => serverEntries.find((entry) => entry.id === initialOpenId)?.section ?? (serverEntries.some((e) => e.section === "MATERIAL") || !serverEntries.length ? "MATERIAL" : "FIXTURE"));
   const [viewMode, setViewMode] = useState<"list" | "board">("list"); // List is the default view (owner, 2026-10-23)
   const [filter, setFilter] = useState<ScheduleFilter>("all");
-  // Hide and highlight show at once, before the server answers; each mark is dropped again once its command settles
-  // and the page carries the saved value (R9.232).
-  const [markOverrides, setMarkOverrides] = useState<ReadonlyMap<string, { hidden?: boolean; highlight?: ScheduleHighlight | null }>>(() => new Map());
+  // Hide and highlight show at once and are held until the page itself carries the saved value (R9.234). A command
+  // that has finished but whose value the page does not show yet asks for the page again (at most twice): that
+  // request starts after the write, so it cannot bring an older value back. If the page still disagrees, it wins.
+  const [markOverrides, setMarkOverrides] = useState<ReadonlyMap<string, MarkOverride>>(() => new Map());
   const entries = useMemo(
     () => (markOverrides.size === 0 ? serverEntries : serverEntries.map((entry) => {
-      const mark = markOverrides.get(entry.id);
-      return mark ? { ...entry, ...mark } : entry;
+      const override = markOverrides.get(entry.id);
+      return override ? { ...entry, ...override.mark } : entry;
     })),
     [serverEntries, markOverrides],
   );
-  const overrideMarks = (ids: readonly string[], mark: { hidden?: boolean; highlight?: ScheduleHighlight | null } | null) =>
+  const overrideMarks = (ids: readonly string[], change: { mark: Mark } | "settled" | "drop") =>
     setMarkOverrides((current) => {
       const next = new Map(current);
       for (const id of ids) {
-        if (mark) next.set(id, { ...next.get(id), ...mark });
-        else next.delete(id);
+        const present = next.get(id);
+        if (change === "drop") next.delete(id);
+        else if (change === "settled") { if (present) next.set(id, { ...present, settled: true }); }
+        else next.set(id, { mark: { ...present?.mark, ...change.mark }, settled: false, retries: 0 });
       }
       return next;
     });
+  useEffect(() => {
+    if (markOverrides.size === 0) return;
+    const timer = window.setTimeout(() => {
+      const byId = new Map(serverEntries.map((entry) => [entry.id, entry]));
+      let refetch = false;
+      setMarkOverrides((current) => {
+        const next = new Map(current);
+        for (const [id, override] of current) {
+          if (!override.settled) continue;
+          const saved = byId.get(id);
+          const agrees = !saved || (Object.keys(override.mark) as Array<keyof Mark>).every((key) => saved[key] === override.mark[key]);
+          if (agrees || override.retries >= 2) next.delete(id);
+          else { next.set(id, { ...override, retries: override.retries + 1 }); refetch = true; }
+        }
+        return next;
+      });
+      if (refetch) router.refresh();
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [serverEntries, markOverrides, router]);
   const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const scrolledInitial = useRef(false);
   useEffect(() => {
@@ -227,18 +253,18 @@ export function ScheduleBoard({
   };
   const setHidden = async (rows: readonly ScheduleEntryView[], hidden: boolean) => {
     const entryIds = rows.map((row) => row.id);
-    overrideMarks(entryIds, { hidden });
+    overrideMarks(entryIds, { mark: { hidden } });
     const ok = await run("mark-hidden", () => setScheduleEntriesHiddenAction({ projectId, entryIds, hidden }), undefined, { refresh: false });
-    overrideMarks(entryIds, null);
+    overrideMarks(entryIds, ok ? "settled" : "drop");
     if (!ok) return;
     const what = rows.length === 1 ? rows[0].code : `${rows.length} items`;
     setNotice(hidden ? `${what} hidden. Choose "Show hidden" to see ${rows.length === 1 ? "it" : "them"} again.` : `${what} shown again.`);
   };
   const setHighlight = async (rows: readonly ScheduleEntryView[], highlight: ScheduleHighlight | null) => {
     const entryIds = rows.map((row) => row.id);
-    overrideMarks(entryIds, { highlight });
-    await run("mark-highlight", () => setScheduleEntriesHighlightAction({ projectId, entryIds, highlight }), undefined, { refresh: false });
-    overrideMarks(entryIds, null);
+    overrideMarks(entryIds, { mark: { highlight } });
+    const ok = await run("mark-highlight", () => setScheduleEntriesHighlightAction({ projectId, entryIds, highlight }), undefined, { refresh: false });
+    overrideMarks(entryIds, ok ? "settled" : "drop");
   };
   /** Hide / Unhide and Highlight for one or several items; empty for a viewer who cannot edit. */
   const markItems = (rows: readonly ScheduleEntryView[]): RowActionItem[] => {
@@ -659,7 +685,7 @@ export function ScheduleBoard({
                                   listDrag.end();
                                 }}
                                 style={rowHighlightStyle(entry.highlight)}
-                                className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${selecting && selectedIds.has(entry.id) ? "outline-2 outline-offset-[-2px] outline-line-focus" : ""} ${entry.hidden ? "opacity-55" : ""} ${canEdit && listManual ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
+                                className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${selecting && selectedIds.has(entry.id) ? "outline-2 outline-offset-[-2px] outline-line-focus" : ""} ${entry.hidden ? "opacity-55" : ""} ${canEdit && listManual ? "cursor-grab active:cursor-grabbing" : ""} ${rowHighlightClass(entry.highlight, open?.id === entry.id)} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
                               >
                                 {selecting ? <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => toggleSelected(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} /> : null}
                                 <button type="button" onClick={() => (selecting ? toggleSelected(entry.id) : openEntry(entry.id))} className="flex min-w-0 flex-1 items-center gap-3 text-left">

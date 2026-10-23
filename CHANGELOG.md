@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.234 | 2026-10-23 | fix(studioflow): highlight and hide marks hold until the page agrees; hover shows on highlighted rows (Lead)
+
+- **Owner report:** after R9.232 a highlight change could still stay stale until reload; and on a gray row, hover showed no change at all.
+- **Cause (R9.232 was not enough):** the instant mark was dropped as soon as the command answered. If the page had not taken in the saved value at that moment, or a response from another command painted older data, the old colour came back and nothing corrected it.
+- **Fix:** a mark is held until the page itself shows the saved value. A finished command whose value the page still lacks asks for the page again (at most twice); that request starts after the write, so it cannot bring an older value back. If the page still disagrees after that, the page wins. A failed command drops its mark at once.
+- **Rows:** the highlight colour is passed as a CSS variable and the tint, edge, hover (24%) and open-row (30%) states are classes, so hover and the open row show over any highlight; plain rows keep their states.
+- **Browser check:** not reproduced live - the built-in browser was not signed in, and Lead does not enter the owner's password. Owner check on :3001.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, eslint, full test suite 1,350/1,350.
+
 ## R9.233 | 2026-10-23 | ui(studioflow): Title Case on schedule names and descriptions; selected List rows outlined (Lead)
 
 - **Owner request:** every word starts with a capital ("Beige muda" -> "Beige Muda"), following the studio's text-case rule of 2026-10-01 (names and titles in Title Case, applied when the field is left; codes, notes and units untouched).
