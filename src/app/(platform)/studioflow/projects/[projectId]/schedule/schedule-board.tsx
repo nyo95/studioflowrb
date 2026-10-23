@@ -266,14 +266,17 @@ function listCellText(entry: ScheduleEntryView, key: ListSortKey | ListFilterKey
 
 /**
  * One item as a row of the studio's Google Sheet: CODE, MATERIAL TYPE, EX, TYPE, INITIALS TYPE, IMAGE, LOCATION,
- * CONTACT (Fixture adds QTY and UNIT). The IMAGE cell stays empty: the sheet cannot fetch a private photo, so the
- * photo is copied on its own and pasted into that cell.
+ * then CONTACT only while the List shows that column (Fixture adds QTY and UNIT). The IMAGE cell stays empty: the
+ * sheet cannot fetch a private photo, so the photo is copied on its own and pasted into that cell.
  */
-function sheetRowOf(entry: ScheduleEntryView): string[] {
+function sheetRowOf(entry: ScheduleEntryView, withContact: boolean): string[] {
   const shown = shownOptionOf(entry);
-  const row = [entry.code, entry.category, shown?.brandName ?? "", shown?.productName ?? "", shown ? initialsOf(shown) : "", "", entry.location ?? "", shown?.contact ?? ""];
+  const row = [entry.code, entry.category, shown?.brandName ?? "", shown?.productName ?? "", shown ? initialsOf(shown) : "", "", entry.location ?? "", ...(withContact ? [shown?.contact ?? ""] : [])];
   return entry.section === "FIXTURE" ? [...row, entry.qty ?? "", entry.unit ?? ""] : row;
 }
+
+/** Contact is optional in the studio's sheet (owner, 2026-10-23: sometimes asked for, often not), so its column is a per-browser choice. */
+const SHOW_CONTACT_KEY = "studioflow.schedule.showContact";
 
 // ── Hide and highlight marks (WO-SF-SCHEDULE-MARKS-01) ───────────────────────
 const HIGHLIGHT_LABEL: Record<ScheduleHighlight, string> = { yellow: "Yellow", green: "Green", blue: "Blue", red: "Red", purple: "Purple" };
@@ -675,6 +678,20 @@ export function ScheduleBoard({
   const [listFilters, setListFilters] = useState<Record<ListFilterKey, string>>(NO_LIST_FILTERS);
   // Collapsed category groups of the List; a group holding the open item always shows it.
   const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(() => new Set());
+  const [showContact, setShowContact] = useState(false);
+  useEffect(() => {
+    // Read after hydration, so the server and the browser render the same page first.
+    const timer = window.setTimeout(() => {
+      try { setShowContact(window.localStorage.getItem(SHOW_CONTACT_KEY) === "1"); } catch { /* storage blocked: column stays off */ }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const toggleContact = () => {
+    const next = !showContact;
+    setShowContact(next);
+    if (!next) setListFilters((current) => ({ ...current, contact: "ALL" }));
+    try { window.localStorage.setItem(SHOW_CONTACT_KEY, next ? "1" : "0"); } catch { /* storage blocked: choice lasts this visit */ }
+  };
   const toggleGroup = (category: string) => setCollapsedGroups((current) => {
     const next = new Set(current);
     if (!next.delete(category)) next.add(category);
@@ -683,7 +700,7 @@ export function ScheduleBoard({
   // Copy for the studio's Google Sheet, which is still kept by hand alongside the app (owner, 2026-10-23).
   const copyRows = async (rows: readonly ScheduleEntryView[]) => {
     try {
-      await writeClipboardText(toSpreadsheetText(rows.map(sheetRowOf)));
+      await writeClipboardText(toSpreadsheetText(rows.map((row) => sheetRowOf(row, showContact))));
       setNotice(rows.length === 1
         ? `${rows[0].code} copied. Paste it into the sheet; paste the photo into IMAGE with Copy image.`
         : `${rows.length} rows copied. Paste them into the sheet; photos are copied one at a time with Copy image.`);
@@ -957,7 +974,7 @@ export function ScheduleBoard({
             <div className="flex flex-wrap items-center gap-1.5">
               <TableFilters
                 resultLabel={`${listGroups.reduce((total, group) => total + group.rows.length, 0)} of ${progress.all} items`}
-                filters={(Object.keys(LIST_FILTER_LABEL) as ListFilterKey[]).map((key) => ({
+                filters={(Object.keys(LIST_FILTER_LABEL) as ListFilterKey[]).filter((key) => key !== "contact" || showContact).map((key) => ({
                   id: key,
                   label: key === "category" && section === "FIXTURE" ? "Category" : LIST_FILTER_LABEL[key],
                   value: listFilters[key],
@@ -966,6 +983,9 @@ export function ScheduleBoard({
                   onValueChange: (value: string) => setListFilters((current) => ({ ...current, [key]: value })),
                 }))}
               />
+              <Button size="sm" variant="ghost" aria-pressed={showContact} leadingIcon={showContact ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />} onClick={toggleContact}>
+                {showContact ? "Hide Contact" : "Show Contact"}
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => setCollapsedGroups(collapsedGroups.size > 0 ? new Set() : new Set(listGroups.map((group) => group.category)))}>
                 {collapsedGroups.size > 0 ? "Expand all" : "Collapse all"}
               </Button>
@@ -1027,7 +1047,7 @@ export function ScheduleBoard({
                 ) : (
                   // Columns follow the studio's Google Sheet (WO-SF-SCHEDULE-SHEET-01). The heading row stays
                   // put while the rows scroll; narrow screens scroll the whole list sideways.
-                  <div className="grid min-w-[1160px]">
+                  <div className={`grid ${showContact ? "min-w-[1160px]" : "min-w-[1028px]"}`}>
                     <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-line bg-surface px-(--ui-section-px) py-1.5 text-micro uppercase tracking-[0.06em] text-ink-tertiary">
                       {selecting ? <span className="w-5 shrink-0" /> : null}
                       <span className="w-16 shrink-0">{sortHead("code", "Code")}</span>
@@ -1037,7 +1057,7 @@ export function ScheduleBoard({
                       <span className="w-32 shrink-0">{sortHead("initials", "Initials type")}</span>
                       <span className="w-11 shrink-0">Image</span>
                       <span className="w-40 shrink-0">{sortHead("location", "Location")}</span>
-                      <span className="w-32 shrink-0">{sortHead("contact", "Contact")}</span>
+                      {showContact ? <span className="w-32 shrink-0">{sortHead("contact", "Contact")}</span> : null}
                       {section === "FIXTURE" ? <span className="w-20 shrink-0 text-right">{sortHead("qty", "Qty")}</span> : null}
                       <span className="w-28 shrink-0">{sortHead("status", "Status")}</span>
                       <span className="w-8 shrink-0" />
@@ -1106,7 +1126,7 @@ export function ScheduleBoard({
                                   <span className="w-32 shrink-0 line-clamp-2 text-sm text-ink-secondary">{shown ? initialsOf(shown) : ""}</span>
                                   <Thumb url={shown?.imageUrl ?? null} alt={shown ? shown.productName : `${entry.code} has no photo`} />
                                   <span className="w-40 shrink-0 line-clamp-2 text-sm text-ink-secondary" title={entry.location ?? undefined}>{entry.location ?? ""}</span>
-                                  <span className="w-32 shrink-0 line-clamp-2 text-sm text-ink-secondary" title={shown?.contact ?? undefined}>{shown?.contact ?? ""}</span>
+                                  {showContact ? <span className="w-32 shrink-0 line-clamp-2 text-sm text-ink-secondary" title={shown?.contact ?? undefined}>{shown?.contact ?? ""}</span> : null}
                                   {section === "FIXTURE" ? <span className="w-20 shrink-0 text-right text-sm tabular-nums text-ink-secondary">{entry.qty ? `${entry.qty} ${entry.unit ?? ""}` : ""}</span> : null}
                                   <span className="flex w-28 shrink-0 flex-wrap gap-1">{entryBadges(entry).map((badge) => <Badge key={badge.label} tone={badge.tone}>{badge.label}</Badge>)}</span>
                                 </button>

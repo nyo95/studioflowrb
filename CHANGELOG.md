@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.215 | 2026-10-23 | ui(studioflow): Contact column is optional in the Schedule List and its copy (Lead)
+
+- **Owner:** Contact is rarely used in the studio's sheet; it is asked for sometimes, not usually.
+- **Change:** the List hides the CONTACT column by default; "Show Contact / Hide Contact" beside Filters turns it on, remembered in this browser. Copy row / Copy items include the CONTACT cell only while the column is shown, so a paste lines up with whichever sheet layout is in use. The Contact filter is offered only while the column is shown. The inspector's Contact field is unchanged.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, schedule regression tests 39/39. Browser check is the owner's on :3001.
+
 ## R9.214 | 2026-10-23 | ui(studioflow): hide and highlight Product Schedule items (Lead)
 
 - **Review of R9.213 (Codex):** PASS. Additive migration, selection checked against the project before any write, unchanged items skipped, audit per change, re-import keeps the marks; 1,314/1,314 in the Executor's high-tier run.

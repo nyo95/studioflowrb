@@ -148,7 +148,7 @@ describe("Schedule field rules survive the relayout", () => {
 
 describe("WO-SF-SCHEDULE-SHEET-01 list follows the studio sheet", () => {
   it("shows the sheet's columns in order under a heading row that stays put", () => {
-    const order = ['"Code"', '"Material type"', '"Ex"', '"Type"', '"Initials type"', ">Image<", '"Location"', '"Contact"', '"Status"'];
+    const order = ['"Code"', '"Material type"', '"Ex"', '"Type"', '"Initials type"', ">Image<", '"Location"', '"Contact"', '"Status"']; // Contact only while shown
     const head = scheduleBoard.slice(scheduleBoard.indexOf("sticky top-0 z-10 flex items-center"));
     let at = 0;
     for (const label of order) {
@@ -187,7 +187,9 @@ describe("List is the default view with the Board's right-click menu", () => {
 
 describe("Copy for the studio sheet", () => {
   it("copies rows in the sheet's column order with an empty IMAGE cell, and photos separately", () => {
-    assert.match(scheduleBoard, /const row = \[entry\.code, entry\.category, shown\?\.brandName \?\? "", shown\?\.productName \?\? "", shown \? initialsOf\(shown\) : "", "", entry\.location \?\? "", shown\?\.contact \?\? ""\];/);
+    assert.match(scheduleBoard, /const row = \[entry\.code, entry\.category, shown\?\.brandName \?\? "", shown\?\.productName \?\? "", shown \? initialsOf\(shown\) : "", "", entry\.location \?\? "", \.\.\.\(withContact \? \[shown\?\.contact \?\? ""\] : \[\]\)\];/);
+    assert.match(scheduleBoard, /sheetRowOf\(row, showContact\)/);
+    assert.match(scheduleBoard, /\{showContact \? "Hide Contact" : "Show Contact"\}/);
     assert.match(scheduleBoard, /label: "Copy row"/);
     assert.match(scheduleBoard, /label: "Copy image"/);
     assert.match(scheduleBoard, /onCopy=\{\(\) => void copyRows\(/);
