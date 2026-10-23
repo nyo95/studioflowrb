@@ -330,7 +330,7 @@ export function SkuDirectory({
             if (!open) setConfirmArchive(null);
           }}
           title={`Archive SKU "${confirmArchive.name}"?`}
-          description="Archiving this SKU cascades archive causes to all its supplier material prices."
+          description="Its supplier prices are archived with it, and it leaves pickers and active pricing. Restoring the SKU brings those prices back."
           confirmLabel="Archive SKU"
           tone="danger"
           onConfirm={() => {
@@ -349,7 +349,7 @@ export function SkuDirectory({
             if (!open) setConfirmRestore(null);
           }}
           title={`Restore SKU "${confirmRestore.name}"?`}
-          description="Restoring this SKU restores its material prices that were archived solely by SKU parent provenance."
+          description="The prices that were archived together with this SKU come back too. A price someone archived on its own stays archived."
           confirmLabel="Restore SKU"
           onConfirm={() => {
             const target = confirmRestore;

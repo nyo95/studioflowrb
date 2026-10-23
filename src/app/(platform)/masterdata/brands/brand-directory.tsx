@@ -634,7 +634,7 @@ export function BrandDirectory({
             if (!open) setConfirmArchive(null);
           }}
           title={`Archive brand "${confirmArchive.name}"?`}
-          description="Archiving this Brand also archives every branded SKU and its Material Prices. Existing direct or other-parent archive causes are preserved."
+          description="Every SKU of this Brand and their supplier prices are archived with it. Restoring the Brand brings them back."
           confirmLabel="Archive brand"
           tone="danger"
           onConfirm={() => {
@@ -653,7 +653,7 @@ export function BrandDirectory({
             if (!open) setConfirmRestore(null);
           }}
           title={`Restore brand "${confirmRestore.name}"?`}
-          description="Restoring this Brand removes only its archive causes. Eligible branded SKUs and Material Prices return to active use; records with another archive cause remain archived."
+          description="The SKUs and prices that were archived together with this Brand come back. Anything archived on its own stays archived."
           confirmLabel="Restore brand"
           onConfirm={() => {
             const target = confirmRestore;

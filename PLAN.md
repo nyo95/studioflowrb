@@ -5,7 +5,7 @@ Scope: Product Schedule Brands do not depend on Master Data: typed Brands surviv
 Module(s): `studioflow` (schedule service), `schedule-assistant` (composer, MCP bridge, contract; 1.3.0 -> 1.4.0).
 Target revision: plan R9.216; backend (Codex) R9.217.
 Risk: medium - reverses a locked Assistant rule (2026-10-22) and touches three create paths.
-Status: READY for Executor (R9.217).
+Status: DONE - backend R9.217 (Codex, PASS in R9.218); owner check owed: GL-03 Brand "Lalapis" through the Assistant, and a typed Brand on a new item in the app.
 Priority: P1
 Owner: Product Owner (decision 2026-10-23: the Product Schedule is independent; it may take a Brand from Master Data when one exists, and a Brand not in Master Data must still be usable)
 Last updated: 2026-10-23

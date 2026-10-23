@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.218 | 2026-10-23 | ui(masterdata): archiving a SKU's last price offers to archive the SKU with it (Lead)
+
+- **Review of R9.217 (Codex):** PASS. One Brand rule for every schedule create/edit path, typed Brands kept, inactive Brand ids still refused; the Assistant resolves an exact Master Data name or keeps the typed name with `SCHEDULE_BRAND_NOT_IN_MASTER_DATA` and suggestions; schedule-assistant 1.4.0, bridge 1.5.0.
+- **Owner report:** a staff member could not archive "HPL Taco TH 099 G - Mocassin Ivory Gloss / PT. Tangkas Cipta Optimal": it was the SKU's only active price, and a live SKU must keep one (`SKU_PRICE_REQUIRED`), so the dialog ended in an error with no way forward.
+- **Change:** when the price is the SKU's last active one, the dialog says so before anything is tried and offers "Archive SKU and price" (the existing SKU archive, which takes its prices with it and brings them back on restore). Someone without SKU management gets the explanation and the two ways out instead. The rule itself is unchanged.
+- **Copy:** the SKU archive/restore and Brand archive/restore dialogs no longer speak of "archive causes" or "parent provenance"; they say what is archived with the record and what comes back.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, new regression test 3/3. Browser check is the owner's on :3001.
+
 ## R9.217 | 2026-10-23 | fix(studioflow): keep typed Product Schedule Brands (Codex Executor)
 
 - **Scope:** one Brand snapshot rule now preserves typed names on schedule item, option and template creation and editing; Master Data ids still require an active Brand, while edits with the same id retain the stored name.

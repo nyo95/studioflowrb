@@ -18,13 +18,15 @@ import { createMoney,currencyPrefix,formatMoney } from "@platform/utilities/mone
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, X } from "lucide-react";
 import { useEffect,useRef,useState,useTransition,type FormEvent,type ReactNode } from "react";
+import { archiveSkuAction } from "../skus/actions";
 import { archivePriceAction,saveBulkWorkPricesAction,saveMaterialSkuPricesBulkAction,createPricingBrandQuickAction,createPricingProductCategoryQuickAction,createPricingVendorQuickAction,createPricingWorkCategoryQuickAction,requestPriceDeletionAction,restorePriceAction,savePriceAction } from "./actions";
 
 type Kind = "material" | "material-labor" | "labor";
 type SkuRef = { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; dimension_length: string | null; dimension_width: string | null; dimension_thickness: string | null; dimension_unit: { id: string; code: string; name: string } | null };
 type MaterialRow = { id: string; amount_label?: string | null; sku: { id: string; name: string | null; code: string | null; brand: { id: string; name: string } | null; categories: Array<{ id: string; name: string }>; size: string }; supplier_vendor: { id: string; name: string }; amount: string; currency: string; unit: { id: string; code: string; name: string }; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
 type WorkRow = { id: string; name: string; category: { id: string; name: string }; vendor: { id: string; name: string }; amount: string; amount_label?: string | null; currency: string; unit: { id: string; code: string; name: string }; scope_note?: string | null; notes: string | null; updated_at: Date; updated_by_label: string; deleted_at: Date | null };
-type Target = { kind: Kind; id: string; name: string };
+/** `sku` is set for a material price: archiving the last live price of a SKU means archiving the SKU with it. */
+type Target = { kind: Kind; id: string; name: string; sku?: { id: string; name: string } };
 type Editor = { kind: Kind; row?: MaterialRow | WorkRow };
 type Ref = { id: string; name: string };
 type PriceSortKey = "name" | "vendor" | "amount" | "updated" | "category" | "brand";
@@ -45,6 +47,7 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
   const [savePending, setSavePending] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null); const [, startTransition] = useTransition();
   const matches = (text: string, deletedAt: Date | null) => matchesDirectoryStatus(deletedAt, status) && text.toLowerCase().includes(query.toLowerCase());
+  const lastPriceSku = archive?.sku && props.materialPrices.filter((row) => row.sku.id === archive.sku?.id && !row.deleted_at).length <= 1 ? archive.sku : null;
   const run = (id: string, command: () => Promise<unknown>, onSuccess?: () => void) => {
     if (pendingId) return;
     setPendingId(id); setRowError(null);
@@ -159,7 +162,7 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
                   {priceCell(row, shown.lowest)}
                   <TableCell><span className="font-ui-mono text-xs">{row.unit.code}</span></TableCell>
                   <UpdatedCell at={row.updated_at} by={row.updated_by_label} />
-                  {actions(row, { kind: "material", id: row.id, name: `${row.sku.name ?? row.sku.code ?? "Unnamed SKU"} / ${row.supplier_vendor.name}` }, props.canManageMaterial, () => setEditor({ kind: "material", row }))}
+                  {actions(row, { kind: "material", id: row.id, name: `${row.sku.name ?? row.sku.code ?? "Unnamed SKU"} / ${row.supplier_vendor.name}`, sku: { id: row.sku.id, name: row.sku.name ?? row.sku.code ?? "Unnamed SKU" } }, props.canManageMaterial, () => setEditor({ kind: "material", row }))}
                 </TableRow>,
               ];
             })}
@@ -221,7 +224,19 @@ export function PricingDirectory(props: { initialSupplierId?: string; initialBra
       { value: "material-labor", label: "Material + Labor", count: materialLaborFiltered.length, disabled: !props.canReadWork, disabledReason: "You do not have permission to view work prices.", content: workTable(materialLaborFiltered, props.materialLaborPrices.length, "material-labor", props.canManageWork, "No material + labor prices") },
       { value: "labor", label: "Labor Only", count: laborFiltered.length, disabled: !props.canReadWork, disabledReason: "You do not have permission to view work prices.", content: workTable(laborFiltered, props.laborPrices.length, "labor", props.canManageWork, "No labor-only prices") },
     ]} />
-    {archive && <ConfirmDialog error={rowError} pending={pendingId !== null} open onOpenChange={(open) => !open && setArchive(null)} title={`Archive ${archive.name}?`} description="It will be removed from active pricing and pickers." confirmLabel="Archive" tone="danger" onConfirm={() => { const value = archive;  run(value.id, () => archivePriceAction(value.kind, value.id), () => { setArchive(null); }); }} />}
+    {archive && !lastPriceSku && <ConfirmDialog error={rowError} pending={pendingId !== null} open onOpenChange={(open) => !open && setArchive(null)} title={`Archive ${archive.name}?`} description="It will be removed from active pricing and pickers." confirmLabel="Archive" tone="danger" onConfirm={() => { const value = archive;  run(value.id, () => archivePriceAction(value.kind, value.id), () => { setArchive(null); }); }} />}
+    {/* A live SKU must keep one active price (SKU_PRICE_REQUIRED), so its last price goes only together with the SKU (owner, 2026-10-23). */}
+    {archive && lastPriceSku && (props.canManageSkus ? (
+      <ConfirmDialog error={rowError} pending={pendingId !== null} open onOpenChange={(open) => !open && setArchive(null)}
+        title={`Archive the SKU "${lastPriceSku.name}" too?`}
+        description={`This is the only active price for ${lastPriceSku.name}, and a SKU in use needs at least one price. The price can only be archived together with its SKU. Restoring the SKU later brings this price back.`}
+        confirmLabel="Archive SKU and price" tone="danger"
+        onConfirm={() => { const sku = lastPriceSku; run(archive.id, () => archiveSkuAction(sku.id), () => { setArchive(null); }); }} />
+    ) : (
+      <Dialog open onOpenChange={(open) => !open && setArchive(null)} title={`This is the last price of "${lastPriceSku.name}"`} size="sm"
+        description="A SKU in use needs at least one price. Add another price first, or ask someone who can manage SKUs to archive the SKU itself; its price goes with it."
+        footer={<Button variant="primary" onClick={() => setArchive(null)}>OK</Button>}>{null}</Dialog>
+    ))}
     {restore && <ConfirmDialog error={rowError} pending={pendingId !== null} open onOpenChange={(open) => !open && setRestore(null)} title={`Restore ${restore.name}?`} description="Required references will be validated before restoring it." confirmLabel="Restore" onConfirm={() => { const value = restore;  run(value.id, () => restorePriceAction(value.kind, value.id), () => { setRestore(null); }); }} />}
     {deletion && <RequestDeletionDialog open onOpenChange={(open) => !open && setDeletion(null)} title="Request permanent deletion" description="The archived record remains until a deletion approver accepts this request." reason={reason} onReasonChange={setReason} placeholder="Optional context for the approver" pending={pendingId !== null} error={rowError} onSubmit={() => { const value = deletion; const note = reason;   run(value.id, () => requestPriceDeletionAction(value.kind, value.id, note), () => { setDeletion(null); setReason(""); }); }} />}
   </div>;
