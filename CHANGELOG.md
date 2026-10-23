@@ -1,5 +1,17 @@
 # Changelog
 
+## R9.214 | 2026-10-23 | ui(studioflow): hide and highlight Product Schedule items (Lead)
+
+- **Review of R9.213 (Codex):** PASS. Additive migration, selection checked against the project before any write, unchanged items skipped, audit per change, re-import keeps the marks; 1,314/1,314 in the Executor's high-tier run.
+- **Menus:** List rows (... and right-click) and Board cards (right-click) offer Copy row / Copy image, Hide or Unhide, and Highlight (Yellow, Green, Blue, Red, Purple, No colour) as a submenu. The selection panel hides, unhides and colours several items at once.
+- **Look:** a highlighted List row gets a tint and a colour edge; a Board card gets a colour frame. Hidden items, when shown, are faded and carry a "Hidden" badge.
+- **Filters:** "Hidden items: off / Show hidden / Hidden only" and a colour filter (All colours, Any highlight, one colour) appear once the section has hidden or highlighted items, for both views.
+- **Counts:** hidden items leave the section counts, "x of y final" and the progress filters. Drag reordering sends the whole category, hidden rows included, because the server reorders a complete group; reordering is off while a colour filter or "Hidden only" is on.
+- **Print:** with hidden items in the project, Print / PDF asks "Include hidden items?"; the print page leaves them out unless `?hidden=include` (the paper/orientation picker keeps that choice).
+- **UI Engine:** `RowActionItem.items` renders a one-level submenu in `RowActionMenu` and `ContextActionMenu` (shared renderer per menu); five `--ui-highlight-*` colour tokens.
+- **Migration/dependencies:** none (R9.213 carried the migration).
+- **Checks:** typecheck, eslint (schedule board, print page, UI Engine), boundary check, UI Engine + schedule regression tests 100/100, submenu/token tests 2/2. Browser check is the owner's on :3001.
+
 ## R9.213 | 2026-10-23 | feat(studioflow): add shared schedule item marks (Codex Executor)
 
 - **Scope:** schedule items now store `hidden` (default false) and an optional highlight from the approved yellow, green, blue, red, purple palette. Schedule reads expose both marks while retaining hidden items; new entries start unmarked, and sheet re-import preserves existing marks.

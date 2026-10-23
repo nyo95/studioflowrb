@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown,Filter,MoreHorizontal,X } from "lucide-react";
+import { ChevronDown,ChevronRight,Filter,MoreHorizontal,X } from "lucide-react";
 import { ContextMenu,DropdownMenu } from "radix-ui";
 import { Fragment,type HTMLAttributes,type ReactElement,type ReactNode,useState,useTransition } from "react";
 
@@ -9,12 +9,72 @@ import { Button,IconButton,type ButtonVariant } from "../primitives";
 
 export type RowActionItem = {
   label: string;
-  onSelect: () => void;
+  /** Not called for an item with `items`: that item only opens its submenu. */
+  onSelect?: () => void;
   icon?: ReactNode;
   danger?: boolean;
   disabled?: boolean;
   separatorBefore?: boolean;
+  /** Nested choices opened from this item (for example a set of colours), one level deep. */
+  items?: readonly RowActionItem[];
 };
+
+const MENU_CONTENT = "z-[65] min-w-[190px] overflow-hidden rounded-control bg-surface-raised shadow-elevated p-[5px]";
+const MENU_ITEM = "flex min-h-8 cursor-pointer items-center gap-2 rounded-action px-2 py-1.5 text-sm text-ink outline-0 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-ink-tertiary data-[danger=true]:text-danger data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted data-[state=open]:bg-surface-muted";
+
+function DropdownItems({ items }: { items: readonly RowActionItem[] }) {
+  return items.map((item) => (
+    <Fragment key={item.label}>
+      {item.separatorBefore ? <DropdownMenu.Separator className="-mx-px my-1 h-px bg-line" /> : null}
+      {item.items ? (
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger className={MENU_ITEM} disabled={item.disabled}>
+            {item.icon}
+            <span className="mr-auto">{item.label}</span>
+            <ChevronRight aria-hidden="true" />
+          </DropdownMenu.SubTrigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.SubContent className={MENU_CONTENT} sideOffset={4}>
+              <DropdownItems items={item.items} />
+            </DropdownMenu.SubContent>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Sub>
+      ) : (
+        <DropdownMenu.Item className={MENU_ITEM} data-danger={item.danger || undefined} disabled={item.disabled} onSelect={item.onSelect}>
+          {item.icon}
+          <span>{item.label}</span>
+        </DropdownMenu.Item>
+      )}
+    </Fragment>
+  ));
+}
+
+function ContextItems({ items }: { items: readonly RowActionItem[] }) {
+  return items.map((item) => (
+    <Fragment key={item.label}>
+      {item.separatorBefore ? <ContextMenu.Separator className="-mx-px my-1 h-px bg-line" /> : null}
+      {item.items ? (
+        <ContextMenu.Sub>
+          <ContextMenu.SubTrigger className={MENU_ITEM} disabled={item.disabled}>
+            {item.icon}
+            <span className="mr-auto">{item.label}</span>
+            <ChevronRight aria-hidden="true" />
+          </ContextMenu.SubTrigger>
+          <ContextMenu.Portal>
+            <ContextMenu.SubContent className={MENU_CONTENT} sideOffset={4}>
+              <ContextItems items={item.items} />
+            </ContextMenu.SubContent>
+          </ContextMenu.Portal>
+        </ContextMenu.Sub>
+      ) : (
+        <ContextMenu.Item className={MENU_ITEM} data-danger={item.danger || undefined} disabled={item.disabled} onSelect={item.onSelect}>
+          {item.icon}
+          <span>{item.label}</span>
+        </ContextMenu.Item>
+      )}
+    </Fragment>
+  ));
+}
 
 type RowActionFailure = { error?: { safeMessage?: string } };
 
@@ -82,27 +142,8 @@ export function RowActionMenu({
         )}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          className="z-[65] min-w-[190px] overflow-hidden rounded-control bg-surface-raised shadow-elevated p-[5px]"
-          sideOffset={5}
-          align={align}
-        >
-          {items.map((item) => (
-            <Fragment key={item.label}>
-              {item.separatorBefore ? (
-                <DropdownMenu.Separator className="-mx-px my-1 h-px bg-line" />
-              ) : null}
-              <DropdownMenu.Item
-                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-action px-2 py-1.5 text-sm text-ink outline-0 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-ink-tertiary data-[danger=true]:text-danger data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted"
-                data-danger={item.danger || undefined}
-                disabled={item.disabled}
-                onSelect={item.onSelect}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </DropdownMenu.Item>
-            </Fragment>
-          ))}
+        <DropdownMenu.Content className={MENU_CONTENT} sideOffset={5} align={align}>
+          <DropdownItems items={items} />
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
@@ -125,21 +166,8 @@ export function ContextActionMenu({
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>{children}</ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className="z-[65] min-w-[190px] overflow-hidden rounded-control bg-surface-raised shadow-elevated p-[5px]">
-          {items.map((item) => (
-            <Fragment key={item.label}>
-              {item.separatorBefore ? <ContextMenu.Separator className="-mx-px my-1 h-px bg-line" /> : null}
-              <ContextMenu.Item
-                className="flex min-h-8 cursor-pointer items-center gap-2 rounded-action px-2 py-1.5 text-sm text-ink outline-0 [&_svg]:h-3.5 [&_svg]:w-3.5 [&_svg]:text-ink-tertiary data-[danger=true]:text-danger data-[disabled]:pointer-events-none data-[disabled]:opacity-45 data-[highlighted]:bg-surface-muted"
-                data-danger={item.danger || undefined}
-                disabled={item.disabled}
-                onSelect={item.onSelect}
-              >
-                {item.icon}
-                <span>{item.label}</span>
-              </ContextMenu.Item>
-            </Fragment>
-          ))}
+        <ContextMenu.Content className={MENU_CONTENT}>
+          <ContextItems items={items} />
         </ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>

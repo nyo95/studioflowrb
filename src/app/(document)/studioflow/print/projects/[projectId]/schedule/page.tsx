@@ -35,10 +35,13 @@ export default async function SchedulePrintPage({
   searchParams,
 }: {
   params: Promise<{ projectId: string }>;
-  searchParams: Promise<{ paper?: string; orientation?: string }>;
+  searchParams: Promise<{ paper?: string; orientation?: string; hidden?: string }>;
 }) {
   const { projectId } = await params;
-  const printFormat = printFormatFromSearchParams(await searchParams);
+  const query = await searchParams;
+  const printFormat = printFormatFromSearchParams(query);
+  // Hidden items are printed only when the Print / PDF question asked for them (owner, 2026-10-23).
+  const includeHidden = query.hidden === "include";
   const { principal, grants } = await requirePrincipalGrants();
 
   const load = async () => {
@@ -52,7 +55,8 @@ export default async function SchedulePrintPage({
       throw error;
     }
   };
-  const [[project, entries], letterhead] = await Promise.all([load(), readConsultantLetterhead()]);
+  const [[project, allEntries], letterhead] = await Promise.all([load(), readConsultantLetterhead()]);
+  const entries = includeHidden ? allEntries : allEntries.filter((entry) => !entry.hidden);
   const cardColumns = printFormat.orientation === "landscape" ? "grid-cols-4" : "grid-cols-3";
 
   return (

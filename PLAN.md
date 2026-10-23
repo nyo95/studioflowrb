@@ -5,7 +5,7 @@ Scope: Product Schedule items can be hidden and highlighted (shared for everyone
 Module(s): `studioflow` (Product Schedule).
 Target revision: plan R9.212; backend (Codex) R9.213; UI (Lead) R9.214.
 Risk: low-medium - two additive columns on schedule items and two bulk commands.
-Status: READY for Executor (R9.213).
+Status: DONE - backend R9.213 (Codex, PASS), UI R9.214 (Lead); owner browser check owed.
 Priority: P1
 Owner: Product Owner (decisions 2026-10-23: marks are shared in the database; hidden items leave the progress count; print asks each time whether hidden items are included)
 Last updated: 2026-10-23

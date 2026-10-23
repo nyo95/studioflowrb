@@ -12,6 +12,7 @@ import {
   SCHEDULE_EXTRA_LABEL_MAX,
   SCHEDULE_EXTRA_MAX,
   SCHEDULE_EXTRA_VALUE_MAX,
+  SCHEDULE_HIGHLIGHTS,
   SCHEDULE_SECTION_LABEL as SECTION_LABEL,
   cardFieldLabel,
   cardFieldValuesOf,
@@ -28,6 +29,7 @@ import {
   templateSourceOf,
   type ScheduleEntryView,
   type ScheduleExtraField,
+  type ScheduleHighlight,
   type ScheduleOptionView,
 } from "@/apps/studioflow/domain/schedule";
 import {
@@ -51,6 +53,7 @@ import {
   PillTabs,
   ContextActionMenu,
   RowActionMenu,
+  type RowActionItem,
   Select,
   SimpleTextEditor,
   SortToggle,
@@ -88,6 +91,8 @@ import {
   requestScheduleSampleAction,
   saveScheduleEntryAsTemplateAction,
   searchReusableScheduleOptionsAction,
+  setScheduleEntriesHiddenAction,
+  setScheduleEntriesHighlightAction,
   setScheduleOptionImageAction,
   updateScheduleEntryAction,
   updateScheduleEntryCardFieldsAction,
@@ -270,6 +275,33 @@ function sheetRowOf(entry: ScheduleEntryView): string[] {
   return entry.section === "FIXTURE" ? [...row, entry.qty ?? "", entry.unit ?? ""] : row;
 }
 
+// ── Hide and highlight marks (WO-SF-SCHEDULE-MARKS-01) ───────────────────────
+const HIGHLIGHT_LABEL: Record<ScheduleHighlight, string> = { yellow: "Yellow", green: "Green", blue: "Blue", red: "Red", purple: "Purple" };
+type Visibility = "visible" | "all" | "hidden";
+type HighlightFilter = "ALL" | "any" | ScheduleHighlight;
+
+function Swatch({ highlight }: { highlight: ScheduleHighlight | null }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-block h-3 w-3 shrink-0 rounded-full"
+      style={highlight ? { background: `var(--ui-highlight-${highlight})` } : { boxShadow: "inset 0 0 0 1px var(--ui-border-strong)" }}
+    />
+  );
+}
+
+/** A List row's tint and colour edge. */
+function rowHighlightStyle(highlight: ScheduleHighlight | null) {
+  if (!highlight) return undefined;
+  return { backgroundColor: `color-mix(in srgb, var(--ui-highlight-${highlight}) 14%, var(--ui-surface))`, boxShadow: `inset 3px 0 0 var(--ui-highlight-${highlight})` };
+}
+
+/** A Board card's colour frame, set off from the card by a thin gap. */
+function cardHighlightStyle(highlight: ScheduleHighlight | null) {
+  if (!highlight) return undefined;
+  return { boxShadow: `0 0 0 3px var(--ui-surface), 0 0 0 6px var(--ui-highlight-${highlight})` };
+}
+
 /** The fields that make up the Initials type; a Board card shows them only as its title, when there is no Type yet. */
 const INITIALS_FIELDS: ReadonlySet<string> = new Set(["color", "pattern", "finishing"]);
 
@@ -331,6 +363,7 @@ function entryBadges(entry: ScheduleEntryView): EntryBadge[] {
   const final = finalOf(entry);
   const shown = shownOptionOf(entry);
   const badges: EntryBadge[] = [];
+  if (entry.hidden) badges.push({ label: "Hidden", tone: "neutral" });
   if (final) badges.push({ label: "Final", tone: "success", quiet: true });
   else if (entry.options.length > 1) badges.push({ label: `${entry.options.length} options`, tone: "neutral" });
   else if (entry.options.length === 1) badges.push({ label: "Not final", tone: "neutral", quiet: true });
@@ -430,6 +463,7 @@ function BoardView({
   section,
   onReorder,
   onDelete,
+  menuItems,
   categoryChoices,
   openId,
   selecting,
@@ -445,6 +479,8 @@ function BoardView({
   section: Section;
   onReorder: (rows: ScheduleEntryView[], draggedId: string, targetId: string) => void;
   onDelete: (entry: ScheduleEntryView) => void;
+  /** Copy, hide and highlight for one card; shared with the List row menu. */
+  menuItems: (entry: ScheduleEntryView) => RowActionItem[];
   categoryChoices: readonly CategoryChoice[];
   openId: string | null;
   selecting: boolean;
@@ -480,9 +516,10 @@ function BoardView({
               return (
                 <ContextActionMenu
                   key={entry.id}
-                  items={canEdit && !selecting ? [
+                  items={!selecting ? [
                     { label: "Open", onSelect: () => onOpen(entry.id) },
-                    { label: "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(entry) },
+                    ...menuItems(entry),
+                    ...(canEdit ? [{ label: "Delete", danger: true, separatorBefore: true, onSelect: () => onDelete(entry) }] : []),
                   ] : []}
                 >
                 <article
@@ -497,7 +534,8 @@ function BoardView({
                     if (draggingId) onReorder(group.rows, draggingId, entry.id);
                     end();
                   }}
-                  className={`group relative grid min-w-0 content-start text-left ${reorderEnabled ? "cursor-grab active:cursor-grabbing" : ""} ${draggingId === entry.id ? "opacity-40" : ""} ${openId === entry.id || selectedIds.has(entry.id) ? "outline-2 outline-offset-2 outline-line-focus" : ""} ${dragOverId === entry.id && draggingId && draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}
+                  style={cardHighlightStyle(entry.highlight)}
+                  className={`group relative grid min-w-0 content-start text-left ${entry.hidden ? "opacity-55" : ""} ${reorderEnabled ? "cursor-grab active:cursor-grabbing" : ""} ${draggingId === entry.id ? "opacity-40" : ""} ${openId === entry.id || selectedIds.has(entry.id) ? "outline-2 outline-offset-2 outline-line-focus" : ""} ${dragOverId === entry.id && draggingId && draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-2 outline-line-focus" : ""}`}
                 >
                   <button type="button" aria-pressed={selecting ? selectedIds.has(entry.id) : undefined} onClick={() => pick(entry.id)} className="relative mb-2 block aspect-[4/5] w-full overflow-hidden bg-surface-muted text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-line-focus">
                     {shown?.imageUrl ? (
@@ -585,6 +623,11 @@ export function ScheduleBoard({
   }, [initialOpenId]);
   const [autoPhotoOptionId, setAutoPhotoOptionId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "add" | "import" | { move: ScheduleEntryView }>(null);
+  const [printAsk, setPrintAsk] = useState(false);
+  const openPrint = (includeHidden: boolean) => {
+    setPrintAsk(false);
+    window.open(`${STUDIOFLOW_ROUTES.projectSchedulePrint(projectId)}${includeHidden ? "?hidden=include" : ""}`, "_blank", "noopener");
+  };
   const [notice, setNotice] = useState<string | null>(null);
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
@@ -599,16 +642,24 @@ export function ScheduleBoard({
     setAutoPhotoOptionId(photoOptionId);
   };
 
+  // Hidden items leave every count and the progress (owner, 2026-10-23); they are still loaded, so they can be shown.
   const counts = useMemo(() => ({
-    MATERIAL: entries.filter((e) => e.section === "MATERIAL").length,
-    FIXTURE: entries.filter((e) => e.section === "FIXTURE").length,
+    MATERIAL: entries.filter((e) => e.section === "MATERIAL" && !e.hidden).length,
+    FIXTURE: entries.filter((e) => e.section === "FIXTURE" && !e.hidden).length,
   }), [entries]);
 
   const sectionEntries = useMemo(() => entries.filter((entry) => entry.section === section), [entries, section]);
-  const progress = useMemo(() => scheduleFilterCounts(sectionEntries), [sectionEntries]);
+  const progress = useMemo(() => scheduleFilterCounts(sectionEntries.filter((entry) => !entry.hidden)), [sectionEntries]);
+  const hiddenCount = sectionEntries.filter((entry) => entry.hidden).length;
+  const highlightedCount = sectionEntries.filter((entry) => entry.highlight).length;
+  const [visibility, setVisibility] = useState<Visibility>("visible");
+  const [highlightFilter, setHighlightFilter] = useState<HighlightFilter>("ALL");
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
-  const visibleEntries = useMemo(() => sectionEntries.filter((entry) => entryMatchesFilter(entry, filter) && (!needle || entryMatchesQuery(entry, needle))), [sectionEntries, filter, needle]);
+  const visibleEntries = useMemo(() => sectionEntries.filter((entry) =>
+    (visibility === "all" || entry.hidden === (visibility === "hidden"))
+    && (highlightFilter === "ALL" || (highlightFilter === "any" ? entry.highlight !== null : entry.highlight === highlightFilter))
+    && entryMatchesFilter(entry, filter) && (!needle || entryMatchesQuery(entry, needle))), [sectionEntries, visibility, highlightFilter, filter, needle]);
 
   const groups = useMemo(() => {
     const map = new Map<string, ScheduleEntryView[]>();
@@ -650,8 +701,37 @@ export function ScheduleBoard({
       setNotice(copyError instanceof Error ? copyError.message : "Could not copy the photo.");
     }
   };
+  const setHidden = async (rows: readonly ScheduleEntryView[], hidden: boolean) => {
+    const entryIds = rows.map((row) => row.id);
+    const ok = await run("mark-hidden", () => setScheduleEntriesHiddenAction({ projectId, entryIds, hidden }));
+    if (!ok) return;
+    const what = rows.length === 1 ? rows[0].code : `${rows.length} items`;
+    setNotice(hidden ? `${what} hidden. Choose "Show hidden" to see ${rows.length === 1 ? "it" : "them"} again.` : `${what} shown again.`);
+  };
+  const setHighlight = (rows: readonly ScheduleEntryView[], highlight: ScheduleHighlight | null) =>
+    void run("mark-highlight", () => setScheduleEntriesHighlightAction({ projectId, entryIds: rows.map((row) => row.id), highlight }));
+  /** Hide / Unhide and Highlight for one or several items; empty for a viewer who cannot edit. */
+  const markItems = (rows: readonly ScheduleEntryView[]): RowActionItem[] => {
+    if (!canEdit || rows.length === 0) return [];
+    const allHidden = rows.every((row) => row.hidden);
+    return [
+      { label: allHidden ? "Unhide" : "Hide", icon: allHidden ? <Eye /> : <EyeOff />, separatorBefore: true, onSelect: () => void setHidden(rows, !allHidden) },
+      {
+        label: "Highlight",
+        icon: <Palette />,
+        items: [
+          ...SCHEDULE_HIGHLIGHTS.map((highlight) => ({ label: HIGHLIGHT_LABEL[highlight], icon: <Swatch highlight={highlight} />, onSelect: () => setHighlight(rows, highlight) })),
+          { label: "No colour", icon: <Swatch highlight={null} />, separatorBefore: true, onSelect: () => setHighlight(rows, null) },
+        ],
+      },
+    ];
+  };
+  const copyItems = (entry: ScheduleEntryView): RowActionItem[] => [
+    { label: "Copy row", icon: <Copy className="h-3.5 w-3.5" />, separatorBefore: true, onSelect: () => void copyRows([entry]) },
+    ...(shownOptionOf(entry)?.imageUrl && canWriteClipboardImage() ? [{ label: "Copy image", icon: <ImageIcon className="h-3.5 w-3.5" />, onSelect: () => void copyImage(entry) }] : []),
+  ];
   const listFiltered = Object.values(listFilters).some((value) => value !== "ALL");
-  const listManual = filter === "all" && listSort === null && !listFiltered;
+  const listManual = filter === "all" && listSort === null && !listFiltered && highlightFilter === "ALL" && visibility !== "hidden";
   const listGroups = useMemo(() => {
     const keep = (entry: ScheduleEntryView) => (Object.keys(listFilters) as ListFilterKey[]).every((key) => {
       const wanted = listFilters[key];
@@ -781,7 +861,8 @@ export function ScheduleBoard({
   /** Reorder within one category group (one code prefix); drag targets never span groups. */
   const reorderGroup = (rows: ScheduleEntryView[], draggedId: string, targetId: string) => {
     if (draggedId === targetId) return;
-    const ids = rows.map((row) => row.id);
+    // The server reorders a whole category, so rows out of view (hidden ones) keep their place in the list sent.
+    const ids = sectionEntries.filter((entry) => entry.category === rows[0]?.category).map((entry) => entry.id);
     const from = ids.indexOf(draggedId);
     if (from === -1 || !ids.includes(targetId)) return;
     ids.splice(from, 1);
@@ -823,6 +904,12 @@ export function ScheduleBoard({
               prefetch={false}
               target="_blank"
               href={STUDIOFLOW_ROUTES.projectSchedulePrint(projectId)}
+              onClick={(event) => {
+                // With hidden items in the project, ask each time whether they are printed (owner, 2026-10-23).
+                if (!entries.some((entry) => entry.hidden)) return;
+                event.preventDefault();
+                setPrintAsk(true);
+              }}
               className="inline-flex min-h-(--ui-control-height-sm) items-center gap-1.5 rounded-control border border-line bg-surface px-2.5 text-xs font-medium text-ink hover:border-line-strong"
             >
               <Printer aria-hidden="true" className="h-3.5 w-3.5" /> Print / PDF
@@ -852,6 +939,20 @@ export function ScheduleBoard({
             <FilterChip selected={filter === "sample"} count={progress.sample} onClick={() => setFilter("sample")}>Sample waiting</FilterChip>
             <FilterChip selected={filter === "empty"} count={progress.empty} onClick={() => setFilter("empty")}>No product yet</FilterChip>
           </div>
+          {hiddenCount > 0 || visibility !== "visible" ? (
+            <Select aria-label="Hidden items" className="!h-8 !w-auto text-xs" value={visibility} onChange={(event) => setVisibility(event.target.value as Visibility)}>
+              <option value="visible">Hidden items: off ({hiddenCount})</option>
+              <option value="all">Show hidden</option>
+              <option value="hidden">Hidden only</option>
+            </Select>
+          ) : null}
+          {highlightedCount > 0 || highlightFilter !== "ALL" ? (
+            <Select aria-label="Highlight colour" className="!h-8 !w-auto text-xs" value={highlightFilter} onChange={(event) => setHighlightFilter(event.target.value as HighlightFilter)}>
+              <option value="ALL">All colours</option>
+              <option value="any">Any highlight</option>
+              {SCHEDULE_HIGHLIGHTS.map((highlight) => <option key={highlight} value={highlight}>{HIGHLIGHT_LABEL[highlight]}</option>)}
+            </Select>
+          ) : null}
           {viewMode === "list" ? (
             <div className="flex flex-wrap items-center gap-1.5">
               <TableFilters
@@ -916,6 +1017,7 @@ export function ScheduleBoard({
                     section={section}
                     onReorder={reorderGroup}
                     onDelete={(entry) => void removeEntry(entry)}
+                    menuItems={(entry) => [...copyItems(entry), ...markItems([entry])]}
                     categoryChoices={categoryChoices}
                     openId={openId}
                     selecting={selecting}
@@ -964,8 +1066,8 @@ export function ScheduleBoard({
                             // One action list for the row's … menu and its right-click menu, as on the Board.
                             const rowItems = !selecting ? [
                               { label: "Open", onSelect: () => openEntry(entry.id) },
-                              { label: "Copy row", icon: <Copy className="h-3.5 w-3.5" />, separatorBefore: true, onSelect: () => void copyRows([entry]) },
-                              ...(shown?.imageUrl && canWriteClipboardImage() ? [{ label: "Copy image", icon: <ImageIcon className="h-3.5 w-3.5" />, onSelect: () => void copyImage(entry) }] : []),
+                              ...copyItems(entry),
+                              ...markItems([entry]),
                               ...(canManageTemplates && templateSourceOf(entry)
                                 ? [{ label: "Save as template item", separatorBefore: true, onSelect: () => void run(`${entry.id}-template`, () => saveScheduleEntryAsTemplateAction({ projectId, entryId: entry.id })) }]
                                 : []),
@@ -990,7 +1092,8 @@ export function ScheduleBoard({
                                   if (listDrag.draggingId) reorderGroup(group.rows, listDrag.draggingId, entry.id);
                                   listDrag.end();
                                 }}
-                                className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${canEdit && listManual ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
+                                style={rowHighlightStyle(entry.highlight)}
+                                className={`flex items-center gap-3 px-(--ui-section-px) py-2.5 ${entry.hidden ? "opacity-55" : ""} ${canEdit && listManual ? "cursor-grab active:cursor-grabbing" : ""} ${open?.id === entry.id ? "bg-surface-muted" : "hover:bg-surface-muted"} ${listDrag.draggingId === entry.id ? "opacity-40" : ""} ${listDrag.dragOverId === entry.id && listDrag.draggingId && listDrag.draggingId !== entry.id ? "outline-2 outline-dashed outline-offset-[-2px] outline-line-focus" : ""}`}
                               >
                                 {selecting ? <Checkbox checked={selectedIds.has(entry.id)} onCheckedChange={() => toggleSelected(entry.id)} label={<span className="sr-only">Select {entry.code}</span>} /> : null}
                                 <button type="button" onClick={() => (selecting ? toggleSelected(entry.id) : openEntry(entry.id))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
@@ -1058,6 +1161,7 @@ export function ScheduleBoard({
               onClear={() => setSelectedIds(new Set())}
               onDelete={() => void removeSelected()}
               onCopy={() => void copyRows(visibleEntries.filter((entry) => selectedIds.has(entry.id)))}
+              marks={markItems(visibleEntries.filter((entry) => selectedIds.has(entry.id)))}
               deleting={command.pendingKeys.includes("bulk-delete")}
             />
           ) : (
@@ -1073,6 +1177,16 @@ export function ScheduleBoard({
       {dialog === "add" ? (
         <AddItemDrawer projectId={projectId} section={section} categoriesBySection={categoriesBySection} categoryChoices={categoryChoices} brands={brands} command={command} confirm={confirm.confirm} onClose={() => setDialog(null)} />
       ) : null}
+      <Dialog
+        open={printAsk}
+        onOpenChange={setPrintAsk}
+        title="Include hidden items?"
+        description={`${entries.filter((entry) => entry.hidden).length} hidden item(s) in this schedule. Hidden items are left out of the print unless you include them.`}
+        size="sm"
+        footer={<><Button variant="ghost" onClick={() => openPrint(true)}>Include hidden</Button><Button variant="primary" onClick={() => openPrint(false)}>Leave them out</Button></>}
+      >
+        {null}
+      </Dialog>
       {dialog === "import" ? <ImportDialog projectId={projectId} section={section} command={command} onClose={() => setDialog(null)} /> : null}
       {dialog && typeof dialog === "object" ? (
         <MoveDialog projectId={projectId} entry={dialog.move} categories={categories} command={command} onClose={() => setDialog(null)} />
@@ -1882,7 +1996,7 @@ function DockedEntryPanel({
 }
 
 /** The inspector while several items are ticked: what is picked, and what can be done with all of them at once. */
-function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, onCopy, deleting }: { picked: readonly ScheduleEntryView[]; total: number; allPicked: boolean; onToggleAll: () => void; onClear: () => void; onDelete: () => void; onCopy: () => void; deleting: boolean }) {
+function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, onCopy, marks, deleting }: { picked: readonly ScheduleEntryView[]; total: number; allPicked: boolean; onToggleAll: () => void; onClear: () => void; onDelete: () => void; onCopy: () => void; marks: readonly RowActionItem[]; deleting: boolean }) {
   const count = picked.length;
   const items = `${count} item${count === 1 ? "" : "s"}`;
   return (
@@ -1905,6 +2019,17 @@ function BulkPanel({ picked, total, allPicked, onToggleAll, onClear, onDelete, o
             );
           })}
         </ul>
+        {marks.length ? (
+          <div className="grid gap-2 rounded-control border border-line-subtle p-3">
+            <Text size="sm" weight="semibold">Hide or highlight</Text>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {marks.filter((mark) => !mark.items).map((mark) => <Button key={mark.label} size="sm" variant="secondary" leadingIcon={mark.icon} onClick={mark.onSelect}>{mark.label} {items}</Button>)}
+              {marks.flatMap((mark) => mark.items ?? []).map((choice) => (
+                <IconButton key={choice.label} size="sm" variant="ghost" label={`Highlight ${items}: ${choice.label}`} icon={choice.icon} onClick={choice.onSelect} />
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="grid gap-2 rounded-control border border-line-subtle p-3">
           <Text size="sm" weight="semibold">Copy for the sheet</Text>
           <Text size="sm" tone="secondary">Rows come in the sheet&apos;s column order, ready to paste. Photos are copied one at a time from each row&apos;s menu.</Text>

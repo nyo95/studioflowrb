@@ -160,7 +160,7 @@ describe("WO-SF-SCHEDULE-SHEET-01 list follows the studio sheet", () => {
   it("sorts and filters the List without breaking the studio's manual order", () => {
     assert.match(scheduleBoard, /<SortToggle/);
     assert.match(scheduleBoard, /<TableFilters/);
-    assert.match(scheduleBoard, /const listManual = filter === "all" && listSort === null && !listFiltered;/);
+    assert.match(scheduleBoard, /const listManual = filter === "all" && listSort === null && !listFiltered && highlightFilter === "ALL" && visibility !== "hidden";/);
     assert.match(scheduleBoard, /draggable=\{canEdit && listManual && !selecting\}/);
   });
   it("keeps Contact off the card fields and print", () => {
@@ -198,5 +198,31 @@ describe("Board card is a viewer: Type or Initials type, then active fields", ()
   it("titles the card with the Type, or the Initials type while there is no Type, never both", () => {
     assert.match(scheduleBoard, /const title = shown \? \(hasTypeOf\(shown\) \? shown\.productName : initialsOf\(shown\) \|\| shown\.productName\) : null;/);
     assert.match(scheduleBoard, /SPEC_LINE_FIELDS\.has\(key\) && !INITIALS_FIELDS\.has\(key\)/);
+  });
+});
+
+const printPage = readFileSync("src/app/(document)/studioflow/print/projects/[projectId]/schedule/page.tsx", "utf8");
+
+describe("WO-SF-SCHEDULE-MARKS-01 hide and highlight", () => {
+  it("offers Hide/Unhide and a Highlight submenu on List rows, Board cards and the selection", () => {
+    assert.match(scheduleBoard, /label: allHidden \? "Unhide" : "Hide"/);
+    assert.match(scheduleBoard, /label: "Highlight",[\s\S]*?items: \[/);
+    assert.match(scheduleBoard, /\.\.\.markItems\(\[entry\]\),/);
+    assert.match(scheduleBoard, /menuItems=\{\(entry\) => \[\.\.\.copyItems\(entry\), \.\.\.markItems\(\[entry\]\)\]\}/);
+    assert.match(scheduleBoard, /marks=\{markItems\(/);
+  });
+  it("keeps hidden items out of the counts and progress, with a visibility and a colour filter", () => {
+    assert.match(scheduleBoard, /scheduleFilterCounts\(sectionEntries\.filter\(\(entry\) => !entry\.hidden\)\)/);
+    assert.match(scheduleBoard, /<option value="all">Show hidden<\/option>/);
+    assert.match(scheduleBoard, /<option value="hidden">Hidden only<\/option>/);
+    assert.match(scheduleBoard, /aria-label="Highlight colour"/);
+  });
+  it("reorders a whole category so hidden rows are never dropped from the order sent", () => {
+    assert.match(scheduleBoard, /const ids = sectionEntries\.filter\(\(entry\) => entry\.category === rows\[0\]\?\.category\)\.map\(\(entry\) => entry\.id\);/);
+  });
+  it("asks at Print / PDF and prints hidden items only when asked", () => {
+    assert.match(scheduleBoard, /title="Include hidden items\?"/);
+    assert.match(scheduleBoard, /\?hidden=include/);
+    assert.match(printPage, /const entries = includeHidden \? allEntries : allEntries\.filter\(\(entry\) => !entry\.hidden\);/);
   });
 });

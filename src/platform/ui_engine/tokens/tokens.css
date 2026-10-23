@@ -84,6 +84,14 @@
   /* Contextual phase identity mark — shapes only, set by JS on phase entry  */
   --ui-mark: var(--ph-mood);
 
+  /* Highlight marks an operator puts on a row or card (StudioFlow schedule). Mid-tone so one value reads on light
+     and dark surfaces; a tint is mixed from it with the surface, an edge uses it as is. */
+  --ui-highlight-yellow: #D9A52B;
+  --ui-highlight-green:  #4E9A5F;
+  --ui-highlight-blue:   #4A80C4;
+  --ui-highlight-red:    #D0574D;
+  --ui-highlight-purple: #8C64C4;
+
   /* ── Table ────────────────────────────────────────────────────────────── */
   --ui-table-header-bg: var(--ui-surface-raised);
   --ui-table-header-fg: var(--ui-text-secondary);
