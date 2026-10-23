@@ -108,8 +108,8 @@ test("app rails link to their own settings", async ({ page }) => {
 
 test("access terminology distinguishes Platform Owner from Developer", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await open(page, "/settings/modules");
-  await expect(page.getByText("Changed only by the Developer.", { exact: true })).toBeVisible();
+  await open(page, "/settings/general");
+  await expect(page.locator('a[href="/settings/modules"]')).toHaveCount(0);
 
   await open(page, "/settings/access/roles");
   await expect(page.getByText("Platform Owner", { exact: true }).first()).toBeVisible();

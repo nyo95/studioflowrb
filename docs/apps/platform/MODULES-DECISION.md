@@ -95,8 +95,7 @@ an operational switch never destroys the Platform Owner's role design.
   **Developer rights are not RBAC
   permissions.** They are not in the permission vocabulary, so no role can
   hold them and no Platform Owner can grant them, including to
-  themselves. System operations are audited with a `system` actor; the app
-  UI (Settings > Modules) shows module state read-only.
+  themselves. System operations are audited with a `system` actor.
 - **Amended 2026-10-10 (owner):** the owner is not a programmer and must be
   able to run the system without an AI assistant, so Developer operations
   get a **web console** (`/system`) in addition to the server command. It is
@@ -108,6 +107,9 @@ an operational switch never destroys the Platform Owner's role design.
   sign-in attempt and change. Enrolment and reset of the authenticator stay a
   server command (`npm run studioflow -- developer setup|reset`), so nobody who
   only reaches the web can claim the console.
+- **Amended 2026-10-23 (owner):** the read-only Settings > Modules page is retired.
+  Module state is shown and changed in the separate Developer console (`/system`);
+  the ordinary Platform settings menu does not link to module operations.
 
 **D6. Versions.** Each module carries its own semver in the manifest; Platform
 records the version each module last ran with. Patch = fixes, minor =

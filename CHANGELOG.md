@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.203 | 2026-10-23 | ui(platform): retire duplicate Modules settings page (Codex, owner-directed UI)
+
+- **Owner decision:** the read-only Modules page in Platform settings is no longer needed because the separate Developer console shows module state and controls.
+- **Change:** removed the Modules settings route and sidebar link, its obsolete refresh call, and the screen check that expected its old notice. The Roles & Access screen still distinguishes Platform Owner authority from Developer authority. Existing module operations and access rules are unchanged.
+- **Docs:** updated the module decision record and server runbook to point to the Developer console. R9.202 remains the record of that console's section redesign; this revision records the removal of the duplicate page.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, focused eslint, boundary and legacy-runtime checks, production build, focused settings browser test (1/1), and Settings General width checks at 375/640/839/840/841 px (5/5) passed. Live narrow browser check confirmed the old route returns 404 and the Platform settings navigation no longer lists Modules. The full E2E suite was not run for this isolated removal.
+- **Limitations:** independent Lead acceptance remains owed. The prior untracked `.next-verify/` build output remains locally because automatic approval review rejected its recursive deletion.
+
 ## R9.202 | 2026-10-23 | ui(platform): clarify Developer console sections (Codex, owner-directed UI)
 
 - **Scope:** the Developer console now shows switchable modules first, with the always-on core applications in a disclosure; section links lead directly to Modules and AI & plugin access.

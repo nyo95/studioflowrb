@@ -11,8 +11,8 @@ as they were when the module is switched on again.
 
 Core modules (StudioFlow, Master Data and BQ) cannot be switched off. Only the
 Developer, with terminal access to the server, can run these commands. No app
-account, including the Platform Owner, can switch modules; Settings > Modules
-shows the current state read-only.
+account, including the Platform Owner, can switch modules. The Developer console
+shows the current state and controls; ordinary Platform settings do not show modules.
 
 ## Steps
 

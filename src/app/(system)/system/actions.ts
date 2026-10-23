@@ -48,7 +48,6 @@ export async function changeDeveloperModuleStateAction(
     const rawToken = await requiredToken();
     const result = await developerAccess.setModuleState(rawToken, moduleId, state);
     revalidatePath("/system");
-    revalidatePath("/settings/modules");
     revalidatePath("/settings/access/roles");
     return result;
   }, { context: "developer_module_state" });
