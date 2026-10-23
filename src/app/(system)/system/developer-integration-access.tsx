@@ -5,23 +5,16 @@ import { useRouter } from "next/navigation";
 
 import {
   Button,
-  DataTable,
   InlineError,
-  Notice,
   SectionCard,
   Select,
-  TableBody,
-  TableCell,
-  TableCellContent,
-  TableHead,
-  TableHeader,
-  TableRow,
+  StatusBadge,
 } from "@/platform/ui_engine";
 
 import { changeIntegrationAccessAction } from "./actions";
 
 type AllowedUser = { userId: string; displayName: string; email: string };
-type GatedModule = { moduleId: string; name: string; allowed: readonly AllowedUser[] };
+type GatedModule = { moduleId: string; name: string; enabled: boolean; allowed: readonly AllowedUser[] };
 type Candidate = { id: string; displayName: string; email: string };
 
 export function DeveloperIntegrationAccess({ modules, users }: { modules: readonly GatedModule[]; users: readonly Candidate[] }) {
@@ -40,45 +33,47 @@ export function DeveloperIntegrationAccess({ modules, users }: { modules: readon
   };
 
   return (
-    <SectionCard title="AI and plugin access" description="Who may connect an AI assistant or a companion plugin. This list is not part of Roles: no role, not even the Platform Owner, gets it automatically." padded={false}>
-      <div className="grid gap-3 p-(--ui-section-px)">
-        <Notice title="Still only what the person may do by hand.">
-          A listed person acts as themselves, with their own role and project access. The list only opens the door; it adds no permission.
-        </Notice>
-        {error ? <InlineError>{error}</InlineError> : null}
+    <SectionCard id="integration-access" className="scroll-mt-4" title="AI & plugin access" count={modules.length} description="Choose which people may connect each tool." padded={false}>
+      <div className="border-b border-line-subtle px-(--ui-section-px) py-3 text-sm text-ink-secondary">
+        Access here is separate from Roles. Each person still uses their own project permissions.
       </div>
+      {error ? <div className="px-(--ui-section-px) pt-3"><InlineError>{error}</InlineError></div> : null}
       {modules.map((module) => {
         const free = users.filter((user) => !module.allowed.some((entry) => entry.userId === user.id));
         const choice = picked[module.moduleId] ?? "";
         return (
-          <div key={module.moduleId} className="grid gap-2 border-t border-(--ui-border) pb-3">
-            <div className="flex flex-wrap items-center gap-2 px-(--ui-section-px) pt-3">
-              <span className="font-medium">{module.name}</span>
-              <span className="grow" />
-              <Select aria-label={`Allow a person to use ${module.name}`} value={choice} onChange={(event) => setPicked((current) => ({ ...current, [module.moduleId]: event.target.value }))}>
+          <div key={module.moduleId} className="border-b border-line-subtle px-(--ui-section-px) py-4 last:border-b-0">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <h4 className="font-semibold text-ink">{module.name}</h4>
+              <StatusBadge tone={module.enabled ? "success" : "neutral"}>{module.enabled ? "Module on" : "Module off"}</StatusBadge>
+              <span className="text-xs text-ink-tertiary">{module.allowed.length} allowed</span>
+            </div>
+            {!module.enabled ? <p className="mt-1 text-sm text-ink-secondary">Access will take effect when this module is turned on.</p> : null}
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Select className="min-w-0 flex-1 basis-52" aria-label={`Allow a person to use ${module.name}`} value={choice} onChange={(event) => setPicked((current) => ({ ...current, [module.moduleId]: event.target.value }))}>
                 <option value="">Choose a person…</option>
                 {free.map((user) => <option key={user.id} value={user.id}>{user.displayName} · {user.email}</option>)}
               </Select>
               <Button type="button" variant="primary" disabled={pending || !choice} onClick={() => change(module.moduleId, choice, true)}>Allow</Button>
             </div>
-            <DataTable framed={false} density="compact">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Allowed person</TableHead>
-                  <TableHead align="end">Control</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {module.allowed.length === 0 ? (
-                  <TableRow><TableCell colSpan={2}>Nobody is allowed yet.</TableCell></TableRow>
-                ) : module.allowed.map((entry) => (
-                  <TableRow key={entry.userId}>
-                    <TableCell><TableCellContent primary={entry.displayName} secondary={entry.email} /></TableCell>
-                    <TableCell align="end"><Button type="button" variant="secondary" disabled={pending} onClick={() => change(module.moduleId, entry.userId, false)}>Remove</Button></TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </DataTable>
+            <div className="mt-4 border-t border-line-subtle pt-2">
+              <div className="text-xs font-medium uppercase tracking-wide text-ink-tertiary">Allowed people</div>
+              {module.allowed.length === 0 ? (
+                <p className="py-3 text-sm text-ink-secondary">Nobody is allowed yet.</p>
+              ) : (
+                <ul className="mt-1 divide-y divide-line-subtle">
+                  {module.allowed.map((entry) => (
+                    <li key={entry.userId} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                      <div className="min-w-0 flex-1 basis-44">
+                        <div className="font-medium text-ink">{entry.displayName}</div>
+                        <div className="break-all text-xs text-ink-secondary">{entry.email}</div>
+                      </div>
+                      <Button type="button" variant="secondary" disabled={pending} onClick={() => change(module.moduleId, entry.userId, false)}>Remove</Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
         );
       })}

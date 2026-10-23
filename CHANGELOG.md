@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.202 | 2026-10-23 | ui(platform): clarify Developer console sections (Codex, owner-directed UI)
+
+- **Scope:** the Developer console now shows switchable modules first, with the always-on core applications in a disclosure; section links lead directly to Modules and AI & plugin access.
+- **Access area:** each connected tool has its own status, person picker and allowed-person list. A disabled module explicitly says its access list takes effect when the module is switched on. Existing module and access actions are unchanged.
+- **Migration/dependencies:** none. The office rebuild databases were already updated to R9.201 before this UI change.
+- **Checks:** typecheck, focused eslint, boundary and legacy-runtime checks, and production build passed. The focused screen-size suite passed 80/80; narrow browser review confirmed section navigation, disclosure and access status. A broader 192-test E2E run was stopped after it stalled on the unrelated BQ walk; it is not counted as passed.
+- **Limitations:** independent Lead acceptance remains owed; no access grants or module states were changed.
+
 ## R9.201 | 2026-10-23 | fix(schedule-assistant): a dialog that never showed no longer reads as "you declined" (Lead)
 
 - **Owner report:** adding CT-01 to "2026-999 Uji Retensi" through the schedule MCP failed twice with "Pengguna tidak menyetujui di dialog konfirmasi" although the owner never saw a dialog and wanted it saved.
