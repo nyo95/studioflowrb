@@ -163,6 +163,7 @@ model SfProject {
   note_tags          SfNoteTag[]
   book_members       SfBookMember[]
   book_todos         SfBookTodo[]
+  book_feedback_points SfBookFeedbackPoint[]
 
   @@index([status, archived_at])
   @@index([pic_designer_id])
@@ -245,6 +246,7 @@ model SfRevision {
   deliverables SfDeliverable[]
   events       SfPhaseEvent[]
   workspace_cards SfWorkspaceCard[]
+  book_feedback_points SfBookFeedbackPoint[]
 
   @@unique([phase_id, major])
   @@index([phase_id, status])
@@ -388,6 +390,7 @@ model SfWorkspaceCard {
   thread    SfWorkspaceThread?     @relation("SfWorkspaceThreadMessages", fields: [thread_id], references: [id], onDelete: Cascade)
   anchored_threads SfWorkspaceThread[] @relation("SfWorkspaceThreadAnchor")
   book_todos SfBookTodo[]
+  book_feedback_points SfBookFeedbackPoint[]
   note_tag_links SfNoteTagLink[]
   note_item_links SfNoteItemLink[]
 
@@ -959,6 +962,8 @@ model SfBookTodo {
   done_at         DateTime?
   /// The workspace card this came from (filled by WO-SF-BOOK-03); the to-do outlives the card.
   source_card_id  String?
+  /// The client feedback point this to-do was made from (WO-SF-BOOK-03); one to-do per point.
+  feedback_point_id String? @unique
   created_by_id   String
   /// Snapshot, so the name survives the person being renamed or removed.
   created_by_name String
@@ -970,9 +975,38 @@ model SfBookTodo {
 
   project     SfProject        @relation(fields: [project_id], references: [id], onDelete: Cascade)
   source_card SfWorkspaceCard? @relation(fields: [source_card_id], references: [id], onDelete: SetNull)
+  feedback_point SfBookFeedbackPoint? @relation(fields: [feedback_point_id], references: [id], onDelete: SetNull)
 
   @@index([project_id, done_at, sort_order])
   @@index([assignee_id, done_at])
   @@map("sf_book_todo")
+  @@schema("studioflow")
+}
+
+/// One thing the client said in one round (WO-SF-BOOK-03). Private to the book; the full text also lives in the round's
+/// workflow-record card. Handled = ticked here (`handled_at`) or its to-do is done. Users are plain ids.
+model SfBookFeedbackPoint {
+  id              String    @id @default(uuid())
+  project_id      String
+  iteration_id    String
+  card_id         String?
+  body            String
+  sort_order      Int       @default(0)
+  handled_at      DateTime?
+  handled_by_id   String?
+  handled_by_name String?
+  created_by_id   String
+  created_by_name String
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  version         Int       @default(1)
+
+  project   SfProject        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  iteration SfRevision       @relation(fields: [iteration_id], references: [id], onDelete: Cascade)
+  card      SfWorkspaceCard? @relation(fields: [card_id], references: [id], onDelete: SetNull)
+  todo      SfBookTodo?
+
+  @@index([project_id, iteration_id, sort_order])
+  @@map("sf_book_feedback_point")
   @@schema("studioflow")
 }

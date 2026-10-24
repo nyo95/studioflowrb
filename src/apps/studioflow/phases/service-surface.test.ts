@@ -7,7 +7,7 @@ it("keeps the phase service surface explicit, with existing-note mutations on th
   const studioFlow = createStudioFlowService({} as never, {} as never);
 
   assert.deepEqual(Object.keys(studioFlow.phases).sort(), [
-    "addIteration", "bypassPhase", "capabilities", "chooseIterationOutcome",
+    "addIteration", "answerIterationInTx", "bypassPhase", "capabilities", "chooseIterationOutcome",
     "chooseSupervisionVisit", "createPhaseDefinition", "createPhaseTemplate", "createSupervisionVisit",
     "deleteDeliverable", "deleteNeverSentIteration", "deletePhaseDefinition", "deletePhaseTemplate",
     "dismissRequirement", "finishSupervision", "getPhaseDetail", "getProjectCompletionReadiness",

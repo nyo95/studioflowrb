@@ -539,6 +539,50 @@ export async function deleteBookTodoAction(input: z.infer<typeof TodoId>): Promi
   });
 }
 
+// ── The Project book: client feedback points (WO-SF-BOOK-03) ───────────────
+// Minimal wiring; the "Client asked" block and the typed composer are the Lead's next revision.
+
+const FeedbackRecord = z.strictObject({ projectId: Id, iterationId: Id, points: z.array(z.string().max(600)).min(1).max(40) });
+const PointConvert = z.strictObject({ projectId: Id, pointId: Id, label: z.string().max(600).optional(), assigneeId: Id.nullish(), dueDate: DateOnly });
+const PointHandled = z.strictObject({ projectId: Id, pointId: Id, handled: z.boolean(), version: z.number().int().min(1).optional() });
+
+export async function listOpenRoundsAction(projectId: string) {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.bookFeedback.listOpenRounds({ grants: ctx.grants, actorId: ctx.userId, projectId: parse(Id, projectId) });
+  });
+}
+
+export async function recordClientFeedbackAction(input: z.infer<typeof FeedbackRecord>): Promise<ActionResult<{ iterationId: string; noteId: string | null; pointIds: string[] }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(FeedbackRecord, input);
+    const result = await studioFlow.bookFeedback.recordClientFeedback({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+export async function convertFeedbackPointAction(input: z.infer<typeof PointConvert>): Promise<ActionResult<{ todoId: string; version: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PointConvert, input);
+    const result = await studioFlow.bookFeedback.convertPointToTodo({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+export async function setFeedbackPointHandledAction(input: z.infer<typeof PointHandled>): Promise<ActionResult<{ pointId: string; version: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(PointHandled, input);
+    const result = await studioFlow.bookFeedback.setPointHandled({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
 const OptionalShort = (max: number) => z.string().max(max).nullish();
 const NoteUseInput = z.strictObject({
   projectId: Id,

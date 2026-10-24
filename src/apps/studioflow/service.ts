@@ -1,3 +1,4 @@
+import { createBookFeedbackService } from "./book/feedback-service";
 import { createBookTodoService } from "./book/todo-service";
 import { createLibraryService } from "./library/service";
 import { createCdListService } from "./cd-list/service";
@@ -14,12 +15,14 @@ import { createDocumentIdentityService } from "./document-identity";
 /** Composed StudioFlow application service (one module per capability). */
 export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
   const schedule = createScheduleService(db, ports);
+  const phases = createPhaseService(db, ports);
   return {
     projects: createProjectService(db, ports),
     cdList: createCdListService(db, ports),
-    phases: createPhaseService(db, ports),
+    phases,
     workspace: createWorkspaceService(db, ports).workspace,
     bookTodos: createBookTodoService(db, ports),
+    bookFeedback: createBookFeedbackService(db, ports, phases.answerIterationInTx),
     tasks: createTaskService(db, ports),
     mom: createMomService(db, ports),
     schedule,

@@ -40,7 +40,7 @@ export const BOOK_MY_TASKS_LIMIT = 200;
 
 type ProjectInput = CommandContext & { projectId: string };
 
-const TODO_SELECT = { id: true, project_id: true, label: true, assignee_id: true, due_date: true, done_at: true, source_card_id: true, created_by_id: true, created_by_name: true, created_at: true, sort_order: true, version: true } satisfies Prisma.SfBookTodoSelect;
+const TODO_SELECT = { id: true, project_id: true, label: true, assignee_id: true, due_date: true, done_at: true, source_card_id: true, feedback_point_id: true, created_by_id: true, created_by_name: true, created_at: true, sort_order: true, version: true } satisfies Prisma.SfBookTodoSelect;
 type TodoRow = Prisma.SfBookTodoGetPayload<{ select: typeof TODO_SELECT }>;
 
 export type BookTodoView = {
@@ -53,6 +53,8 @@ export type BookTodoView = {
   dueDate: string | null;
   doneAt: Date | null;
   sourceCardId: string | null;
+  /** The client feedback point this came from, when it came from one. */
+  feedbackPointId: string | null;
   createdById: string;
   createdByName: string;
   createdAt: Date;
@@ -60,7 +62,7 @@ export type BookTodoView = {
   version: number;
 };
 
-export type MyTaskView = { id: string; projectId: string; projectName: string; label: string; dueDate: string | null; sourceCardId: string | null; version: number };
+export type MyTaskView = { id: string; projectId: string; projectName: string; label: string; dueDate: string | null; sourceCardId: string | null; feedbackPointId: string | null; /** Name of the round the client point came from, for "client point, 3D R2". */ roundName: string | null; version: number };
 
 function todoNotFound() {
   return new AppError("NOT_FOUND", "BOOK_TODO_NOT_FOUND", "This to-do no longer exists.");
@@ -70,31 +72,38 @@ function staleTodo() {
   return conflict("BOOK_TODO_STALE", "Someone changed this to-do in the meantime. Reload to see the latest version.");
 }
 
-function dueDateOf(value: string | null | undefined): Date | null {
+export function dueDateOf(value: string | null | undefined): Date | null {
   if (value === undefined || value === null || value === "") return null;
   if (!isDateOnlyString(value)) throw invalid("BOOK_TODO_DUE_INVALID", "The due date must be a real date.");
   return dateOnlyToDate(value);
 }
 
+/**
+ * The gate of every write: a book reader of an open project. An invited member writes under the same rule as a
+ * member's note (project active); a PIC needs only the project open, since a to-do carries no phase.
+ * Serialises order changes of the project.
+ */
+export async function writableBook(tx: TxClient, input: ProjectInput) {
+  const actorId = requireCommand(input, P.phaseWork);
+  await tx.$queryRaw`SELECT id FROM studioflow.sf_project WHERE id = ${input.projectId} FOR UPDATE`;
+  const access = await getProjectAccess(tx, { grants: input.grants, actorId, projectId: input.projectId });
+  if (!access.canReadBook) throw bookForbidden();
+  const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true, status: true, pic_designer_id: true, pic_drafter_id: true } });
+  if (!project) throw notFound("project");
+  assertProjectWritable(project);
+  if (access.isBookMember && project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing its to-dos.");
+  return { actorId, project };
+}
+
+/** The assignee must read the book now: a PIC of the project or an invited member. */
+export async function requireAssigneeReader(tx: TxClient, project: { id: string; pic_designer_id: string | null; pic_drafter_id: string | null }, assigneeId: string) {
+  if (project.pic_designer_id === assigneeId || project.pic_drafter_id === assigneeId) return;
+  const member = await tx.sfBookMember.findUnique({ where: { project_id_user_id: { project_id: project.id, user_id: assigneeId } }, select: { id: true } });
+  if (!member) throw invalid("BOOK_TODO_ASSIGNEE_NOT_READER", "Assign a to-do only to the project's designer, drafter or an invited member.");
+}
+
 export function createBookTodoService(db: Db, ports: StudioFlowPorts) {
   const { runTransaction } = ports;
-
-  /**
-   * The gate of every write: a book reader of an open project. An invited member writes under the same rule as a
-   * member's note (project active); a PIC needs only the project open, since a to-do carries no phase.
-   * Serialises order changes of the project.
-   */
-  async function writableBook(tx: TxClient, input: ProjectInput) {
-    const actorId = requireCommand(input, P.phaseWork);
-    await tx.$queryRaw`SELECT id FROM studioflow.sf_project WHERE id = ${input.projectId} FOR UPDATE`;
-    const access = await getProjectAccess(tx, { grants: input.grants, actorId, projectId: input.projectId });
-    if (!access.canReadBook) throw bookForbidden();
-    const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true, status: true, pic_designer_id: true, pic_drafter_id: true } });
-    if (!project) throw notFound("project");
-    assertProjectWritable(project);
-    if (access.isBookMember && project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing its to-dos.");
-    return { actorId, project };
-  }
 
   async function loadTodo(tx: TxClient, input: ProjectInput & { todoId: string }): Promise<TodoRow> {
     const todo = await tx.sfBookTodo.findFirst({ where: { id: input.todoId, project_id: input.projectId }, select: TODO_SELECT });
@@ -102,19 +111,12 @@ export function createBookTodoService(db: Db, ports: StudioFlowPorts) {
     return todo;
   }
 
-  /** The assignee must read the book now: a PIC of the project or an invited member. */
-  async function requireAssigneeReader(tx: TxClient, project: { id: string; pic_designer_id: string | null; pic_drafter_id: string | null }, assigneeId: string) {
-    if (project.pic_designer_id === assigneeId || project.pic_drafter_id === assigneeId) return;
-    const member = await tx.sfBookMember.findUnique({ where: { project_id_user_id: { project_id: project.id, user_id: assigneeId } }, select: { id: true } });
-    if (!member) throw invalid("BOOK_TODO_ASSIGNEE_NOT_READER", "Assign a to-do only to the project's designer, drafter or an invited member.");
-  }
-
   async function views(rows: readonly TodoRow[]): Promise<BookTodoView[]> {
     const ids = [...new Set(rows.flatMap((row) => (row.assignee_id ? [row.assignee_id] : [])))];
     const people = new Map((ids.length ? await ports.people.resolve(ids) : []).map((person) => [person.id, person.displayName]));
     return rows.map((row) => ({
       id: row.id, projectId: row.project_id, label: row.label, assigneeId: row.assignee_id, assigneeName: row.assignee_id ? people.get(row.assignee_id) ?? null : null,
-      dueDate: dateToDateOnly(row.due_date), doneAt: row.done_at, sourceCardId: row.source_card_id, createdById: row.created_by_id, createdByName: row.created_by_name,
+      dueDate: dateToDateOnly(row.due_date), doneAt: row.done_at, sourceCardId: row.source_card_id, feedbackPointId: row.feedback_point_id, createdById: row.created_by_id, createdByName: row.created_by_name,
       createdAt: row.created_at, sortOrder: row.sort_order, version: row.version,
     }));
   }
@@ -149,9 +151,9 @@ export function createBookTodoService(db: Db, ports: StudioFlowPorts) {
         },
         orderBy: [{ due_date: { sort: "asc", nulls: "last" } }, { created_at: "asc" }, { id: "asc" }],
         take: BOOK_MY_TASKS_LIMIT,
-        select: { id: true, label: true, due_date: true, source_card_id: true, version: true, project: { select: { id: true, name: true } } },
+        select: { id: true, label: true, due_date: true, source_card_id: true, feedback_point_id: true, version: true, project: { select: { id: true, name: true } }, feedback_point: { select: { iteration: { select: { name: true } } } } },
       });
-      return rows.map((row) => ({ id: row.id, projectId: row.project.id, projectName: row.project.name, label: row.label, dueDate: dateToDateOnly(row.due_date), sourceCardId: row.source_card_id, version: row.version }));
+      return rows.map((row) => ({ id: row.id, projectId: row.project.id, projectName: row.project.name, label: row.label, dueDate: dateToDateOnly(row.due_date), sourceCardId: row.source_card_id, feedbackPointId: row.feedback_point_id, roundName: row.feedback_point?.iteration.name ?? null, version: row.version }));
     },
 
     async createTodo(input: ProjectInput & { label: string; assigneeId?: string | null; dueDate?: string | null }) {

@@ -292,6 +292,22 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
     return { phaseId: phase.id, autoAdvance: auto };
   }
 
+  /** Shared by the phase dialog and the Project book: answer a SENT round, or add notes to an ANSWERED one. */
+  async function answerIterationStep(tx: TxClient, input: PhaseCommandInput & { iterationId: string }, note: string | null) {
+    const { phase } = await writableIteration(tx, input);
+    const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } });
+    if (!iteration) throw iterationNotFound();
+    // A retry, or notes added after "decide later": keep the answer, post the notes.
+    if (iteration.status !== "ANSWERED") {
+      if (iteration.status !== "SENT") throw invalidState("Only an iteration sent to the client can receive an answer.");
+      await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "ANSWERED", answered_at: nowOf(ports) } });
+      await recordEvent(tx, input, phase, iteration.id, "SENT", "ANSWERED", { beforeIteration: iterationUndo(iteration) });
+      await audit(tx, input.actor, "client-answer-recorded", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id, notes: note !== null });
+    }
+    const posted = note ? await insertWorkspaceCard(tx, ports, { projectId: phase.project_id, phaseId: phase.id, iterationId: iteration.id, body: note, origin: "CLIENT_ANSWER", workflowRecord: true, actor: input.actor, at: nowOf(ports) }) : null;
+    return { iterationId: iteration.id, noteId: posted?.id ?? null };
+  }
+
   const iterationCommands = {
     async addIteration(input: PhaseCommandInput) {
       return runTransaction(async (tx) => {
@@ -328,20 +344,14 @@ export function createPhaseService(db: Db, ports: StudioFlowPorts) {
      */
     async recordClientAnswer(input: PhaseCommandInput & { iterationId: string; note?: string | null }) {
       const note = optionalText(input.note, PHASE_NOTE_MAX);
-      return runTransaction(async (tx) => {
-        const { phase } = await writableIteration(tx, input);
-        const iteration = await tx.sfRevision.findFirst({ where: { id: input.iterationId, phase_id: phase.id } });
-        if (!iteration) throw iterationNotFound();
-        // A retry, or notes added after "decide later": keep the answer, post the notes.
-        if (iteration.status !== "ANSWERED") {
-          if (iteration.status !== "SENT") throw invalidState("Only an iteration sent to the client can receive an answer.");
-          await tx.sfRevision.update({ where: { id: iteration.id }, data: { status: "ANSWERED", answered_at: nowOf(ports) } });
-          await recordEvent(tx, input, phase, iteration.id, "SENT", "ANSWERED", { beforeIteration: iterationUndo(iteration) });
-          await audit(tx, input.actor, "client-answer-recorded", phase, "ACTIVE", "ACTIVE", { iterationId: iteration.id, notes: note !== null });
-        }
-        const posted = note ? await insertWorkspaceCard(tx, ports, { projectId: phase.project_id, phaseId: phase.id, iterationId: iteration.id, body: note, origin: "CLIENT_ANSWER", workflowRecord: true, actor: input.actor, at: nowOf(ports) }) : null;
-        return { iterationId: iteration.id, noteId: posted?.id ?? null };
-      });
+      return runTransaction(async (tx) => answerIterationStep(tx, input, note));
+    },
+    /**
+     * The same step inside the caller's transaction, for the Project book (WO-SF-BOOK-03): recording what the client
+     * said there answers the round exactly as the phase dialog does. `note` is already validated by the caller.
+     */
+    async answerIterationInTx(tx: TxClient, input: PhaseCommandInput & { iterationId: string }, note: string | null) {
+      return answerIterationStep(tx, input, note);
     },
     async chooseIterationOutcome(input: PhaseCommandInput & { iterationId: string; outcome: "REVISION" | "DONE" | "CONTINUE_CD_FINAL" }) {
       return runTransaction(async (tx) => {
