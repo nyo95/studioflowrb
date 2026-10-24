@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.257 | 2026-10-24 | plan: Templates page mockup, remember-me and named schedule templates drafts (Lead)
+
+- **Owner priority (2026-10-24):** "Keep me signed in" and a built-in StudioFlow Templates page come before Home and My tasks.
+- **Mockup:** board "v3 · StudioFlow Templates (built in)" added to the v2 canvas (https://claude.ai/artifact/5sChwEHLG1ta1wmzTpDcBS).
+- **Drafts:** `docs/agent/queued-plans/WO-PLATFORM-REMEMBER-ME-01.md` (login checkbox, 30-day window proposed, `remember` on the session row) and `WO-SF-TEMPLATES-01.md` (named schedule templates, today's items become "Standard", pick a template on New project, Templates entry in the StudioFlow rail). Both wait for owner answers.
+- **Environment:** the main folder is back on `feat/project-book`; the dev database (`masterdata`) received the two pending migrations (`sf_book_feedback_point`, `studioflow_manager_profile`, which replaces the StudioFlow grants of the canonical Manager role).
+- **Migration/dependencies:** none in this revision. **Checks:** docs only; `git diff --check`.
+
 ## R9.256 | 2026-10-24 | feat(studioflow): the Manager may also reset a phase's history (Lead)
 
 - **Owner decision (2026-10-24):** the Manager holds `studioflow.phase.override` too, so a Manager can restart a phase when a PIC is away, with the required audited note. Applied to the code profile, the not-yet-applied migration `20261024200000_studioflow_manager_profile` (edited in place: it had reached no database), the role-editor wording ("For a Manager or the Platform Owner"), `ACCESS-MATRIX.md` (regenerated), the KB note and `PLAN.md`.
