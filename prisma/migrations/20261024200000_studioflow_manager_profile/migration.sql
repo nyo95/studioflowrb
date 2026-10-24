@@ -33,6 +33,7 @@ FROM (
     ('studioflow.presentation.manage'),
     ('studioflow.project.manage'),
     ('studioflow.project.override'),
+    ('studioflow.phase.override'),
     ('studioflow.settings.manage')
 ) AS profile(permission_id)
 JOIN platform."Role" AS role_row ON role_row.code = 'studio-manager' AND role_row.is_system = FALSE

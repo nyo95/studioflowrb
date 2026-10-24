@@ -111,10 +111,10 @@ describe("StudioFlow access matrix", () => {
     // The Platform Owner does not read staff books; neither does a Manager; a Manager acts for an absent PIC.
     assert.equal(owner[col("Reads the private book")], false);
     assert.equal(manager[col("Reads the private book")], false);
-    for (const column of ["Moves designer-seat phases", "Moves drafter-seat phases", "Edits documents (with the feature permission)", "Manages templates and settings", "Sets Timeline dates"] as const) {
+    for (const column of ["Moves designer-seat phases", "Moves drafter-seat phases", "Edits documents (with the feature permission)", "Manages templates and settings", "Sets Timeline dates", "Resets phase history"] as const) {
       assert.equal(manager[col(column)], true, column);
     }
-    assert.equal(manager[col("Resets phase history")], false);
+    assert.equal(manager[col("Resets phase history")], true);
     assert.equal(manager[col("Can be picked as PIC")], false);
     // A designer works only where they are PIC; a drafter only in drafter-seat phases.
     assert.deepEqual(rows.get("Designer, not on the project")!.slice(0, 6), [false, false, false, false, false, false]);

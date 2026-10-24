@@ -20,10 +20,10 @@ Workflow records (the client's answer, site visits) stay visible to everyone who
 
 - **Designer** and **Drafter**: a PIC position plus the working tools for assigned projects. No templates, no settings.
 - **Manager**: for the one person who runs the studio's setup. Everything a Designer can do on any project (so status
-  can be updated when a PIC is away), plus templates and settings, client and project operations, and Timeline dates. Not a
+  can be updated when a PIC is away), plus templates and settings, client and project operations, Timeline dates and the destructive reset of a phase's history (owner, 2026-10-24). Not a
   PIC unless also given the Designer or Drafter profile. Does not read private books. Answers a client round with the
   buttons in the phase strip, not through the book.
-- **Platform Owner**: holds every permission, including the destructive reset of a phase's history, and no PIC seat.
+- **Platform Owner**: holds every permission and no PIC seat (the owner policy never gives a position).
 
 ## Matrix
 
@@ -31,7 +31,7 @@ Workflow records (the client's answer, site visits) stay visible to everyone who
 | Who | Sees the project's work pages | Reads the private book | Edits project info and assigns PICs | Edits documents (with the feature permission) | Moves designer-seat phases | Moves drafter-seat phases | Manages templates and settings | Sets Timeline dates | Resets phase history | Can be picked as PIC |
 |---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
 | Platform Owner (holds everything, no PIC seat) | yes | - | yes | yes | yes | yes | yes | yes | yes | - |
-| Manager (not on the project) | yes | - | yes | yes | yes | yes | yes | yes | - | - |
+| Manager (not on the project) | yes | - | yes | yes | yes | yes | yes | yes | yes | - |
 | Designer, PIC designer of the project | yes | yes | - | yes | yes | yes | - | - | - | yes |
 | Designer, not on the project | - | - | - | - | - | - | - | - | - | yes |
 | Drafter, PIC drafter of the project | yes | yes | - | yes | - | yes | - | - | - | yes |

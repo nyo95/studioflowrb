@@ -123,8 +123,11 @@ describe("Manager stands in for an absent PIC (WO-SF-ROLES-01)", () => {
     await rejectsWith(sf.bookTodos.listProjectTodos({ grants: MANAGER, actorId: manager.id, projectId }), "PROJECT_NOT_FOUND");
     const next = await testDb.prisma.sfRevision.findFirstOrThrow({ where: { phase_id: moodboard.id, status: "NOT_SENT" } });
     await rejectsWith(sf.bookFeedback.recordClientFeedback({ ...as(manager, MANAGER), projectId, iterationId: next.id, points: ["Through the book"] }), "PERMISSION_DENIED");
-    // The destructive reset of a phase's history is not a Manager power.
-    await rejectsWith(sf.phases.overrideRevision({ ...base, mode: "HARD_RESET_ACTIVE", major: 1, note: "no" }), "PERMISSION_DENIED");
+    // The Manager may also reset a phase's history (owner, 2026-10-24); the same call is refused for a plain Designer.
+    await rejectsWith(sf.phases.overrideRevision({ ...as(await seedUser("Dina Plain", DESIGNER), DESIGNER), projectId, phaseId: moodboard.id, mode: "HARD_RESET_ACTIVE", major: 1, note: "no" }), "PERMISSION_DENIED");
+    await sf.phases.overrideRevision({ ...base, mode: "HARD_RESET_ACTIVE", major: 3, note: "PIC is away, restarting the phase" });
+    assert.equal(await testDb.prisma.auditEvent.count({ where: { action: "studioflow.phase.revision-overridden", actor_user_id: manager.id } }), 1);
+    assert.deepEqual((await testDb.prisma.sfRevision.findMany({ where: { phase_id: moodboard.id } })).map((row) => row.major), [3]);
   });
 
   it("applies one override rule: manage and override together; override alone, or a Designer who is not on the project, is refused", async () => {

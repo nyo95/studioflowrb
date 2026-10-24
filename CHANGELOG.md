@@ -1,5 +1,11 @@
 # Changelog
 
+## R9.256 | 2026-10-24 | feat(studioflow): the Manager may also reset a phase's history (Lead)
+
+- **Owner decision (2026-10-24):** the Manager holds `studioflow.phase.override` too, so a Manager can restart a phase when a PIC is away, with the required audited note. Applied to the code profile, the not-yet-applied migration `20261024200000_studioflow_manager_profile` (edited in place: it had reached no database), the role-editor wording ("For a Manager or the Platform Owner"), `ACCESS-MATRIX.md` (regenerated), the KB note and `PLAN.md`.
+- **Tests:** `manager-standin` now proves the Manager resets a phase (audited as `phase.revision-overridden` by the Manager, history replaced) and a plain Designer is refused; the matrix and profile tests assert the new rule; the migration test still equals the code profile.
+- **Migration/dependencies:** none new. **Checks (rumah, `masterdata_test`):** typecheck and lint clean, full `npm test` 1376/1376, 0 skipped. Not run: build, e2e (as R9.255).
+
 ## R9.255 | 2026-10-24 | feat(studioflow): Manager profile as the stand-in and template admin, access matrix generated from code (Lead)
 
 - **Plan:** `WO-SF-ROLES-01` (`PLAN.md`), owner decisions 2026-10-24: the office has Designers and Drafters only; Manager is a role the owner gives one user to run every template and setting and to update status when a PIC is away; the Platform Owner does not read staff books; the Manager answers a client round with the phase-strip buttons, not through the book. This replaces the Manager definition of 2026-10-19 (`KB-SF-ROLE-PROFILES-2026-10-19.md` carries a superseded note).

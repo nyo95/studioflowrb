@@ -35,13 +35,14 @@ const DRAFTER_PERMISSION_IDS = [
  * Manager (owner, 2026-10-24, replaces the 2026-10-19 definition): everything a Designer can do on any project, so a
  * Manager can stand in for a PIC who is away and update status without the Platform Owner, plus the templates and
  * settings and the client and project operations. Not himself a PIC: the position permission is left out, so he is
- * eligible as a PIC only when also given the Designer or Drafter profile. `phase.override` (the hard reset of a
- * phase's history) stays with the Platform Owner.
+ * eligible as a PIC only when also given the Designer or Drafter profile. He also holds `phase.override` (the hard
+ * reset of a phase's history; owner, 2026-10-24).
  */
 const MANAGER_PERMISSION_IDS = [
   ...DESIGNER_PERMISSION_IDS.filter((permission) => permission !== P.projectPicDesigner),
   P.projectManage,
   P.projectOverride,
+  P.phaseOverride,
   P.settingsManage,
 ] as const satisfies readonly StudioFlowPermission[];
 

@@ -15,7 +15,7 @@ const PRESENTATION: Readonly<Record<string, PermissionPresentation>> = {
   "studioflow.project.override": { resourceLabel: "Studio operations", actionLabel: "Act for an absent PIC", description: "Can send, answer, finish and complete phases and edit documents on any project, and set Timeline dates. For a Manager or the Platform Owner.", caution: true },
   "studioflow.phase.work": { resourceLabel: "Project workflow", actionLabel: "Work on assigned phases", description: "Can edit phase work and send iterations when the project seat permits it." },
   "studioflow.phase.review": { resourceLabel: "Project workflow", actionLabel: "Review and skip phases", description: "Can perform review actions on phases the user may work on." },
-  "studioflow.phase.override": { resourceLabel: "Project workflow", actionLabel: "Reset phase history", description: "Destructive recovery: wipes a phase's iteration history. Platform Owner only; needs an audited reason.", caution: true },
+  "studioflow.phase.override": { resourceLabel: "Project workflow", actionLabel: "Reset phase history", description: "Destructive recovery: wipes a phase's iteration history. For a Manager or the Platform Owner; needs an audited reason.", caution: true },
   "studioflow.task.manage": { resourceLabel: "Project workflow", actionLabel: "Manage requirements", description: "Can rename requirements and manage their subtasks." },
   "studioflow.mom.manage": { resourceLabel: "Core documents", actionLabel: "Edit MOM", description: "Can create and edit MOM on projects where the user is a PIC." },
   "studioflow.schedule.manage": { resourceLabel: "Core documents", actionLabel: "Edit Product Schedule", description: "Can create and edit Product Schedule content on assigned projects." },

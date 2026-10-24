@@ -23,8 +23,8 @@ Previous plan: `WO-SF-BOOK-03` backend DONE R9.251 (Lead UI pending, see `PROJEC
 
 ## Locked decisions
 
-- Manager profile = every Designer permission except the PIC position, plus `project.manage`, `project.override` and
-  `settings.manage`. No `phase.override` (hard reset of a phase's history stays with the Platform Owner), no Ideas, no PIC
+- Manager profile = every Designer permission except the PIC position, plus `project.manage`, `project.override`,
+  `phase.override` (hard reset of a phase's history; owner, 2026-10-24) and `settings.manage`. No Ideas, no PIC
   position (a Manager who also works as a PIC is given the Designer or Drafter profile as well).
 - One override rule, unchanged and now documented in one place: `hasProjectAssignmentOverride` needs `project.manage` and
   `project.override` together (the role editor grants them as a pair). Making `project.override` enough on its own was

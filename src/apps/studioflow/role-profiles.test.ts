@@ -24,12 +24,11 @@ describe("StudioFlow role profiles", () => {
 
   it("makes Manager a stand-in for any PIC plus template and operations authority, without a PIC position", () => {
     const manager = new Set<string>(profile("studio-manager").permissionIds);
-    for (const permission of [P.access, P.projectRead, P.phaseWork, P.phaseReview, P.taskManage, P.momManage, P.scheduleManage, P.presentationManage, P.projectManage, P.projectOverride, P.settingsManage]) {
+    for (const permission of [P.access, P.projectRead, P.phaseWork, P.phaseReview, P.taskManage, P.momManage, P.scheduleManage, P.presentationManage, P.projectManage, P.projectOverride, P.phaseOverride, P.settingsManage]) {
       assert.equal(manager.has(permission), true, permission);
     }
     assert.equal(manager.has(P.projectPicDesigner), false);
     assert.equal(manager.has(P.projectPicDrafter), false);
-    assert.equal(manager.has(P.phaseOverride), false, "the hard reset of phase history stays with the Platform Owner");
     assert.equal(manager.has(P.ideasManage), false);
   });
 });
