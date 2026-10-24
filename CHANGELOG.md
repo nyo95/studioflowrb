@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.252 | 2026-10-24 | docs(harness): one folder per Sub-Lead task (Lead)
+
+- **Why:** two Sub-Lead sessions and the Lead edited the same folder at once; the folder changed branch under the Lead and uncommitted files mixed. `docs/agent/SUB-LEAD.md` now requires an own git worktree per task, a branch and status check before editing and committing, staging only owned files, and the `node_modules` link with its build limit.
+- **Migration/dependencies:** none. **Checks:** docs only; `git diff --check`.
+
 ## R9.251 | 2026-10-24 | feat(studioflow): client feedback points in the book, point to to-do, handled count (Lead as Executor, owner-assigned)
 
 - **Plan:** `WO-SF-BOOK-03`, module `studioflow`, branch `feat/project-book`. The owner assigned the Executor lane to the Lead for this slice (2026-10-24) so it runs beside the two Sub-Lead tasks; reviewer independence is therefore weaker here (see Limitations).

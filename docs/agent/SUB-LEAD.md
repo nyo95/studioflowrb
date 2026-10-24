@@ -43,6 +43,13 @@ and never deploys.
 - **Branch:** never `main`. Work on the branch the owner names, or `sublead/<topic>` cut from it. One task per
   branch when the Lead may be working on the same base at the same time (the serial rule in `AGENTS.md` still
   holds for one branch).
+- **Own folder (owner, 2026-10-24):** every Sub-Lead task runs in its own git worktree, never in the folder another
+  session is using: `git worktree add ..\studioflow-sublead-<topic> -b sublead/<topic> origin/feat/project-book`
+  (an existing branch: omit `-b` and the base). Run `git branch --show-current` and `git status` before the first
+  edit and before every commit; stage only files this task owns (never `next-env.d.ts`, `tsconfig.json` noise, `.env*`).
+  A worktree has no `node_modules`: link the main one with `cmd /c mklink /J node_modules ..\studioflow-rebuild\node_modules`
+  (tests and lint work; `npm run build` refuses a linked folder, so a deferred build goes under "Lead check").
+  Remove the folder with `git worktree remove` when the branch is integrated.
 - **Plan:** for anything beyond a one-file fix, write a short Work Order first (`docs/agent/queued-plans/` or
   `PLAN.md` when the branch is free): goal, module, tier and why, decisions, tests. The owner does not approve
   small plans; the Lead sees them in review.
