@@ -5,7 +5,7 @@ Scope: The Project book becomes private to the project's PICs and invited member
 the note-image "Use in schedule" moves from Ideas into StudioFlow.
 Module(s): `studioflow` (workspace/notes service, project access policy, new member table, actions); `ideas` (its
 note-image schedule path removed); `presentation` bridge read of note images (consumer).
-Target revision: plan R9.239-R9.240 (Lead); backend + minimal wiring (Codex) R9.241; UI (Lead) R9.242.
+Target revision: plan R9.239-R9.240 (Lead); backend + minimal wiring (Codex) R9.241; review correction (Codex) R9.242; UI (Lead) R9.243.
 Branch: `feat/project-book` (never `main`; see PROJECT-BOOK-DECISION.md "Branch").
 Risk: high - narrows read access on existing data and widens project-page access for invited members; a missed
 read path leaks private notes, an over-narrow one hides the official client answers from managers. Escalate
@@ -45,7 +45,7 @@ Previous plan: `WO-PLATFORM-MODULE-USER-ACCESS-01` SUPERSEDED in R9.238 (not bui
    (same copy semantics, idempotency key, refusals). The Ideas service's `useNoteImageInSchedule` and its action
    are removed; `saveNoteImageToIdeas` stays (Ideas is switched off, not deleted) but now also requires book reader.
 7. No UI design work: minimal wiring only (the note-image button calls the new action; a temporary plain list to
-   add/remove members may be exposed through an action without a screen). The Lead builds the screens in R9.242.
+   add/remove members may be exposed through an action without a screen). The Lead builds the screens in R9.243.
 
 ## Non-goals
 
@@ -81,7 +81,7 @@ rules, roles or the Workspace board module state.
 ## Reviewer Acceptance (Lead, after R9.241)
 
 Browser on an isolated server with three accounts (PIC, override manager, invited member) walking criteria 1-6;
-then the Lead's R9.242 UI (members list in the book panel header, the moved Use in schedule button).
+then the Lead's R9.243 UI (members list in the book panel header, the moved Use in schedule button).
 
 ## Executor Prompt
 
@@ -94,6 +94,6 @@ studioflow_rebuild_test); never any other database. Read AGENTS.md, docs/agent/E
 the single StudioFlow access policy, workflow-record exception, every notes read/write path guarded, book member
 table (additive migration) with audited PIC-only add/remove, member read-only project access, note-image Use in
 schedule moved from Ideas into StudioFlow. Do not delete Ideas. Tests and checks per Verification; changelog
-R9.241. No screen design (Lead R9.242). Commit as R9.241 on feat/project-book, push only feat/project-book, and
+R9.241. No screen design (Lead R9.243). Commit as R9.241 on feat/project-book, push only feat/project-book, and
 return the Planner/Reviewer prompt with outcome, commit, checks, limitations and dirty files.
 ```

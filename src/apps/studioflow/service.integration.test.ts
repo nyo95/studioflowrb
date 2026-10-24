@@ -5002,4 +5002,54 @@ describe("WO-SF-BOOK-01 the private Project book", () => {
     await rejectsWith(sf.workspace.useNoteImageInSchedule({ ...use, projectId: other.projectId, operationId: randomUUID() }), "NOTE_IMAGE_NOT_FOUND");
     assert.equal(await testDb.prisma.sfScheduleOption.count(), 2);
   });
+
+  it("never lets an operation id from one project replay in another, on either door, including the concurrent fallback", async () => {
+    const { projectId, pic } = await setup("Project A");
+    const other = await setup("Project B");
+    const imageA = await sf.workspace.createWorkspaceImage({ ...pic, file: png() });
+    const imageB = await sf.workspace.createWorkspaceImage({ ...other.pic, file: png() });
+    const target = { kind: "new-item" as const, section: "MATERIAL", category: "Stone" };
+    const useA = { ...pic, operationId: randomUUID(), imageId: imageA.cardId, target, option: { productName: "A stone" } };
+    const placedA = await sf.workspace.useNoteImageInSchedule(useA);
+
+    // Book door: the same id for project B is refused; nothing is created in B and A's result is not disclosed.
+    const objectsBefore = storage.objects.size;
+    await assert.rejects(sf.workspace.useNoteImageInSchedule({ ...other.pic, operationId: useA.operationId, imageId: imageB.cardId, target, option: { productName: "B stone" } }), (error: unknown) => {
+      assert.equal(code(error), "SCHEDULE_OPERATION_FOREIGN");
+      assert.equal(JSON.stringify(error, Object.getOwnPropertyNames(error)).includes(placedA.entryId), false);
+      return true;
+    });
+    assert.equal(await testDb.prisma.sfScheduleEntry.count({ where: { project_id: other.projectId } }), 0);
+    assert.equal(storage.objects.size, objectsBefore);
+    // The same project still retries to its first result.
+    assert.deepEqual(await sf.workspace.useNoteImageInSchedule(useA), placedA);
+
+    // Concurrent fallback: the foreign receipt appears after the first lookup, so the insert hits the unique key.
+    const raced = randomUUID();
+    const copy = storage.copy.bind(storage);
+    const racing = mock.method(storage, "copy", async (...args: Parameters<typeof storage.copy>) => {
+      await testDb.prisma.sfExternalSchedulePlacement.create({ data: { operation_id: raced, project_id: projectId, entry_id: placedA.entryId, option_id: placedA.optionId, code: placedA.code, label: placedA.label } });
+      return copy(...args);
+    });
+    try {
+      await rejectsWith(sf.workspace.useNoteImageInSchedule({ ...other.pic, operationId: raced, imageId: imageB.cardId, target, option: { productName: "B race" } }), "SCHEDULE_OPERATION_FOREIGN");
+    } finally { racing.mock.restore(); }
+    assert.equal(await testDb.prisma.sfScheduleEntry.count({ where: { project_id: other.projectId } }), 0);
+    assert.equal(storage.objects.size, objectsBefore, "the copy made before the refusal is discarded");
+
+    // Ideas door, same rule: a card used in A, its operation id replayed for B.
+    const { cardId } = await ideas.createIdeaCard({ ...as(designer), file: png() });
+    const ideaOp = randomUUID();
+    await ideas.useIdeaInSchedule({ ...as(designer), operationId: ideaOp, cardId, projectId, target, option: { productName: "Idea A" } });
+    await rejectsWith(ideas.useIdeaInSchedule({ ...as(designer), operationId: ideaOp, cardId, projectId: other.projectId, target, option: { productName: "Idea B" } }), "SCHEDULE_OPERATION_FOREIGN");
+    const racedIdea = randomUUID();
+    const racingIdea = mock.method(storage, "copy", async (...args: Parameters<typeof storage.copy>) => {
+      await testDb.prisma.sfExternalSchedulePlacement.create({ data: { operation_id: racedIdea, project_id: projectId, entry_id: placedA.entryId, option_id: placedA.optionId, code: placedA.code, label: placedA.label } });
+      return copy(...args);
+    });
+    try {
+      await rejectsWith(ideas.useIdeaInSchedule({ ...as(designer), operationId: racedIdea, cardId, projectId: other.projectId, target, option: { productName: "Idea race" } }), "SCHEDULE_OPERATION_FOREIGN");
+    } finally { racingIdea.mock.restore(); }
+    assert.equal(await testDb.prisma.sfScheduleEntry.count({ where: { project_id: other.projectId } }), 0);
+  });
 });

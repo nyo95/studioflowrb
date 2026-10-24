@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.242 | 2026-10-24 | fix(studioflow): an operation id replays only in the project it first ran in (Executor)
+
+- **Review finding (Lead, R9.241, P2):** `schedule/external-placement.ts` looked the idempotency receipt up by `operationId` alone and returned it without comparing projects, so a valid request for project B reusing project A's operation id answered A's result as success and created nothing in B. The behavior predates R9.241; it came along into the shared helper now used by the Project book path and the Ideas bridge.
+- **Fix:** a receipt that belongs to another project is refused with `CONFLICT` `SCHEDULE_OPERATION_FOREIGN`, on the first lookup and on the `P2002` concurrency fallback, and no identifier of the other project's result is returned. The copy made before the refusal is still discarded; a retry in the same project still answers its first result.
+- **Tests:** new regression in `service.integration.test.ts` covering the Project book door and the Ideas door: foreign replay refused, no entry created in B, no object left behind, same-project retry intact, and the concurrent fallback (the foreign receipt appears after the first lookup). It fails on a52e533's helper and passes now.
+- **Migration/dependencies:** none. R9.241 is not amended.
+- **Checks:** see the handoff.
+- **Limitations:** an incomplete receipt (no result yet) of the same project is handled as before.
+
 ## R9.241 | 2026-10-23 | feat(studioflow): private Project book, book members, note-image Use in schedule moved in (Executor)
 
 - **Plan:** `WO-SF-BOOK-01` (owner decisions 2026-10-23, `PROJECT-BOOK-DECISION.md` 5, 6, 8), module `studioflow`; branch `feat/project-book`.

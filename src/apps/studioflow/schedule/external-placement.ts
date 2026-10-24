@@ -3,7 +3,7 @@ import { createPrivateObjectKey } from "@platform/core/storage";
 
 import { discardObjects } from "../asset-cleanup";
 import { STUDIOFLOW_IMAGE_TYPES } from "../domain/images";
-import type { CommandContext, StudioFlowPorts } from "../shared";
+import { conflict, type CommandContext, type StudioFlowPorts } from "../shared";
 import type { createScheduleService } from "./service";
 import type { SnapshotInput } from "./sync";
 
@@ -20,6 +20,11 @@ export type ExternalScheduleOption = {
   dimension?: string | null;
   notes?: string | null;
 };
+
+/** An operation id belongs to the project it first ran in; another project may not replay it or learn its result. */
+function foreignReceipt() {
+  return conflict("SCHEDULE_OPERATION_FOREIGN", "This operation was already used for another project. Start the action again.");
+}
 
 export type ExternalPlacement = { projectId: string; entryId: string; optionId: string; code: string; label: string };
 
@@ -42,6 +47,7 @@ export async function placeExternalImageInSchedule(
   },
 ): Promise<ExternalPlacement> {
   const previous = await db.sfExternalSchedulePlacement.findUnique({ where: { operation_id: input.operationId } });
+  if (previous && previous.project_id !== input.projectId) throw foreignReceipt();
   if (previous?.entry_id && previous.option_id && previous.code && previous.label) {
     return { projectId: previous.project_id, entryId: previous.entry_id, optionId: previous.option_id, code: previous.code, label: previous.label };
   }
@@ -64,6 +70,7 @@ export async function placeExternalImageInSchedule(
     await discardObjects(db, ports.storage, [key]);
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       const receipt = await db.sfExternalSchedulePlacement.findUnique({ where: { operation_id: input.operationId } });
+      if (receipt && receipt.project_id !== input.projectId) throw foreignReceipt();
       if (receipt?.entry_id && receipt.option_id && receipt.code && receipt.label) {
         return { projectId: receipt.project_id, entryId: receipt.entry_id, optionId: receipt.option_id, code: receipt.code, label: receipt.label };
       }
