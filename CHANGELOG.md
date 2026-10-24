@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.248 | 2026-10-24 | docs(harness): Codex as Sub-Lead for low and medium work (Lead)
+
+- **Change:** brought in `harness/sub-lead` (owner 2026-10-24): `AGENTS.md` operating model and lanes, new `docs/agent/SUB-LEAD.md`, the Sub-Lead row in `docs/agent/README.md`, a Sub-Lead review section in `docs/agent/REVIEWER.md`. From now on a Codex session given a task directly is Sub-Lead; given a READY `PLAN.md` it is still Executor.
+- **Lead review:** consistent with `VERIFICATION.md` tiers (low, medium, high exist) and with the escalation list (auth/RBAC/book privacy, migrations, public contracts, money, deletion, shared runtime, DESIGN.md, open product questions all stay with the Lead). One conflict adjusted: README required every commit subject to be `R<N>.<NN> | ...`, while SUB-LEAD uses `S-<yyyymmdd>-<n>` on `sublead/<topic>` branches; README now states that exception and that the Lead renumbers at integration.
+- **R9.247 follow-up:** `npm run build` passes (the only obstacle was a stale ignored `.next-e2e` folder, removed).
+- **Migration/dependencies:** none.
+- **Checks:** docs only; `git diff --check`.
+
 ## R9.247 | 2026-10-24 | ui(studioflow): To-dos controls keep their width; R9.246 walked and tested (Lead)
 
 - **Change:** the assignee and date fields in the To-dos panel kept stretching to the full row in a narrow window; they now keep a fixed width.

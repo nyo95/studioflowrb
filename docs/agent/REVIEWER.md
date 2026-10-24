@@ -71,3 +71,8 @@ After recording the verdict and next plan, a separate-session final response
 contains only the copy-ready Executor prompt for the consolidated correction or
 next slice. When genuinely BLOCKED, return one copy-ready owner-decision prompt
 instead. Do not make the owner reconstruct a handoff from narrative status.
+
+## Sub-Lead commits
+
+Review `(Sub-Lead)` work in batches per `SUB-LEAD.md` "How the Lead reviews it": changelog entry plus diff, the
+tier the Sub-Lead chose, anything that should have been escalated, then the deferred checks at integration.
