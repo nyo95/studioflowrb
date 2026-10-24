@@ -3,7 +3,7 @@ import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 import { EmptyState, PageHeader, PageShell, PillTabs, StatCard, StatGrid } from "@/platform/ui_engine";
 
-import { todayInPlatformZone } from "./_components/book-today";
+import { bookDateDisplaySettings } from "./_components/book-today";
 import { MyTasks } from "./_components/my-tasks";
 import { pageSession } from "./_components/session";
 import { ProjectCard } from "./_components/project-card";
@@ -19,11 +19,11 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const { userId, displayName, grants } = await pageSession();
   const { status: rawStatus } = await searchParams;
   const statusView: StatusView = rawStatus === "completed" ? "completed" : "running";
-  const [cards, stats, myTasks, today] = await Promise.all([
+  const [cards, stats, myTasks, dateDisplay] = await Promise.all([
     studioFlow.projects.listProjectCards({ grants, filter: "mine", actorId: userId }),
     studioFlow.projects.getHomeStats({ grants, filter: "mine", actorId: userId }),
     studioFlow.bookTodos.listMyTasks({ grants, actorId: userId }),
-    todayInPlatformZone(),
+    bookDateDisplaySettings(),
   ]);
   const firstName = displayName.split(" ")[0] ?? displayName;
 
@@ -42,7 +42,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
 
       {stats.runningProjects > 0 ? <StatGrid><StatCard label="Waiting on you" value={stats.waitingOnYou} caption="Client answered" /><StatCard label="With client" value={stats.withClient} caption={stats.withClient === 0 ? "nothing sent" : stats.longestClientDays > 0 ? `longest ${stats.longestClientDays} day${stats.longestClientDays === 1 ? "" : "s"}` : "all sent today"} /><StatCard label="Phases done" value={`${stats.phasesDone} / ${stats.phasesTotal}`} caption="across running projects" /><StatCard label="Samples waiting" value={stats.samplesWaiting} caption="Requested samples" /></StatGrid> : null}
 
-      <MyTasks tasks={myTasks.map((task) => ({ id: task.id, projectId: task.projectId, projectName: task.projectName, label: task.label, dueDate: task.dueDate, version: task.version }))} today={today} />
+      <MyTasks tasks={myTasks.map((task) => ({ id: task.id, projectId: task.projectId, projectName: task.projectName, label: task.label, dueDate: task.dueDate, version: task.version }))} today={dateDisplay.today} locale={dateDisplay.locale} />
 
       {shown.length === 0 ? (
         <EmptyState

@@ -288,8 +288,10 @@ describe("UI Engine foundation", () => {
     assert.match(panels, /Panel A/);
     assert.doesNotMatch(panels, /Panel B/); // inactive panels are not mounted
     const stats = renderToStaticMarkup(createElement(ui.StatGrid, null, createElement(ui.StatCard, { label: "Waiting", value: "2", caption: "Needs action" })));
+    assert.match(stats, /grid-cols-1/);
+    assert.match(stats, /min-\[360px\]:grid-cols-2/);
     assert.match(stats, /min-\[840px\]:grid-cols-4/);
-    assert.match(stats, /max-\[400px\]:grid-cols-1/);
+    assert.doesNotMatch(stats, /max-\[400px\]:grid-cols-1/);
   });
 
   it("keeps accessibility-critical state and dialog semantics distinct", () => {

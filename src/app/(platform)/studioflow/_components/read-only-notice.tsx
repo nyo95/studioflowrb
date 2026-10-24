@@ -6,7 +6,7 @@ export function ReadOnlyNotice({ scope, className }: { scope: "project" | "phase
     <Notice className={className} tone="neutral" title="View only">
       {scope === "phase"
         ? "This phase is assigned to someone else. You can read it, but an assigned PIC or manager must make changes."
-        : "You can view this section. Only an assigned PIC or manager can make changes."}
+        : "You can view this phase. Only an assigned PIC or manager can make changes."}
     </Notice>
   );
 }

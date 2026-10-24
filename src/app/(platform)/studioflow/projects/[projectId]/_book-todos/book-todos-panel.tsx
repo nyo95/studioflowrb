@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import type { ActionResult } from "@platform/core/actions";
 import { formatDateOnly } from "@platform/utilities/date";
-import { Button, Checkbox, IconButton, InlineError, Input, SectionCard, Select, Text, useConfirm } from "@/platform/ui_engine";
+import { Button, Checkbox, IconButton, InlineError, Input, SectionCard, Select, StatusBadge, Text, useConfirm } from "@/platform/ui_engine";
 
 import {
   createBookTodoAction,
@@ -22,13 +22,15 @@ type Assignee = { id: string; name: string };
 /** A stale or out-of-step list is not the person's mistake: say so and show the latest. */
 const RELOAD_CODES = new Set(["BOOK_TODO_STALE", "BOOK_TODO_ORDER_INVALID", "BOOK_TODO_NOT_FOUND"]);
 
-export function BookTodosPanel({ projectId, todos, assignees, canWrite, today, currentUserId }: {
+export function BookTodosPanel({ projectId, todos, assignees, canWrite, today, locale, currentUserId }: {
   projectId: string;
   todos: readonly Todo[];
   assignees: readonly Assignee[];
   canWrite: boolean;
   /** `YYYY-MM-DD` in the platform time zone. */
   today: string;
+  /** BCP-47 locale from platform general settings. */
+  locale: string;
   currentUserId: string;
 }) {
   const router = useRouter();
@@ -88,7 +90,7 @@ export function BookTodosPanel({ projectId, todos, assignees, canWrite, today, c
     const late = !todo.done && todo.dueDate !== null && todo.dueDate < today;
     const editable = canWrite && !todo.done;
     return (
-      <li key={todo.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line-subtle px-3 py-2 last:border-b-0">
+      <li key={todo.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 border-b border-line-subtle px-3 py-2 last:border-b-0 min-[560px]:flex min-[560px]:flex-nowrap">
         <Checkbox
           checked={todo.done}
           disabled={!canWrite || busy === todo.id}
@@ -108,31 +110,37 @@ export function BookTodosPanel({ projectId, todos, assignees, canWrite, today, c
               onKeyDown={(event) => { if (event.key === "Enter") void saveLabel(todo); if (event.key === "Escape") setEditing(null); }}
             />
           ) : editable ? (
-            <button type="button" className="block w-full truncate text-left text-sm hover:underline" onClick={() => { setEditing(todo.id); setDraft(todo.label); }}>{todo.label}</button>
+            <button type="button" className="line-clamp-2 w-full text-left text-sm hover:underline" title={todo.label} onClick={() => { setEditing(todo.id); setDraft(todo.label); }}>{todo.label}</button>
           ) : (
-            <span className={`block truncate text-sm ${todo.done ? "text-ink-tertiary line-through" : ""}`}>{todo.label}</span>
+            <span className={`line-clamp-2 text-sm ${todo.done ? "text-ink-tertiary line-through" : ""}`} title={todo.label}>{todo.label}</span>
           )}
         </div>
-        {editable ? (
-          <Select density="compact" className="!w-36 shrink-0" aria-label="Assignee" value={todo.assigneeId ?? ""} disabled={busy === todo.id} onChange={(event) => void run(todo.id, () => updateBookTodoAction({ projectId, todoId: todo.id, version: todo.version, assigneeId: event.target.value || null }))}>
-            <option value="">Nobody</option>
-            {assignees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
-            {todo.assigneeId && !assignees.some((person) => person.id === todo.assigneeId) ? <option value={todo.assigneeId}>{todo.assigneeName ?? "Former member"}</option> : null}
-          </Select>
-        ) : (
-          <Text size="sm" tone="secondary">{todo.assigneeName ?? (todo.assigneeId ? "Former member" : "Nobody")}</Text>
-        )}
-        {editable ? (
-          <Input density="compact" type="date" className="!w-36 shrink-0" aria-label="Due date" value={todo.dueDate ?? ""} disabled={busy === todo.id} onChange={(event) => void run(todo.id, () => updateBookTodoAction({ projectId, todoId: todo.id, version: todo.version, dueDate: event.target.value || null }))} />
-        ) : todo.dueDate ? <Text size="sm" tone="secondary">{formatDateOnly(todo.dueDate)}</Text> : null}
-        {late ? <span className="inline-flex h-5 items-center rounded-pill bg-danger-subtle px-2 text-xs text-danger">Late</span> : null}
-        {editable ? (
-          <span className="flex items-center">
-            <IconButton size="sm" variant="ghost" label="Move up" icon={<ArrowUp aria-hidden="true" />} disabled={index === 0 || busy !== null} onClick={() => move(index, -1)} />
-            <IconButton size="sm" variant="ghost" label="Move down" icon={<ArrowDown aria-hidden="true" />} disabled={index === open.length - 1 || busy !== null} onClick={() => move(index, 1)} />
+        <div className="col-span-2 flex min-w-0 flex-wrap items-center gap-2 pl-10 min-[560px]:contents">
+          {editable ? (
+            <Select density="compact" className="!w-36 shrink-0" aria-label="Assignee" value={todo.assigneeId ?? ""} disabled={busy === todo.id} onChange={(event) => void run(todo.id, () => updateBookTodoAction({ projectId, todoId: todo.id, version: todo.version, assigneeId: event.target.value || null }))}>
+              <option value="">Nobody</option>
+              {assignees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+              {todo.assigneeId && !assignees.some((person) => person.id === todo.assigneeId) ? <option value={todo.assigneeId}>{todo.assigneeName ?? "Former member"}</option> : null}
+            </Select>
+          ) : (
+            <Text size="sm" tone="secondary" className="w-36 shrink-0">{todo.assigneeName ?? (todo.assigneeId ? "Former member" : "Nobody")}</Text>
+          )}
+          {editable ? (
+            <Input density="compact" type="date" lang={locale} className="!w-36 shrink-0" aria-label="Due date" value={todo.dueDate ?? ""} disabled={busy === todo.id} onChange={(event) => void run(todo.id, () => updateBookTodoAction({ projectId, todoId: todo.id, version: todo.version, dueDate: event.target.value || null }))} />
+          ) : (
+            <Text size="sm" tone="secondary" className="w-36 shrink-0">{todo.dueDate ? formatDateOnly(todo.dueDate, { locale }) : "—"}</Text>
+          )}
+          <span className="flex w-14 shrink-0 items-center">
+            {late ? <StatusBadge tone="danger">Late</StatusBadge> : null}
           </span>
-        ) : null}
-        {canWrite ? <IconButton size="sm" variant="ghost" label="Delete to-do" icon={<Trash2 aria-hidden="true" />} disabled={busy === todo.id} onClick={() => void remove(todo)} /> : null}
+          {editable ? (
+            <span className="flex items-center">
+              <IconButton size="sm" variant="ghost" className="max-[559px]:!min-h-10 max-[559px]:!w-10" label="Move up" icon={<ArrowUp aria-hidden="true" />} disabled={index === 0 || busy !== null} onClick={() => move(index, -1)} />
+              <IconButton size="sm" variant="ghost" className="max-[559px]:!min-h-10 max-[559px]:!w-10" label="Move down" icon={<ArrowDown aria-hidden="true" />} disabled={index === open.length - 1 || busy !== null} onClick={() => move(index, 1)} />
+            </span>
+          ) : null}
+          {canWrite ? <IconButton size="sm" variant="ghost" className="max-[559px]:!min-h-10 max-[559px]:!w-10" label="Delete to-do" icon={<Trash2 aria-hidden="true" />} disabled={busy === todo.id} onClick={() => void remove(todo)} /> : null}
+        </div>
       </li>
     );
   };
@@ -155,7 +163,7 @@ export function BookTodosPanel({ projectId, todos, assignees, canWrite, today, c
                 <option value="">Nobody</option>
                 {assignees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
               </Select>
-              <Input density="compact" type="date" className="!w-36 shrink-0" aria-label="Due date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <Input density="compact" type="date" lang={locale} className="!w-36 shrink-0" aria-label="Due date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
               <Button size="sm" variant="primary" type="submit" disabled={!label.trim()} pending={busy === "add"}>Add</Button>
             </form>
           ) : <Text as="p" size="sm" tone="secondary" className="border-t border-line-subtle px-3 py-2">To-dos can’t be changed while the project is in this state.</Text>}

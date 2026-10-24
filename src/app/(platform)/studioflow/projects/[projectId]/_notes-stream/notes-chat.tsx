@@ -333,7 +333,7 @@ export function NotesChat({ projectId, projectName, currentUserId, phases, writa
       <div ref={streamRef} role="log" aria-label="Notes" aria-busy={loading} onScroll={(event) => { const stream = event.currentTarget; stickToBottom.current = stream.scrollHeight - stream.scrollTop - stream.clientHeight < 32; }} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-surface-raised px-4 py-3 sm:px-6">
         {cursor ? <Button size="sm" variant="ghost" className="self-center" pending={loading} onClick={() => void olderPage()}>Show older notes</Button> : null}
         {entries.length === 0 ? (
-          <Text as="p" size="sm" tone="tertiary" className="m-auto text-center">{filter.kind !== "all" ? "No notes match this view." : emptyText ?? "Nothing here yet. Write what you learn about this project below: info, client feedback, photos."}</Text>
+          <Text as="p" size="sm" tone="tertiary" className="m-auto text-center">{filter.kind !== "all" ? "No notes match this view." : emptyText ?? (composer ? "Nothing here yet. Write what you learn about this project below: info, client feedback, photos." : "Nothing here yet. You can read the client’s answers here when they arrive.")}</Text>
         ) : entries.map((entry) => {
           const first = entry.notes[0]!;
           const day = currentDateOnly({ now: new Date(first.createdAt), timeZone: timezone });

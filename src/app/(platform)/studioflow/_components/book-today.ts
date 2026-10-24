@@ -4,8 +4,8 @@ import { prisma } from "@platform/core/db";
 import { readPlatformGeneralSettings } from "@platform/core/settings";
 import { currentDateOnly } from "@platform/utilities/date";
 
-/** Today's calendar date (`YYYY-MM-DD`) in the platform time zone: what a to-do's due date is compared with. */
-export async function todayInPlatformZone(): Promise<string> {
-  const { timezone } = await readPlatformGeneralSettings(prisma);
-  return currentDateOnly({ timeZone: timezone });
+/** Date display settings for the book, read once from the platform-wide settings. */
+export async function bookDateDisplaySettings(): Promise<{ today: string; locale: string }> {
+  const { timezone, locale } = await readPlatformGeneralSettings(prisma);
+  return { today: currentDateOnly({ timeZone: timezone }), locale };
 }

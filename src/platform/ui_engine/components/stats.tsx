@@ -14,5 +14,5 @@ export function StatCard({ label, value, caption, icon, href, className }: { lab
 }
 
 export function StatGrid({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cx("grid grid-cols-2 gap-3 min-[840px]:grid-cols-4 max-[400px]:grid-cols-1", className)}>{children}</div>;
+  return <div className={cx("grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 min-[840px]:grid-cols-4", className)}>{children}</div>;
 }
