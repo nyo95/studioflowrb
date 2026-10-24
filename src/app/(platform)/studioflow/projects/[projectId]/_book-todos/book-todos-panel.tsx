@@ -114,7 +114,7 @@ export function BookTodosPanel({ projectId, todos, assignees, canWrite, today, c
           )}
         </div>
         {editable ? (
-          <Select density="compact" className="w-36" aria-label="Assignee" value={todo.assigneeId ?? ""} disabled={busy === todo.id} onChange={(event) => void run(todo.id, () => updateBookTodoAction({ projectId, todoId: todo.id, version: todo.version, assigneeId: event.target.value || null }))}>
+          <Select density="compact" className="!w-36 shrink-0" aria-label="Assignee" value={todo.assigneeId ?? ""} disabled={busy === todo.id} onChange={(event) => void run(todo.id, () => updateBookTodoAction({ projectId, todoId: todo.id, version: todo.version, assigneeId: event.target.value || null }))}>
             <option value="">Nobody</option>
             {assignees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
             {todo.assigneeId && !assignees.some((person) => person.id === todo.assigneeId) ? <option value={todo.assigneeId}>{todo.assigneeName ?? "Former member"}</option> : null}
@@ -123,7 +123,7 @@ export function BookTodosPanel({ projectId, todos, assignees, canWrite, today, c
           <Text size="sm" tone="secondary">{todo.assigneeName ?? (todo.assigneeId ? "Former member" : "Nobody")}</Text>
         )}
         {editable ? (
-          <Input density="compact" type="date" className="w-36" aria-label="Due date" value={todo.dueDate ?? ""} disabled={busy === todo.id} onChange={(event) => void run(todo.id, () => updateBookTodoAction({ projectId, todoId: todo.id, version: todo.version, dueDate: event.target.value || null }))} />
+          <Input density="compact" type="date" className="!w-36 shrink-0" aria-label="Due date" value={todo.dueDate ?? ""} disabled={busy === todo.id} onChange={(event) => void run(todo.id, () => updateBookTodoAction({ projectId, todoId: todo.id, version: todo.version, dueDate: event.target.value || null }))} />
         ) : todo.dueDate ? <Text size="sm" tone="secondary">{formatDateOnly(todo.dueDate)}</Text> : null}
         {late ? <span className="inline-flex h-5 items-center rounded-pill bg-danger-subtle px-2 text-xs text-danger">Late</span> : null}
         {editable ? (
@@ -151,11 +151,11 @@ export function BookTodosPanel({ projectId, todos, assignees, canWrite, today, c
           {canWrite ? (
             <form className="flex flex-wrap items-center gap-2 border-t border-line-subtle px-3 py-2" onSubmit={(event) => { event.preventDefault(); void add(); }}>
               <Input density="compact" className="min-w-48 flex-1" placeholder="Add a to-do…" aria-label="New to-do" value={label} maxLength={200} onChange={(event) => setLabel(event.target.value)} />
-              <Select density="compact" className="w-36" aria-label="Assign to" value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)}>
+              <Select density="compact" className="!w-36 shrink-0" aria-label="Assign to" value={assigneeId} onChange={(event) => setAssigneeId(event.target.value)}>
                 <option value="">Nobody</option>
                 {assignees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
               </Select>
-              <Input density="compact" type="date" className="w-36" aria-label="Due date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+              <Input density="compact" type="date" className="!w-36 shrink-0" aria-label="Due date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
               <Button size="sm" variant="primary" type="submit" disabled={!label.trim()} pending={busy === "add"}>Add</Button>
             </form>
           ) : <Text as="p" size="sm" tone="secondary" className="border-t border-line-subtle px-3 py-2">To-dos can’t be changed while the project is in this state.</Text>}

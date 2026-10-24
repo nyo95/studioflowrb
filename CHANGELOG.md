@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.247 | 2026-10-24 | ui(studioflow): To-dos controls keep their width; R9.246 walked and tested (Lead)
+
+- **Change:** the assignee and date fields in the To-dos panel kept stretching to the full row in a narrow window; they now keep a fixed width.
+- **Tests (rumah, `masterdata_test`, both rebuild databases migrated with `migrate deploy`):** full `npm test` 1365/1365, 0 skipped.
+- **Browser walk (throwaway database `studioflow_walk` on the rebuild PostgreSQL, dropped afterwards; seeded designer PIC, drafter PIC, manager with override, invited member):** designer adds two to-dos, sets a past due date (Late appears), moves one down (order holds after reload), marks one done from Home (My tasks drops it, Done (1) appears in the book); Home My tasks lists the open ones with the late one first. The invited member sees the panel, the assignee choices and Done (1), and adds a to-do. The manager who is not in the book sees no To-dos panel. A first run mis-hit an input behind the member's welcome tour dialog; nothing to fix in the app.
+- **Not covered:** `npm run build`, a project on hold, an archived or completed project, and a stale-version collision between two browsers. Owner browser check still owed.
+- **Migration/dependencies:** none.
+
 ## R9.246 | 2026-10-24 | ui(studioflow): the book's To-dos section and My tasks on Home (Lead)
 
 - **Plan:** `WO-SF-BOOK-02` UI slice, after PASS of R9.245 (Lead review: code, migration, actions and test list read; checks not rerun by the Lead, taken from the Executor report).
