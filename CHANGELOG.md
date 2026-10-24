@@ -1,5 +1,13 @@
 # Changelog
 
+## R9.249 | 2026-10-24 | plan(studioflow): design critique, Sub-Lead work orders, WO-SF-BOOK-03 draft (Lead)
+
+- **Critique:** `docs/UIUX-CRITIQUE-2026-10-24.md`, from the real screens (1440/1280/840/390, light and dark, designer PIC, invited member, manager outside the book). Nine fixes inside the contract (A1-A9) and two layout questions for the owner (B1: how loud the To-dos panel is; B2: My tasks beside the project cards or above them).
+- **Work orders:** `docs/agent/queued-plans/WO-SUBLEAD-BOOK-UI-POLISH-01.md` (A1-A9, Sub-Lead, medium) and `WO-SKETCHUP-DEV-01.md` (moved here from `plan/sketchup-dev-tooling`, now a Sub-Lead task, low). Each runs on its own `sublead/<topic>` branch.
+- **Plan:** `PLAN.md` is now `WO-SF-BOOK-03` (client feedback points, point to to-do, handled count, round answered from the book), high tier, Executor lane, status DRAFT until the owner answers what "handled" means. Program table in `PROJECT-BOOK-DECISION.md` updated.
+- **Migration/dependencies:** none (BOOK-03 plans one additive migration).
+- **Checks:** docs only; `git diff --check`.
+
 ## R9.248 | 2026-10-24 | docs(harness): Codex as Sub-Lead for low and medium work (Lead)
 
 - **Change:** brought in `harness/sub-lead` (owner 2026-10-24): `AGENTS.md` operating model and lanes, new `docs/agent/SUB-LEAD.md`, the Sub-Lead row in `docs/agent/README.md`, a Sub-Lead review section in `docs/agent/REVIEWER.md`. From now on a Codex session given a task directly is Sub-Lead; given a READY `PLAN.md` it is still Executor.

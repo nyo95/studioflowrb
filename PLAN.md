@@ -1,84 +1,116 @@
 # Active Plan
 
-Plan ID: WO-SF-BOOK-02
-Scope: To-dos in the Project book (who, when, done) and one "My tasks" read across projects.
-Module(s): `studioflow` (new book to-do table, workspace/book service, actions). No other module.
-Target revision: plan R9.244 (Lead); backend + minimal wiring (Codex) R9.245; UI (Lead) R9.246.
-Branch: `feat/project-book` (never `main`; see PROJECT-BOOK-DECISION.md "Branch").
-Risk: medium - a new private record type; a missed guard leaks private to-dos, and touching the phase checklist by
-mistake would change approval blocking. Escalate (BLOCKED) if a to-do would need to block a phase, or if "My tasks"
-cannot be bounded to the caller's own book projects.
-Status: READY
+Plan ID: WO-SF-BOOK-03
+Scope: Client feedback points in the Project book: record what the client said for the round that is with them, turn
+each point into a to-do, show "n of m handled", all without leaving the book.
+Module(s): `studioflow` (book service, one new table, one additive column on `sf_book_todo`, a small shared helper
+from the phase service, actions). No other module.
+Target revision: plan R9.249 (Lead); backend + minimal wiring (Codex, Executor) R9.250 or the next free number;
+UI (Lead) after it.
+Branch: `feat/project-book` (never `main`).
+Risk: HIGH - it records the client's answer, which moves a round's status (workflow record and phase state), and it
+adds private-book data derived from a workflow record. A wrong guard either leaks private points or lets a member
+change a phase. Escalate (BLOCKED) if answering a round from the book would need a change to an existing phase
+status rule.
+Status: DRAFT - one owner question open (locked decision 3). Do not send the Executor prompt until it is READY.
 Priority: P1
-Owner: Product Owner (decisions 2026-10-23, `docs/apps/studioflow/PROJECT-BOOK-DECISION.md` 1, 4, 5)
+Owner: Product Owner (`docs/apps/studioflow/PROJECT-BOOK-DECISION.md` decisions 3, 4, 5)
 Last updated: 2026-10-24
 
-Previous plan: `WO-SF-BOOK-01` PASS (R9.241, R9.242 by Codex; UI R9.243 by the Lead); owner browser check owed.
+Previous plan: `WO-SF-BOOK-02` PASS (R9.245 Executor, R9.246-R9.247 Lead UI; owner browser check owed).
 
 ## Locked Decisions
 
-1. **Own table, not the phase checklist** (Lead, 2026-10-24; amends the storage wording of decision 4 only, the
-   product behaviour is unchanged): the phase checklist stays the approval gate (templates, blocking, phase lock,
-   completion). A book to-do never blocks anything, so it lives in a new `studioflow` table, e.g. `sf_book_todo`:
-   id, project id (cascade with the project), label (same max as a checklist label), assignee user id (nullable,
-   plain id), due date (nullable, date only, the project's existing date-only convention), done at (nullable),
-   source card id (nullable, the workspace card it came from, `SetNull` on delete; filled by WO-SF-BOOK-03, not
-   now), created by id + name snapshot, created at, sort order, version (optimistic concurrency like workspace
-   cards). Additive migration only. No change to `sf_checklist_*`, blockers, completion or templates.
-2. **Who:** every read and write needs a book reader of that project (`requireBookAccess`). Writes also need the
-   project open (not archived, not completed) like other book writes; a member writes under the same rule as a
-   member's note (WO-SF-BOOK-01 `writableForMember`); a PIC needs only the open project (a to-do has no phase).
-3. **Assignee** must be a book reader of that project at the time of assignment (a PIC or a member), or empty.
-   Removing a member leaves their to-dos assigned to them but they disappear from that person's "My tasks"
-   because they no longer read the book.
-4. **Operations:** create, update label / assignee / due date (version-checked), mark done / not done, reorder,
-   delete. Every write is audited (`book-todo`). Delete is allowed to any book reader.
-5. **Project list read:** open to-dos first in sort order, then done ones (most recent first, bounded, e.g. last 50).
-6. **My tasks read:** the caller's open to-dos where they are the assignee, across every non-archived project whose
-   book they read, plus open unassigned to-dos they created; each row carries project id and name, label, due date,
-   source card id. Bounded (e.g. 200), ordered by due date (empty last) then created at. No "late" computation on
-   the server: the screen compares the date with today in the platform time zone.
-7. No UI design: minimal wiring through server actions only. The Lead builds the book section and Home in R9.246.
+1. **A round is a phase iteration** (`SfRevision`). A round "with the client" is `SENT`; "answered" is `ANSWERED`.
+   Feedback points belong to one round. The existing phase "Client answered" dialog keeps working unchanged.
+2. **Write once, status follows.** `recordClientFeedback` takes the round and one or more points. If the round is
+   `SENT` it becomes `ANSWERED` exactly as `recordClientAnswer` does today (same event, same audit, same undo data:
+   extract the shared step from `phases/service.ts` and call it from both; behaviour and existing tests unchanged).
+   If the round is already `ANSWERED` and no outcome was chosen, more points are appended (late feedback). Any other
+   round state is refused. The full text is also posted as the one workflow-record card (`origin CLIENT_ANSWER`,
+   `workflowRecord true`) as today, so managers keep seeing the client's answer and the record stays complete.
+3. **"Handled" (OWNER QUESTION, recommended default below).** A point is handled when someone ticks it, or when the
+   to-do made from it is done. Reopening that to-do makes the point open again unless it was ticked itself. The round
+   shows "n of m handled" from this rule. Recommended: yes (both ways), because a point can be dealt with in the
+   meeting without becoming a to-do, and a to-do closing should close its point without a second click.
+4. **Point to to-do:** one to-do per point (`feedback_point_id` unique). Defaults: label = the point text (trimmed to
+   the label limit), assignee and due date optional as for any to-do; it keeps `source_card_id` = the card the point
+   came from. A second request for the same point is refused (`BOOK_POINT_ALREADY_TODO`) and returns the existing
+   to-do id.
+5. **Who:** reading points and handling or converting them needs a book reader (PIC or invited member), written
+   exactly like to-do writes (`studioflow.phase.work`, open project, member only when ACTIVE). **Recording** the
+   client's answer also needs what `recordClientAnswer` needs for that round's phase today (the phase's PIC seat or
+   manager authority as `writableIteration` decides), so an invited member can never change a phase. A non-reader is
+   refused like an unknown project on reads and `PERMISSION_DENIED` on writes, as BOOK-02.
+6. **Two rounds out:** the caller names the round (`iterationId`); the read returns every open round so the screen
+   can ask "which one?" in one click. The server never guesses.
+7. **Points are split by the caller**, one per non-empty line, 1-30 points, each up to 500 characters; a duplicate
+   line inside one request is kept (the client may repeat themselves).
+8. **Not changed:** the phase checklist, blockers, completion, templates, `chooseIterationOutcome`, the workspace
+   card model beyond the one new card per answer.
+
+## Data
+
+Additive migration: new `studioflow.sf_book_feedback_point` (id; project id cascade; iteration id cascade; card id
+nullable, SetNull; body; sort order; `handled_at` nullable; `handled_by_id` + name snapshot nullable; created by id +
+name; created at; version) with indexes on (project, iteration, sort order); and nullable unique `feedback_point_id` on
+`sf_book_todo` (SetNull). Users are plain ids. Nothing else changes.
+
+## Operations (service `studioFlow.bookFeedback`, plus actions)
+
+- `listOpenRounds({projectId})`: the project's rounds that are `SENT`, or `ANSWERED` without an outcome, each with
+  phase label, round name, status, answered at, its points in order (id, text, handled flag with the reason ticked or
+  to-do done, linked to-do id/assignee/due/done) and counts `handled`/`total`. Book readers only.
+- `recordClientFeedback({projectId, iterationId, points[]})`: decision 2 and 5; audited `book-feedback.recorded`.
+- `convertPointToTodo({projectId, pointId, label?, assigneeId?, dueDate?})`: decision 4; reuses the BOOK-02 create
+  rules (assignee must be a reader); audited `book-feedback.converted`.
+- `setPointHandled({projectId, pointId, handled, version?})`: ticks or unticks the point itself; audited.
+- `listMyTasks` and the to-do reads additionally return the linked round name and point id so the screen can say
+  "client point, 3D R2" (no new permission).
 
 ## Non-goals
 
-No feedback points, no feedback-to-to-do conversion (BOOK-03), no material tries, no notifications, no change to
-the phase checklist or its screens, no Todoist sync.
+No screens, no composer, no material tries, no discussion, no notifications, no change to the phase dialog, no
+automatic revise or approve (offered later by the UI), no parsing of images.
 
 ## Acceptance Criteria
 
-1. A PIC and a member create, edit, complete, reopen, reorder and delete to-dos; each write is audited.
-2. A manager / override holder / Platform Owner who is not PIC or member: every to-do read and write is refused
-   (lists answer the same as for an unknown project).
-3. Assigning a non-reader is refused; assigning a member or PIC works.
-4. "My tasks" returns only the caller's own open to-dos from books they read; a removed member's tasks vanish.
-5. A stale version is refused; an archived or completed project refuses writes.
-6. Phase approval, blockers and completion behave exactly as before (existing tests unchanged and green).
+1. A phase PIC records feedback for a `SENT` round: the round becomes `ANSWERED` exactly as the existing command
+   does (same event and audit; existing phase tests unchanged and green), the points appear in order, the workflow
+   card exists and a manager still sees that card.
+2. Recording again on an `ANSWERED` round appends points; on any other state it is refused; two rounds out require
+   `iterationId`.
+3. An invited member can read points, convert and tick them, but cannot record the client's answer; a manager,
+   override holder and Platform Owner who are not readers cannot read or write points.
+4. Convert makes one linked to-do; a second convert is refused with the existing id; deleting the to-do leaves the
+   point (SetNull) and it can be converted again.
+5. "n of m handled" follows decision 3 under tick, untick, to-do done and reopened.
+6. Stale or foreign ids (point of another project, round of another project) are refused as not found.
+7. Phase approval, blockers, completion and the phase checklist behave exactly as before.
 
-## Verification (Executor, before commit)
+## Verification (Executor, before commit; tier HIGH per `docs/agent/VERIFICATION.md`)
 
-- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`,
-  `npx prisma validate`, migration applied on the disposable test database only.
-- New integration tests (real database) for criteria 1-6; existing StudioFlow suites unchanged and green.
-- Full `npm test` and `npm run build`. Per-command timeout 10 min.
-- Safe checkpoint: migration + service + guards + tests committed together only.
+`npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`, `npx prisma validate`,
+migration on the disposable test database only; new real-database integration tests for criteria 1-7; the phase
+suites unchanged and green; full `npm test`; `npm run build`; `node scripts/verify.mjs --tier high --e2e` when the
+environment allows it, otherwise name it as not run. Per-command timeout 10 min.
 
-## Reviewer Acceptance (Lead, after R9.245)
+## Reviewer Acceptance (Lead)
 
-Lead UI R9.246: the To-do section of the book (DESIGN.md §6.3, the "Client asked" block arrives with BOOK-03) and
-"My tasks" on Home; browser walk with a PIC, a member and a manager.
+Code read of the extracted shared step, of every guard, and of the migration; own run of the full suite and build;
+then the Lead UI: "Client asked" block with the progress ring and the typed composer's "Client said" kind (DESIGN.md
+§6.3, UI Engine `ProgressRing` and `TypedComposer` activated), browser walk with PIC, member and manager.
 
 ## Executor Prompt
 
 ```text
-Role: BACKEND EXECUTOR (Codex, cloud). Repository nyo95/studioflowrb, branch feat/project-book: check it out and
-work only there; never commit to or push main. Location: cloud - per AGENTS.md create an ignored .env /
-.env.test.local pointing at a PostgreSQL you start inside this container (studioflow_rebuild,
-studioflow_rebuild_test); never any other database. Read AGENTS.md, docs/agent/EXECUTOR.md, PLAN.md
-(WO-SF-BOOK-02) and docs/apps/studioflow/PROJECT-BOOK-DECISION.md. Implement the whole plan: new book to-do table
-(additive migration), book-reader guards on every read and write, assignee rule, audited operations, the project
-list read and the cross-project My tasks read, minimal server actions. Do not touch the phase checklist. Tests and
-checks per Verification; changelog R9.245. No screen design (Lead R9.246). Commit as R9.245 on feat/project-book,
-push only feat/project-book, and return the Planner/Reviewer prompt with outcome, commit, checks, limitations and
-dirty files.
+Role: BACKEND EXECUTOR (Codex). Work on branch feat/project-book (never main; push only when the owner says so).
+Location: home -> load .env.rumah, STUDIOFLOW_LOCATION=rumah, use only the rebuild databases (masterdata,
+masterdata_test); verify the target before any database command. Read AGENTS.md, docs/agent/EXECUTOR.md,
+docs/agent/VERIFICATION.md, PLAN.md (WO-SF-BOOK-03) and docs/apps/studioflow/PROJECT-BOOK-DECISION.md. Implement the
+whole plan: the additive migration, the shared "answer a round" step extracted from phases/service.ts without
+changing existing behaviour, studioFlow.bookFeedback with the four operations, the linked-round fields on the to-do
+reads, minimal server actions, audit, tests per Verification. Do not build screens. Changelog entry with the next free
+revision number. Commit locally and return the Planner/Reviewer prompt with outcome, commit, checks (with numbers),
+limitations and dirty files.
 ```
