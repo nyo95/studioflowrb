@@ -19,8 +19,9 @@ export const ITERATION_STATE_TONE: Record<IterationView["state"], "neutral" | "w
 /**
  * Under a note image in the large viewer: keep a copy on the person's Ideas board, or put it in this project's schedule.
  * Both copy; the note is never changed. The Workspace uses it too, where a card may have no phase label.
+ * "Use in schedule" is StudioFlow's own (WO-SF-BOOK-01): only a book reader who may edit the Schedule gets it.
  */
-export function NoteImageActions({ image, projectId, projectName, phaseId, canUseIdeas, canUsePresentation }: { image: { id: string }; projectId: string; projectName: string; phaseId: string | null; canUseIdeas: boolean; canUsePresentation: boolean }) {
+export function NoteImageActions({ image, projectId, projectName, phaseId, canUseIdeas, canUsePresentation, canUseInSchedule }: { image: { id: string }; projectId: string; projectName: string; phaseId: string | null; canUseIdeas: boolean; canUsePresentation: boolean; canUseInSchedule: boolean }) {
   const ideasEnabled = useStudioFlowModuleEnabled("ideas") && canUseIdeas;
   const presentationEnabled = useStudioFlowModuleEnabled("presentation") && canUsePresentation;
   const [saved, setSaved] = useState(false);
@@ -52,10 +53,10 @@ export function NoteImageActions({ image, projectId, projectName, phaseId, canUs
   return (
     <>
       {ideasEnabled ? <Button size="sm" variant="secondary" pending={pending} disabled={saved} onClick={() => void save()}>{saved ? "Saved to Ideas" : "Save to Ideas"}</Button> : null}
-      <Button size="sm" variant="secondary" onClick={() => setUsing(true)}>Use in schedule</Button>
+      {canUseInSchedule ? <Button size="sm" variant="secondary" onClick={() => setUsing(true)}>Use in schedule</Button> : null}
       {presentationEnabled ? <Button size="sm" variant="secondary" pending={moodboard === "pending"} disabled={moodboard === "done"} onClick={() => void addToMoodboard()}>{moodboard === "done" ? "Added to moodboard" : "Add to moodboard"}</Button> : null}
       {error ? <InlineError>{error}</InlineError> : null}
-      {using ? (
+      {canUseInSchedule && using ? (
         <UseInScheduleDialog
           initialName=""
           initialNotes=""

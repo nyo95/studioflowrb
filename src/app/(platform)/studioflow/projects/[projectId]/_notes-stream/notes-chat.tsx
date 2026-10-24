@@ -106,7 +106,7 @@ const TOKEN_TRIGGERS = ["@", "#"];
  * topic (the phase tag comes from the composer), `@HT1` links a Product Schedule item. Writing follows each phase's
  * rule, so the composer offers only the phases this person may write.
  */
-export function NotesChat({ projectId, projectName, currentUserId, phases, writablePhaseIds, canEditGeneral, defaultPhaseId, initial, canUseIdeas, canUsePresentation, scopeOf, poster, header, composer = true, emptyText, onLocate }: {
+export function NotesChat({ projectId, projectName, currentUserId, phases, writablePhaseIds, canEditGeneral, defaultPhaseId, initial, canUseIdeas, canUsePresentation, canUseInSchedule, scopeOf, poster, header, composer = true, emptyText, onLocate }: {
   projectId: string;
   projectName: string;
   currentUserId: string;
@@ -117,6 +117,8 @@ export function NotesChat({ projectId, projectName, currentUserId, phases, writa
   initial: { notes: readonly ChatNote[]; cursor: string | null };
   canUseIdeas: boolean;
   canUsePresentation: boolean;
+  /** A book reader who may edit the Schedule: offers "Use in schedule" under a note image. */
+  canUseInSchedule: boolean;
   /** Read at request time, so a thread created by the first message is followed at once. Without it: every note. */
   scopeOf?: () => NoteScope;
   poster?: NotePoster;
@@ -349,6 +351,7 @@ export function NotesChat({ projectId, projectName, currentUserId, phases, writa
                 canEdit={canEdit}
                 canUseIdeas={canUseIdeas}
                 canUsePresentation={canUsePresentation}
+                canUseInSchedule={canUseInSchedule}
                 locale={locale}
                 timezone={timezone}
                 busy={busy}
@@ -403,7 +406,7 @@ function tagsOf(text: string) {
   return [...new Set([...plain(text).matchAll(TAG)].map((match) => match[1]!).filter((name) => name.toLowerCase() !== "feedback"))].slice(0, 5);
 }
 
-function Bubble({ group, projectId, projectName, currentUserId, canEdit, canUseIdeas, canUsePresentation, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onReload, onLocate, onMarkup, onDelete }: {
+function Bubble({ group, projectId, projectName, currentUserId, canEdit, canUseIdeas, canUsePresentation, canUseInSchedule, locale, timezone, busy, onReply, onTag, onStar, onFeedback, onEdit, onReload, onLocate, onMarkup, onDelete }: {
   group: readonly ChatNote[];
   projectId: string;
   projectName: string;
@@ -411,6 +414,7 @@ function Bubble({ group, projectId, projectName, currentUserId, canEdit, canUseI
   canEdit: boolean;
   canUseIdeas: boolean;
   canUsePresentation: boolean;
+  canUseInSchedule: boolean;
   locale: string;
   timezone: string;
   busy: string | null;
@@ -480,7 +484,7 @@ function Bubble({ group, projectId, projectName, currentUserId, canEdit, canUseI
                 const owner = group.find((item) => item.images.some((candidate) => candidate.id === image.id)) ?? note;
                 return <>
                   {onMarkup && image.url ? <Button size="sm" variant="primary" onClick={() => onMarkup(owner, image.url!)}>Mark up</Button> : null}
-                  {note.phaseId ? <NoteImageActions image={image} projectId={projectId} projectName={projectName} phaseId={note.phaseId} canUseIdeas={canUseIdeas} canUsePresentation={canUsePresentation} /> : null}
+                  {note.phaseId ? <NoteImageActions image={image} projectId={projectId} projectName={projectName} phaseId={note.phaseId} canUseIdeas={canUseIdeas} canUsePresentation={canUsePresentation} canUseInSchedule={canUseInSchedule} /> : null}
                 </>;
               }}
             />

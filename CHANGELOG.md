@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.243 | 2026-10-24 | ui(studioflow): the Project book names its readers; Use in schedule only for those who may (Lead)
+
+- **Plan:** `WO-SF-BOOK-01` UI slice, after PASS of R9.241 + R9.242 (Lead review: code read, own run of typecheck, lint, boundaries and the full suite).
+- **Change:** a bar above the project notes says who reads the private book (designer, drafter, invited members); a PIC invites from the people who may write notes and removes with a confirmation; a member sees the list; someone outside the book (manager, Platform Owner) sees one line explaining that the book is private and that they see the client's answers and site visits, and no composer. "Use in schedule" under a note image shows only for a book reader who may edit the Schedule (`canUseNoteImageInSchedule`), on the notes stream and the board.
+- **Browser walk (disposable container database, seeded PIC designer, PIC drafter, Platform Owner, a fourth user):** designer sees the private and the client note and invites the fourth user; the owner and the not-yet-invited user see only the client note and the notice; after the invitation that user reads the private note. A first layout put the bar inside the notes grid as a column; fixed before commit.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck, lint, `check:boundaries`, full `npm test` 1359/1359 (0 skipped), `npm run build`: pass.
+- **Limitations:** the bar sits on today's Phases page; the §6.3 Project page layout arrives with later slices. Owner browser check owed.
+
 ## R9.242 | 2026-10-24 | fix(studioflow): an operation id replays only in the project it first ran in (Executor)
 
 - **Review finding (Lead, R9.241, P2):** `schedule/external-placement.ts` looked the idempotency receipt up by `operationId` alone and returned it without comparing projects, so a valid request for project B reusing project A's operation id answered A's result as success and created nothing in B. The behavior predates R9.241; it came along into the shared helper now used by the Project book path and the Ideas bridge.

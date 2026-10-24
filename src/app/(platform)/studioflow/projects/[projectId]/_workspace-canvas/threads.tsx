@@ -36,6 +36,7 @@ export type ThreadChatProps = {
   defaultPhaseId: string | null;
   canUseIdeas: boolean;
   canUsePresentation: boolean;
+  canUseInSchedule: boolean;
 };
 
 const EMPTY = { notes: [] as readonly ChatNote[], cursor: null };

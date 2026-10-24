@@ -110,7 +110,7 @@ export default async function ProjectOverviewPage({
               ? <ConstructionDrawingWorkspace projectId={projectId} phaseId={selectedPhase.id} archived={archived} status={project.status} />
               : boardEnabled
               ? <ProjectWorkspace projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />
-              : <ProjectNotes projectId={projectId} projectName={project.name} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />}
+              : <ProjectNotes projectId={projectId} projectName={project.name} team={{ designer: project.designer, drafter: project.drafter }} selectedPhaseId={selectedPhaseId} people={people} archived={archived} status={project.status} />}
           </Suspense>
         </div>
         {selectedPhaseId ? <Suspense fallback={null}><PhaseAside projectId={projectId} phaseId={selectedPhaseId} archived={archived} /></Suspense> : null}

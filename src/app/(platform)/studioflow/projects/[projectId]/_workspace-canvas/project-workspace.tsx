@@ -1,7 +1,7 @@
 import { hasPermission } from "@platform/core/rbac";
 import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
-import { pageProjectAccess, pageSession } from "../../../_components/session";
+import { canUseNoteImageInSchedule, pageProjectAccess, pageSession } from "../../../_components/session";
 import { WorkspaceCanvas } from "./canvas";
 
 type PersonItem = Awaited<ReturnType<typeof studioFlow.projects.listAssignablePeople>>[number];
@@ -44,6 +44,7 @@ export async function ProjectWorkspace({ projectId, projectName, selectedPhaseId
       writablePhaseIds={writable ? access.phases.filter((item) => item.canTransition).map((item) => item.phaseId) : []}
       canUseIdeas={hasPermission(grants, P.ideasManage)}
       canUsePresentation={hasPermission(grants, P.presentationManage)}
+      canUseInSchedule={canUseNoteImageInSchedule(access, grants)}
       drawingList={null}
       threads={threads.map((thread) => ({ id: thread.id, version: thread.version, x: thread.x, y: thread.y, anchorCardId: thread.anchorCardId, offsetX: thread.offsetX, offsetY: thread.offsetY, messageCount: thread.messageCount, clientFeedback: thread.clientFeedback }))}
       chatPhases={phaseList.map((phase) => ({ id: phase.id, label: phase.label, iteration: phase.iterationShortName ?? null }))}

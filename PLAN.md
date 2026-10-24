@@ -11,7 +11,7 @@ Risk: high - narrows read access on existing data and widens project-page access
 read path leaks private notes, an over-narrow one hides the official client answers from managers. Escalate
 (BLOCKED) if any notes read path cannot tell a workflow record from an ordinary card, or if invited-member access
 would need a change to RBAC roles.
-Status: READY
+Status: DONE - R9.241 + R9.242 (Codex, PASS) and R9.243 (Lead UI); owner browser check owed.
 Priority: P1
 Owner: Product Owner (decisions 2026-10-23, `docs/apps/studioflow/PROJECT-BOOK-DECISION.md` 5, 6, 8)
 Last updated: 2026-10-23

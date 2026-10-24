@@ -3,6 +3,8 @@ import "server-only";
 import { redirect } from "next/navigation";
 
 import { requirePrincipalGrants } from "@platform/core/auth";
+import { hasPermission, type PermissionGrants } from "@platform/core/rbac";
+import { STUDIOFLOW_PERMISSIONS as P } from "@/apps/studioflow/public";
 import { studioFlow } from "@/apps/studioflow/runtime";
 
 /** Principal + grants for StudioFlow pages; the layout already enforced access. */
@@ -26,4 +28,9 @@ export async function pageProjectAccess(projectId: string) {
 /** Work sections are for a project PIC or someone with manager authority. */
 export function canSeeProjectWorkSections(access: Awaited<ReturnType<typeof pageProjectAccess>>) {
   return access.canSeeWorkSections;
+}
+
+/** "Use in schedule" under a note image (WO-SF-BOOK-01): a book reader who may also edit this project's Schedule. */
+export function canUseNoteImageInSchedule(access: Awaited<ReturnType<typeof pageProjectAccess>>, grants: PermissionGrants) {
+  return access.canReadBook && access.canEditDocuments && hasPermission(grants, P.scheduleManage);
 }

@@ -39,7 +39,7 @@ const isEditable = (target: EventTarget | null) => target instanceof HTMLElement
  * (or middle-click, or Space + drag) to move around; zoom only enlarges, and the overview map jumps anywhere.
  * Layout is last-write-wins and never makes someone's text edit stale. Below 768 px the elements read top to bottom.
  */
-export function WorkspaceCanvas({ projectId, projectName, currentUserId, elements: board, threads: serverThreads, chatPhases, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, canUsePresentation, drawingList }: {
+export function WorkspaceCanvas({ projectId, projectName, currentUserId, elements: board, threads: serverThreads, chatPhases, phases, selectedPhase, readOnlyReason, canEditGeneral, writablePhaseIds, canUseIdeas, canUsePresentation, canUseInSchedule, drawingList }: {
   projectId: string;
   /** Note threads on the board (WO-SF-BOARD-THREADS-01); their messages are project notes, never board elements. */
   threads: readonly BoardThread[];
@@ -55,6 +55,7 @@ export function WorkspaceCanvas({ projectId, projectName, currentUserId, element
   writablePhaseIds: readonly string[];
   canUseIdeas: boolean;
   canUsePresentation: boolean;
+  canUseInSchedule: boolean;
   /** The selected phase's Drawing list, offered as a second lens when the phase has one. */
   drawingList?: ReactNode;
 }) {
@@ -113,7 +114,7 @@ export function WorkspaceCanvas({ projectId, projectName, currentUserId, element
   // A board note is a Notes message: it needs a phase this person may write (G3); moving a free marker is project-level.
   const canThread = labelChoices.phases.length > 0;
   const canMoveThreads = canEditGeneral;
-  const chat: ThreadChatProps = { projectId, projectName, currentUserId, phases: chatPhases, writablePhaseIds, canEditGeneral, defaultPhaseId: selectedPhase?.id ?? null, canUseIdeas, canUsePresentation };
+  const chat: ThreadChatProps = { projectId, projectName, currentUserId, phases: chatPhases, writablePhaseIds, canEditGeneral, defaultPhaseId: selectedPhase?.id ?? null, canUseIdeas, canUsePresentation, canUseInSchedule };
 
   // ── View (pan and zoom are personal: this browser only) ─────────────
   const viewKey = `studioflow.workspace.view.${projectId}`;
@@ -578,6 +579,7 @@ export function WorkspaceCanvas({ projectId, projectName, currentUserId, element
         labelChoices={canWrite ? labelChoices : { allowNone: false, phases: [] }}
         canUseIdeas={canUseIdeas}
         canUsePresentation={canUsePresentation}
+        canUseInSchedule={canUseInSchedule}
         dimmed={!matches(item)}
         selected={board && selection.has(item.id)}
         style={style}
