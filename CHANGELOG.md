@@ -1,5 +1,12 @@
 # Changelog
 
+## R9.244 | 2026-10-24 | plan(studioflow): WO-SF-BOOK-02 to-dos and My tasks (Lead)
+
+- **Plan:** `PLAN.md` is READY `WO-SF-BOOK-02` (Codex R9.245, Lead UI R9.246): book to-dos with assignee, due date and done, every read and write behind the book reader, audited, plus a cross-project "My tasks" read.
+- **Decision record:** `PROJECT-BOOK-DECISION.md` decision 4 storage wording: a to-do is its own `studioflow` table, not a phase checklist row, so approval blocking can never change; product behaviour unchanged. Program table: BOOK-01 DONE, BOOK-02 READY.
+- **Migration/dependencies:** none in this revision (BOOK-02 plans one additive table).
+- **Checks:** docs only; `git diff --check`.
+
 ## R9.243 | 2026-10-24 | ui(studioflow): the Project book names its readers; Use in schedule only for those who may (Lead)
 
 - **Plan:** `WO-SF-BOOK-01` UI slice, after PASS of R9.241 + R9.242 (Lead review: code read, own run of typecheck, lint, boundaries and the full suite).

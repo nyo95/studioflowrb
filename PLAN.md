@@ -1,87 +1,72 @@
 # Active Plan
 
-Plan ID: WO-SF-BOOK-01
-Scope: The Project book becomes private to the project's PICs and invited members (workflow records excepted), and
-the note-image "Use in schedule" moves from Ideas into StudioFlow.
-Module(s): `studioflow` (workspace/notes service, project access policy, new member table, actions); `ideas` (its
-note-image schedule path removed); `presentation` bridge read of note images (consumer).
-Target revision: plan R9.239-R9.240 (Lead); backend + minimal wiring (Codex) R9.241; review correction (Codex) R9.242; UI (Lead) R9.243.
+Plan ID: WO-SF-BOOK-02
+Scope: To-dos in the Project book (who, when, done) and one "My tasks" read across projects.
+Module(s): `studioflow` (new book to-do table, workspace/book service, actions). No other module.
+Target revision: plan R9.244 (Lead); backend + minimal wiring (Codex) R9.245; UI (Lead) R9.246.
 Branch: `feat/project-book` (never `main`; see PROJECT-BOOK-DECISION.md "Branch").
-Risk: high - narrows read access on existing data and widens project-page access for invited members; a missed
-read path leaks private notes, an over-narrow one hides the official client answers from managers. Escalate
-(BLOCKED) if any notes read path cannot tell a workflow record from an ordinary card, or if invited-member access
-would need a change to RBAC roles.
-Status: DONE - R9.241 + R9.242 (Codex, PASS) and R9.243 (Lead UI); owner browser check owed.
+Risk: medium - a new private record type; a missed guard leaks private to-dos, and touching the phase checklist by
+mistake would change approval blocking. Escalate (BLOCKED) if a to-do would need to block a phase, or if "My tasks"
+cannot be bounded to the caller's own book projects.
+Status: READY
 Priority: P1
-Owner: Product Owner (decisions 2026-10-23, `docs/apps/studioflow/PROJECT-BOOK-DECISION.md` 5, 6, 8)
-Last updated: 2026-10-23
+Owner: Product Owner (decisions 2026-10-23, `docs/apps/studioflow/PROJECT-BOOK-DECISION.md` 1, 4, 5)
+Last updated: 2026-10-24
 
-Previous plan: `WO-PLATFORM-MODULE-USER-ACCESS-01` SUPERSEDED in R9.238 (not built).
+Previous plan: `WO-SF-BOOK-01` PASS (R9.241, R9.242 by Codex; UI R9.243 by the Lead); owner browser check owed.
 
 ## Locked Decisions
 
-1. **Book reader** = the project's `pic_designer_id`, `pic_drafter_id`, or a book member of that project. Nothing
-   else qualifies: not `projectManage`/`projectOverride`, not the Platform Owner. Put it in the single access
-   policy (`projectAccessFromFacts` / `ProjectAccess`, e.g. `canReadBook`), not per call site.
-2. **Workflow-record exception:** a card with `workflow_record = true` (client answer, site visit written by a
-   phase step) stays readable by everyone with today's `canSeeWorkSections`. Every other card (and its replies,
-   tags, item links, thread, image/file object and signed URL) needs book reader.
-3. Every notes/workspace read and write path applies 1-2: `readWorkspace`, `listWorkspaceThreads`,
-   `listProjectNotes` (all filters), `listNoteTags`, `listNotesForItem` (the Schedule side), `listStarredPhaseNotes`,
-   thread/card/image/file writes, tag and item-link writes, the note image/file object read, and the Presentation
-   bridge's note-image read. A non-reader asking for a private card gets the same NOT_FOUND as a missing card.
-   `searchNoteItems` (Schedule item lookup) is unchanged. Phase-step writers (`recordClientAnswer`, site visits)
-   keep working for whoever may run the step today.
-4. **Book members:** new `studioflow` table (project id, user id, invited by id + name snapshot, invited at; unique
-   per project+user; cascade with the project; user as a plain id). Only a PIC adds or removes; only an ACTIVE user
-   with StudioFlow access may be added; a PIC is never stored as a member. Both changes are audited. Additive
-   migration only; no data backfill.
-5. **Member project access:** a member passes project-detail and work-section reads for that project (the page head,
-   stage strip, the book) as if assigned, but gains no edit: `canEditProject`, `canEditDocuments`, phase
-   `canTransition`/`canEditContent`, Schedule, MOM and Presentation writes stay as today for them. The project list
-   may show the project to a member.
-6. **Use in schedule from a note image** becomes a StudioFlow operation (workspace service + action): book reader
-   AND the existing Schedule-edit rule; it creates the item or extra option exactly as the Ideas path does today
-   (same copy semantics, idempotency key, refusals). The Ideas service's `useNoteImageInSchedule` and its action
-   are removed; `saveNoteImageToIdeas` stays (Ideas is switched off, not deleted) but now also requires book reader.
-7. No UI design work: minimal wiring only (the note-image button calls the new action; a temporary plain list to
-   add/remove members may be exposed through an action without a screen). The Lead builds the screens in R9.243.
+1. **Own table, not the phase checklist** (Lead, 2026-10-24; amends the storage wording of decision 4 only, the
+   product behaviour is unchanged): the phase checklist stays the approval gate (templates, blocking, phase lock,
+   completion). A book to-do never blocks anything, so it lives in a new `studioflow` table, e.g. `sf_book_todo`:
+   id, project id (cascade with the project), label (same max as a checklist label), assignee user id (nullable,
+   plain id), due date (nullable, date only, the project's existing date-only convention), done at (nullable),
+   source card id (nullable, the workspace card it came from, `SetNull` on delete; filled by WO-SF-BOOK-03, not
+   now), created by id + name snapshot, created at, sort order, version (optimistic concurrency like workspace
+   cards). Additive migration only. No change to `sf_checklist_*`, blockers, completion or templates.
+2. **Who:** every read and write needs a book reader of that project (`requireBookAccess`). Writes also need the
+   project open (not archived, not completed) like other book writes; a member writes under the same rule as a
+   member's note (WO-SF-BOOK-01 `writableForMember`); a PIC needs only the open project (a to-do has no phase).
+3. **Assignee** must be a book reader of that project at the time of assignment (a PIC or a member), or empty.
+   Removing a member leaves their to-dos assigned to them but they disappear from that person's "My tasks"
+   because they no longer read the book.
+4. **Operations:** create, update label / assignee / due date (version-checked), mark done / not done, reorder,
+   delete. Every write is audited (`book-todo`). Delete is allowed to any book reader.
+5. **Project list read:** open to-dos first in sort order, then done ones (most recent first, bounded, e.g. last 50).
+6. **My tasks read:** the caller's open to-dos where they are the assignee, across every non-archived project whose
+   book they read, plus open unassigned to-dos they created; each row carries project id and name, label, due date,
+   source card id. Bounded (e.g. 200), ordered by due date (empty last) then created at. No "late" computation on
+   the server: the screen compares the date with today in the platform time zone.
+7. No UI design: minimal wiring through server actions only. The Lead builds the book section and Home in R9.246.
 
 ## Non-goals
 
-No to-do, feedback, material-try, discussion or Ideas work (BOOK-02..06). Ideas is not deleted. No change to phases, Schedule
-rules, roles or the Workspace board module state.
+No feedback points, no feedback-to-to-do conversion (BOOK-03), no material tries, no notifications, no change to
+the phase checklist or its screens, no Todoist sync.
 
 ## Acceptance Criteria
 
-1. PIC designer and PIC drafter read and write all cards of their project as today.
-2. A Studio Manager with override and the Platform Owner, not PIC and not member: see only workflow records in
-   notes lists, item notes and the phase view; a private card id, its image URL and its Presentation import answer
-   NOT_FOUND; every notes write is refused.
-3. Invited member: reads and writes the book, opens the project page, cannot change phases, Schedule, MOM or
-   Presentation; removed member loses access on the next request.
-4. Only a PIC can add/remove members; inactive or non-StudioFlow users refused; audit rows written.
-5. Note-image "Use in schedule" works for a PIC with Schedule edit, refused for a member without it and for a
-   non-reader, and no longer depends on the Ideas module being on.
-6. Existing phase steps (client answer, site visit) still post their workflow records and remain visible to managers.
+1. A PIC and a member create, edit, complete, reopen, reorder and delete to-dos; each write is audited.
+2. A manager / override holder / Platform Owner who is not PIC or member: every to-do read and write is refused
+   (lists answer the same as for an unknown project).
+3. Assigning a non-reader is refused; assigning a member or PIC works.
+4. "My tasks" returns only the caller's own open to-dos from books they read; a removed member's tasks vanish.
+5. A stale version is refused; an archived or completed project refuses writes.
+6. Phase approval, blockers and completion behave exactly as before (existing tests unchanged and green).
 
 ## Verification (Executor, before commit)
 
-- `npm run typecheck`, `npm run lint`, boundary scan, `npx prisma validate` + migration generated and applied on the
-  disposable rebuild test database only.
-- Integration tests (new, real database): access matrix PIC / member / override manager / Platform Owner / outsider
-  for every path in decision 3; workflow-record visibility; member add/remove + audit; note-image Use in schedule
-  allowed/refused cases and idempotent retry.
-- Existing suites: `src/apps/studioflow/**` integration, `note-actions.test.ts`, `asset-cleanup-actions.test.ts`,
-  `module-gates.integration.test.ts`, ideas and presentation tests. Per-command timeout 10 min.
-- `npm run build`.
-- Safe checkpoint: migration + access policy + tests may be committed only together; never commit a state where
-  a read path is unguarded.
+- `npm run typecheck`, `npm run lint`, `npm run check:boundaries`, `npm run check:legacy-runtime`,
+  `npx prisma validate`, migration applied on the disposable test database only.
+- New integration tests (real database) for criteria 1-6; existing StudioFlow suites unchanged and green.
+- Full `npm test` and `npm run build`. Per-command timeout 10 min.
+- Safe checkpoint: migration + service + guards + tests committed together only.
 
-## Reviewer Acceptance (Lead, after R9.241)
+## Reviewer Acceptance (Lead, after R9.245)
 
-Browser on an isolated server with three accounts (PIC, override manager, invited member) walking criteria 1-6;
-then the Lead's R9.243 UI (members list in the book panel header, the moved Use in schedule button).
+Lead UI R9.246: the To-do section of the book (DESIGN.md §6.3, the "Client asked" block arrives with BOOK-03) and
+"My tasks" on Home; browser walk with a PIC, a member and a manager.
 
 ## Executor Prompt
 
@@ -90,10 +75,10 @@ Role: BACKEND EXECUTOR (Codex, cloud). Repository nyo95/studioflowrb, branch fea
 work only there; never commit to or push main. Location: cloud - per AGENTS.md create an ignored .env /
 .env.test.local pointing at a PostgreSQL you start inside this container (studioflow_rebuild,
 studioflow_rebuild_test); never any other database. Read AGENTS.md, docs/agent/EXECUTOR.md, PLAN.md
-(WO-SF-BOOK-01) and docs/apps/studioflow/PROJECT-BOOK-DECISION.md. Implement the whole plan: book-reader policy in
-the single StudioFlow access policy, workflow-record exception, every notes read/write path guarded, book member
-table (additive migration) with audited PIC-only add/remove, member read-only project access, note-image Use in
-schedule moved from Ideas into StudioFlow. Do not delete Ideas. Tests and checks per Verification; changelog
-R9.241. No screen design (Lead R9.243). Commit as R9.241 on feat/project-book, push only feat/project-book, and
-return the Planner/Reviewer prompt with outcome, commit, checks, limitations and dirty files.
+(WO-SF-BOOK-02) and docs/apps/studioflow/PROJECT-BOOK-DECISION.md. Implement the whole plan: new book to-do table
+(additive migration), book-reader guards on every read and write, assignee rule, audited operations, the project
+list read and the cross-project My tasks read, minimal server actions. Do not touch the phase checklist. Tests and
+checks per Verification; changelog R9.245. No screen design (Lead R9.246). Commit as R9.245 on feat/project-book,
+push only feat/project-book, and return the Planner/Reviewer prompt with outcome, commit, checks, limitations and
+dirty files.
 ```

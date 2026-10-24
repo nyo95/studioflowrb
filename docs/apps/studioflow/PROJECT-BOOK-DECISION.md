@@ -22,8 +22,10 @@ own working tools.
    round (reuses the existing `recordClientAnswer` behaviour); when two rounds are out, the composer asks which,
    in one click. Each feedback point can become a to-do; the round shows "n of m handled". Revise / approve is
    offered right after, or later from Home.
-4. **To-dos extend the existing checklist** (assignee, due date, link to the feedback point it came from); Home
-   gains "My tasks" across projects. No separate task model.
+4. **To-dos** have who, when and done, and can link to the feedback point they came from; Home gains "My tasks"
+   across projects. No Todoist-like task system. (Storage, Lead 2026-10-24, R9.244: a to-do is its own small table
+   inside StudioFlow, not a row of the phase checklist, so the checklist stays the approval gate and a to-do can
+   never block a phase. Product behaviour unchanged.)
 5. **Privacy.** The book is readable and writable only by the project's PIC designer and PIC drafter and the people
    a PIC invites to that book. Managers, override holders and the Platform Owner do not read it. **Exception:**
    workflow records (the client's answer and site-visit records written by a phase step) stay visible to everyone
@@ -57,8 +59,8 @@ the merge. Revisions on the branch continue the ledger (R9.236 onward); every Ex
 
 | Slice | Content | Status |
 |---|---|---|
-| WO-SF-BOOK-01 | Privacy (PIC + invited members, workflow-record exception), member invitations, note-image "Use in schedule" moved into StudioFlow | READY in `PLAN.md` |
-| WO-SF-BOOK-02 | To-dos on the checklist: assignee, due date, feedback link; "My tasks" read | planned |
+| WO-SF-BOOK-01 | Privacy (PIC + invited members, workflow-record exception), member invitations, note-image "Use in schedule" moved into StudioFlow | DONE R9.241-R9.243 |
+| WO-SF-BOOK-02 | To-dos (own table): assignee, due date, done; "My tasks" read | READY in `PLAN.md` |
 | WO-SF-BOOK-03 | Feedback composer: points, point → to-do, handled count; round answered from the book | planned |
 | WO-SF-BOOK-04 | Material tries: kind, status, promote to Schedule, discard | planned |
 | WO-SF-BOOK-05 | Discussion anchors and `@person` notifications | planned |
