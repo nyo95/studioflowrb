@@ -12,10 +12,10 @@ Risk: HIGH - it records the client's answer, which moves a round's status (workf
 adds private-book data derived from a workflow record. A wrong guard either leaks private points or lets a member
 change a phase. Escalate (BLOCKED) if answering a round from the book would need a change to an existing phase
 status rule.
-Status: DRAFT - one owner question open (locked decision 3). Do not send the Executor prompt until it is READY.
+Status: READY (owner answered decision 3 on 2026-10-24: yes, both ways)
 Priority: P1
 Owner: Product Owner (`docs/apps/studioflow/PROJECT-BOOK-DECISION.md` decisions 3, 4, 5)
-Last updated: 2026-10-24
+Last updated: 2026-10-24 (READY)
 
 Previous plan: `WO-SF-BOOK-02` PASS (R9.245 Executor, R9.246-R9.247 Lead UI; owner browser check owed).
 
@@ -29,10 +29,10 @@ Previous plan: `WO-SF-BOOK-02` PASS (R9.245 Executor, R9.246-R9.247 Lead UI; own
    If the round is already `ANSWERED` and no outcome was chosen, more points are appended (late feedback). Any other
    round state is refused. The full text is also posted as the one workflow-record card (`origin CLIENT_ANSWER`,
    `workflowRecord true`) as today, so managers keep seeing the client's answer and the record stays complete.
-3. **"Handled" (OWNER QUESTION, recommended default below).** A point is handled when someone ticks it, or when the
+3. **"Handled" (owner, 2026-10-24: yes, both ways).** A point is handled when someone ticks it, or when the
    to-do made from it is done. Reopening that to-do makes the point open again unless it was ticked itself. The round
-   shows "n of m handled" from this rule. Recommended: yes (both ways), because a point can be dealt with in the
-   meeting without becoming a to-do, and a to-do closing should close its point without a second click.
+   shows "n of m handled" from this rule. A point can be dealt with in a meeting without becoming a to-do, and a to-do
+   closing closes its point without a second click.
 4. **Point to to-do:** one to-do per point (`feedback_point_id` unique). Defaults: label = the point text (trimmed to
    the label limit), assignee and due date optional as for any to-do; it keeps `source_card_id` = the card the point
    came from. A second request for the same point is refused (`BOOK_POINT_ALREADY_TODO`) and returns the existing

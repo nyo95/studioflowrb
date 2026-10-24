@@ -1,5 +1,10 @@
 # Changelog
 
+## R9.250 | 2026-10-24 | plan(studioflow): WO-SF-BOOK-03 READY (Lead)
+
+- **Owner decision (2026-10-24):** a feedback point is handled when it is ticked or when the to-do made from it is done. Locked as decision 3 of `WO-SF-BOOK-03`; status DRAFT becomes READY.
+- **Migration/dependencies:** none in this revision. **Checks:** docs only; `git diff --check`.
+
 ## R9.249 | 2026-10-24 | plan(studioflow): design critique, Sub-Lead work orders, WO-SF-BOOK-03 draft (Lead)
 
 - **Critique:** `docs/UIUX-CRITIQUE-2026-10-24.md`, from the real screens (1440/1280/840/390, light and dark, designer PIC, invited member, manager outside the book). Nine fixes inside the contract (A1-A9) and two layout questions for the owner (B1: how loud the To-dos panel is; B2: My tasks beside the project cards or above them).
