@@ -95,6 +95,7 @@ contract: own folder and schema, only public doors, protected core untouched.
 | Lane | Always after bootstrap | Add only when relevant | Do not load automatically |
 |---|---|---|---|
 | Planner/Reviewer | `PLANNER.md`, `REVIEWER.md`, `PLAN.md` when present | targeted `BACKLOG.md` section/contract, current code/tests, allowed legacy evidence | all app internals/contracts |
+| Sub-Lead | `SUB-LEAD.md`, `EXECUTOR.md`, `VERIFICATION.md` | the task's module code/tests, `DESIGN.md`/`UI_ENGINE.md` for UI, a queued or active plan when one exists | all of `BACKLOG.md`/legacy material |
 | Executor | `EXECUTOR.md`, READY `PLAN.md` | named authority, affected code/tests/migrations, nearby consumers needed for safe completion | all of `BACKLOG.md`/legacy material |
 
 ## Priority

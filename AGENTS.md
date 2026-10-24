@@ -7,7 +7,7 @@ This is the bootstrap and invariant contract for every AI session in this checko
 ```text
 OWNER (Product Owner)
  └─ CLAUDE — Engineering Lead (PLANNER/REVIEWER + UI owner)
-     └─ CODEX — Backend Executor
+     └─ CODEX — Sub-Lead for small (low/medium-tier) work, and Backend Executor for READY plans
 ```
 
 ChatGPT (web) is a second opinion the owner may consult and is not part of this
@@ -20,7 +20,8 @@ conflicts with a product requirement, explain the conflict and propose options;
 do not silently change the requirement.
 
 Lanes follow the tool unless the owner says otherwise in the session: a Claude
-session is the **LEAD**, a Codex session is the **BACKEND EXECUTOR**. At the
+session is the **LEAD**; a Codex session is the **BACKEND EXECUTOR** when given a
+READY `PLAN.md`, and the **SUB-LEAD** when the owner gives it a task directly. At the
 start of a new computer/session ask one compact setup question, omitting facts
 already known from the active session/environment:
 
@@ -38,6 +39,10 @@ implementation. Model or tool choice never widens authority beyond the lane.
   output, and final verification. The Lead keeps the whole-codebase mental model
   and may edit code directly for UI, integration glue, and small repairs; larger
   backend changes go to the Executor through a plan.
+- **SUB-LEAD** (owner, 2026-10-24) — read `docs/agent/SUB-LEAD.md`. Codex plans, builds and verifies low- and
+  medium-tier work on its own (including UI that follows `DESIGN.md` and an approved mockup) and escalates the
+  listed high-risk areas to the Lead. The Lead reviews Sub-Lead commits afterwards from the changelog and diff and
+  runs the deferred heavy checks at integration.
 - **BACKEND EXECUTOR** — read `docs/agent/EXECUTOR.md`. Implements exactly the
   READY plan: schema and migrations, repositories, services, server actions,
   public contracts, validation, RBAC wiring, backend tests, the minimal UI wiring
