@@ -1,5 +1,14 @@
 # Changelog
 
+## R9.246 | 2026-10-24 | ui(studioflow): the book's To-dos section and My tasks on Home (Lead)
+
+- **Plan:** `WO-SF-BOOK-02` UI slice, after PASS of R9.245 (Lead review: code, migration, actions and test list read; checks not rerun by the Lead, taken from the Executor report).
+- **Change:** a collapsible To-dos panel above the project's notes or board, shown only to a book reader (a manager outside the book sees nothing): open to-dos in order with a done box, label (click to edit), assignee (PIC or invited member), due date, a Late mark, move up/down, delete with confirmation, an add row, and the done ones folded below. Home gets a My tasks block grouped by project, linked to the project, with a done box. "Late" compares the due date with today in the platform time zone (`currentDateOnly`), never on the server. A stale or out-of-step list shows one plain sentence and reloads.
+- **Fix:** a member's refusal on an inactive project now says "to-dos", not "notes".
+- **Deviation from the plan sketch:** reorder is by Move up/down buttons, not drag; drag can follow if the owner wants it.
+- **Migration/dependencies:** none.
+- **Checks:** typecheck (only stale generated `.next` type files complain), lint and `check:boundaries` pass after `prisma generate`. Not run: full `npm test`, build, and the browser walk (PIC, member, manager), because no rebuild database or location was selected in this session. Owner browser check owed.
+
 ## R9.245 | 2026-10-24 | feat(studioflow): book to-dos with who, when and done, and the cross-project My tasks read (Executor, Claude local)
 
 - **Plan:** `WO-SF-BOOK-02` (`PROJECT-BOOK-DECISION.md` 4), module `studioflow`; branch `feat/project-book`. Backend and minimal action wiring only; the book section and Home are the Lead's R9.246.

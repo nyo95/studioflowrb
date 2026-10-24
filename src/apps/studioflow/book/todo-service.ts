@@ -92,7 +92,7 @@ export function createBookTodoService(db: Db, ports: StudioFlowPorts) {
     const project = await tx.sfProject.findUnique({ where: { id: input.projectId }, select: { id: true, archived_at: true, status: true, pic_designer_id: true, pic_drafter_id: true } });
     if (!project) throw notFound("project");
     assertProjectWritable(project);
-    if (access.isBookMember && project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing its notes.");
+    if (access.isBookMember && project.status !== "ACTIVE") throw conflict("PROJECT_NOT_ACTIVE", "The project must be active before changing its to-dos.");
     return { actorId, project };
   }
 

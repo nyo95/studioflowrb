@@ -15,6 +15,7 @@ import { PhaseAside } from "../../_components/phase-aside";
 import { PhaseCanvas } from "../../_components/phase-canvas";
 import { canSeeProjectWorkSections, pageProjectAccess, pageSession } from "../../_components/session";
 import { STUDIOFLOW_ROUTES } from "@/apps/studioflow/public";
+import { BookTodos } from "./_book-todos/book-todos";
 import { ProjectNotes } from "./_notes-stream/project-notes";
 import { ProjectWorkspace } from "./_workspace-canvas/project-workspace";
 import { ConstructionDrawingWorkspace } from "./construction-drawing-workspace";
@@ -105,6 +106,10 @@ export default async function ProjectOverviewPage({
           Both read the same notes; each column scrolls by itself. */}
       <div className="flex flex-1 gap-4 max-xl:flex-col xl:min-h-0">
         <div className="flex min-h-[28rem] min-w-0 flex-1 flex-col gap-4 xl:min-h-0">
+          {/* To-dos of the book: only a book reader gets this section; a drafter-seat phase has its own workspace. */}
+          <Suspense fallback={null}>
+            <BookTodos projectId={projectId} team={{ designer: project.designer, drafter: project.drafter }} archived={archived} status={project.status} />
+          </Suspense>
           <Suspense fallback={<SectionCard padded><SkeletonBlock className="h-[420px] w-full" /></SectionCard>}>
             {selectedPhase?.seat === "drafter"
               ? <ConstructionDrawingWorkspace projectId={projectId} phaseId={selectedPhase.id} archived={archived} status={project.status} />
