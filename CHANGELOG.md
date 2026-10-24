@@ -1,5 +1,15 @@
 # Changelog
 
+## R9.253 | 2026-10-24 | test(sketchup): develop and test the plugin without restarts (Sub-Lead S-20261024-1, integrated by the Lead)
+
+- **Scope:** tooling only under the SketchUp companion plugin. A one-time development loader runs the checkout source directly, refuses to coexist with the installed `.rbz`, and documents reload, restart, Ruby Console and switch-back steps. No plugin behavior, version, server, schema or public contract changed.
+- **Tests:** a plain-Ruby fake covers the SketchUp model/material/selection/UI surface and records dialogs; a no-network StudioFlow fake records method, path, body and idempotency key and returns the documented envelopes. Schedule-link coverage now exercises project connection, existing-item selection, new-item retry with one key, name refresh, stale and other-project links, and a visible server error. The runner also checks every Ruby file and the explicit reload list.
+- **Artifact:** `BerkahStudio_1.3.0.rbz` is byte-identical before and after: SHA-256 `2D8F98BC3EA38F77A7FF5F6F6E3E712C70353002D997338B7C45780EB9514970`.
+- **Migration/dependencies:** none; no file under plugin `src/` changed.
+- **Checks (rumah):** Docker Ruby 3.2 runner passed 28 syntax checks and 4 test files, 25 scenarios / 103 assertions, 0 failures, 0 errors, 0 skips; low gate passed boundaries, legacy-runtime and both whitespace checks; repository lint passed; `.rbz` rebuild passed with the identical hash above.
+- **Lead check:** read loader duplicate detection/source registration, fake response recording, retry-key assertions and reload coverage; the risk if wrong is loading two plugin copies or tests hiding a reload/network regression. Checks run: 25/25 scenarios and 103/103 assertions, 28/28 syntax checks, 2/2 boundary scans, 2/2 whitespace checks, lint 0 errors, artifact hash 1/1 identical. Native Ruby was unavailable, so Ruby 3.2 ran in Docker. Deferred: live SketchUp loader/reload/switch-back walk by the Lead and owner; full `npm test`, build and e2e are integration checks, not low-tier tooling gates.
+- **Lead review (PASS):** read the loader (duplicate-install guard, source registration), the reload-coverage test and the fakes; ran the Ruby 3.2 Docker runner myself (28 files parsed, 4 test files passed, 0 failures) and rebuilt the `.rbz`: SHA-256 `2D8F98BC...14970`, identical to the recorded hash; no file under plugin `src/` changed. Tier low was right; nothing needed escalating. Still owed: one walk in real SketchUp (install the dev loader, edit a string, Reload Plugin, switch back) by the owner; note the loader relies on the `.rbz` loading before `berkahstudio_dev.rb`, which that walk will confirm.
+
 ## R9.252 | 2026-10-24 | docs(harness): one folder per Sub-Lead task (Lead)
 
 - **Why:** two Sub-Lead sessions and the Lead edited the same folder at once; the folder changed branch under the Lead and uncommitted files mixed. `docs/agent/SUB-LEAD.md` now requires an own git worktree per task, a branch and status check before editing and committing, staging only owned files, and the `node_modules` link with its build limit.
