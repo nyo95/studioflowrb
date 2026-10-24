@@ -1,5 +1,18 @@
 # Changelog
 
+## R9.245 | 2026-10-24 | feat(studioflow): book to-dos with who, when and done, and the cross-project My tasks read (Executor, Claude local)
+
+- **Plan:** `WO-SF-BOOK-02` (`PROJECT-BOOK-DECISION.md` 4), module `studioflow`; branch `feat/project-book`. Backend and minimal action wiring only; the book section and Home are the Lead's R9.246.
+- **Table:** new `studioflow.sf_book_todo` (additive migration `20261024120000_sf_book_todo`; project id cascade, label, assignee and creator plain ids with a creator name snapshot, `due_date` DATE, `done_at`, `source_card_id` nullable with `SetNull` to the workspace card and unused until BOOK-03, `sort_order`, `version`). No change to `sf_checklist_*`, blockers, completion, templates or any screen.
+- **Service (`book/todo-service.ts`, composed as `studioFlow.bookTodos`):** `listProjectTodos` (open in order, then the last 50 done, most recent first), `listMyTasks` (the caller's open to-dos assigned to them plus unassigned ones they created, only from non-archived projects whose book they read, due date then creation, empty date last, at most 200; each row carries project id and name, label, due date, source card id; no "late" computation), `createTodo`, `updateTodo` (label, assignee, due date; version-checked), `setTodoDone` (repeat is a no-op; version optional), `reorderTodos` (every open to-do once), `deleteTodo`.
+- **Guards:** every read and write needs a book reader (PIC or invited member). Writes also need `studioflow.phase.work`, a project that is not archived or completed, and, for a member only, an `ACTIVE` project (a PIC may write while on hold; a to-do has no phase). A non-reader (manager, override holder, Platform Owner, outsider) is refused with `PERMISSION_DENIED` on every write and by-id operation, and a project list read answers `PROJECT_NOT_FOUND`, exactly like an unknown project; `listMyTasks` returns nothing for them. An assignee must be a PIC or a member now (`BOOK_TODO_ASSIGNEE_NOT_READER`); removing a member keeps the assignment but drops the task from that person's My tasks.
+- **Audit:** `studioflow.book-todo.created|updated|done|reopened|reordered|deleted` (entity `book-todo`); an update that changes nothing writes none.
+- **Actions (`studioflow/actions.ts`):** `listBookTodosAction`, `listMyTasksAction`, `createBookTodoAction`, `updateBookTodoAction`, `setBookTodoDoneAction`, `reorderBookTodosAction`, `deleteBookTodoAction`.
+- **Tests:** new `book/todo.integration.test.ts` (6 real-database tests): acceptance 1-5, plus the done-list bound and an untouched phase checklist, phase state and project delete cascade.
+- **Migration/dependencies:** one additive migration, applied only to the disposable `studioflow_rebuild_test` created inside this cloud container; no dependency.
+- **Checks:** `npm run typecheck`, `npm run lint`, `check:boundaries`, `check:legacy-runtime`, `npx prisma validate` pass; full `npm test` 1365/1365 (0 skipped; 1359 before plus 6 new); `npm run build` pass. `prisma migrate diff` shows only the existing `sf_settings.cd_mall_days` default drift (unrelated).
+- **Limitations:** no screens; no "late" flag on the server; `reorderTodos` takes the whole open list (a stale list is refused, not merged); a to-do's assignee name is read live, so a deleted user shows no name. No browser work was needed.
+
 ## R9.244 | 2026-10-24 | plan(studioflow): WO-SF-BOOK-02 to-dos and My tasks (Lead)
 
 - **Plan:** `PLAN.md` is READY `WO-SF-BOOK-02` (Codex R9.245, Lead UI R9.246): book to-dos with assignee, due date and done, every read and write behind the book reader, audited, plus a cross-project "My tasks" read.

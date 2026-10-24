@@ -1,3 +1,4 @@
+import { createBookTodoService } from "./book/todo-service";
 import { createLibraryService } from "./library/service";
 import { createCdListService } from "./cd-list/service";
 import { createMomService } from "./mom/service";
@@ -18,6 +19,7 @@ export function createStudioFlowService(db: Db, ports: StudioFlowPorts) {
     cdList: createCdListService(db, ports),
     phases: createPhaseService(db, ports),
     workspace: createWorkspaceService(db, ports).workspace,
+    bookTodos: createBookTodoService(db, ports),
     tasks: createTaskService(db, ports),
     mom: createMomService(db, ports),
     schedule,

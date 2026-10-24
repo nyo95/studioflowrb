@@ -465,6 +465,80 @@ export async function removeBookMemberAction(input: z.infer<typeof BookMemberInp
   });
 }
 
+// ── The Project book: to-dos and "My tasks" (WO-SF-BOOK-02) ─────────────────
+// Minimal wiring; the book section and Home are the Lead's next revision.
+
+const TodoId = z.strictObject({ projectId: Id, todoId: Id });
+const TodoCreate = z.strictObject({ projectId: Id, label: z.string().max(400), assigneeId: Id.nullish(), dueDate: DateOnly });
+const TodoUpdate = z.strictObject({ projectId: Id, todoId: Id, version: z.number().int().min(1), label: z.string().max(400).optional(), assigneeId: Id.nullish(), dueDate: DateOnly });
+const TodoDone = z.strictObject({ projectId: Id, todoId: Id, done: z.boolean(), version: z.number().int().min(1).optional() });
+const TodoReorder = z.strictObject({ projectId: Id, orderedIds: z.array(Id).max(500) });
+
+export async function listBookTodosAction(projectId: string) {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.bookTodos.listProjectTodos({ grants: ctx.grants, actorId: ctx.userId, projectId: parse(Id, projectId) });
+  });
+}
+
+/** The caller's own open to-dos across the books they read. */
+export async function listMyTasksAction() {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    return studioFlow.bookTodos.listMyTasks({ grants: ctx.grants, actorId: ctx.userId });
+  });
+}
+
+export async function createBookTodoAction(input: z.infer<typeof TodoCreate>): Promise<ActionResult<{ todoId: string; version: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(TodoCreate, input);
+    const result = await studioFlow.bookTodos.createTodo({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+export async function updateBookTodoAction(input: z.infer<typeof TodoUpdate>): Promise<ActionResult<{ todoId: string; version: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(TodoUpdate, input);
+    const result = await studioFlow.bookTodos.updateTodo({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+export async function setBookTodoDoneAction(input: z.infer<typeof TodoDone>): Promise<ActionResult<{ todoId: string; version: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(TodoDone, input);
+    const result = await studioFlow.bookTodos.setTodoDone({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+export async function reorderBookTodosAction(input: z.infer<typeof TodoReorder>): Promise<ActionResult<{ count: number }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(TodoReorder, input);
+    const result = await studioFlow.bookTodos.reorderTodos({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
+export async function deleteBookTodoAction(input: z.infer<typeof TodoId>): Promise<ActionResult<{ todoId: string }>> {
+  return runSafeAction(async () => {
+    const ctx = await context();
+    const data = parse(TodoId, input);
+    const result = await studioFlow.bookTodos.deleteTodo({ ...ctx, ...data });
+    refresh(data.projectId);
+    return result;
+  });
+}
+
 const OptionalShort = (max: number) => z.string().max(max).nullish();
 const NoteUseInput = z.strictObject({
   projectId: Id,

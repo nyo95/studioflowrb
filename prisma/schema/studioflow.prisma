@@ -162,6 +162,7 @@ model SfProject {
   workspace_threads  SfWorkspaceThread[]
   note_tags          SfNoteTag[]
   book_members       SfBookMember[]
+  book_todos         SfBookTodo[]
 
   @@index([status, archived_at])
   @@index([pic_designer_id])
@@ -386,6 +387,7 @@ model SfWorkspaceCard {
   replies   SfWorkspaceCard[]      @relation("SfWorkspaceCardReplies")
   thread    SfWorkspaceThread?     @relation("SfWorkspaceThreadMessages", fields: [thread_id], references: [id], onDelete: Cascade)
   anchored_threads SfWorkspaceThread[] @relation("SfWorkspaceThreadAnchor")
+  book_todos SfBookTodo[]
   note_tag_links SfNoteTagLink[]
   note_item_links SfNoteItemLink[]
 
@@ -942,5 +944,35 @@ model SfBookMember {
   @@unique([project_id, user_id])
   @@index([user_id])
   @@map("sf_book_member")
+  @@schema("studioflow")
+}
+
+/// A to-do in one project's private book (WO-SF-BOOK-02). Deliberately not a checklist item: it never blocks a phase,
+/// approval or completion. Users are plain ids, never relations.
+model SfBookTodo {
+  id              String    @id @default(uuid())
+  project_id      String
+  label           String
+  /// Must be a book reader when assigned; later removal from the book hides it from that person's "My tasks".
+  assignee_id     String?
+  due_date        DateTime? @db.Date
+  done_at         DateTime?
+  /// The workspace card this came from (filled by WO-SF-BOOK-03); the to-do outlives the card.
+  source_card_id  String?
+  created_by_id   String
+  /// Snapshot, so the name survives the person being renamed or removed.
+  created_by_name String
+  created_at      DateTime  @default(now())
+  updated_at      DateTime  @updatedAt
+  sort_order      Int       @default(0)
+  /// Optimistic concurrency: every change increments it; a write naming an older version is refused.
+  version         Int       @default(1)
+
+  project     SfProject        @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  source_card SfWorkspaceCard? @relation(fields: [source_card_id], references: [id], onDelete: SetNull)
+
+  @@index([project_id, done_at, sort_order])
+  @@index([assignee_id, done_at])
+  @@map("sf_book_todo")
   @@schema("studioflow")
 }
