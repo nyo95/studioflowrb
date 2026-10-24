@@ -94,7 +94,7 @@ owns grant mechanics.
 | `studioflow.access` | Open the app |
 | `studioflow.project.read` | Open Home, the project-directory summary and Library; assigned project detail remains assignment-scoped |
 | `studioflow.project.manage` | Studio Manager operations: Clients, create/edit/archive all projects, PIC assignment, and read-only portfolio Timeline |
-| `studioflow.project.override` | Together with `studioflow.project.manage`, Platform Owner recovery and manual Timeline override authority; alone it gives no bypass |
+| `studioflow.project.override` | Act for an absent PIC on any project (send, answer, finish, complete, edit documents) and set Timeline dates. One rule: needs `project.manage` as well (the role editor grants them as a pair); alone it gives no bypass. Held by the Manager profile and the Platform Owner (owner, 2026-10-24) |
 | `studioflow.project.pic-designer` / `.pic-drafter` | Positions: who may be picked for each PIC seat |
 | `studioflow.phase.work` | Round commands (add, send, client answered, outcome, visits, rename, delete unsent), phase notes (post, edit, star, mark client feedback, delete, images), dismiss requirement, undo of the round commands, CD list, files |
 | `studioflow.phase.review` | Skip a phase that is pending or active (bypass, reason required) and undo that skip |

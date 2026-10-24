@@ -1,5 +1,13 @@
 # StudioFlow role profiles
 
+> **Superseded in part by the owner, 2026-10-24 (WO-SF-ROLES-01).** The **Manager** profile below is replaced: Manager is the
+> person who runs the studio's setup and stands in for an absent PIC. It holds the Designer working tools without the Designer
+> PIC position, plus `studioflow.project.manage`, `studioflow.project.override` and `studioflow.settings.manage`
+> (templates and settings). It never receives `studioflow.phase.override` (the destructive reset of a phase's history),
+> `studioflow.ideas.manage` or a PIC position. Designer and Drafter are unchanged. The live table is generated in
+> `ACCESS-MATRIX.md`; the guardrail "override and settings are Platform Owner only" no longer holds for Manager. The grants
+> table below is the 2026-10-19 history.
+
 **Owner decision — 2026-10-19**
 
 StudioFlow uses a small operating matrix. It is policy expressed through the existing permission vocabulary and project PIC facts; application code must never authorize from a role name.

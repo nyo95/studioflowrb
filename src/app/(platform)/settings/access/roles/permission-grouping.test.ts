@@ -74,7 +74,7 @@ describe("task-based role matrix", () => {
     const override = studioflow.resources.flatMap((resource) => resource.permissions).find((permission) => permission.id === "studioflow.project.override")!;
     assert.equal(manage.actionLabel, "Run StudioFlow operations");
     assert.match(manage.description ?? "", /Manager/u);
-    assert.equal(override.actionLabel, "Override project workflow");
+    assert.equal(override.actionLabel, "Act for an absent PIC");
     assert.equal(override.caution, true);
     assert.match(override.description ?? "", /Platform Owner/u);
   });
@@ -104,6 +104,6 @@ describe("task-based role matrix", () => {
       "studioflow.access",
       "studioflow.project.pic-designer",
       "studioflow.project.override",
-    ], registry), ["Designer", "Override project workflow"]);
+    ], registry), ["Designer", "Act for an absent PIC"]);
   });
 });

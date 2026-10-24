@@ -83,7 +83,11 @@ export type ProjectAccess = {
   phases: Array<{ phaseId: string; canTransition: boolean; canEditContent: boolean }>;
 };
 
-/** Assignment bypass belongs to managers explicitly granted project recovery authority. */
+/**
+ * The one override rule: acting for an absent PIC on any project needs `project.manage` and `project.override` together
+ * (the role editor always grants them as a pair; the Manager profile and the Platform Owner hold both). `project.override`
+ * alone gives nothing, so a half-configured role can never widen anyone's reach.
+ */
 export function hasProjectAssignmentOverride(grants: PermissionGrants): boolean {
   return hasPermission(grants, P.projectManage) && hasPermission(grants, P.projectOverride);
 }

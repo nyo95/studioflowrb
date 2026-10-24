@@ -12,10 +12,10 @@ type PermissionPresentation = {
 const PRESENTATION: Readonly<Record<string, PermissionPresentation>> = {
   "studioflow.project.read": { resourceLabel: "Projects", actionLabel: "View projects", description: "Can open projects and their documents." },
   "studioflow.project.manage": { resourceLabel: "Studio operations", actionLabel: "Run StudioFlow operations", description: "Manager access to Clients, all Projects, PIC assignment, and the read-only portfolio Timeline." },
-  "studioflow.project.override": { resourceLabel: "Studio operations", actionLabel: "Override project workflow", description: "Platform Owner recovery and manual Timeline authority across every project.", caution: true },
+  "studioflow.project.override": { resourceLabel: "Studio operations", actionLabel: "Act for an absent PIC", description: "Can send, answer, finish and complete phases and edit documents on any project, and set Timeline dates. For a Manager or the Platform Owner.", caution: true },
   "studioflow.phase.work": { resourceLabel: "Project workflow", actionLabel: "Work on assigned phases", description: "Can edit phase work and send iterations when the project seat permits it." },
   "studioflow.phase.review": { resourceLabel: "Project workflow", actionLabel: "Review and skip phases", description: "Can perform review actions on phases the user may work on." },
-  "studioflow.phase.override": { resourceLabel: "Project workflow", actionLabel: "Reset phase history", description: "Platform Owner recovery action; use only with an audited reason.", caution: true },
+  "studioflow.phase.override": { resourceLabel: "Project workflow", actionLabel: "Reset phase history", description: "Destructive recovery: wipes a phase's iteration history. Platform Owner only; needs an audited reason.", caution: true },
   "studioflow.task.manage": { resourceLabel: "Project workflow", actionLabel: "Manage requirements", description: "Can rename requirements and manage their subtasks." },
   "studioflow.mom.manage": { resourceLabel: "Core documents", actionLabel: "Edit MOM", description: "Can create and edit MOM on projects where the user is a PIC." },
   "studioflow.schedule.manage": { resourceLabel: "Core documents", actionLabel: "Edit Product Schedule", description: "Can create and edit Product Schedule content on assigned projects." },

@@ -61,7 +61,7 @@ the merge. Revisions on the branch continue the ledger (R9.236 onward); every Ex
 |---|---|---|
 | WO-SF-BOOK-01 | Privacy (PIC + invited members, workflow-record exception), member invitations, note-image "Use in schedule" moved into StudioFlow | DONE R9.241-R9.243 |
 | WO-SF-BOOK-02 | To-dos (own table): assignee, due date, done; "My tasks" read | DONE R9.245-R9.247 (owner browser check owed) |
-| WO-SF-BOOK-03 | Feedback composer: points, point → to-do, handled count; round answered from the book | READY in `PLAN.md` (owner 2026-10-24: handled = ticked or its to-do done) |
+| WO-SF-BOOK-03 | Feedback composer: points, point → to-do, handled count; round answered from the book | Backend DONE R9.251 (handled = ticked or its to-do done); Lead UI pending |
 | WO-SF-BOOK-04 | Material tries: kind, status, promote to Schedule, discard | planned |
 | WO-SF-BOOK-05 | Discussion anchors and `@person` notifications | planned |
 | WO-SF-BOOK-06 | Ideas Off (verify every entry point hides; no deletion) and retire the Workspace board | planned |
